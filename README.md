@@ -1,4 +1,4 @@
-* Components
+# Components
 
  - Directory bootstrapping
  - Nextflow submission
@@ -34,7 +34,7 @@ run those scripts to generate the output (both the scientist-viewable
 reports, and the bioinformatician-consumable data objects).
 
 
-* Nextflow submission
+# Nextflow submission
 `make nfcore` should generate an nf-core samplesheet and a shell script
 to run nfcore with the relevant library parameters, and then run that
 script.
@@ -50,7 +50,7 @@ first_pass/results/versionID/*.genes.counts etc
  
 ```
 
-* Differential analysis
+# Differential analysis
 `make desdemona` should generate R scripts, install a `renv`:
 
 ```
@@ -76,6 +76,6 @@ first_pass/results/versionID/{{analysis}}.html
 first_pass/results/versionID/{{genelist}}.xlsx
 ```
 
-* Static Reporting
+# Static Reporting
 
-* Dynamic Reporting
+# Dynamic Reporting
