@@ -31,7 +31,12 @@ sequencing/
 or other build tool should be able to run on this state, and populate the
 directories with the necessary scripts to analyse the data and also
 run those scripts to generate the output (both the scientist-viewable
-reports, and the bioinformatician-consumable data objects).
+reports, and the bioinformatician-consumable data objects). 
+
+The idea would be that we could build with e.g. `make simulate` to
+test a design before data is in; `make preprocess` to just run
+nextflow, `make all` to do everything. We could have a `run=FALSE`
+flag to just build the scripts without executing them.
 
 
 # Nextflow submission
