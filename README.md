@@ -6,7 +6,7 @@
  - Static reporting
  - Interactive reporting
  
- * Directory Bootstrapping
+# Directory Bootstrapping
  
  This could be done with e.g. [CookieCutter](https://github.com/cookiecutter/cookiecutter)
  
