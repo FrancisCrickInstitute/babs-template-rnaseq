@@ -1,6 +1,6 @@
 {
     "directory_name": "new_project",
-    "sample_sheet": "/camp/stp/sequencing/inputs/instruments/data/liv/nikolaos.angelis/RN21103/RN21103_design.csv",
+    "sample_sheet": "/camp/stp/sequencing/inputs/instruments/data/PI/SCI/LIMS/LIMS_design.csv",
     "genomes":{
 	"mouse": {
 	    "fasta": "mouse_fasta_file",
