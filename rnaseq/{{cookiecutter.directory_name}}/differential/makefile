@@ -42,7 +42,7 @@ $(dda): data/%_dds.rda: 01_analyse.r %.spec $(dds) R.bib
 
 
 $(dds) : data/dds%.rda : 00_init.r $(wildcard inst/extdata/rsem/*.genes.results)
-	$(R) -e "source('00_init.r')" --args spec_suffix="$*"
+	$(R) -e "source('00_init.r')" --args spec_suffix="$*" nfcore=../results/nfcore/$* metadata=inst/extdata/metadata_$*.csv
 
 
 R.bib: renv.lock

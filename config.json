@@ -11,13 +11,13 @@
 		"stranded": "reverse",
 		"species": "Mus musculus"
 	    },
-	    "mouse": {
-		"fasta": "mouse_fasta_file",
-		"gtf": "mouse_gtf_file",
-		"rsem_index": "mouse_rsem.idx",
+	    "human": {
+		"fasta": "human_fasta_file",
+		"gtf": "human_gtf_file",
+		"rsem_index": "human_rsem.idx",
 		"ended": "single",
 		"stranded": "reverse",
-		"species": "Mus musculus"
+		"species": "Homo sapiens"
 	    }
 	    
 	},
