@@ -1,0 +1,22 @@
+{
+    "directory_name": "new_project",
+    "sample_sheet": "/camp/stp/sequencing/inputs/instruments/data/liv/nikolaos.angelis/RN21103/RN21103_design.csv",
+    "genomes":{
+	"mouse": {
+	    "fasta": "mouse_fasta_file",
+	    "gtf": "mouse_gtf_file",
+	    "rsem_index": "mouse_rsem.idx",
+	    "ended": "single",
+	    "stranded": "reverse",
+	    "species": "Mus musculus"
+	},
+	"human": {
+	    "fasta": "human_fasta_file",
+	    "gtf": "human_gtf_file",
+	    "rsem_index": "human_rsem.idx",
+	    "ended": "single",
+	    "stranded": "reverse",
+	    "species": "Homo sapiens"
+	}
+    }
+}

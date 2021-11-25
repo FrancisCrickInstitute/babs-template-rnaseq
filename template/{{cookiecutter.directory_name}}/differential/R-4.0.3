@@ -1,0 +1,19 @@
+#!/bin/bash
+
+function R {
+    module load pandoc/2.2.3.2-foss-2016b
+    module load R/4.0.3-foss-2020a
+    command R "$@"
+}
+
+function Rscript {
+    module load pandoc/2.2.3.2-foss-2016b
+    module load R/4.0.3-foss-2020a
+    command Rscript "$@"
+}
+
+# If I've been 'source'd just make the above functions available
+# If I've been executed e.g. ./R-version -e "1+1" or ./R-version then
+# call the R function as well:
+
+[[ "$BASH_SOURCE" == "$0" ]] && R "$@"
