@@ -1,32 +1,43 @@
-nf_cache_dir := /camp/apps/misc/stp/babs/nf-core/singularity/rnaseq/3.0/
+nf_cache_dir := /camp/apps/misc/stp/babs/nf-core/singularity/rnaseq/3.4/
+label_column := sample # which column from the ASF csv to use in nf-core.  Maybe sample_name
 
-{% for genome, details in cookiecutter.genomes.items() %}
+include ../docs/*.config
 
+samplesheets := $(patsubst ../docs/%.config,samplesheet_%.csv,$(wildcard ../docs/*.config))
+alignments := $(patsubst ../docs/%.config,results/nfcore/%,$(wildcard ../docs/*.config))
 
-align_{{genome}}: samplesheet_{{genome}}.csv 
+alignments: $(alignments)
+
+$(alignments) : results/nfcore/% : samplesheet_%.csv
+	mkdir -p results/$*
 	ml purge ;\
-	ml Nextflow/20.12.0-edge ;\
+	ml Nextflow/21.10.3 ;\
 	ml Singularity/3.4.2 ;\
 	ml CAMP_proxy ;\
 	export NXF_SINGULARITY_CACHEDIR="${nf_cache_dir}" ;\
 	nextflow run nf-core/rnaseq \
 	--input $< \
-	--outdir ../results/nf-core/ \
+	--outdir ../results/nf-core/$*/ \
 	--aligner star_rsem \
-	--fasta "{{details.fasta}}" \
-	--gtf "{{details.gtf}}" \
-	--rsem_index "{{details.rsem_index}}" \
+	--genome "$($*.genome)" \
 	-w "${nf_work}" \
 	-profile crick \
 	-resume \
 	-with-tower \
-	-r 3.0
+	-r 3.4
 
-{% if details.ended == "single" %}
-samplesheet_{{genome}}.csv: {{ cookiecutter.sample_sheet}}
-	awk 'BEGIN {FS=","; OFS=","}; $$7=="RNA-Seq" && $$6=="{{details.species}}" {print $$2,$$3,"","{{details.stranded}}"}; NR==1 {print "sample", "fastq_1", "fastq_2", "stranded"}' $<  > $@
-{% else %}
-	awk 'BEGIN {FS=","; OFS=","}; $$7=="RNA-Seq" && $$6=="{{details.species}} && $$3~/_R1_/ " {print $$2,$$3,sub(/_R1_/, "_R2_", $$3),"{{details.stranded}}"}; NR==1 {print "sample", "fastq_1", "fastq_2", "stranded"}' $< > $@
-{% endif %}
 
-{% endfor %}
+
+
+samplesheets: $(samplesheets)
+
+$(samplesheets): samplesheet_%.csv: ../docs/%.config | samples.db
+	if [ "$($*.ended)" == "single" ]; then \
+	sqlite3 -header -csv  samples.db 'SELECT $(label_column) AS sample, file AS fastq_1, NULL AS fastq_2, "$($*.stranded)" AS strandedness FROM fastqs WHERE species="$($*.species)" AND type="$($*.type)";' > $@ ;\
+	sqlite3 samples.db 'UPDATE fastqs SET _babs_config_file="$*" WHERE species="$($*.species)" AND type="$($*.type)";' ;\
+	fi
+
+samples.db: ../docs/asf_samplesheet.csv
+	rm -f $@
+	sqlite3 $@ -csv ".import $< fastqs"
+	sqlite3 $@ "ALTER TABLE fastqs ADD COLUMN _babs_config_file text;"
