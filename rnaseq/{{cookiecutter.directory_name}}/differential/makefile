@@ -11,7 +11,7 @@ des_outdir   := ${nf_outdir}
 
 # Where to look for experimental design information
 des_metadata := inst/extdata/metadata.xlsx
-file_column  := "filename","sample","sample_ID","Sample.limsid"
+
 name_column  := "name","label","sample","filename"
 
 # Produce a self-contained report (false to link images etc)
@@ -44,7 +44,7 @@ $(dda): data/%_dds.rda: 01_analyse.r %.spec $(dds) R.bib
 generate_count_objects: $(dds)
 
 $(dds) : data/dds%.rda : 00_init.r $(wildcard ../results/nfcore/%/rsem/*.genes.results)
-	$(R) -e "source('00_init.r')" --args spec_suffix="$*" nfcore=../results/nfcore/$* metadata=inst/extdata/metadata_$*.csv
+	$(R) -e "source('00_init.r')" --args spec_suffix="$*" nfcore=../results/nfcore/$* metadata=inst/extdata/metadata_$*.csv file_col=_babs_nfcore name_col=sample_label counts=../results/nf-core/$*/star_rsem/ nfcore=../results/nf-core/$*/ org_package=org.Mm.eg.db
 
 
 R.bib: renv.lock
@@ -64,7 +64,7 @@ $(desdemona_files): renv.lock
 	  git status ;\
 	  echo "Please commit changes before re-running 'prepare_scripts'" ; exit 1 ;\
 	fi ;\
-	$(R) -e 'renv::restore(); DESdemonA::get_started(files=commandArgs(trailing=TRUE),nfcore="$(strip ${nf_outdir})",metadata="${des_metadata}",file_col=c($(file_column)),name_col=c($(name_column)),overwrite=TRUE)' --args $(desdemona_files)
+	$(R) -e 'renv::restore(); DESdemonA::get_started(files=commandArgs(trailing=TRUE),nfcore="$(strip ${nf_outdir})",metadata="${des_metadata}",file_col="_babs_nfcore",name_col=c($(name_column)),overwrite=TRUE)' --args $(desdemona_files)
 	git add $(desdemona_files)
 	echo -e 'Initialised by DESdemonA\n\n' `grep -A 4 DESdemonA renv.lock` | git commit -F - || true
 	git rev-parse "v0.0.1" >/dev/null 2>&1 || git tag v0.0.1

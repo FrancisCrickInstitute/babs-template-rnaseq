@@ -17,9 +17,14 @@ library(DESdemonA)
 library(R.utils)
 
 
-args <- R.utils::cmdArgs(args=defaults)
+args <- R.utils::cmdArgs(defaults=defaults)
 
-sample_sheet <- readxl::read_excel(args$metadata, sheet=1)
+
+if (grepl("\\.csv$", args$metadata)) {
+  sample_sheet <- read.csv(args$metadata, header=TRUE, check.names=FALSE)
+} else {
+  sample_sheet <- readxl::read_excel(args$metadata, sheet=1)
+}
 file_col <- args$file_col[args$file_col %in% names(sample_sheet)][1]
 if (is.na(file_col)) {
   stop("Metadata has none of: ", paste(args$file_col, collapse=", "))
@@ -39,6 +44,12 @@ tx_path <-   file.path(
 )
 
 names(tx_path) <- as.character(sample_sheet[[name_col]])
+not_here <- !file.exists(tx_path)
+if (any(not_here)) {
+  warning("Dropping samples", tx_path[not_here])
+  tx_path <- tx_path[!not_here]
+  sample_sheet <- sample_sheet[!not_here,]
+}
 
 txi <- tximport(tx_path, type="rsem")
 txi$length[txi$length==0] <- 1

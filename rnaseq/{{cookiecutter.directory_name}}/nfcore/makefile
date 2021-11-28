@@ -9,7 +9,7 @@ alignments := $(patsubst ../docs/%.config,results/nfcore/%,$(wildcard ../docs/*.
 alignments: $(alignments)
 
 $(alignments) : results/nfcore/% : samplesheet_%.csv
-	mkdir -p results/$*
+	mkdir -p results/nfcore/$*
 	ml purge ;\
 	ml Nextflow/21.10.3 ;\
 	ml Singularity/3.4.2 ;\
