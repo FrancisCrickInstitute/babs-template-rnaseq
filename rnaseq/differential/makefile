@@ -19,14 +19,14 @@ $(V).SILENT:
 alignments := $(patsubst ../nfcore/samplesheet_%.csv,%,$(wildcard ../nfcore/samplesheet_*.csv))
 specfiles := $(patsubst %.spec,%,$(wildcard *.spec))
 
-count_objs := $(patsubst %,data/dds%.rda,$(alignments))
+count_objs := $(patsubst %,data/counts_%.rda,$(alignments))
 result_objs := $(foreach alignment,$(alignments),$(foreach spec,$(specfiles),data/$(spec)_x_$(alignment).dda))
 
 .PHONY: analyses
 analyses: $(result_objs)
 
 .SECONDEXPANSION:
-$(result_objs): data/%.dda: 01_analyse.r $$(word 1,$$(subst _x_, ,%)).spec data/dds$$(word 2,$$(subst _x_, ,%)).rda R.bib
+$(result_objs): data/%.dda: 01_analyse.r $$(word 1,$$(subst _x_, ,%)).spec data/counts_$$(word 2,$$(subst _x_, ,%)).rda R.bib
 	SPEC=$(word 1,$(subst _x_, ,$*)) ;\
 	ALIGN=$(word 2,$(subst _x_, ,$*)) ;\
 	OUTDIR=../results/$${ALIGN}/$(VERSION) ;\
@@ -43,7 +43,7 @@ $(result_objs): data/%.dda: 01_analyse.r $$(word 1,$$(subst _x_, ,%)).spec data/
 .PHONY: generate_count_objects
 generate_count_objects: $(count_objs)
 
-$(count_objs) : data/dds%.rda : 00_init.r $(wildcard ../results/%/nfcore/rsem/*.genes.results)
+$(count_objs) : data/counts_%.rda : 00_init.r $(wildcard ../results/%/nfcore/rsem/*.genes.results)
 	$(R) -e "source('00_init.r')" --args spec_suffix="$*" nfcore="../results/$*/nfcore" metadata="inst/extdata/metadata_$*.csv" file_col="_babs_nfcore" name_col="sample_label" counts=../results/$*/nfcore/star_rsem/ nfcore=../results/$*/nfcore/ org_package=org.Mm.eg.db
 
 
