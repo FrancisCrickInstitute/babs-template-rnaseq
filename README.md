@@ -17,14 +17,11 @@ makefile
 docs/
 docs/proposal.md
 docs/metadata.txt
-docs/config.txt
+docs/genomeID.config
 docs/analysis.spec
-first_pass/
-first_pass/nf_core/
-first_pass/differential/
-first_pass/results/
-first_pass/outputs/
-sequencing/
+nf_core/
+differential/
+results/
 ```
 
 `docs` should be populated during the proposal stage. The `makefile`
@@ -38,6 +35,11 @@ test a design before data is in; `make preprocess` to just run
 nextflow, `make all` to do everything. We could have a `run=FALSE`
 flag to just build the scripts without executing them.
 
+`genomeID.config` can be a set of files that provide variable that
+link info that's retrieved from LIMS to information that enables
+nextflow and other components to run. For instance, where the genome
+files are.
+
 
 # Nextflow submission
 `make nfcore` should generate an nf-core samplesheet and a shell script
@@ -48,10 +50,10 @@ The state after running this part of the build would be:
 
 ```
 sequencing/links_to_the_relevant_files
-first_pass/nf_core/
-first_pass/nf_core/samplesheet.txt
-first_pass/nf_core/run.sh
-first_pass/results/versionID/*.genes.counts etc
+nf_core/
+nf_core/samplesheet.txt
+nf_core/run.sh
+results/genomeID/*.genes.counts etc
  
 ```
 
@@ -59,26 +61,26 @@ first_pass/results/versionID/*.genes.counts etc
 `make desdemona` should generate R scripts, install a `renv`:
 
 ```
-first_pass/differential/
-first_pass/differential/00_init.r
-first_pass/differential/01_analyse.r
-first_pass/differential/R-4.0.3
-first_pass/differential/R.bib
-first_pass/differential/renv
-first_pass/differential/renv.lock
-first_pass/differential/.Rprofile
-first_pass/differential/inst/extdata/analysis.spec
-first_pass/differential/inst/extdata/metadata.txt
+differential/
+differential/00_init.r
+differential/01_analyse.r
+differential/R-4.0.3
+differential/R.bib
+differential/renv
+differential/renv.lock
+differential/.Rprofile
+differential/inst/extdata/analysis.spec
+differential/inst/extdata/metadata.txt
 ```
 
 and then run the scripts to produce the outputs:
 
 ```
-first_pass/differential/data/dds.(rds|rda)
-first_pass/differential/data/{{analysis}}.(rds|rda)
-first_pass/differential/#other stuff to make this a package
-first_pass/results/versionID/{{analysis}}.html
-first_pass/results/versionID/{{genelist}}.xlsx
+differential/data/dds{{genomeID}}.(rds|rda)
+differential/data/{{analysis}}_x_{{genomID}}.(rds|rda)
+differential/#other stuff to make this a package
+results/{{genomID}}/versionID/{{analysis}}.html
+results/{{genomeID}}versionID/{{genelist}}.xlsx
 ```
 
 # Static Reporting
