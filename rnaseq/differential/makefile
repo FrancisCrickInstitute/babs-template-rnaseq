@@ -1,19 +1,11 @@
 R := module load pandoc/2.2.3.2-foss-2016b;  module load R/4.0.3-foss-2020a; R 
 
-# NF-Core settings
-nf_outdir    := ../results
-nf_cache_dir := /camp/apps/misc/stp/babs/nf-core/singularity/rnaseq/3.0/
-label_column := sample # which column from the ASF csv to use in nf-core.  Maybe sample_name
-meta2asf := ASF_lims_id # which metadata column will match ASF's 'sample' column.
-
-# Where the downstream analysis should put it's results
-des_outdir   := ${nf_outdir}
-
+# which column from the ASF csv to use in nf-core.  Maybe sample_name
+label_column := sample
+# which metadata column will match ASF's 'sample' column.
+meta2asf := ASF_lims_id
 # Where to look for experimental design information
-des_metadata := inst/extdata/metadata.xlsx
-
 name_column  := "name","label","sample","filename"
-
 # Produce a self-contained report (false to link images etc)
 contained    := FALSE
 
@@ -23,28 +15,36 @@ TAG = $(shell git describe --tags --dirty=_altered --always --long)# e.g. v1.0.2
 VERSION = $(shell git describe --tags --abbrev=0)#e.g. v1.0.2
 
 $(V).SILENT:
-nfcore_sheets := $(wildcard ../nfcore/samplesheet_*.csv)
-dds := $(patsubst ../nfcore/samplesheet_%.csv,data/dds%.rda,$(nfcore_sheets))
-dda := $(patsubst %.spec,data/%_dds.rda,$(wildcard *.spec))
+
+alignments := $(patsubst ../nfcore/samplesheet_%.csv,%,$(wildcard ../nfcore/samplesheet_*.csv))
+specfiles := $(patsubst %.spec,%,$(wildcard *.spec))
+
+count_objs := $(patsubst %,data/dds%.rda,$(alignments))
+result_objs := $(foreach alignment,$(alignments),$(foreach spec,$(specfiles),data/$(spec)_x_$(alignment).dda))
 
 .PHONY: analyses
-analyses: $(dda)
+analyses: $(result_objs)
 
-$(dda): data/%_dds.rda: 01_analyse.r %.spec $(dds) R.bib
-	mkdir -p "$(des_outdir)/$(VERSION)"
-	$(R) -e "rmarkdown::render('$<', output_file='$*_$(TAG).html', output_options = list(self_contained=$(contained)), params=list(res_dir='$(strip $(des_outdir))/$(VERSION)',spec_file='$*.spec', spec_suffix='$(spec_suffix)'))"
-	rm -f "$(des_outdir)/$(VERSION)/$*_$(TAG).html"
-	mv "$*_$(TAG).html"  "$(des_outdir)/$(VERSION)"
-	rm -rf "$(des_outdir)/$(VERSION)/$*_$(TAG)_files"
-	mv "$*_$(TAG)_files" "$(des_outdir)/$(VERSION)"
-	ln -sfn "$(des_outdir)/$(VERSION)" ../results/latest
+.SECONDEXPANSION:
+$(result_objs): data/%.dda: 01_analyse.r $$(word 1,$$(subst _x_, ,%)).spec data/dds$$(word 2,$$(subst _x_, ,%)).rda R.bib
+	SPEC=$(word 1,$(subst _x_, ,$*)) ;\
+	ALIGN=$(word 2,$(subst _x_, ,$*)) ;\
+	OUTDIR=../results/$${ALIGN}/$(VERSION) ;\
+	mkdir -p "$${OUTDIR}" ;\
+	$(R) -e "rmarkdown::render('$<', output_file='$*_$(TAG).html', output_options = list(self_contained=$(contained)), params=list(res_dir='$${OUTDIR}',spec_file='$${SPEC}.spec', spec_suffix='$${ALIGN}'))" ;\
+	rm -f "$${OUTDIR}/$*_$(TAG).html" ;\
+	mv "$*_$(TAG).html"  "$${OUTDIR}" ;\
+	rm -rf "$${OUTDIR}/$*_$(TAG)_files" ;\
+	mv "$*_$(TAG)_files" "$${OUTDIR}" ;\
+	ln -sfn "$${OUTDIR}" ../results/latest
+
 
 
 .PHONY: generate_count_objects
-generate_count_objects: $(dds)
+generate_count_objects: $(count_objs)
 
-$(dds) : data/dds%.rda : 00_init.r $(wildcard ../results/nfcore/%/rsem/*.genes.results)
-	$(R) -e "source('00_init.r')" --args spec_suffix="$*" nfcore=../results/nfcore/$* metadata=inst/extdata/metadata_$*.csv file_col=_babs_nfcore name_col=sample_label counts=../results/nf-core/$*/star_rsem/ nfcore=../results/nf-core/$*/ org_package=org.Mm.eg.db
+$(count_objs) : data/dds%.rda : 00_init.r $(wildcard ../results/%/nfcore/rsem/*.genes.results)
+	$(R) -e "source('00_init.r')" --args spec_suffix="$*" nfcore="../results/$*/nfcore" metadata="inst/extdata/metadata_$*.csv" file_col="_babs_nfcore" name_col="sample_label" counts=../results/$*/nfcore/star_rsem/ nfcore=../results/$*/nfcore/ org_package=org.Mm.eg.db
 
 
 R.bib: renv.lock
@@ -64,14 +64,14 @@ $(desdemona_files): renv.lock
 	  git status ;\
 	  echo "Please commit changes before re-running 'prepare_scripts'" ; exit 1 ;\
 	fi ;\
-	$(R) -e 'renv::restore(); DESdemonA::get_started(files=commandArgs(trailing=TRUE),nfcore="$(strip ${nf_outdir})",metadata="${des_metadata}",file_col="_babs_nfcore",name_col=c($(name_column)),overwrite=TRUE)' --args $(desdemona_files)
+	$(R) -e 'renv::restore(); DESdemonA::get_started(files=commandArgs(trailing=TRUE),nfcore="",metadata="",file_col="_babs_nfcore",name_col=c($(name_column)),overwrite=TRUE)' --args $(desdemona_files)
 	git add $(desdemona_files)
 	echo -e 'Initialised by DESdemonA\n\n' `grep -A 4 DESdemonA renv.lock` | git commit -F - || true
 	git rev-parse "v0.0.1" >/dev/null 2>&1 || git tag v0.0.1
 
 
 
-samplesheets := $(patsubst ../nfcore/samplesheet_%.csv,inst/extdata/metadata_%.csv,$(nfcore_sheets))
+samplesheets := $(patsubst %,inst/extdata/metadata_%.csv,$(alignments))
 samplesheets: $(samplesheets)
 
 $(samplesheets) : inst/extdata/metadata_%.csv : samples.db

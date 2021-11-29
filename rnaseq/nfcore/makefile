@@ -4,12 +4,12 @@ label_column := sample # which column from the ASF csv to use in nf-core.  Maybe
 include ../docs/*.config
 
 samplesheets := $(patsubst ../docs/%.config,samplesheet_%.csv,$(wildcard ../docs/*.config))
-alignments := $(patsubst ../docs/%.config,results/nfcore/%,$(wildcard ../docs/*.config))
+alignments := $(patsubst ../docs/%.config,results/%/nfcore,$(wildcard ../docs/*.config))
 
 alignments: $(alignments)
 
 $(alignments) : results/nfcore/% : samplesheet_%.csv
-	mkdir -p results/nfcore/$*
+	mkdir -p results/$*/nfcore
 	ml purge ;\
 	ml Nextflow/21.10.3 ;\
 	ml Singularity/3.4.2 ;\
@@ -17,7 +17,7 @@ $(alignments) : results/nfcore/% : samplesheet_%.csv
 	export NXF_SINGULARITY_CACHEDIR="${nf_cache_dir}" ;\
 	nextflow run nf-core/rnaseq \
 	--input $< \
-	--outdir ../results/nf-core/$*/ \
+	--outdir ../results/$*/nfcore/ \
 	--aligner star_rsem \
 	--genome "$($*.genome)" \
 	-w "${nf_work}" \
