@@ -2,13 +2,10 @@ include global.mk
 nf_cache_dir := /camp/apps/misc/stp/babs/nf-core/singularity/rnaseq/3.4/
 include ../docs/*.config
 
-samplesheets := $(patsubst ../docs/%.config,samplesheet_%.csv,$(wildcard ../docs/*.config))
-alignments := $(patsubst ../docs/%.config,%,$(wildcard ../docs/*.config))
-
+alignments:= $(patsubst ../docs/%.config,%,$(wildcard ../docs/*.config))
 alignments: results/nfcore/$(alignments)
 
-
-results/nfcore/$(alignments) : results/nfcore/% : samplesheet_%.csv
+results/$(alignments)/nfcore : results/%/nfcore : samplesheet_%.csv
 	mkdir -p results/$*/nfcore
 	ml purge ;\
 	ml Nextflow/21.10.3 ;\
@@ -27,8 +24,7 @@ results/nfcore/$(alignments) : results/nfcore/% : samplesheet_%.csv
 	-r 3.4
 
 
-
-
+samplesheets:= $(patsubst ../docs/%.config,samplesheet_%.csv,$(wildcard ../docs/*.config))
 samplesheets: $(samplesheets)
 
 $(samplesheets): samplesheet_%.csv: ../docs/%.config samples.db

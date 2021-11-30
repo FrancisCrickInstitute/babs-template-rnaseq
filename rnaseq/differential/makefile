@@ -54,7 +54,7 @@ R.bib: renv.lock
 desdemona_files = 00_init.r 01_analyse.r DESCRIPTION
 prepare_scripts: $(desdemona_files)
 
-$(desdemona_files): renv.lock 
+$(desdemona_files) &: renv.lock 
 	git rev-parse --git-dir > /dev/null 2>&1 || git init
 	for file in $(desdemona_files) ; do \
 	  [ -f $${file} ] && git add "$${file}" || true;\
@@ -70,7 +70,7 @@ $(desdemona_files): renv.lock
 
 
 
-samplesheets := $(patsubst %,inst/extdata/metadata_%.csv,$(alignments))
+samplesheets:= $(patsubst %,inst/extdata/metadata_%.csv,$(alignments))
 samplesheets: $(samplesheets)
 
 $(samplesheets) : inst/extdata/metadata_%.csv : samples.db
