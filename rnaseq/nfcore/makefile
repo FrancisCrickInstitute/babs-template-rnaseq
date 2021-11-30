@@ -1,14 +1,14 @@
+include global.mk
 nf_cache_dir := /camp/apps/misc/stp/babs/nf-core/singularity/rnaseq/3.4/
-label_column := sample # which column from the ASF csv to use in nf-core.  Maybe sample_name
-
 include ../docs/*.config
 
 samplesheets := $(patsubst ../docs/%.config,samplesheet_%.csv,$(wildcard ../docs/*.config))
-alignments := $(patsubst ../docs/%.config,results/%/nfcore,$(wildcard ../docs/*.config))
+alignments := $(patsubst ../docs/%.config,%,$(wildcard ../docs/*.config))
 
-alignments: $(alignments)
+alignments: results/nfcore/$(alignments)
 
-$(alignments) : results/nfcore/% : samplesheet_%.csv
+
+results/nfcore/$(alignments) : results/nfcore/% : samplesheet_%.csv
 	mkdir -p results/$*/nfcore
 	ml purge ;\
 	ml Nextflow/21.10.3 ;\
@@ -31,7 +31,7 @@ $(alignments) : results/nfcore/% : samplesheet_%.csv
 
 samplesheets: $(samplesheets)
 
-$(samplesheets): samplesheet_%.csv: ../docs/%.config | samples.db
+$(samplesheets): samplesheet_%.csv: ../docs/%.config samples.db
 	if [ "$($*.ended)" == "single" ]; then \
 	sqlite3 -header -csv  samples.db 'SELECT $(label_column) AS sample, file AS fastq_1, NULL AS fastq_2, "$($*.stranded)" AS strandedness FROM fastqs WHERE species="$($*.species)" AND type="$($*.type)";' > $@ ;\
 	sqlite3 samples.db 'UPDATE fastqs SET _babs_config_file="$*" WHERE species="$($*.species)" AND type="$($*.type)";' ;\
@@ -41,3 +41,4 @@ samples.db: ../docs/asf_samplesheet.csv
 	rm -f $@
 	sqlite3 $@ -csv ".import $< fastqs"
 	sqlite3 $@ "ALTER TABLE fastqs ADD COLUMN _babs_config_file text;"
+
