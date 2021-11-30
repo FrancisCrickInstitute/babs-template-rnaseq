@@ -1,11 +1,11 @@
-include global.mk
+include ../config/global.mk
 nf_cache_dir := /camp/apps/misc/stp/babs/nf-core/singularity/rnaseq/3.4/
-include ../docs/*.config
+include ../config/*.config
 
-alignments:= $(patsubst ../docs/%.config,%,$(wildcard ../docs/*.config))
+alignments:= $(patsubst ../config/%.config,%,$(wildcard ../config/*.config))
 alignments: results/nfcore/$(alignments)
 
-results/$(alignments)/nfcore : results/%/nfcore : samplesheet_%.csv
+../results/$(alignments)/nfcore : ../results/%/nfcore : samplesheet_%.csv
 	mkdir -p results/$*/nfcore
 	ml purge ;\
 	ml Nextflow/21.10.3 ;\
@@ -24,10 +24,10 @@ results/$(alignments)/nfcore : results/%/nfcore : samplesheet_%.csv
 	-r 3.4
 
 
-samplesheets:= $(patsubst ../docs/%.config,samplesheet_%.csv,$(wildcard ../docs/*.config))
+samplesheets:= $(patsubst ../config/%.config,samplesheet_%.csv,$(wildcard ../config/*.config))
 samplesheets: $(samplesheets)
 
-$(samplesheets): samplesheet_%.csv: ../docs/%.config samples.db
+$(samplesheets): samplesheet_%.csv: ../config/%.config samples.db
 	if [ "$($*.ended)" == "single" ]; then \
 	sqlite3 -header -csv  samples.db 'SELECT $(label_column) AS sample, file AS fastq_1, NULL AS fastq_2, "$($*.stranded)" AS strandedness FROM fastqs WHERE species="$($*.species)" AND type="$($*.type)";' > $@ ;\
 	sqlite3 samples.db 'UPDATE fastqs SET _babs_config_file="$*" WHERE species="$($*.species)" AND type="$($*.type)";' ;\
