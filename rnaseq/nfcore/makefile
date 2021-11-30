@@ -6,7 +6,8 @@ alignments:= $(patsubst ../config/%.config,%,$(wildcard ../config/*.config))
 alignments: results/nfcore/$(alignments)
 
 ../results/$(alignments)/nfcore : ../results/%/nfcore : samplesheet_%.csv
-	mkdir -p results/$*/nfcore
+	mkdir -p ../results/$*/nfcore
+	cp ../config/$*.config .
 	ml purge ;\
 	ml Nextflow/21.10.3 ;\
 	ml Singularity/3.4.2 ;\
@@ -35,6 +36,7 @@ $(samplesheets): samplesheet_%.csv: ../config/%.config samples.db
 
 samples.db: ../docs/asf_samplesheet.csv
 	rm -f $@
+	rm -f *.config
 	sqlite3 $@ -csv ".import $< fastqs"
 	sqlite3 $@ "ALTER TABLE fastqs ADD COLUMN _babs_config_file text;"
 

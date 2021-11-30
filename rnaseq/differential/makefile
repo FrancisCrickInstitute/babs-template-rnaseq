@@ -1,4 +1,5 @@
 include ../config/global.mk
+include ../nfcore/*.config
 R := module load pandoc/2.2.3.2-foss-2016b;  module load R/4.0.3-foss-2020a; R 
 
 # which metadata column will match ASF's 'sample' column.
@@ -43,7 +44,7 @@ $(result_objs): data/%.dda: 01_analyse.r $$(word 1,$$(subst _x_, ,%)).spec data/
 generate_count_objects: $(count_objs)
 
 $(count_objs) : data/counts_%.rda : 00_init.r $(wildcard ../results/%/nfcore/rsem/*.genes.results)
-	$(R) -e "source('00_init.r')" --args spec_suffix="$*" nfcore="../results/$*/nfcore" metadata="inst/extdata/metadata_$*.csv" file_col="_babs_nfcore" name_col="sample_label" counts=../results/$*/nfcore/star_rsem/ nfcore=../results/$*/nfcore/ org_package=org.Mm.eg.db
+	$(R) -e "source('00_init.r')" --args spec_suffix="$*" nfcore="../results/$*/nfcore" metadata="inst/extdata/metadata_$*.csv" file_col="_babs_nfcore" name_col="sample_label" counts=../results/$*/nfcore/star_rsem/ nfcore=../results/$*/nfcore/ org_package=$($(%*).org.db)
 
 
 R.bib: renv.lock
