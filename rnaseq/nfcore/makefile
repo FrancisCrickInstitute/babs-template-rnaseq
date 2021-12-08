@@ -34,7 +34,7 @@ $(samplesheets): samplesheet_%.csv: ../config/%.config samples.db
 	sqlite3 samples.db 'UPDATE fastqs SET _babs_config_file="$*" WHERE species="$($*.species)" AND type="$($*.type)";' ;\
 	fi
 
-samples.db: ../docs/asf_samplesheet.csv
+samples.db: $(global_docs_dir)/asf_samplesheet.csv
 	rm -f $@
 	rm -f *.config
 	sqlite3 $@ -csv ".import $< fastqs"

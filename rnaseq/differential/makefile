@@ -1,5 +1,5 @@
 include ../config/global.mk
-include ../nfcore/*.config
+-include ../nfcore/*.config
 R := module load pandoc/2.2.3.2-foss-2016b;  module load R/4.0.3-foss-2020a; R 
 
 # which metadata column will match ASF's 'sample' column.
@@ -17,7 +17,8 @@ VERSION = $(shell git describe --tags --abbrev=0)#e.g. v1.0.2
 $(V).SILENT:
 
 alignments := $(patsubst ../nfcore/samplesheet_%.csv,%,$(wildcard ../nfcore/samplesheet_*.csv))
-specfiles := $(patsubst %.spec,%,$(wildcard *.spec))
+docs_specfiles := $(patsubst $(global_docs_dir)/%.spec,%,$(wildcard $(global_docs_dir)/*.spec))
+specfiles := $(patsubst %.spec,%,$(wildcard *.spec)) $(docs_specfiles)
 
 count_objs := $(patsubst %,data/counts_%.rda,$(alignments))
 result_objs := $(foreach alignment,$(alignments),$(foreach spec,$(specfiles),data/$(spec)_x_$(alignment).dda))
@@ -77,9 +78,11 @@ samplesheets: $(samplesheets)
 $(samplesheets) : inst/extdata/metadata_%.csv : samples.db
 	sqlite3 -header -csv  samples.db 'SELECT asf.$(label_column) AS _babs_nfcore, metadata.* FROM metadata LEFT JOIN (SELECT * FROM fastqs GROUP BY sample) AS asf on metadata.$(meta2asf)=asf.sample WHERE asf._babs_config_file="$*";' > $@
 
-samples.db: ../nfcore/samples.db ../docs/metadata.csv
+samples.db: ../nfcore/samples.db $(global_docs_dir)/metadata.csv
 	cp $< $@
 	sqlite3 $@ -csv "DROP TABLE IF EXISTS metadata;"
 	sqlite3 $@ -csv ".import $(word 2, $^) metadata"
 
 
+$(docs_specfiles).spec: %.spec: $(global_docs_dir)/%.spec
+	cp $< $@
