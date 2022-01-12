@@ -1,9 +1,11 @@
 include ../config/global.mk
 include local.mk
-include ../config/*.config
+-include ../config/*.config
 
+#alignments:= $(patsubst samplesheet_%.csv,%,$(wildcard samplesheet_*.csv))
 alignments:= $(patsubst ../ingress/samplesheet_%.csv,%,$(wildcard ../ingress/samplesheet_*.csv))
 alignments: results/$(alignments)
+
 
 results/$(alignments) : results/% : ../ingress/samplesheet_%.csv
 	mkdir -p $@
@@ -22,3 +24,13 @@ results/$(alignments) : results/% : ../ingress/samplesheet_%.csv
 	-resume \
 	-with-tower \
 	-r 3.4
+
+
+bootstrap: 
+	make -n -s > bootstrap.sh
+
+samplesheets:= $(patsubst ../ingress/samplesheet_%.csv,%.csv,$(wildcard ../ingress/samplesheet_*.csv))
+samplesheets: $(samplesheets)
+
+$(samplesheets): samplesheet_%.csv: ../ingress/samplesheet_%.csv
+	cp $< $@
