@@ -2,6 +2,11 @@ include ../config/global.mk
 include local.mk
 -include ../config/*.config
 
+.PHONY: all bootstrap
+
+all: alignments
+
+.PHONY: alignments
 #alignments:= $(patsubst samplesheet_%.csv,%,$(wildcard samplesheet_*.csv))
 alignments:= $(patsubst ../ingress/samplesheet_%.csv,%,$(wildcard ../ingress/samplesheet_*.csv))
 alignments: results/$(alignments)
@@ -25,10 +30,14 @@ results/$(alignments) : results/% : ../ingress/samplesheet_%.csv
 	-with-tower \
 	-r 3.4
 
+################################################################
+#### Bootrap all relevant data from outside
+################################################################
 
 bootstrap: 
 	make -n -s > bootstrap.sh
 
+.PHONY: samplesheets
 samplesheets:= $(patsubst ../ingress/samplesheet_%.csv,%.csv,$(wildcard ../ingress/samplesheet_*.csv))
 samplesheets: $(samplesheets)
 

@@ -1,6 +1,11 @@
 include ../config/global.mk
 -include ../ingress/*.config
 
+.PHONY: all bootstrap
+
+all: analyses
+
+
 $(V).SILENT:
 
 alignments := $(patsubst ../nfcore/results/%,%,$(wildcard ../nfcore/results/*))
@@ -8,12 +13,6 @@ specfiles := $(patsubst %.spec,%,$(wildcard *.spec))
 count_objs := $(patsubst %,data/dds_%.rda,$(alignments))
 result_objs := $(foreach alignment,$(alignments),$(foreach spec,$(specfiles),data/$(spec)_x_$(alignment).dda))
 
-.PHONY: debug
-debug:
-	echo $(count_objs)
-	echo $(alignments)
-	echo $(result_objs)
-	echo $(specfiles)
 
 .PHONY: analyses
 analyses: $(result_objs)
