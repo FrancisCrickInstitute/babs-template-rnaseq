@@ -1,4 +1,5 @@
 include ../config/global.mk
+include local.mk
 -include ../ingress/*.config
 
 .PHONY: all bootstrap
@@ -8,7 +9,7 @@ all: analyses
 
 $(V).SILENT:
 
-alignments := $(patsubst ../nfcore/results/%,%,$(wildcard ../nfcore/results/*))
+alignments := $(patsubst inst/extdata/genes.results/%,%,$(wildcard inst/extdata/genes.results/*))
 specfiles := $(patsubst %.spec,%,$(wildcard *.spec))
 count_objs := $(patsubst %,data/dds_%.rda,$(alignments))
 result_objs := $(foreach alignment,$(alignments),$(foreach spec,$(specfiles),data/$(spec)_x_$(alignment).dda))
@@ -21,14 +22,14 @@ analyses: $(result_objs)
 $(result_objs): data/%.dda: 01_analyse.r $$(word 1,$$(subst _x_, ,%)).spec data/dds_$$(word 2,$$(subst _x_, ,%)).rda R.bib
 	SPEC=$(word 1,$(subst _x_, ,$*)) ;\
 	ALIGN=$(word 2,$(subst _x_, ,$*)) ;\
-	OUTDIR=results/$${ALIGN}/$(VERSION) ;\
+	OUTDIR=results/$(VERSION)/$${ALIGN} ;\
 	mkdir -p "$${OUTDIR}" ;\
-	$(R) -e "rmarkdown::render('$<', output_file='$*_$(TAG).html', output_options = list(self_contained=$(contained)), params=list(res_dir='$${OUTDIR}',spec_file='$${SPEC}.spec', spec_suffix='_$${ALIGN}'))" ;\
+	$(R) -e "rmarkdown::render('$<', output_file='$*_$(TAG).html', output_options = list(self_contained=$(contained)), params=list(res_dir='$${OUTDIR}',spec_file='$${SPEC}.spec', spec_suffix='$${ALIGN}'))" ;\
 	rm -f "$${OUTDIR}/$*_$(TAG).html" ;\
 	mv "$*_$(TAG).html"  "$${OUTDIR}" ;\
 	rm -rf "$${OUTDIR}/$*_$(TAG)_files" ;\
 	mv "$*_$(TAG)_files" "$${OUTDIR}" ;\
-	ln -sfn "$${OUTDIR}" results/latest
+	ln -sfn "results/$${VERSION}" results/latest
 
 
 
@@ -51,8 +52,8 @@ R.bib: renv.lock
 
 
 
-bootstrap: docs_specfiles samplesheets prepare_scripts
-	make -n -s > bootstrap.sh
+bootstrap: genes_results docs_specfiles samplesheets prepare_scripts
+	make -n -s all > bootstrap.sh
 
 docs_specfiles := $(patsubst ../docs/%,%,$(wildcard ../docs/*.spec))
 docs_specfiles: $(docs_specfiles)
@@ -90,4 +91,16 @@ $(desdemona_files) &: renv.lock
 	echo -e 'Initialised by DESdemonA\n\n' `grep -A 4 DESdemonA renv.lock` | git commit -F - || true
 	git rev-parse "v0.0.1" >/dev/null 2>&1 || git tag v0.0.1
 
+
+genes_results := $(patsubst ../nfcore/results/%,inst/extdata/genes.results/%,$(wildcard ../nfcore/results/*))
+genes_results : $(genes_results)
+$(genes_results): inst/extdata/genes.results/%: ../nfcore/results/%
+	if [ -z "${$*.group-as}" ] ; then \
+	  mkdir -p inst/extdata/genes.results/$* ;\
+	  cd inst/extdata/genes.results/$* ;\
+	else \
+	  mkdir -p inst/extdata/genes.results/${$*.group-as} ;\
+	  cd  inst/extdata/genes.results/${$*.group-as} ;\
+	fi ;\
+	ln -sf ../../../../../nfcore/results/$*/star_rsem/*.genes.results . ;\
 
