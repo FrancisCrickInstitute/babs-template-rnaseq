@@ -2,9 +2,9 @@ include ../config/global.mk
 include local.mk
 -include ../ingress/*.config
 
-.PHONY: all bootstrap
+.PHONY: build run
 
-all: analyses
+run: analyses
 
 
 $(V).SILENT:
@@ -20,11 +20,11 @@ analyses: $(result_objs)
 
 .SECONDEXPANSION:
 $(result_objs): data/%.dda: 01_analyse.r $$(word 1,$$(subst _x_, ,%)).spec data/dds_$$(word 2,$$(subst _x_, ,%)).rda R.bib
-	SPEC=$(word 1,$(subst _x_, ,$*)) ;\
-	ALIGN=$(word 2,$(subst _x_, ,$*)) ;\
+	SPEC=$(word 2,$^) ;\
+	ALIGN=$(patsubst data/dds_%.rda,%,$(word 3,$^)) ;\
 	OUTDIR=results/$(VERSION)/$${ALIGN} ;\
 	mkdir -p "$${OUTDIR}" ;\
-	$(R) -e "rmarkdown::render('$<', output_file='$*_$(TAG).html', output_options = list(self_contained=$(contained)), params=list(res_dir='$${OUTDIR}',spec_file='$${SPEC}.spec', spec_suffix='$${ALIGN}'))" ;\
+	$(R) -e "rmarkdown::render('$<', output_file='$*_$(TAG).html', output_options = list(self_contained=$(contained)), params=list(res_dir='$${OUTDIR}',spec_file='$${SPEC}', spec_suffix='$${ALIGN}'))" ;\
 	rm -f "$${OUTDIR}/$*_$(TAG).html" ;\
 	mv "$*_$(TAG).html"  "$${OUTDIR}" ;\
 	rm -rf "$${OUTDIR}/$*_$(TAG)_files" ;\
@@ -50,10 +50,8 @@ R.bib: renv.lock
 #### Bootrap all relevant data from outside
 ################################################################
 
-
-
-bootstrap: genes_results docs_specfiles samplesheets prepare_scripts
-	make -n -s all > bootstrap.sh
+build: genes_results docs_specfiles samplesheets prepare_scripts
+	make -n -s all > run.sh
 
 docs_specfiles := $(patsubst ../docs/%,%,$(wildcard ../docs/*.spec))
 docs_specfiles: $(docs_specfiles)
@@ -102,5 +100,5 @@ $(genes_results): inst/extdata/genes.results/%: ../nfcore/results/%
 	  mkdir -p inst/extdata/genes.results/${$*.group-as} ;\
 	  cd  inst/extdata/genes.results/${$*.group-as} ;\
 	fi ;\
-	ln -sf ../../../../../nfcore/results/$*/star_rsem/*.genes.results . ;\
+	ln -f ../../../../../nfcore/results/$*/star_rsem/*.genes.results . ;\
 

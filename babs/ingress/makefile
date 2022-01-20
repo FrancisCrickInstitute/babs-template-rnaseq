@@ -1,9 +1,9 @@
 include ../config/global.mk
 -include *.config
 
-.PHONY: all bootstrap
+.PHONY: run build copy publish clean
 
-all: samplesheets
+run: samplesheets
 
 .PHONY: samplesheets
 samplesheets:= $(patsubst %.config,samplesheet_%.csv,$(wildcard *.config))
@@ -19,8 +19,8 @@ $(samplesheets): samplesheet_%.csv: %.config samples.db
 #### Bootrap all relevant data from outside
 ################################################################
 
-bootstrap: configs samples.db
-	make -n -s > bootstrap.sh
+build: configs samples.db
+	make -n -s run > run.sh
 
 samples.db: ../docs/asf_samplesheet.csv
 	rm -f $@
@@ -28,9 +28,17 @@ samples.db: ../docs/asf_samplesheet.csv
 	sqlite3 $@ "ALTER TABLE fastqs ADD COLUMN _babs_config_file text;"
 
 
+.PHONY: configs 
 configs:= $(patsubst ../docs/%.config,%.config,$(wildcard ../docs/*.config))
 configs: $(configs)
 
 $(configs): %.config: ../docs/%.config
 	cp $< $@
 	sed -i 's/^/$*./' $@
+
+copy:
+
+publish:
+
+clean:
+	rm -f run.sh samples.db *.config 

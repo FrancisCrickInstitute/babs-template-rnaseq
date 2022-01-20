@@ -1,18 +1,17 @@
 include ../config/global.mk
 include local.mk
--include ../config/*.config
+-include ../ingress/*.config
 
-.PHONY: all bootstrap
+.PHONY: run build copy publish clean
 
-all: alignments
+run: alignments
 
 .PHONY: alignments
-#alignments:= $(patsubst samplesheet_%.csv,%,$(wildcard samplesheet_*.csv))
-alignments:= $(patsubst ../ingress/samplesheet_%.csv,%,$(wildcard ../ingress/samplesheet_*.csv))
+alignments:= $(patsubst samplesheet_%.csv,%,$(wildcard samplesheet_*.csv))
 alignments: results/$(alignments)
 
 
-results/$(alignments) : results/% : ../ingress/samplesheet_%.csv
+results/$(alignments) : results/% : samplesheet_%.csv
 	mkdir -p $@
 	ml purge ;\
 	ml Nextflow/21.10.3 ;\
@@ -34,12 +33,11 @@ results/$(alignments) : results/% : ../ingress/samplesheet_%.csv
 #### Bootrap all relevant data from outside
 ################################################################
 
-bootstrap: 
-	make -n -s > bootstrap.sh
+build: samplesheets
+	make -n -s run > run.sh
 
 .PHONY: samplesheets
-samplesheets:= $(patsubst ../ingress/samplesheet_%.csv,%.csv,$(wildcard ../ingress/samplesheet_*.csv))
+samplesheets = $(patsubst ../ingress/samplesheet_%.csv,samplesheet_%.csv,$(wildcard ../ingress/samplesheet_*.csv))
 samplesheets: $(samplesheets)
-
 $(samplesheets): samplesheet_%.csv: ../ingress/samplesheet_%.csv
 	cp $< $@
