@@ -1,7 +1,7 @@
 R := module load pandoc/2.2.3.2-foss-2016b;  module load R/4.0.3-foss-2020a; R 
 
 # which metadata column will match ASF's 'sample' column.
-meta2asf := ASF_lims_id
+	meta2asf := ID
 # Where to look for experimental design information
 name_column  := "name","label","sample","filename"
 # Produce a self-contained report (false to link images etc)

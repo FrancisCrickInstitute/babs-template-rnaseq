@@ -37,7 +37,7 @@ $(result_objs): data/%.dda: 01_analyse.r $$(word 1,$$(subst _x_, ,%)).spec data/
 generate_count_objects: $(count_objs)
 
 $(count_objs) : data/dds_%.rda : 00_init.r $(wildcard ../nfcore/results/%/star_rsem/*.genes.results)
-	$(R) -e "source('00_init.r')" --args spec_suffix="$*" nfcore="../nfcore/results/$*" metadata="inst/extdata/metadata_$*.csv" file_col="_babs_nfcore" name_col="sample_label" counts="../nfcore/results/$*/star_rsem/" org_package="$($*.org.db)"
+	$(R) -e "source('00_init.r')" --args spec_suffix="$*" nfcore="../nfcore/results/$*" metadata="inst/extdata/experimental_table$*.csv" file_col="_babs_nfcore" name_col="sample_label" counts="../nfcore/results/$*/star_rsem/" org_package="$($*.org.db)"
 
 
 R.bib: renv.lock
@@ -59,10 +59,10 @@ docs_specfiles: $(docs_specfiles)
 $(docs_specfiles): %: ../docs/%
 	cp $< $@
 
-samplesheets:= $(patsubst %,inst/extdata/metadata_%.csv,$(alignments))
+samplesheets:= $(patsubst %,inst/extdata/experimental_table%.csv,$(alignments))
 samplesheets: $(samplesheets)
 
-$(samplesheets) : inst/extdata/metadata_%.csv : samples.db
+$(samplesheets) : inst/extdata/experimental_table%.csv : samples.db
 	sqlite3 -header -csv  samples.db 'SELECT asf.$(label_column) AS _babs_nfcore, metadata.* FROM metadata LEFT JOIN (SELECT * FROM fastqs GROUP BY sample) AS asf on metadata.$(meta2asf)=asf.sample WHERE asf._babs_config_file="$*";' > $@
 
 samples.db: ../ingress/samples.db ../docs/metadata.csv
