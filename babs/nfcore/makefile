@@ -22,7 +22,8 @@ results/$(alignments) : results/% : samplesheet_%.csv
 	--input $< \
 	--outdir $@/ \
 	--aligner star_rsem \
-	--genome "$($*.genome)" \
+	--fasta "$($*.genome_fasta)" \
+	--gtf "$($*.gtf)" \
 	-w "${nf_work}" \
 	-profile crick \
 	-resume \
