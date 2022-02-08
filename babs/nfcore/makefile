@@ -35,6 +35,8 @@ results/$(alignments) : results/% : samplesheet_%.csv
 ################################################################
 
 build: samplesheets
+	makedir -p ${nf_work}
+	ln -sf ${nf_work} nf_work
 	make -n -s run > run.sh
 
 .PHONY: samplesheets
@@ -42,3 +44,5 @@ samplesheets = $(patsubst ../ingress/samplesheet_%.csv,samplesheet_%.csv,$(wildc
 samplesheets: $(samplesheets)
 $(samplesheets): samplesheet_%.csv: ../ingress/samplesheet_%.csv
 	cp $< $@
+
+print-%: ; @echo $*=$($*)
