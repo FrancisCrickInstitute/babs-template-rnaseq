@@ -78,9 +78,9 @@
     },
     "DESdemonA": {
       "Package": "DESdemonA",
-      "Version": "0.20.1",
+      "Version": "0.20.4",
       "Source": "Local",
-      "Hash": "3a115026408a841e6dfef0827258a314"
+      "Hash": "3482c372da3f14978a4dd5b788d28b38"
     },
     "DESeq2": {
       "Package": "DESeq2",
