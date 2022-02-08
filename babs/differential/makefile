@@ -63,12 +63,12 @@ samplesheets:= $(patsubst %,inst/extdata/experimental_table%.csv,$(alignments))
 samplesheets: $(samplesheets)
 
 $(samplesheets) : inst/extdata/experimental_table%.csv : samples.db
-	sqlite3 -header -csv  samples.db 'SELECT asf.$(label_column) AS _babs_nfcore, metadata.* FROM metadata LEFT JOIN (SELECT * FROM fastqs GROUP BY sample) AS asf on metadata.$(meta2asf)=asf.sample WHERE asf._babs_config_file="$*";' > $@
+	$(SQLITE) -header -csv  samples.db 'SELECT asf.$(label_column) AS _babs_nfcore, metadata.* FROM metadata LEFT JOIN (SELECT * FROM fastqs GROUP BY sample) AS asf on metadata.$(meta2asf)=asf.sample WHERE asf._babs_config_file="$*";' > $@
 
 samples.db: ../ingress/samples.db ../docs/metadata.csv
 	cp $< $@
-	sqlite3 $@ -csv "DROP TABLE IF EXISTS metadata;"
-	sqlite3 $@ -csv ".import $(word 2, $^) metadata"
+	$(SQLITE) $@ -csv "DROP TABLE IF EXISTS metadata;"
+	$(SQLITE) $@ -csv ".import $(word 2, $^) metadata"
 
 
 .PHONY: prepare_scripts
