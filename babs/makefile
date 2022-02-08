@@ -1,14 +1,21 @@
 all: differential
 
 ingress: 
-	cd $< && $(MAKE) bootstrap && $(MAKE) all
+	cd $< && $(MAKE) build && $(MAKE) run
 
 nfcore: 
-	cd $< && $(MAKE) bootstrap && $(MAKE) all
+	cd $< && $(MAKE) build && $(MAKE) run
 
 differential: nfcore
-	cd $< && $(MAKE) bootstrap && $(MAKE)
+	cd $< && $(MAKE) build && $(MAKE) run
 
+biologic: differential
+	cd $< && $(MAKE) build && $(MAKE) run
+
+
+
+build-%:
+	cd % && $(MAKE) build
 
 
 
