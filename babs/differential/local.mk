@@ -1,4 +1,4 @@
-R := module load pandoc/2.2.3.2-foss-2016b;  module load R/4.0.3-foss-2020a; R 
+R := module load pandoc/2.2.3.2-foss-2016b;  module load R/4.0.3-foss-2020a; command R 
 
 # which metadata column will match ASF's 'sample' column.
 	meta2asf := ID

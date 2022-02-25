@@ -4,7 +4,7 @@ include local.mk
 
 .PHONY: build run
 
-run: analyses
+run: analyses | run.sh
 
 
 $(V).SILENT:
@@ -41,27 +41,27 @@ $(count_objs) : data/dds_%.rda : 00_init.r $(wildcard ../nfcore/results/%/star_r
 
 
 R.bib: renv.lock
-	 $(R) -e 'renv::restore(); knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")'
-
+	 $(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")'
 
 
 
 ################################################################
 #### Bootrap all relevant data from outside
 ################################################################
+run.sh: build
 
-build: genes_results docs_specfiles samplesheets prepare_scripts
+build: docs_specfiles samplesheets genes_results scripts
 	make -n -s run > run.sh
 
 docs_specfiles := $(patsubst ../docs/%,%,$(wildcard ../docs/*.spec))
 docs_specfiles: $(docs_specfiles)
-
 $(docs_specfiles): %: ../docs/%
 	cp $< $@
 
+
+
 samplesheets:= $(patsubst %,inst/extdata/experimental_table%.csv,$(alignments))
 samplesheets: $(samplesheets)
-
 $(samplesheets) : inst/extdata/experimental_table%.csv : samples.db
 	$(SQLITE) -header -csv  samples.db 'SELECT asf.$(label_column) AS _babs_nfcore, metadata.* FROM metadata LEFT JOIN (SELECT * FROM fastqs GROUP BY sample) AS asf on metadata.$(meta2asf)=asf.sample WHERE asf._babs_config_file="$*";' > $@
 
@@ -70,24 +70,6 @@ samples.db: ../ingress/samples.db ../docs/experimental_table.csv
 	$(SQLITE) $@ -csv "DROP TABLE IF EXISTS metadata;"
 	$(SQLITE) $@ -csv ".import $(word 2, $^) metadata"
 
-
-.PHONY: prepare_scripts
-desdemona_files = 00_init.r 01_analyse.r DESCRIPTION
-prepare_scripts: $(desdemona_files)
-
-$(desdemona_files) &: renv.lock 
-	git rev-parse --git-dir > /dev/null 2>&1 || git init
-	for file in $(desdemona_files) ; do \
-	  [ -f $${file} ] && git add "$${file}" || true;\
-	done ;\
-	if [ ! -z "$$(git diff --staged)" ] ; then \
-	  git status ;\
-	  echo "Please commit changes before re-running 'prepare_scripts'" ; exit 1 ;\
-	fi ;\
-	$(R) -e 'renv::restore(); DESdemonA::get_started(files=commandArgs(trailing=TRUE),nfcore="",metadata="",file_col="_babs_nfcore",name_col=c($(name_column)),overwrite=TRUE)' --args $(desdemona_files)
-	git add $(desdemona_files)
-	echo -e 'Initialised by DESdemonA\n\n' `grep -A 4 DESdemonA renv.lock` | git commit -F - || true
-	git rev-parse "v0.0.1" >/dev/null 2>&1 || git tag v0.0.1
 
 
 genes_results := $(patsubst ../nfcore/results/%,inst/extdata/genes.results/%,$(wildcard ../nfcore/results/*))
@@ -102,3 +84,28 @@ $(genes_results): inst/extdata/genes.results/%: ../nfcore/results/%
 	fi ;\
 	ln -f ../../../../../nfcore/results/$*/star_rsem/*.genes.results . ;\
 
+
+.PHONY: scripts
+scripts = 00_init.r 01_analyse.r
+scripts: $(scripts)
+
+$(scripts) &: | renv.lock
+	for file in $(scripts) ; do \
+	  [ -f $${file} ] && git add "$${file}" || true;\
+	done ;\
+	if [ ! -z "$$(git diff --staged)" ] ; then \
+	  git status ;\
+	  echo "Please commit changes before re-running 'prepare_scripts'" ; exit 1 ;\
+	fi ;\
+	$(R) -e 'DESdemonA::get_started(files=commandArgs(trailing=TRUE),nfcore="",metadata="",file_col="_babs_nfcore",name_col=c($(name_column)),overwrite=TRUE)' --args $(scripts)
+	git add $(scripts)
+	echo -e 'Initialised by DESdemonA\n\n' `grep -A 4 DESdemonA renv.lock` | git commit -F - || true
+	git rev-parse "v0.0.1" >/dev/null 2>&1 || git tag v0.0.1
+
+
+renv.lock:
+	module purge ;\
+	export RENV_PATHS_LIBRARY=renv/library ;\
+	$(R) -e 'library(renv); options(repos=BiocManager::repositories()); renv::init(bioconductor=TRUE, bare=TRUE); renv::install(); renv::snapshot()'
+	git add renv.lock
+	git commit -m "Pipeline creates renv environment"
