@@ -106,6 +106,6 @@ $(scripts) &: | renv.lock
 renv.lock:
 	module purge ;\
 	export RENV_PATHS_LIBRARY=renv/library ;\
-	$(R) -e 'library(renv); options(repos=BiocManager::repositories()); renv::init(bioconductor=TRUE, bare=TRUE); renv::install(); renv::snapshot()'
+	$(R) -e 'library(renv); renv::install("BiocManager"); options(repos=BiocManager::repositories()); renv::init(bioconductor=TRUE, bare=TRUE); renv::install(); renv::snapshot()'
 	git add renv.lock
 	git commit -m "Pipeline creates renv environment"
