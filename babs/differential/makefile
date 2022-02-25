@@ -51,7 +51,7 @@ R.bib: renv.lock
 ################################################################
 
 build: genes_results docs_specfiles samplesheets prepare_scripts
-	make -n -s all > run.sh
+	make -n -s run > run.sh
 
 docs_specfiles := $(patsubst ../docs/%,%,$(wildcard ../docs/*.spec))
 docs_specfiles: $(docs_specfiles)
@@ -65,7 +65,7 @@ samplesheets: $(samplesheets)
 $(samplesheets) : inst/extdata/experimental_table%.csv : samples.db
 	$(SQLITE) -header -csv  samples.db 'SELECT asf.$(label_column) AS _babs_nfcore, metadata.* FROM metadata LEFT JOIN (SELECT * FROM fastqs GROUP BY sample) AS asf on metadata.$(meta2asf)=asf.sample WHERE asf._babs_config_file="$*";' > $@
 
-samples.db: ../ingress/samples.db ../docs/metadata.csv
+samples.db: ../ingress/samples.db ../docs/experimental_table.csv
 	cp $< $@
 	$(SQLITE) $@ -csv "DROP TABLE IF EXISTS metadata;"
 	$(SQLITE) $@ -csv ".import $(word 2, $^) metadata"

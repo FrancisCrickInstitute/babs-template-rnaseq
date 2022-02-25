@@ -35,7 +35,7 @@ results/$(alignments) : results/% : samplesheet_%.csv
 ################################################################
 
 build: samplesheets
-	makedir -p ${nf_work}
+	mkdir -p ${nf_work}
 	ln -sf ${nf_work} nf_work
 	make -n -s run > run.sh
 
