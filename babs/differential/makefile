@@ -9,11 +9,18 @@ run: analyses | run.sh
 
 $(V).SILENT:
 
-alignments := $(patsubst inst/extdata/genes.results/%,%,$(wildcard inst/extdata/genes.results/*))
+my_counts_dir=inst/extdata/genes.results
+nfcore_dir=../nfcore/results
+my_metadata=inst/extdata/metadata
+file_column := _babs_nfcore
+
+
+alignments := $(patsubst ${my_counts_dir}/%,%,$(wildcard ${my_counts_dir}/*))
 specfiles := $(patsubst %.spec,%,$(wildcard *.spec))
 count_objs := $(patsubst %,data/dds_%.rda,$(alignments))
 result_objs := $(foreach alignment,$(alignments),$(foreach spec,$(specfiles),data/$(spec)_x_$(alignment).dda))
-
+align1 := $(firstword $(alignments))
+spec1 := $(firstword $(specfiles))
 
 .PHONY: analyses
 analyses: $(result_objs)
@@ -36,8 +43,8 @@ $(result_objs): data/%.dda: 01_analyse.r $$(word 1,$$(subst _x_, ,%)).spec data/
 .PHONY: generate_count_objects
 generate_count_objects: $(count_objs)
 
-$(count_objs) : data/dds_%.rda : 00_init.r $(wildcard ../nfcore/results/%/star_rsem/*.genes.results)
-	$(R) -e "source('00_init.r')" --args spec_suffix="$*" nfcore="../nfcore/results/$*" metadata="inst/extdata/experimental_table$*.csv" file_col="_babs_nfcore" name_col="sample_label" counts="../nfcore/results/$*/star_rsem/" org_package="$($*.org.db)"
+$(count_objs) : data/dds_%.rda : 00_init.r $(wildcard $(my_counts_dir)/%/*.genes.results)
+	$(R) -e "source('00_init.r')" --args spec_suffix="$*" metadata="$(my_metadata)_$*.csv" file_col="$(file_column)" name_col="$(NAME_COLUMN)" counts="$(my_counts_dir)/$*/" org_package="$($*.org.db)"
 
 
 R.bib: renv.lock
@@ -50,39 +57,34 @@ R.bib: renv.lock
 ################################################################
 run.sh: build
 
-build: docs_specfiles samplesheets genes_results scripts
+build: specfiles samplesheets genes_results scripts
 	make -n -s run > run.sh
 
-docs_specfiles := $(patsubst ../docs/%,%,$(wildcard ../docs/*.spec))
-docs_specfiles: $(docs_specfiles)
-$(docs_specfiles): %: ../docs/%
+specfiles := $(patsubst ../docs/%,%,$(wildcard ../docs/*.spec))
+specfiles: $(specfiles)
+$(specfiles): %: ../docs/%
 	cp $< $@
 
 
 
-samplesheets:= $(patsubst %,inst/extdata/experimental_table%.csv,$(alignments))
+samplesheets:= $(patsubst %,$(my_metadata)_%.csv,$(alignments))
 samplesheets: $(samplesheets)
-$(samplesheets) : inst/extdata/experimental_table%.csv : samples.db
-	$(SQLITE) -header -csv  samples.db 'SELECT asf.$(label_column) AS _babs_nfcore, metadata.* FROM metadata LEFT JOIN (SELECT * FROM fastqs GROUP BY sample) AS asf on metadata.$(meta2asf)=asf.sample WHERE asf._babs_config_file="$*";' > $@
+$(samplesheets) : $(my_metadata)_%.csv : samples.db
+	$(SQLITE) -header -csv  samples.db 'SELECT asf.$(label_column) AS $(file_column), metadata.* FROM metadata LEFT JOIN (SELECT * FROM fastqs GROUP BY sample) AS asf on metadata.$(meta2asf)=asf.sample WHERE asf._babs_config_file="$*";' > $@
 
-samples.db: ../ingress/samples.db ../docs/experimental_table.csv
+samples.db: ../ingress/samples.db ../docs/$(BABS_TABLE).csv
 	cp $< $@
 	$(SQLITE) $@ -csv "DROP TABLE IF EXISTS metadata;"
 	$(SQLITE) $@ -csv ".import $(word 2, $^) metadata"
 
 
 
-genes_results := $(patsubst ../nfcore/results/%,inst/extdata/genes.results/%,$(wildcard ../nfcore/results/*))
+genes_results := $(patsubst $(nfcore_dir)/%,$(my_counts_dir)/%,$(wildcard $(nfcore_dir)/*))
 genes_results : $(genes_results)
-$(genes_results): inst/extdata/genes.results/%: ../nfcore/results/%
-	if [ -z "${$*.group-as}" ] ; then \
-	  mkdir -p inst/extdata/genes.results/$* ;\
-	  cd inst/extdata/genes.results/$* ;\
-	else \
-	  mkdir -p inst/extdata/genes.results/${$*.group-as} ;\
-	  cd  inst/extdata/genes.results/${$*.group-as} ;\
-	fi ;\
-	ln -f ../../../../../nfcore/results/$*/star_rsem/*.genes.results . ;\
+$(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/%
+	dir=$(if $($*.group-as),$($*.group-as),$*);\
+	mkdir -p $(my_counts_dir)/$${dir} ;\
+	ln -f $(nfcore_dir)/$${dir}/star_rsem/*.genes.results $(my_counts_dir)/$${dir}/ 
 
 
 .PHONY: scripts
@@ -97,7 +99,7 @@ $(scripts) &: | renv.lock
 	  git status ;\
 	  echo "Please commit changes before re-running 'prepare_scripts'" ; exit 1 ;\
 	fi ;\
-	$(R) -e 'DESdemonA::get_started(files=commandArgs(trailing=TRUE),nfcore="",metadata="",file_col="_babs_nfcore",name_col=c($(name_column)),overwrite=TRUE)' --args $(scripts)
+	$(R) -e 'DESdemonA::get_started(files=commandArgs(trailing=TRUE),nfcore="", metadata="$(my_metadata)_$(align1).csv", file_col="$(file_column)",name_col=c($(NAME_COLUMN)), counts="$(my_counts_dir)/$(align1)/", org_package="$($(align1).org.db)", spec_suffix="$(align1)", specfile="$(spec1)",  project="$(babsproject)", overwrite=TRUE)' --args $(scripts)
 	git add $(scripts)
 	echo -e 'Initialised by DESdemonA\n\n' `grep -A 4 DESdemonA renv.lock` | git commit -F - || true
 	git rev-parse "v0.0.1" >/dev/null 2>&1 || git tag v0.0.1
