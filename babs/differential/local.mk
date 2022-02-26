@@ -1,13 +1,13 @@
 R := module load pandoc/2.2.3.2-foss-2016b;  module load R/4.0.3-foss-2020a; command R 
 
-# What's BABS' experimental table (excluding csv file extention)
+# What's BABS' experiment table (excluding csv file extention)
 BABS_TABLE := experiment_table
 
 # which metadata column will match ASF's 'sample' column.
 meta2asf := ID
 
 # Where to look for experimental design information
-NAME_COLUMN  := "name","label","sample","filename"
+NAME_COLUMN  := "sample_label","name","label","sample","filename"
 
 # Produce a self-contained report (false to link images etc)
 contained    := FALSE

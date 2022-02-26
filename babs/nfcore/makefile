@@ -4,7 +4,7 @@ include local.mk
 
 .PHONY: run build copy publish clean
 
-run: alignments
+run: alignments | run.sh
 
 .PHONY: alignments
 alignments:= $(patsubst samplesheet_%.csv,%,$(wildcard samplesheet_*.csv))
@@ -33,6 +33,7 @@ results/$(alignments) : results/% : samplesheet_%.csv
 ################################################################
 #### Bootrap all relevant data from outside
 ################################################################
+run.sh: build
 
 build: samplesheets
 	mkdir -p ${nf_work}
@@ -45,4 +46,3 @@ samplesheets: $(samplesheets)
 $(samplesheets): samplesheet_%.csv: ../ingress/samplesheet_%.csv
 	cp $< $@
 
-print-%: ; @echo $*=$($*)

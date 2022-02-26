@@ -1,24 +1,21 @@
 all: differential
 
+stages := ingress nfcore differential biologic 
+.PHONY: $(stages) clean
+
 ingress: 
-	cd $< && $(MAKE) build && $(MAKE) run
-
-nfcore: 
-	cd $< && $(MAKE) build && $(MAKE) run
-
+nfcore: ingress
 differential: nfcore
-	cd $< && $(MAKE) build && $(MAKE) run
-
 biologic: differential
-	cd $< && $(MAKE) build && $(MAKE) run
 
 
-
-build-%:
-	cd % && $(MAKE) build
-
+$(stages):
+	cd $@ && $(MAKE) build && $(MAKE) run
 
 
+cleaners := $(stages:%=clean-%)
+clean: $(cleaners)
+.PHONY: $(cleaners)
 
-clean:
-	cd nfcore && rm -rf work	
+$(cleaners) : clean-% :
+	cd $* && $(MAKE) clean

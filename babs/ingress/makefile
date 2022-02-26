@@ -3,7 +3,7 @@ include ../config/global.mk
 
 .PHONY: run build copy publish clean
 
-run: samplesheets
+run: samplesheets | run.sh
 
 .PHONY: samplesheets
 samplesheets:= $(patsubst %.config,samplesheet_%.csv,$(wildcard *.config))
@@ -18,6 +18,7 @@ $(samplesheets): samplesheet_%.csv: %.config samples.db
 ################################################################
 #### Bootrap all relevant data from outside
 ################################################################
+run.sh: build
 
 build: configs samples.db
 	make -n -s run > run.sh
