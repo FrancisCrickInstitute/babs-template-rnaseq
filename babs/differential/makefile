@@ -36,8 +36,23 @@ $(result_objs): data/%.dda: 01_analyse.r $$(word 1,$$(subst _x_, ,%)).spec data/
 	mv "$*_$(TAG).html"  "$${OUTDIR}" ;\
 	rm -rf "$${OUTDIR}/$*_$(TAG)_files" ;\
 	mv "$*_$(TAG)_files" "$${OUTDIR}" ;\
-	ln -sfn "results/$${VERSION}" results/latest
+	ln -sfn "results/$(VERSION)" results/latest
 
+# define RESULT_RULE
+# data/$(spec)_x_$(alignment).dda : 01_analyse.r $(spec).spec data/dds_$(alignment).rda R.bib
+# 	mkdir -p "results/$(VERSION)/$(alignment)" 
+# 	$(R) -e "rmarkdown::render('01_analyse.r', output_file='$(spec)_x_$(alignment)_$(TAG).html', output_options = list(self_contained=$(contained)), params=list(res_dir='results/$(VERSION)/$(alignment)',spec_file='$(spec)', spec_suffix='$(alignment)'))"
+# 	mv -f "$(spec)_x_$(alignment)_$(TAG).html"  "results/$(VERSION)/$(alignment)"
+# 	rm -rf "results/$(VERSION)/$(alignment)/$(spec)_x_$(alignment)_$(TAG)_files"
+# 	mv "$(spec)_x_$(alignment)_$(TAG)_files" "results/$(VERSION)/$(alignment)"
+# 	ln -sfn "results/$(VERSION)" results/latest
+# endef
+
+# $(foreach spec,$(specfiles), \
+#   $(foreach alignment,$(alignments), \
+#     $(eval $(RESULT_RULE)) \
+#   ) \
+# )
 
 
 .PHONY: generate_count_objects
