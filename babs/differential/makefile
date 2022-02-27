@@ -2,12 +2,9 @@ include ../config/global.mk
 include local.mk
 -include ../ingress/*.config
 
-.PHONY: build run
+.PHONY: build run copy publish clean
 
 run: analyses | run.sh
-
-
-$(V).SILENT:
 
 my_counts_dir=inst/extdata/genes.results
 nfcore_dir=../nfcore/results
@@ -17,7 +14,6 @@ file_column := _babs_nfcore
 
 alignments := $(patsubst ${my_counts_dir}/%,%,$(wildcard ${my_counts_dir}/*))
 specfiles := $(patsubst %.spec,%,$(wildcard *.spec))
-count_objs := $(patsubst %,data/dds_%.rda,$(alignments))
 result_objs := $(foreach alignment,$(alignments),$(foreach spec,$(specfiles),data/$(spec)_x_$(alignment).dda))
 align1 := $(firstword $(alignments))
 spec1 := $(firstword $(specfiles))
@@ -25,31 +21,18 @@ spec1 := $(firstword $(specfiles))
 .PHONY: analyses
 analyses: $(result_objs)
 
-# .SECONDEXPANSION:
-# $(result_objs): data/%.dda: 01_analyse.r $$(word 1,$$(subst _x_, ,%)).spec data/dds_$$(word 2,$$(subst _x_, ,%)).rda R.bib
-# 	SPEC=$(word 2,$^) ;\
-# 	ALIGN=$(patsubst data/dds_%.rda,%,$(word 3,$^)) ;\
-# 	OUTDIR=results/$(VERSION)/$${ALIGN} ;\
-# 	mkdir -p "$${OUTDIR}" ;\
-# 	$(R) -e "rmarkdown::render('$<', output_file='$*_$(TAG).html', output_options = list(self_contained=$(contained)), params=list(res_dir='$${OUTDIR}',spec_file='$${SPEC}', spec_suffix='$${ALIGN}'))" ;\
-# 	rm -f "$${OUTDIR}/$*_$(TAG).html" ;\
-# 	mv "$*_$(TAG).html"  "$${OUTDIR}" ;\
-# 	rm -rf "$${OUTDIR}/$*_$(TAG)_files" ;\
-# 	mv "$*_$(TAG)_files" "$${OUTDIR}" ;\
-# 	ln -sfn "results/$(VERSION)" results/latest
-
 define RESULT_RULE
 data/$(spec)_x_$(alignment).dda : resdir = results/$(VERSION)/$(alignment)
-data/$(spec)_x_$(alignment).dda : 01_analyse.r $(spec).spec data/dds_$(alignment).rda R.bib
+data/$(spec)_x_$(alignment).dda : 01_analyse.r $(spec).spec data/counts_$(alignment).rda R.bib
 	mkdir -p "$$(resdir)" 
 	$(R) -e "rmarkdown::render('01_analyse.r',\
 	 output_file='$(spec)_x_$(alignment)_$(TAG).html',\
 	 output_options = list(self_contained=$(contained)),\
-	 params=list(res_dir='$$(resdir)',spec_file='$(spec)', spec_suffix='$(alignment)'))"
+	 params=list(res_dir='$$(resdir)',spec_file='$(spec).spec', spec_suffix='$(alignment)'))"
 	mv -f "$(spec)_x_$(alignment)_$(TAG).html"  "$$(resdir)"
 	rm -rf "$$(resdir)/$(spec)_x_$(alignment)_$(TAG)_files"
 	mv "$(spec)_x_$(alignment)_$(TAG)_files" "$$(resdir)"
-	ln -sfn "results/$(VERSION)" results/latest
+	ln -sfn "$(VERSION)" results/latest
 endef
 
 $(foreach spec,$(specfiles), \
@@ -59,11 +42,9 @@ $(foreach spec,$(specfiles), \
 )
 
 
-.PHONY: generate_count_objects
-generate_count_objects: $(count_objs)
-
-$(count_objs) : data/dds_%.rda : 00_init.r $(wildcard $(my_counts_dir)/%/*.genes.results)
-	$(R) -e "source('00_init.r')" --args spec_suffix="$*" metadata="$(my_metadata)_$*.csv" file_col="$(file_column)" name_col="$(NAME_COLUMN)" counts="$(my_counts_dir)/$*/" org_package="$($*.org.db)"
+count_objs := $(patsubst %,data/counts_%.rda,$(alignments))
+$(count_objs) : data/counts_%.rda : 00_init.r $(wildcard $(my_counts_dir)/%/*.genes.results)
+	$(R) -e "source('00_init.r')" --args spec_suffix="$*" metadata="$(my_metadata)_$*.csv" file_col="$(file_column)"  counts="$(my_counts_dir)/$*/" org_package="$($*.org.db)"
 
 
 R.bib: renv.lock
@@ -85,7 +66,7 @@ $(specfiles): %: ../docs/%
 	cp $< $@
 
 
-
+alignments := $(patsubst $(nfcore_dir)/%,%,$(wildcard $(nfcore_dir)/*))
 samplesheets:= $(patsubst %,$(my_metadata)_%.csv,$(alignments))
 samplesheets: $(samplesheets)
 $(samplesheets) : $(my_metadata)_%.csv : samples.db
@@ -98,7 +79,7 @@ samples.db: ../ingress/samples.db ../docs/$(BABS_TABLE).csv
 
 
 
-genes_results := $(patsubst $(nfcore_dir)/%,$(my_counts_dir)/%,$(wildcard $(nfcore_dir)/*))
+genes_results := $(patsubst %,$(my_counts_dir)/%,$(alignments))
 genes_results : $(genes_results)
 $(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/%
 	dir=$(if $($*.group-as),$($*.group-as),$*);\
@@ -123,10 +104,18 @@ $(scripts) &: | renv.lock
 	echo -e 'Initialised by DESdemonA\n\n' `grep -A 4 DESdemonA renv.lock` | git commit -F - || true
 	git rev-parse "v0.0.1" >/dev/null 2>&1 || git tag v0.0.1
 
-
+renv.lock:orgs=$(subst $(space),$(comma),$(foreach align,$(alignments),$($(align).org.db))),
 renv.lock:
+	sed -i 's/^Imports:/Imports:\n    $(orgs)/' DESCRIPTION
 	module purge ;\
 	export RENV_PATHS_LIBRARY=renv/library ;\
 	$(R) -e 'library(renv); renv::install("BiocManager"); options(repos=BiocManager::repositories()); renv::init(bioconductor=TRUE, bare=TRUE); renv::install(); renv::snapshot()'
 	git add renv.lock
 	git commit -m "Pipeline creates renv environment"
+
+
+copy:
+
+clean:
+
+publish:

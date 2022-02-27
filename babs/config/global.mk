@@ -5,3 +5,11 @@ babsproject=$(shell sed -n  "s/ *Project: *//p" ../../.babs)
 
 #Debugging tool - `make print-varname` will show variable's value
 print-%: ; @echo $*=$($*)
+
+#Set V=true to suppress silent mode
+$(V).SILENT:
+
+#Standard makefile hacks
+comma:= ,
+empty:=
+space:= $(empty) $(empty)
