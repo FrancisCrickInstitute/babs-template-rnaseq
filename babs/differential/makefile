@@ -28,7 +28,7 @@ data/$(spec)_x_$(alignment).dda : 01_analyse.r $(spec).spec data/counts_$(alignm
 	$(R) -e "rmarkdown::render('01_analyse.r',\
 	 output_file='$(spec)_x_$(alignment)_$(TAG).html',\
 	 output_options = list(self_contained=$(contained)),\
-	 params=list(res_dir='$$(resdir)',spec_file='$(spec).spec', spec_suffix='$(alignment)'))"
+	 params=list(res_dir='$$(resdir)',spec_file='$(spec).spec', count_source='$(alignment)'))"
 	mv -f "$(spec)_x_$(alignment)_$(TAG).html"  "$$(resdir)"
 	rm -rf "$$(resdir)/$(spec)_x_$(alignment)_$(TAG)_files"
 	mv "$(spec)_x_$(alignment)_$(TAG)_files" "$$(resdir)"
@@ -44,7 +44,7 @@ $(foreach spec,$(specfiles), \
 
 count_objs := $(patsubst %,data/counts_%.rda,$(alignments))
 $(count_objs) : data/counts_%.rda : 00_init.r $(wildcard $(my_counts_dir)/%/*.genes.results)
-	$(R) -e "source('00_init.r')" --args spec_suffix="$*" metadata="$(my_metadata)_$*.csv" file_col="$(file_column)"  counts="$(my_counts_dir)/$*/" org_package="$($*.org.db)"
+	$(R) -e "source('00_init.r')" --args count_source="$*" metadata="$(my_metadata)_$*.csv" file_col="$(file_column)"  counts="$(my_counts_dir)/$*/" org_package="$($*.org.db)"
 
 
 R.bib: renv.lock
@@ -99,7 +99,7 @@ $(scripts) &: | renv.lock
 	  git status ;\
 	  echo "Please commit changes before re-running 'prepare_scripts'" ; exit 1 ;\
 	fi ;\
-	$(R) -e 'DESdemonA::get_started(files=commandArgs(trailing=TRUE),nfcore="", metadata="$(my_metadata)_$(align1).csv", file_col="$(file_column)",name_col=c($(NAME_COLUMN)), counts="$(my_counts_dir)/$(align1)/", org_package="$($(align1).org.db)", spec_suffix="$(align1)", specfile="$(spec1)",  project="$(babsproject)", overwrite=TRUE)' --args $(scripts)
+	$(R) -e 'DESdemonA::get_started(files=commandArgs(trailing=TRUE),nfcore="", metadata="$(my_metadata)_$(align1).csv", file_col="$(file_column)",name_col=c($(NAME_COLUMN)), counts="$(my_counts_dir)/$(align1)/", org_package="$($(align1).org.db)", count_source="$(align1)", specfile="$(spec1)",  project="$(babsproject)", overwrite=TRUE)' --args $(scripts)
 	git add $(scripts)
 	echo -e 'Initialised by DESdemonA\n\n' `grep -A 4 DESdemonA renv.lock` | git commit -F - || true
 	git rev-parse "v0.0.1" >/dev/null 2>&1 || git tag v0.0.1
