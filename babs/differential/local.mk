@@ -7,7 +7,7 @@ BABS_TABLE := experiment_table
 meta2asf := ID
 
 # Where to look for experimental design information
-NAME_COLUMN  := "sample_label","name","label","sample","filename"
+NAME_COLUMN  := "sample_label","name","label","sample","filename","$(meta2asf)"
 
 # Produce a self-contained report (false to link images etc)
 contained    := FALSE
