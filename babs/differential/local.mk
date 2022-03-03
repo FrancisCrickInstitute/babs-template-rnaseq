@@ -7,11 +7,11 @@ BABS_TABLE = experiment_table
 meta2asf = ID
 
 # Where to look for experimental design information
-NAME_COLUMN  := "sample_label","name","label","sample","filename","$(meta2asf)"
+NAME_COLUMN  = "sample_label","name","label","sample","filename","$(meta2asf)"
 
 # Produce a self-contained report (false to link images etc)
 contained    = FALSE
 
 # Git variables
-TAG := $(shell git describe --tags --dirty=_altered --always --long)# e.g. v1.0.2-2-ace1729a
-VERSION := $(shell git describe --tags --abbrev=0)#e.g. v1.0.2
+TAG = $(shell git describe --tags --dirty=_altered --always --long)# e.g. v1.0.2-2-ace1729a
+VERSION = $(shell git describe --tags --abbrev=0)#e.g. v1.0.2
