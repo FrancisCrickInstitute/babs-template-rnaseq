@@ -4,20 +4,13 @@ include local.mk
 
 .PHONY: run build copy publish clean
 
-run: samplesheets | run.sh
+run: samples.db | run.sh
 
-.PHONY: samplesheets
-samplesheets:= $(patsubst %.config,samplesheet_%.csv,$(wildcard *.config))
-samplesheets: $(samplesheets)
+samples.db: $(samplesheet_fname).csv
+	rm -f $@
+	$(SQLITE) $@ -csv ".import $< fastqs"
+	$(SQLITE) $@ "ALTER TABLE fastqs ADD COLUMN _babs_config_file text;"
 
-$(samplesheets): samplesheet_%.csv: %.config samples.db
-	$(SQLITE) samples.db "DROP TABLE IF EXISTS 'config_$*';"
-	field='$(shell sed '/^$$/d; s/^$*./"/;s/=.*/" TEXT/' "$*.config" | paste -sd ',')' ;\
-	insfield='$(shell sed '/^$$/d; s/^$*./"/;s/=.*/"/' "$*.config" | paste -sd ',')' ;\
-	vals='$(shell sed -r '/^$$/d; s/.*=(.*)/"\1"/' "$*.config" | paste -sd ',')' ;\
-	$(SQLITE) samples.db 'CREATE TABLE "config_$*" ($${field}); INSERT INTO "$*" ($${insfield}) VALUES $${vals}'
-	$(SQLITE) -header -csv  samples.db 'SELECT fastqs.$(samplesheet_id_column) AS sample, fastqs.*, "config_$*".* FROM fastqs NATURAL JOIN "config_$*" ;' > $@ 
-	$(SQLITE) samples.db 'UPDATE fastqs SET _babs_config_file="$*" WHERE fastqs.$(samplesheet_id_column) IN (SELECT $(samplesheet_id_column) FROM fastqs NATURAL JOIN "config_$*" ;'
 
 
 ################################################################
@@ -25,14 +18,11 @@ $(samplesheets): samplesheet_%.csv: %.config samples.db
 ################################################################
 run.sh: build
 
-build: configs samples.db
+build: configs $(samplesheet_fname).csv
 	make -n -s run > run.sh
 
-samples.db: ../docs/$(samplesheet_fname).csv
-	rm -f $@
-	$(SQLITE) $@ -csv ".import $< fastqs"
-	$(SQLITE) $@ "ALTER TABLE fastqs ADD COLUMN _babs_config_file text;"
-
+$(samplesheet_fname).csv: ../docs/$(samplesheet_fname).csv
+	cp $< &@
 
 .PHONY: configs 
 configs:= $(patsubst ../docs/%.config,%.config,$(wildcard ../docs/*.config))

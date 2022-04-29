@@ -34,12 +34,23 @@ build: samplesheets
 	ln -sf ${nf_work} nf_work
 	make -n -s run > run.sh
 
-.PHONY: samplesheets
-samplesheets = $(patsubst ../ingress/samplesheet_%.csv,samplesheet_%.csv,$(wildcard ../ingress/samplesheet_*.csv))
-samplesheets: $(samplesheets)
-$(samplesheets): samplesheet_%.csv: ../ingress/samplesheet_%.csv
-	cp $< $@
 
+
+.PHONY: samplesheets
+samplesheets:= $(patsubst ../ingress/%.config,samplesheet_%.csv,$(wildcard ../ingress/*.config))
+samplesheets: $(samplesheets)
+
+$(samplesheets): samplesheet_%.csv: ../ingress/%.config samples.db
+	$(SQLITE) samples.db "DROP TABLE IF EXISTS 'config_$*';"
+	field='$(shell sed '/^$$/d; s/^$*./"/;s/=.*/" TEXT/' "$*.config" | paste -sd ',')' ;\
+	insfield='$(shell sed '/^$$/d; s/^$*./"/;s/=.*/"/' "$*.config" | paste -sd ',')' ;\
+	vals='$(shell sed -r '/^$$/d; s/.*=(.*)/"\1"/' "$*.config" | paste -sd ',')' ;\
+	$(SQLITE) samples.db 'CREATE TABLE "config_$*" ($${field}); INSERT INTO "$*" ($${insfield}) VALUES $${vals}'
+	$(SQLITE) -header -csv  samples.db 'SELECT * FROM fastqs NATURAL JOIN "config_$*" ;' > $@ 
+	$(SQLITE) samples.db 'UPDATE fastqs SET _babs_config_file="$*" WHERE fastqs.$(samplesheet_id_column) IN (SELECT $(samplesheet_id_column) FROM fastqs NATURAL JOIN "config_$*" ;'
+
+samples.db: ../ingress/samples.db
+	cp $< $@
 
 clean:
 	rm -rf ${nf_work}

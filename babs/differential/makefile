@@ -7,10 +7,6 @@ include local.mk
 
 run: analyses | run.sh
 
-my_counts_dir=inst/extdata/genes.results
-nfcore_dir=../nfcore/results
-my_metadata=inst/extdata/metadata
-
 
 alignments := $(patsubst ${my_counts_dir}/%,%,$(wildcard ${my_counts_dir}/*))
 specfiles := $(patsubst %.spec,%,$(wildcard *.spec))
@@ -66,20 +62,20 @@ $(specfiles): %: ../docs/%
 	cp $< $@
 
 
-alignments := $(patsubst $(nfcore_dir)/%,%,$(wildcard $(nfcore_dir)/*))
-samplesheets:= $(patsubst %,$(my_metadata)_%.csv,$(alignments))
+nf_alignments := $(patsubst $(nfcore_dir)/%,%,$(wildcard $(nfcore_dir)/*))
+samplesheets:= $(patsubst %,$(my_metadata)_%.csv,$(nf_alignments))
 samplesheets: $(samplesheets)
 $(samplesheets) : $(my_metadata)_%.csv : samples.db
 	$(SQLITE) -header -csv  samples.db 'SELECT metadata.* FROM metadata LEFT JOIN (SELECT * FROM fastqs GROUP BY $(label_column)) AS asf on metadata.$(meta2asf)=asf.$(label_column) WHERE asf._babs_config_file="$*";' > $@
 
-samples.db: ../ingress/samples.db ../docs/$(BABS_TABLE).csv
+samples.db: ../nfcore/samples.db ../docs/$(BABS_TABLE).csv
 	cp $< $@
 	$(SQLITE) $@ -csv "DROP TABLE IF EXISTS metadata;"
 	$(SQLITE) $@ -csv ".import $(word 2, $^) metadata"
 
 
 
-genes_results := $(patsubst %,$(my_counts_dir)/%,$(alignments))
+genes_results := $(patsubst %,$(my_counts_dir)/%,$(nf_alignments))
 genes_results : $(genes_results)
 $(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/% %.config
 	dir=$(if $($*.group-as),$($*.group-as),$*);\
@@ -104,7 +100,7 @@ $(scripts) &: $(align1).config | renv.lock
 	echo -e 'Initialised by DESdemonA\n\n' `grep -A 4 DESdemonA renv.lock` | git commit -F - || true
 	git rev-parse "v0.0.1" >/dev/null 2>&1 || git tag v0.0.1
 
-renv.lock:orgs=$(subst $(space),$(comma),$(foreach align,$(alignments),$($(align).org.db))),
+renv.lock:orgs=$(subst $(space),$(comma),$(foreach align,$(nf_alignments),$($(align).org.db))),
 renv.lock:
 	sed -i 's/^Imports:/Imports:\n    $(orgs)/' DESCRIPTION
 	module purge ;\

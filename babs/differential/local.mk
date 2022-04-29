@@ -1,5 +1,9 @@
 R = module load pandoc/2.2.3.2-foss-2016b;  module load R/4.0.3-foss-2020a; command R 
 
+my_counts_dir=inst/extdata/genes.results
+nfcore_dir=../nfcore/results
+my_metadata=inst/extdata/metadata
+
 # What's BABS' experiment table (excluding csv file extention)
 BABS_TABLE = experiment_table
 
