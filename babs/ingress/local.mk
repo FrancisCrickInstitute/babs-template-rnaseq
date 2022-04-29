@@ -1,0 +1,2 @@
+samplesheet_id_column=sample
+samplesheet_fname=asf_samplesheet
