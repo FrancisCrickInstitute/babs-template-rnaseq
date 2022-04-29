@@ -21,10 +21,8 @@ results/$(alignments) : results/% : samplesheet_%.csv
 	--fasta "$($*.genome_fasta)" \
 	--gtf "$($*.gtf)" \
 	-w "${nf_work}" \
-	-profile crick \
-	-resume \
-	-with-tower \
-	-r 3.4
+	$(nf_options)
+
 
 ################################################################
 #### Bootrap all relevant data from outside
