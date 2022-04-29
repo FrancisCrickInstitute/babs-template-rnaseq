@@ -40,7 +40,7 @@ $(foreach spec,$(specfiles), \
 
 count_objs := $(patsubst %,data/counts_%.rda,$(alignments)) %.config
 $(count_objs) : data/counts_%.rda : 00_init.r $(wildcard $(my_counts_dir)/%/*.genes.results)
-	$(R) -e "source('00_init.r')" --args count_source="$*" metadata="$(my_metadata)_$*.csv" file_col="$(meta2asf)" counts="$(my_counts_dir)/$*/" org_package="$($*.org.db)"
+	$(R) -e "source('00_init.r')" --args count_source="$*" metadata="$(my_metadata)_$*.csv" file_col="$(metadata_id_column)" counts="$(my_counts_dir)/$*/" org_package="$($*.org.db)"
 
 
 R.bib: renv.lock
@@ -66,7 +66,7 @@ nf_alignments := $(patsubst $(nfcore_dir)/%,%,$(wildcard $(nfcore_dir)/*))
 samplesheets:= $(patsubst %,$(my_metadata)_%.csv,$(nf_alignments))
 samplesheets: $(samplesheets)
 $(samplesheets) : $(my_metadata)_%.csv : samples.db
-	$(SQLITE) -header -csv  samples.db 'SELECT metadata.* FROM metadata LEFT JOIN (SELECT * FROM fastqs GROUP BY $(label_column)) AS asf on metadata.$(meta2asf)=asf.$(label_column) WHERE asf._babs_config_file="$*";' > $@
+	$(SQLITE) -header -csv  samples.db 'SELECT metadata.* FROM metadata INNER JOIN (SELECT * FROM fastqs GROUP BY $(samplesheet_id_column)) AS asf on metadata.$(metadata_id_column)=asf.$(samplesheet_id_column) WHERE asf._babs_config_file="$*";' > $@
 
 samples.db: ../nfcore/samples.db ../docs/$(BABS_TABLE).csv
 	cp $< $@
@@ -95,7 +95,7 @@ $(scripts) &: $(align1).config | renv.lock
 	  git status ;\
 	  echo "Please commit changes before re-running 'prepare_scripts'" ; exit 1 ;\
 	fi ;\
-	$(R) -e 'DESdemonA::get_started(files=commandArgs(trailing=TRUE),nfcore="", metadata="$(my_metadata)_$(align1).csv", file_col="$(meta2asf)",name_col=c($(NAME_COLUMN)), counts="$(my_counts_dir)/$(align1)/", org_package="$($(align1).org.db)", count_source="$(align1)", specfile="$(spec1)",  project="$(babsproject)", overwrite=TRUE)' --args $(scripts)
+	$(R) -e 'DESdemonA::get_started(files=commandArgs(trailing=TRUE),nfcore="", metadata="$(my_metadata)_$(align1).csv", file_col="$(metadata_id_column)",name_col=c($(NAME_COLUMN)), counts="$(my_counts_dir)/$(align1)/", org_package="$($(align1).org.db)", count_source="$(align1)", specfile="$(spec1)",  project="$(babsproject)", overwrite=TRUE)' --args $(scripts)
 	git add $(scripts)
 	echo -e 'Initialised by DESdemonA\n\n' `grep -A 4 DESdemonA renv.lock` | git commit -F - || true
 	git rev-parse "v0.0.1" >/dev/null 2>&1 || git tag v0.0.1

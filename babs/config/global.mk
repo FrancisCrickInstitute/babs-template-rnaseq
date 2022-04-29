@@ -1,4 +1,6 @@
-label_column := sample # which column from the ASF csv to use in nf-core.  Maybe sample_name
+samplesheet_id_column := sample # which column from the ASF csv to use in nf-core.  Maybe sample_name
+metadata_id_column := sample_name
+
 babsid=$(shell sed -n  "s/ *Hash: *//p" ../../.babs)
 babsproject=$(shell sed -n  "s/ *Project: *//p" ../../.babs)
 

@@ -7,8 +7,6 @@ my_metadata=inst/extdata/metadata
 # What's BABS' experiment table (excluding csv file extention)
 BABS_TABLE = experiment_table
 
-# which metadata column will match ASF's 'sample' column.
-meta2asf = ID
 
 # Where to look for experimental design information
 NAME_COLUMN  = "sample_label","name","label","sample","filename","$(meta2asf)"
