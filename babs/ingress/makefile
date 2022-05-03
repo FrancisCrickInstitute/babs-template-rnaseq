@@ -4,7 +4,7 @@ include local.mk
 
 .PHONY: run build copy publish clean
 
-run: samples.db | run.sh
+run: samples.db | run.sh ## Generate a database of samples for downstream convenience
 
 samples.db: $(samplesheet_fname).csv
 	rm -f $@
@@ -18,7 +18,7 @@ samples.db: $(samplesheet_fname).csv
 ################################################################
 run.sh: build
 
-build: configs $(samplesheet_fname).csv
+build: configs $(samplesheet_fname).csv ## Prepare for `run` by gathering configs and samplesheet into current directory
 	make -n -s run > run.sh
 
 $(samplesheet_fname).csv: ../docs/$(samplesheet_fname).csv
