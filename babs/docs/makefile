@@ -2,7 +2,7 @@ checklist := specfiles experiment_table configs proposal
 
 check:clear := $(shell rm -f error.log)
 
-check: $(checklist)
+check: $(checklist) ## Basic check that the contents of the docs folder conforms to requirements
 	if [[  -s error.log ]] ; then \
 	  echo "Errors produced - check error.log" ;\
 	else \
@@ -59,7 +59,7 @@ proposal = $(wildcard proposal.docx)
 
 ifeq ($(words $(proposal)),0)
 proposal:
-	echo "No proposal.csv in the docs directory" | tee -a error.log
+	echo "No proposal.docx in the docs directory" | tee -a error.log
 else
 proposal: $(proposal)
 endif
@@ -70,3 +70,6 @@ $(proposal) :
 
 
 $(V).SILENT:
+
+help: ## show help message
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m\033[0m\n"} /^[$$()% 0-9a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
