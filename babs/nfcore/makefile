@@ -4,7 +4,7 @@ include local.mk
 
 .PHONY: run build copy publish clean
 
-run: alignments
+run: alignments ## Generate NF-CORE alignments, one folder for each config-specific samplesheet from the `build` process.
 
 .PHONY: alignments
 alignments:= $(patsubst samplesheet_%.csv,%,$(wildcard samplesheet_*.csv))
@@ -29,7 +29,7 @@ results/$(alignments) : results/% : samplesheet_%.csv
 ################################################################
 run.sh: build
 
-build: samplesheets
+build: samplesheets ## Build all necessary inputs: samplesheets for each matching alignment '.config' from 'docs'.
 	mkdir -p ${nf_work}
 	ln -sf ${nf_work} nf_work
 	make -n -s run > run.sh
@@ -54,6 +54,13 @@ $(samplesheets): samplesheet_%.csv: ../ingress/%.config samples.db
 samples.db: ../ingress/samples.db
 	cp $< $@
 
-clean:
+clean: ## Remove working files from scratch
 	rm -rf ${nf_work}
 	rm -f nf_work
+
+clean-build: clean ## Remove files only needed for re-`run`ning. Downstream steps will still work if `run` has already completed.
+	rm -f $(samplesheets)
+	rm -f samples.db
+
+clean-complete: clean-build ## Complete reset. Donwstream steps will no `build` (and perhaps might not even run even if they've already been built.)
+	rm -rf results/$(alignments)

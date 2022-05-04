@@ -1,7 +1,7 @@
 samplesheet_id_column := sample # which column from the ASF csv to use in nf-core.  Maybe sample_name
 metadata_id_column := sample_name
 
-babsid=$(shell sed -n  "s/ *Hash: *//p" ../../.babs)
+babsid=$(shell sed -n  "s/ *Hash: *//p" ../../.babs || printf "no-babs-%s-%s" ${USER} `basename ${PWD}`)
 babsproject=$(shell sed -n  "s/ *Project: *//p" ../../.babs)
 
 #Executibles (can be overridden in local.mk's)
