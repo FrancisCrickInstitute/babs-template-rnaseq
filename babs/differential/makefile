@@ -5,7 +5,7 @@ include local.mk
 
 .PHONY: build run copy publish clean
 
-run: analyses | run.sh
+run: analyses  ## Create objects in `data` that store the results of applying each spec file, along with a versioned html report in `results`
 
 
 alignments := $(patsubst ${my_counts_dir}/%,%,$(wildcard ${my_counts_dir}/*))
@@ -40,6 +40,7 @@ $(foreach spec,$(specfiles), \
 
 count_objs := $(patsubst %,data/counts_%.rda,$(alignments)) %.config
 $(count_objs) : data/counts_%.rda : 00_init.r $(wildcard $(my_counts_dir)/%/*.genes.results)
+	mkdir -p data
 	$(R) -e "source('00_init.r')" --args count_source="$*" metadata="$(my_metadata)_$*.csv" file_col="$(metadata_id_column)" counts="$(my_counts_dir)/$*/" org_package="$($*.org.db)"
 
 
@@ -51,9 +52,8 @@ R.bib: renv.lock
 ################################################################
 #### Bootrap all relevant data from outside
 ################################################################
-run.sh: build
 
-build: specfiles samplesheets genes_results scripts
+build: specfiles samplesheets genes_results scripts ## Create experimental tables that reflect the samples actually run. Generate R scripts and environment that will analyse the data. Copy the required nfcore count files into the `inst/extdata` area.
 	make -n -s run > run.sh
 
 specfiles := $(patsubst ../docs/%,%,$(wildcard ../docs/*.spec))
@@ -66,6 +66,7 @@ nf_alignments := $(patsubst $(nfcore_dir)/%,%,$(wildcard $(nfcore_dir)/*))
 samplesheets:= $(patsubst %,$(my_metadata)_%.csv,$(nf_alignments))
 samplesheets: $(samplesheets)
 $(samplesheets) : $(my_metadata)_%.csv : samples.db
+	mkdir -p $(dir $(my_metadata))
 	$(SQLITE) -header -csv  samples.db 'SELECT metadata.* FROM metadata INNER JOIN (SELECT * FROM fastqs GROUP BY $(samplesheet_id_column)) AS asf on metadata.$(metadata_id_column)=asf.$(samplesheet_id_column) WHERE asf._babs_config_file="$*";' > $@
 
 samples.db: ../nfcore/samples.db ../docs/$(BABS_TABLE).csv
@@ -85,7 +86,7 @@ $(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/% %.config
 
 .PHONY: scripts
 scripts = 00_init.r 01_analyse.r
-scripts: $(scripts)
+scripts: $(scripts) ## Generate (or reinstate) the default analysis scripts
 
 $(scripts) &: $(align1).config | renv.lock
 	for file in $(scripts) ; do \
@@ -105,7 +106,7 @@ renv.lock:
 	sed -i 's/^Imports:/Imports:\n    $(orgs)/' DESCRIPTION
 	module purge ;\
 	export RENV_PATHS_LIBRARY=renv/library ;\
-	$(R) -e 'library(renv); renv::install("BiocManager"); options(repos=BiocManager::repositories()); renv::init(bioconductor=TRUE, bare=TRUE); renv::install(); renv::snapshot()'
+	$(R) -e 'library(renv); renv::install("BiocManager"); options(repos=BiocManager::repositories()); renv::init(bioconductor=TRUE, bare=TRUE); renv::install(); renv::snapshot(type="all")'
 	git add renv.lock
 	git commit -m "Pipeline creates renv environment"
 
@@ -114,6 +115,18 @@ configs=$(patsubst ../ingress/%.config,%.config,$(wildcard ../ingress/*.config))
 
 $(configs):%.config: ../ingress/%.config
 	cp $< $@
+
+R-local:
+	echo "#!/bin/bash" > $@
+	echo "function R {" >> $@
+	echo $(R) " $$@">> $@
+	echo "}" >> $@
+	echo "function Rscript {" >> $@
+	echo "$(R)script  $$@" >> $@
+	echo "}" >> $@
+	echo "[[ "'$$BASH_SOURCE'" == "$$0" ]] && R "$$@"" >> $@
+
+
 
 
 copy:
