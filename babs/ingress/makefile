@@ -22,7 +22,7 @@ build: configs $(samplesheet_fname).csv ## Prepare for `run` by gathering config
 	make -n -s run > run.sh
 
 $(samplesheet_fname).csv: ../docs/$(samplesheet_fname).csv
-	cp $< &@
+	cp $< $@
 
 .PHONY: configs 
 configs:= $(patsubst ../docs/%.config,%.config,$(wildcard ../docs/*.config))

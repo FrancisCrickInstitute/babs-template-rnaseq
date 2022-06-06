@@ -1,4 +1,4 @@
-R = module load pandoc/2.2.3.2-foss-2016b;  module load R/4.0.3-foss-2020a; command R 
+R = module load pandoc/2.2.3.2-foss-2016b;  module load R/4.1.2-foss-2021b; ml NLopt/2.7.0-GCCcore-11.2.0 ; command R 
 
 my_counts_dir=inst/extdata/genes.results
 nfcore_dir=../nfcore/results

@@ -8,11 +8,9 @@ include local.mk
 run: analyses  ## Create objects in `data` that store the results of applying each spec file, along with a versioned html report in `results`
 
 
-alignments := $(patsubst ${my_counts_dir}/%,%,$(wildcard ${my_counts_dir}/*))
-specfiles := $(patsubst %.spec,%,$(wildcard *.spec))
-result_objs := $(foreach alignment,$(alignments),$(foreach spec,$(specfiles),data/$(spec)_x_$(alignment).dda))
-align1 := $(firstword $(alignments))
-spec1 := $(firstword $(specfiles))
+alignments = $(patsubst ${my_counts_dir}/%,%,$(wildcard ${my_counts_dir}/*))
+specfiles = $(patsubst %.spec,%,$(wildcard *.spec))
+result_objs = $(foreach alignment,$(alignments),$(foreach spec,$(specfiles),data/$(spec)_x_$(alignment).dda))
 
 .PHONY: analyses
 analyses: $(result_objs)
@@ -38,7 +36,7 @@ $(foreach spec,$(specfiles), \
 )
 
 
-count_objs := $(patsubst %,data/counts_%.rda,$(alignments)) %.config
+count_objs = $(patsubst %,data/counts_%.rda,$(alignments))
 $(count_objs) : data/counts_%.rda : 00_init.r $(wildcard $(my_counts_dir)/%/*.genes.results)
 	mkdir -p data
 	$(R) -e "source('00_init.r')" --args count_source="$*" metadata="$(my_metadata)_$*.csv" file_col="$(metadata_id_column)" counts="$(my_counts_dir)/$*/" org_package="$($*.org.db)"
@@ -56,14 +54,14 @@ R.bib: renv.lock
 build: specfiles samplesheets genes_results scripts ## Create experimental tables that reflect the samples actually run. Generate R scripts and environment that will analyse the data. Copy the required nfcore count files into the `inst/extdata` area.
 	make -n -s run > run.sh
 
-specfiles := $(patsubst ../docs/%,%,$(wildcard ../docs/*.spec))
-specfiles: $(specfiles)
-$(specfiles): %: ../docs/%
+docs_specfiles = $(patsubst ../docs/%,%,$(wildcard ../docs/*.spec))
+specfiles: $(docs_specfiles)
+$(docs_specfiles): %: ../docs/%
 	cp $< $@
 
 
-nf_alignments := $(patsubst $(nfcore_dir)/%,%,$(wildcard $(nfcore_dir)/*))
-samplesheets:= $(patsubst %,$(my_metadata)_%.csv,$(nf_alignments))
+nfcore_alignments = $(patsubst $(nfcore_dir)/%,%,$(wildcard $(nfcore_dir)/*))
+samplesheets = $(patsubst %,$(my_metadata)_%.csv,$(nfcore_alignments))
 samplesheets: $(samplesheets)
 $(samplesheets) : $(my_metadata)_%.csv : samples.db
 	mkdir -p $(dir $(my_metadata))
@@ -76,7 +74,7 @@ samples.db: ../nfcore/samples.db ../docs/$(BABS_TABLE).csv
 
 
 
-genes_results := $(patsubst %,$(my_counts_dir)/%,$(nf_alignments))
+genes_results = $(patsubst %,$(my_counts_dir)/%,$(nfcore_alignments))
 genes_results : $(genes_results)
 $(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/% %.config
 	dir=$(if $($*.group-as),$($*.group-as),$*);\
@@ -88,9 +86,12 @@ $(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/% %.config
 scripts = 00_init.r 01_analyse.r
 scripts: $(scripts) ## Generate (or reinstate) the default analysis scripts
 
+align1 = $(firstword $(nfcore_alignments))
+spec1 = $(firstword $(docs_specfiles))
+
 $(scripts) &: $(align1).config | renv.lock
 	for file in $(scripts) ; do \
-	  [ -f $${file} ] && git add "$${file}" || true;\
+	  [ -f $${file} ] && git add -f "$${file}" || true;\
 	done ;\
 	if [ ! -z "$$(git diff --staged)" ] ; then \
 	  git status ;\
@@ -101,12 +102,12 @@ $(scripts) &: $(align1).config | renv.lock
 	echo -e 'Initialised by DESdemonA\n\n' `grep -A 4 DESdemonA renv.lock` | git commit -F - || true
 	git rev-parse "v0.0.1" >/dev/null 2>&1 || git tag v0.0.1
 
-renv.lock:orgs=$(subst $(space),$(comma),$(foreach align,$(nf_alignments),$($(align).org.db))),
+renv.lock:orgs=$(subst $(space),$(comma),$(foreach align,$(nfcore_alignments),$($(align).org.db))),
 renv.lock:
 	sed -i 's/^Imports:/Imports:\n    $(orgs)/' DESCRIPTION
 	module purge ;\
 	export RENV_PATHS_LIBRARY=renv/library ;\
-	$(R) -e 'library(renv); renv::install("BiocManager"); options(repos=BiocManager::repositories()); renv::init(bioconductor=TRUE, bare=TRUE); renv::install(); renv::snapshot(type="all")'
+	$(R) -e 'library(renv); install("BiocManager"); init(bioconductor=TRUE)'
 	git add renv.lock
 	git commit -m "Pipeline creates renv environment"
 
@@ -134,3 +135,6 @@ copy:
 clean:
 
 publish:
+
+
+MAKEFLAGS += --no-builtin-rules
