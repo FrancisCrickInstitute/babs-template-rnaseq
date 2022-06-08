@@ -15,8 +15,16 @@ result_objs = $(foreach alignment,$(alignments),$(foreach spec,$(specfiles),data
 .PHONY: analyses
 analyses: $(result_objs)
 
+.PHONY: submit
+tmp_script:=$(shell mktemp -u)
+submit:
+	echo "$${slurm}" > $(tmp_script)
+	make -n -s analyses >> $(tmp_script)
+	sbatch $(tmp_script)
+	rm -f $(tmp_script)
+
 define RESULT_RULE
-data/$(spec)_x_$(alignment).dda : resdir = results/$(VERSION)/$(alignment)
+data/$(spec)_x_$(alignment).dda : resdir = results/$(VERSION)/$(alignment)/$(spec)
 data/$(spec)_x_$(alignment).dda : 01_analyse.r $(spec).spec data/counts_$(alignment).rda R.bib
 	mkdir -p "$$(resdir)" 
 	$(R) -e "rmarkdown::render('01_analyse.r',\
@@ -117,15 +125,18 @@ configs=$(patsubst ../ingress/%.config,%.config,$(wildcard ../ingress/*.config))
 $(configs):%.config: ../ingress/%.config
 	cp $< $@
 
-R-local:
+.PHONY: R-local
+R-local: R-$(Rversion)
+R-$(Rversion):
 	echo "#!/bin/bash" > $@
 	echo "function R {" >> $@
-	echo $(R) " $$@">> $@
+	echo "$(R)" \$$@>> $@
 	echo "}" >> $@
 	echo "function Rscript {" >> $@
-	echo "$(R)script  $$@" >> $@
+	echo "$(R)script" \$$@ >> $@
 	echo "}" >> $@
-	echo "[[ "'$$BASH_SOURCE'" == "$$0" ]] && R "$$@"" >> $@
+	echo "[[ "'$$BASH_SOURCE'" == "'$$0'" ]] && R " \$$@ >> $@
+	setfacl -m u::rwx $@
 
 
 
