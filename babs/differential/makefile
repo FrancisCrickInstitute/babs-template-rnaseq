@@ -111,11 +111,12 @@ $(scripts) &: $(align1).config | renv.lock
 	git rev-parse "v0.0.1" >/dev/null 2>&1 || git tag v0.0.1
 
 renv.lock:orgs=$(subst $(space),$(comma),$(foreach align,$(nfcore_alignments),$($(align).org.db))),
-renv.lock:
+renv.lock: .renv.lock
+	cp $< $@
 	sed -i 's/^Imports:/Imports:\n    $(orgs)/' DESCRIPTION
 	module purge ;\
 	export RENV_PATHS_LIBRARY=renv/library ;\
-	$(R) -e 'library(renv); install("BiocManager"); init(bioconductor=TRUE)'
+	$(R) -e 'library(renv); renv::restore(); renv::install(strsplit("$(orgs)", ",")[[1]])'
 	git add renv.lock
 	git commit -m "Pipeline creates renv environment"
 
