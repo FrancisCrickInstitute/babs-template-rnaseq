@@ -5,7 +5,7 @@ include local.mk
 
 .PHONY: build run copy publish clean
 
-run: analyses  ## Create objects in `data` that store the results of applying each spec file, along with a versioned html report in `results`
+run: analyses  ## Create objects in `data` that store the results of applying each spec file, along with a versioned html report in `results`.  Requires 'make build' be done first.
 
 
 alignments = $(patsubst ${my_counts_dir}/%,%,$(wildcard ${my_counts_dir}/*))
@@ -17,7 +17,7 @@ analyses: $(result_objs)
 
 .PHONY: submit
 tmp_script:=$(shell mktemp -u)
-submit:
+submit:  ## Do 'run' but submit to slurm rather than run locally
 	echo "$${slurm}" > $(tmp_script)
 	make -n -s analyses >> $(tmp_script)
 	sbatch $(tmp_script)
@@ -30,7 +30,7 @@ data/$(spec)_x_$(alignment).dda : 01_analyse.r $(spec).spec data/counts_$(alignm
 	$(R) -e "rmarkdown::render('01_analyse.r',\
 	 output_file='$(spec)_x_$(alignment)_$(TAG).html',\
 	 output_options = list(self_contained=$(contained)),\
-	 params=list(res_dir='$$(resdir)',spec_file='$(spec).spec', count_source='$(alignment)'))"
+	 params=list(res_dir='$$(resdir)',spec_file='$(spec).spec', count_source='$(alignment)'))" 2>&1 | tee logs/01_analyse.log
 	mv -f "$(spec)_x_$(alignment)_$(TAG).html"  "$$(resdir)"
 	rm -rf "$$(resdir)/$(spec)_x_$(alignment)_$(TAG)_files"
 	mv "$(spec)_x_$(alignment)_$(TAG)_files" "$$(resdir)"
@@ -47,11 +47,11 @@ $(foreach spec,$(specfiles), \
 count_objs = $(patsubst %,data/counts_%.rda,$(alignments))
 $(count_objs) : data/counts_%.rda : 00_init.r $(wildcard $(my_counts_dir)/%/*.genes.results)
 	mkdir -p data
-	$(R) -e "source('00_init.r')" --args count_source="$*" metadata="$(my_metadata)_$*.csv" file_col="$(metadata_id_column)" counts="$(my_counts_dir)/$*/" org_package="$($*.org.db)"
+	$(R) -e "source('00_init.r')" --args count_source="$*" metadata="$(my_metadata)_$*.csv" file_col="$(metadata_id_column)" counts="$(my_counts_dir)/$*/" org_package="$($*.org.db)" 2>&1 | tee logs/00_init.log
 
 
 R.bib: renv.lock
-	 $(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")'
+	 $(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")' 2>&1 | tee logs/bib.log
 
 
 
@@ -98,28 +98,27 @@ align1 = $(firstword $(nfcore_alignments))
 spec1 = $(firstword $(docs_specfiles))
 
 $(scripts) &: $(align1).config | renv.lock
-	for file in $(scripts) ; do \
-	  [ -f $${file} ] && git add -f "$${file}" || true;\
-	done ;\
-	if [ ! -z "$$(git diff --staged)" ] ; then \
-	  git status ;\
-	  echo "Please commit changes before re-running 'prepare_scripts'" ; exit 1 ;\
-	fi ;\
-	$(R) -e 'DESdemonA::get_started(files=commandArgs(trailing=TRUE),nfcore="", metadata="$(my_metadata)_$(align1).csv", file_col="$(metadata_id_column)",name_col=c($(NAME_COLUMN)), counts="$(my_counts_dir)/$(align1)/", org_package="$($(align1).org.db)", count_source="$(align1)", specfile="$(spec1)",  project="$(babsproject)", overwrite=TRUE)' --args $(scripts)
+	git stash -m "DESdemonA stashed your scripts. Use 'git stash pop' to retrieve them" 2>/dev/null -- $(scripts) || true
+	$(R) -e 'DESdemonA::get_started(files=commandArgs(trailing=TRUE),nfcore="", metadata="$(my_metadata)_$(align1).csv", file_col="$(metadata_id_column)",name_col=c($(NAME_COLUMN)), counts="$(my_counts_dir)/$(align1)/", org_package="$($(align1).org.db)", count_source="$(align1)", specfile="$(spec1)",  project="$(babsproject)", overwrite=TRUE)' --args $(scripts) 2>&1 | tee logs/get_started.log
 	git add $(scripts)
 	echo -e 'Initialised by DESdemonA\n\n' `grep -A 4 DESdemonA renv.lock` | git commit -F - || true
 	git rev-parse "v0.0.1" >/dev/null 2>&1 || git tag v0.0.1
+	git stash list
 
 renv.lock:orgs=$(subst $(space),$(comma),$(foreach align,$(nfcore_alignments),$($(align).org.db))),
-renv.lock: .renv.lock
+renv.lock: .renv.lock | logs
+	git stash push -m "DESdemonA stashed your lock file. Use 'git stash pop' to retrieve it" 2>/dev/null -- $@ || true
 	cp $< $@
 	sed -i 's/^Imports:/Imports:\n    $(orgs)/' DESCRIPTION
 	module purge ;\
 	export RENV_PATHS_LIBRARY=renv/library ;\
-	$(R) -e 'library(renv); renv::restore(); renv::install(strsplit("$(orgs)", ",")[[1]])'
+	$(R) -e 'library(renv); renv::restore(); renv::install(strsplit("$(orgs)", ",")[[1]])' 2>&1 | tee logs/renv.log
 	git add renv.lock
 	git commit -m "Pipeline creates renv environment"
+	git stash list
 
+logs:
+	mkdir $@
 
 configs=$(patsubst ../ingress/%.config,%.config,$(wildcard ../ingress/*.config))
 
@@ -127,15 +126,11 @@ $(configs):%.config: ../ingress/%.config
 	cp $< $@
 
 .PHONY: R-local
-R-local: R-$(Rversion)
+R-local: R-$(Rversion) ## Create a local shell script that will run R (optional, but helpful for interactive analyses)
 R-$(Rversion):
 	echo "#!/bin/bash" > $@
-	echo "function R {" >> $@
-	echo "$(R)" \$$@>> $@
-	echo "}" >> $@
-	echo "function Rscript {" >> $@
-	echo "$(R)script" \$$@ >> $@
-	echo "}" >> $@
+	echo "function R { $(R)" \$$@  " ; }" >> $@
+	echo "function Rscript { $(R)script" \$$@  " ; }" >> $@
 	echo "[[ "'$$BASH_SOURCE'" == "'$$0'" ]] && R " \$$@ >> $@
 	setfacl -m u::rwx $@
 
