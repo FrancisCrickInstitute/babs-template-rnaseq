@@ -54,6 +54,24 @@ R.bib: renv.lock
 	 $(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")' 2>&1 | tee logs/bib.log
 
 
+.PHONY: geo
+geo: geo/md5.txt  ## Gather everything into the 'geo' folder. Specify `geo_version=`, `geo_alignment=` and `geo_spec=` to customise. Remember to `make clean-geo` when the files have been upload.
+
+
+geo_version=latest
+geo_alignment=$(firstword $(aligments))
+geo_spec=$(firstword $(specfiles))
+geo/md5.txt:
+	mkdir -p $(geo_dir)
+	ln -s $(geo_dir) geo
+	ln -f $(my_counts_dir)/$(geo_alignment)/*.genes.results geo/
+	ln -f results/$(geo_version)/$(geo_alignment)/$(geo_spec)/*.xlsx geo/
+	$(SQLITE) samples.db 'select fastq_1 from fastqs  where _babs_config_file="$(geo_alignment)";' | \
+	while read -r fq ; do cp ${fq} geo/ ; done
+	$(SQLITE) samples.db 'select fastq_2 from fastqs  where _babs_config_file="$(geo_alignment)";' | \
+	while read -r fq ; do cp ${fq} geo/ ; done
+	pushd geo; md5sum *.* > geo.md5.txt; popd
+
 
 ################################################################
 #### Bootrap all relevant data from outside
@@ -87,7 +105,7 @@ genes_results : $(genes_results)
 $(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/% %.config
 	dir=$(if $($*.group-as),$($*.group-as),$*);\
 	mkdir -p $(my_counts_dir)/$${dir} ;\
-	ln -f $(nfcore_dir)/$${dir}/star_rsem/*.genes.results $(my_counts_dir)/$${dir}/ 
+	ln -f $(nfcore_dir)/$${dir}/star_rsem/*.genes.results $(my_counts_dir)/$${dir}/ ;\
 
 
 .PHONY: scripts
@@ -140,6 +158,9 @@ R-$(Rversion):
 copy:
 
 clean:
+clean-geo:  ## Remove the GEO files from scratch
+	rm -rf $(geo_dir)
+	rm geo
 
 publish:
 

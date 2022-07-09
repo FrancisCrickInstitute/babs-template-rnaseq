@@ -12,12 +12,19 @@
      "assignees": [],
      "deps":["Respond to ticket"]
     },
-    {"title": "BABS Approval",
-     "body": "Ensure that the work is achievable with the resources we have. Assign staff members to the remaining tasks as appropriate.",
+    {"title": "Analysis spec file",
+     "body": "Write a DESdemonA analysis.spec file that encodes the required statistical comparisons. This file will be used by the RNA-seq preprocessing pipeline",
      "milestone": "Planning",
      "labels": ["Management"],
      "assignees": [],
-     "deps":["Design experiment"]
+     "deps": []
+    },
+    {"title": "BABS Approval",
+     "body": "Ensure that the work is achievable with the resources we have; and that the PI has approved the initial budget. Assign staff members to the remaining tasks as appropriate.",
+     "milestone": "Planning",
+     "labels": ["Management"],
+     "assignees": [],
+     "deps":["Design experiment", "Analysis spec file"]
     },
     {"title": "ASF Approval",
      "body": "The project has gained ASF committee approval and ASF has opened the project. The project should now have an ASF LIMS project ID (asf-lims-id).",
@@ -26,29 +33,16 @@
      "assignees": [],
      "deps":["BABS Approval"]
     },
-    {"title": "Analysis spec file",
-     "body": "Write a DESdemonA analysis.spec file that encodes the required statistical comparisons. This file will be used by the RNA-seq preprocessing pipeline",
-     "milestone": "Planning",
-     "labels": ["Management"],
-     "assignees": [],
-     "deps": []
-    },
     {"title": "Await Data",
      "body": "Await Data",
      "milestone": "Planning",
      "labels": ["External"],
      "assignees": [],
      "deps":["BABS Approval"]},
-    {"title":"First-Pass Analysis",
-     "body":"First-Pass Analysis",
-     "milestone":"Analysis",
-     "labels": ["Analyst"],
-     "assignees": [],
-     "deps": ["Await Data"]},
-    {"title":"Bespoke Analysis",
+    {"title":"Work Package 1",
      "body":"Bespoke Analysis",
      "milestone":"Analysis",
-     "labels": ["Analyst"],
+     "labels": ["Analyst", "BABS Work Package"],
      "assignees": [],
      "deps":["Await Data"]},
     {"title":"Finish",
@@ -56,8 +50,7 @@
      "milestome":"Completion",
      "labels":["Analyst"],
      "assignees": [],
-     "deps": ["First-Pass Analysis",
-	      "Bespoke Analysis"]
+     "deps": ["Work Package 1"]
     }
 ],
  "milestones": [
@@ -66,6 +59,9 @@
      },
      {"title": "Analysis",
       "description": "Analysis"
+     },
+     {"title": "Completion",
+      "description": "Completion of the project"
      }
  ]
 }
