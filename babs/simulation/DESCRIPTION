@@ -1,0 +1,60 @@
+Package: BABS
+Title: BABS Analysis
+Version: 0.0.0
+Authors@R: person("Bioinformatics and Biostatistics",  email = "bioinformatics@crick.ac.uk", role = c("aut", "cre"))
+Description: BABS Analysis Package
+biocViews: RNASeq
+Depends: R (>= 3.1.0)
+Imports:
+    ashr,
+    circlize,
+    ComplexHeatmap,
+    DESdemonA,
+    DESeq2,
+    dplyr,
+    emmeans,
+    glue,
+    ggrepel,
+    grid,
+    gt,
+    htmltools,
+    htmlwidgets,
+    IHW,
+    knitr,
+    limma,
+    lme4,
+    MASS,
+    openxlsx,
+    PoiClaClu,
+    purrr,
+    R6,
+    RColorBrewer,
+    readr,
+    rlang,
+    S4Vectors,
+    tibble,
+    tidyr,
+    tidyverse,
+    usethis
+Suggests:
+    bookdown,
+    clusterProfiler,
+    devtools,
+    equatiomatic,
+    ggrepel,
+    GO.db,
+    knitr,
+    ragg,
+    R.utils,
+    ReactomePA,
+    readxl,
+    rtracklayer,
+    remotes,
+    tximport
+Remotes: github::FrancisCrickInstitute/DESdemonA
+License: GPL-3
+LazyData: true
+git_last_commit: v0.20.10-1-g57c12bc_altered
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.1.1
+Encoding: UTF-8
