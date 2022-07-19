@@ -1,25 +1,27 @@
-.PHONY: all
-all: differential
+.PHONY: all simulate clean update-pipeline
 
-stages := ingress nfcore differential biologic simulation
+all: differential.log
 
-nfcore: ingress
-differential: nfcore
-biologic: differential
+differential.log: nfcore.log
+nfcore.log: ingress.log
+ingress.log: docs.log
+biologic.log: differential.log
 
-.PHONY: $(stages)
-$(stages) : % : %.log
-
-
-$(stages:%=%.log) : %.log :
-	cd $* && $(MAKE) build > ../$*.err 2>&1 && $(MAKE) run >> ../$*.err 2>&1
-	mv $*.err $*.log
+simulate: simulation.log
 
 
-cleaners := $(stages:%=clean-%)
-.PHONY: $(cleaners) clean
+%.log : %
+	$(MAKE) -C $* build > $*.err 2>&1
+	$(MAKE) -C $* run  >> $*.err 2>&1
+	mv $*.err $@
+
+
+cleaners := $(patsubst %/,clean-%,$(wildcard */))
+.PHONY: $(cleaners)
 clean: $(cleaners)
-	rm -f $(logs)
+	rm -f *.log
+$(cleaners): clean-%:
+	$(MAKE) -C $* clean || echo "Couldn't clean $*"
 
-$(cleaners) : clean-% :
-	cd $* && $(MAKE) clean
+.PHONY: update-pipeline
+        rsync -avzp {{source_dir}}/ .

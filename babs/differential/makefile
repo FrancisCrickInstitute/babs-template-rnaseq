@@ -3,7 +3,7 @@ include local.mk
 -include ../ingress/*.config
 -include *.config
 
-.PHONY: build run copy publish clean
+.PHONY: build run clean
 
 run: analyses  ## Create objects in `data` that store the results of applying each spec file, along with a versioned html report in `results`.  Requires 'make build' be done first.
 
@@ -155,14 +155,10 @@ R-$(Rversion):
 
 
 
-copy:
-
 clean:
 clean-geo:  ## Remove the GEO files from scratch
 	rm -rf $(geo_dir)
 	rm geo
-
-publish:
 
 
 MAKEFLAGS += --no-builtin-rules

@@ -2,7 +2,7 @@ include ../config/global.mk
 include local.mk
 -include ../ingress/*.config
 
-.PHONY: run build copy publish clean
+.PHONY: run build clean
 
 run: alignments ## Generate NF-CORE alignments, one folder for each config-specific samplesheet from the `build` process.
 
@@ -27,7 +27,6 @@ results/$(alignments) : results/% : samplesheet_%.csv
 ################################################################
 #### Bootrap all relevant data from outside
 ################################################################
-run.sh: build
 
 build: samplesheets ## Build all necessary inputs: samplesheets for each matching alignment '.config' from 'docs'.
 	mkdir -p ${nf_work}
