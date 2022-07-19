@@ -1,72 +1,50 @@
 include ../config/global.mk
 
-checklist := specfiles experiment_table configs proposal
+checklist := specfiles experiment_table configs asf_samplesheet
 
-check:clear := $(shell rm -f error.log)
+.PHONY: build run $(checklist)
 
-check: $(checklist) ## Basic check that the contents of the docs folder conforms to requirements
-	if [[  -s error.log ]] ; then \
-	  echo "Errors produced - check error.log" ;\
-	else \
-	  echo "All seems fine" ;\
-	  touch error.log ;\
-	fi
+build: $(checklist) ## Basic check that the contents of the docs folder conforms to requirements
+run:  ## Empty target just to conform to general pattern
 
-.PHONY: check $(checklist)
 
-################################################################
 specfiles = $(wildcard *.spec)
-.PHONY: $(specfiles)
-
 specfiles: $(specfiles)
 ifeq ($(words $(specfiles)),0)
-	echo "No *.spec files in the docs directory" | tee -a error.log
+	echo "No *.spec files in the docs directory"
 endif
-
 $(specfiles) : 
-	[[ -s "$@" ]] || { echo "$@ is empty" | tee -a error.log ;  }
+	[[ -s "$@" ]] || { echo "$@ is empty" ; exit 1 ;  }
 
 
-################################################################
+asf_samplesheet = $(wildcard asf_samplesheet.csv)
+asf_samplesheet: $(asf_samplesheet)
+ifeq ($(words $(asf_samplesheet)),0)
+	echo "No asf_samplesheet in the docs directory"
+endif
+$(asf_samplesheet) : 
+	[[ -s "$@" ]] || { echo "$@ is empty" ; exit 1 ;  }
+	head -1 $@ | grep -q "sample" || { echo "$@ does not start with a 'sample'  column" ; exit 1 ; }
+	head -1 $@ | grep -q "sample,fastq_1" || { echo "$@ does not have fastq_1 column after sample" ; exit 1 ; }
+
+
 configs = $(wildcard *.config)
-.PHONY: $(configs)
-
 configs: $(configs)
 ifeq ($(words $(configs)),0)
-	echo "No *.config files in the docs directory" | tee -a error.log
+	echo "No *.config files in the docs directory"
+	exit 1
 endif
-
 $(configs) : 
-	[[ -s "$@" ]] || { echo "$@ is empty" | tee -a error.log ;  }
+	[[ -s "$@" ]] || { echo "$@ is empty" ; exit 1 ;  }
 
-################################################################
+
 experiment_table = $(wildcard experiment_table.csv)
-.PHONY: $(experiment_table)
-
-ifeq ($(words $(experiment_table)),0)
-experiment_table:
-	echo "No experiment_table.csv in the docs directory" | tee -a error.log
-else
 experiment_table: $(experiment_table)
+ifeq ($(words $(experiment_table)),0)
+	echo "No experiment_table.csv in the docs directory"
+	exit 1
 endif
-
 $(experiment_table) :
-	[[ -s "$@" ]] || { echo "$@ is empty" | tee -a error.log ;  }
-	head -1 $@ | grep -q "ID" || echo "experiment_table.csv does not start with an ID column" | tee -a error.log
-
-
-################################################################
-proposal = $(wildcard proposal.docx)
-.PHONY: $(proposal)
-
-ifeq ($(words $(proposal)),0)
-proposal:
-	echo "No proposal.docx in the docs directory" | tee -a error.log
-else
-proposal: $(proposal)
-endif
-
-$(proposal) : 
-	[[ -s "$@" ]] || { echo "$@ is empty" | tee -a error.log;  }
-
-
+	[[ -s "$@" ]] || { echo "$@ is empty" ; exit 1 ;  }
+	head -1 $@ | grep -q "ID" || { echo "experiment_table.csv does not start with an ID column" ; exit 1 ; }
+	head -1 $@ | grep -q "ID,sample_label" || { echo "experiment_table.csv does not have sample_label column after ID" ; exit 1 ; }
