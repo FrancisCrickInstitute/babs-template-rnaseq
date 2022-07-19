@@ -1,8 +1,13 @@
-samplesheet_id_column := sample # which column from the ASF csv to use in nf-core.  Maybe sample_name
+# csv file names (excluding ext)
+samplesheet_fname=asf_samplesheet
+experiment_table = experiment_table
+# Column names
+samplesheet_id_column := sample
 metadata_id_column := ID
+name_column  = "sample_label","name","label","sample","filename","$(meta2asf)"
 
 babsid=$(shell sed -n  "s/ *Hash: *//p" ../../.babs || printf "no-babs-%s-%s" ${USER} `basename ${PWD}`)
-babsproject=$(shell sed -n  "s/ *Project: *//p" ../../.babs)
+babsproject=$(shell sed -n  "s/ *Project: *//p" ../../.babs || printf "%s-%s" ${USER} `basename ${PWD}`))
 
 #Executibles (can be overridden in local.mk's)
 NEXTFLOW := ml purge; ml Nextflow/21.10.3; ml Singularity/3.4.2; ml CAMP_proxy; nextflow

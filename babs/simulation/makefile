@@ -79,7 +79,7 @@ spec1 = $(firstword $(docs_specfiles))
 .PHONY: samplesheets
 samplesheets = $(my_metadata)_$(alignments).csv
 samplesheets: $(samplesheets)
-$(samplesheets) : ../docs/experiment_table.csv
+$(samplesheets) : ../docs/$(experiment_table).csv
 	mkdir -p $(dir $(my_metadata))
 	cp $< $@
 

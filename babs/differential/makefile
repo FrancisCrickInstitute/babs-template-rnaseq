@@ -93,7 +93,7 @@ $(samplesheets) : $(my_metadata)_%.csv : samples.db
 	mkdir -p $(dir $(my_metadata))
 	$(SQLITE) -header -csv  samples.db 'SELECT metadata.* FROM metadata INNER JOIN (SELECT * FROM fastqs GROUP BY $(samplesheet_id_column)) AS asf on metadata.$(metadata_id_column)=asf.$(samplesheet_id_column) WHERE asf._babs_config_file="$*";' > $@
 
-samples.db: ../nfcore/samples.db ../docs/$(BABS_TABLE).csv
+samples.db: ../nfcore/samples.db ../docs/$(experiment_table).csv
 	cp $< $@
 	$(SQLITE) $@ -csv "DROP TABLE IF EXISTS metadata;"
 	$(SQLITE) $@ -csv ".import $(word 2, $^) metadata"
@@ -117,7 +117,7 @@ spec1 = $(firstword $(docs_specfiles))
 
 $(scripts) &: $(align1).config | renv.lock
 	git stash -m "DESdemonA stashed your scripts. Use 'git stash pop' to retrieve them" 2>/dev/null -- $(scripts) || true
-	$(R) -e 'DESdemonA::get_started(files=commandArgs(trailing=TRUE),nfcore="", metadata="$(my_metadata)_$(align1).csv", file_col="$(metadata_id_column)",name_col=c($(NAME_COLUMN)), counts="$(my_counts_dir)/$(align1)/", org_package="$($(align1).org.db)", count_source="$(align1)", specfile="$(spec1)",  project="$(babsproject)", overwrite=TRUE)' --args $(scripts) 2>&1 | tee logs/get_started.log
+	$(R) -e 'DESdemonA::get_started(files=commandArgs(trailing=TRUE),nfcore="", metadata="$(my_metadata)_$(align1).csv", file_col="$(metadata_id_column)",name_col=c($(name_column)), counts="$(my_counts_dir)/$(align1)/", org_package="$($(align1).org.db)", count_source="$(align1)", specfile="$(spec1)",  project="$(babsproject)", overwrite=TRUE)' --args $(scripts) 2>&1 | tee logs/get_started.log
 	git add $(scripts)
 	echo -e 'Initialised by DESdemonA\n\n' `grep -A 4 DESdemonA renv.lock` | git commit -F - || true
 	git rev-parse "v0.0.1" >/dev/null 2>&1 || git tag v0.0.1

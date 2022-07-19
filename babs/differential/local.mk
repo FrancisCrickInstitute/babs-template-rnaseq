@@ -7,12 +7,6 @@ nfcore_dir=../nfcore/results
 my_metadata=inst/extdata/metadata
 geo_dir=nf_work = /camp/stp/babs/scratch/bioinformatics/projects/${babsid}/geo/
 
-# What's BABS' experiment table (excluding csv file extention)
-BABS_TABLE = experiment_table
-
-
-# Where to look for experimental design information
-NAME_COLUMN  = "sample_label","name","label","sample","filename","$(meta2asf)"
 
 # Produce a self-contained report (false to link images etc)
 contained    = FALSE
