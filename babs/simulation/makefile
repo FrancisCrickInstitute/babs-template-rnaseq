@@ -30,7 +30,7 @@ data/$(spec)_x_$(alignment).dda : 01_analyse.r $(spec).spec data/counts_$(alignm
 	$(R) -e "rmarkdown::render('01_analyse.r',\
 	 output_file='$(spec)_x_$(alignment)_$(TAG).html',\
 	 output_options = list(self_contained=$(contained)),\
-	 params=list(res_dir='$$(resdir)',spec_file='$(spec).spec', count_source='$(alignment)'))"
+	 params=list(res_dir='$$(resdir)',spec_file='$(spec).spec', count_source='$(alignment)'))" 2>&1 | tee logs/01_analyse.log
 	mv -f "$(spec)_x_$(alignment)_$(TAG).html"  "$$(resdir)"
 	rm -rf "$$(resdir)/$(spec)_x_$(alignment)_$(TAG)_files"
 	mv "$(spec)_x_$(alignment)_$(TAG)_files" "$$(resdir)"
@@ -54,11 +54,11 @@ $(count_objs) : data/counts_%.rda : 00_init.r
 	 mcols(dds)\$$symbol <- as.character(1:nrow(dds)); \
 	 mcols(dds)\$$entrez <- as.character(1:nrow(dds)); \
 	 save(dds, file='$@'); \
-	 saveRDS(dds, file='$(@:rda=rds)')"
+	 saveRDS(dds, file='$(@:rda=rds)')"  2>&1 | tee logs/00_init.log
 
 
 R.bib: renv.lock
-	 $(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")'
+	 $(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")'  2>&1 | tee logs/bib.log
 
 
 
@@ -97,21 +97,23 @@ $(scripts) &:  | renv.lock
 	  git status ;\
 	  echo "Please commit changes before re-running 'prepare_scripts'" ; exit 1 ;\
 	fi ;\
-	$(R) -e 'DESdemonA::get_started(files=commandArgs(trailing=TRUE),nfcore="", metadata="$(my_metadata)_$(alignments).csv", file_col="$(metadata_id_column)",name_col=c($(NAME_COLUMN)), counts="$(my_counts_dir)/$(alignments)/", org_package="$($(alignments).org.db)", count_source="$(alignments)", specfile="$(spec1)",  project="$(babsproject)", overwrite=TRUE)' --args $(scripts)
+	$(R) -e 'DESdemonA::get_started(files=commandArgs(trailing=TRUE),nfcore="", metadata="$(my_metadata)_$(alignments).csv", file_col="$(metadata_id_column)",name_col=c($(name_column)), counts="$(my_counts_dir)/$(alignments)/", org_package="$($(alignments).org.db)", count_source="$(alignments)", specfile="$(spec1)",  project="$(babsproject)", overwrite=TRUE)' --args $(scripts)  2>&1 | tee logs/get_started.log
 	sed -i '376i knitr::knit_exit()' 01_analyse.r
 	git add $(scripts)
 	echo -e 'Initialised by DESdemonA\n\n' `grep -A 4 DESdemonA renv.lock` | git commit -F - || true
 	git rev-parse "v0.0.1" >/dev/null 2>&1 || git tag v0.0.1
 
 renv.lock:orgs=$(subst $(space),$(comma),$(foreach align,$(nfcore_alignments),$($(align).org.db))),
-renv.lock: .renv.lock
+renv.lock: .renv.lock| logs
 	cp $< $@
 	module purge ;\
 	export RENV_PATHS_LIBRARY=renv/library ;\
-	$(R) -e 'library(renv); renv::restore() '
+	$(R) -e 'library(renv); renv::restore() '  2>&1 | tee logs/renv.log
 	git add renv.lock
 	git commit -m "Pipeline creates renv environment"
 
+logs:
+	mkdir $@
 
 .PHONY: R-local
 R-local: R-$(Rversion)
