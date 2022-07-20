@@ -1,6 +1,6 @@
 include ../config/global.mk
 include local.mk
--include ../ingress/*.config
+-include $(confs_dir)/*.config
 -include *.config
 
 .PHONY: build run clean
@@ -80,9 +80,9 @@ geo/md5.txt:
 build: specfiles samplesheets genes_results scripts ## Create experimental tables that reflect the samples actually run. Generate R scripts and environment that will analyse the data. Copy the required nfcore count files into the `inst/extdata` area.
 	make -n -s run > run.sh
 
-docs_specfiles = $(patsubst ../docs/%,%,$(wildcard ../docs/*.spec))
+docs_specfiles = $(patsubst $(docs_dir)/%,%,$(wildcard $(docs_dir)/*.spec))
 specfiles: $(docs_specfiles)
-$(docs_specfiles): %: ../docs/%
+$(docs_specfiles): %: $(docs_dir)/%
 	cp $< $@
 
 
@@ -93,7 +93,7 @@ $(samplesheets) : $(my_metadata)_%.csv : samples.db
 	mkdir -p $(dir $(my_metadata))
 	$(SQLITE) -header -csv  samples.db 'SELECT metadata.* FROM metadata INNER JOIN (SELECT * FROM fastqs GROUP BY $(samplesheet_id_column)) AS asf on metadata.$(metadata_id_column)=asf.$(samplesheet_id_column) WHERE asf._babs_config_file="$*";' > $@
 
-samples.db: ../nfcore/samples.db ../docs/$(experiment_table).csv
+samples.db: ../nfcore/samples.db $(docs_dir)/$(experiment_table).csv
 	cp $< $@
 	$(SQLITE) $@ -csv "DROP TABLE IF EXISTS metadata;"
 	$(SQLITE) $@ -csv ".import $(word 2, $^) metadata"
@@ -138,9 +138,9 @@ renv.lock: .renv.lock | logs
 logs:
 	mkdir $@
 
-configs=$(patsubst ../ingress/%.config,%.config,$(wildcard ../ingress/*.config))
+configs=$(patsubst $(confs_dir)/%.config,%.config,$(wildcard $(confs_dir)/*.config))
 
-$(configs):%.config: ../ingress/%.config
+$(configs):%.config: $(ingress_dir)/%.config
 	cp $< $@
 
 .PHONY: R-local

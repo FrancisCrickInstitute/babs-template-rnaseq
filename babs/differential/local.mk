@@ -1,9 +1,12 @@
 Rversion = 4.0.3-foss-2020b
 R = module load pandoc/2.2.3.2-foss-2016b  R/$(Rversion) NLopt/2.7.0-GCCcore-11.2.0 OpenBLAS/0.3.18-GCC-11.2.0 zstd/1.4.5-GCCcore-10.2.0; command R
 
+docs_dir=../docs
+confs_dir=../ingress
+nfcore_dir=../nfcore/results
+
 
 my_counts_dir=inst/extdata/genes.results
-nfcore_dir=../nfcore/results
 my_metadata=inst/extdata/metadata
 geo_dir=nf_work = /camp/stp/babs/scratch/bioinformatics/projects/${babsid}/geo/
 
