@@ -30,7 +30,7 @@ data/$(spec)_x_$(alignment).dda : 01_analyse.r $(spec).spec data/counts_$(alignm
 	$(R) -e "rmarkdown::render('01_analyse.r',\
 	 output_file='$(spec)_x_$(alignment)_$(TAG).html',\
 	 output_options = list(self_contained=$(contained)),\
-	 params=list(res_dir='$$(resdir)',spec_file='$(spec).spec', count_source='$(alignment)'))" 2>&1 | tee logs/01_analyse.log
+	 params=list(res_dir='$$(resdir)',spec_file='$(spec).spec', count_source='$(alignment)'))"  >logs/01_analyse.log 2>&1
 	mv -f "$(spec)_x_$(alignment)_$(TAG).html"  "$$(resdir)"
 	rm -rf "$$(resdir)/$(spec)_x_$(alignment)_$(TAG)_files"
 	mv "$(spec)_x_$(alignment)_$(TAG)_files" "$$(resdir)"
@@ -47,11 +47,11 @@ $(foreach spec,$(specfiles), \
 count_objs = $(patsubst %,data/counts_%.rda,$(alignments))
 $(count_objs) : data/counts_%.rda : 00_init.r $(wildcard $(my_counts_dir)/%/*.genes.results)
 	mkdir -p data
-	$(R) -e "source('00_init.r')" --args count_source="$*" metadata="$(strip $(my_metadata))_$*.csv" file_col="$(metadata_id_column)" counts="$(my_counts_dir)/$*/" org_package="$($*.org.db)" 2>&1 | tee logs/00_init.log
+	$(R) -e "source('00_init.r')" --args count_source="$*" metadata="$(strip $(my_metadata))_$*.csv" file_col="$(metadata_id_column)" counts="$(my_counts_dir)/$*/" org_package="$($*.org.db)" >logs/00_init.log 2>&1 
 
 
 R.bib: renv.lock
-	 $(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")' 2>&1 | tee logs/bib.log
+	 $(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")' >logs/bib.log 2>&1
 
 
 .PHONY: geo
@@ -124,7 +124,7 @@ $(scripts) &: $(align1).config | renv.lock
 	  count_source='$(align1)',\
 	  specfile='$(spec1)',\
 	  project='$(babsproject)',\
-	  overwrite=TRUE)" --args $(scripts) 2>&1 | tee logs/get_started.log
+	  overwrite=TRUE)" --args $(scripts) >logs/get_started.log 2>&1
 	git add $(scripts)
 	echo -e 'Initialised by DESdemonA\n\n' `grep -A 4 DESdemonA renv.lock` | git commit -F - || true
 	git rev-parse "v0.0.1" >/dev/null 2>&1 || git tag v0.0.1
@@ -137,7 +137,7 @@ renv.lock: .renv.lock | logs
 	sed -i 's/^Imports:/Imports:\n    $(orgs)/' DESCRIPTION
 	module purge ;\
 	export RENV_PATHS_LIBRARY=renv/library ;\
-	$(R) -e 'library(renv); renv::restore(); renv::install(strsplit("$(orgs)", ",")[[1]])' 2>&1 | tee logs/renv.log
+	$(R) -e 'library(renv); renv::restore(); renv::install(strsplit("$(orgs)", ",")[[1]])' >logs/renv.log 2>&1
 	git add renv.lock
 	git commit -m "Pipeline creates renv environment"  >/dev/null 2>&1 || echo "renv.lock already in git"
 
