@@ -44,9 +44,13 @@ my_metadata=inst/extdata/metadata
 #
 #my_metadata=experiment_table_results.csv#CUSTOMISED
 
+#The directory we'll store results folders in
+results=results
+# The scripts we will pull from DESdemonA's template directory
+scripts = 00_init.r 01_analyse.rmd
 
-# Produce a self-contained report (false to link images etc)
-contained    = FALSE
+# Produce a self-contained report (css path breaks if FALSE!)
+contained    = TRUE
 
 # Git variables
 TAG = $(shell git describe --tags --dirty=_altered --always --long)# e.g. v1.0.2-2-ace1729a

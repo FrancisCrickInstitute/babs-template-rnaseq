@@ -175,10 +175,10 @@
     },
     "DESdemonA": {
       "Package": "DESdemonA",
-      "Version": "0.21.0",
+      "Version": "0.22.0",
       "Source": "Bioconductor",
-      "git_last_commit": "v0.21.0-0-g9f73065_altered",
-      "Hash": "0b6448841dcd46889d621c5c21a6d351",
+      "git_last_commit": "v0.22.0-0-g9c9e2a4_altered",
+      "Hash": "74a9aaecbfbe6f326988dbeb70e272b9",
       "Requirements": [
         "ComplexHeatmap",
         "DESeq2",

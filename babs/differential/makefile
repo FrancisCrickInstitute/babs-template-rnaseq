@@ -24,17 +24,17 @@ submit:  ## Do 'run' but submit to slurm rather than run locally
 	rm -f $(tmp_script)
 
 define RESULT_RULE
-data/$(spec)_x_$(alignment).dda : resdir = results/$(VERSION)/$(alignment)/$(spec)
+data/$(spec)_x_$(alignment).dda : resdir = $(results)/$(VERSION)/$(alignment)/$(spec)
 data/$(spec)_x_$(alignment).dda : 01_analyse.r $(spec).spec data/counts_$(alignment).rda R.bib
 	mkdir -p "$$(resdir)" 
-	$(R) -e "rmarkdown::render('01_analyse.r',\
+	$(R) -e "rmarkdown::render('01_analyse.rmd',\
 	 output_file='$(spec)_x_$(alignment)_$(TAG).html',\
 	 output_options = list(self_contained=$(contained)),\
 	 params=list(res_dir='$$(resdir)',spec_file='$(spec).spec', count_source='$(alignment)'))"  >logs/01_analyse.log 2>&1
 	mv -f "$(spec)_x_$(alignment)_$(TAG).html"  "$$(resdir)"
 	rm -rf "$$(resdir)/$(spec)_x_$(alignment)_$(TAG)_files"
 	mv "$(spec)_x_$(alignment)_$(TAG)_files" "$$(resdir)"
-	ln -sfn "$(VERSION)" results/latest
+	ln -sfn "$(VERSION)" $(results)/latest
 endef
 
 $(foreach spec,$(specfiles), \
@@ -65,7 +65,7 @@ geo/md5.txt:
 	mkdir -p $(geo_dir)
 	ln -s $(geo_dir) geo
 	ln -f $(my_counts_dir)/$(geo_alignment)/*.genes.results geo/
-	ln -f results/$(geo_version)/$(geo_alignment)/$(geo_spec)/*.xlsx geo/
+	ln -f $(results)/$(geo_version)/$(geo_alignment)/$(geo_spec)/*.xlsx geo/
 	$(SQLITE) samples.db 'select fastq_1 from fastqs  where _babs_config_file="$(geo_alignment)";' | \
 	while read -r fq ; do cp ${fq} geo/ ; done
 	$(SQLITE) samples.db 'select fastq_2 from fastqs  where _babs_config_file="$(geo_alignment)";' | \
@@ -106,7 +106,6 @@ $(genes_results): $(my_counts_dir)/%: $(strip $(nfcore_dir))/% %.config
 
 
 .PHONY: scripts
-scripts = 00_init.r 01_analyse.r
 scripts: $(scripts) ## Generate (or reinstate) the default analysis scripts
 
 align1 = $(firstword $(nfcore_alignments))
