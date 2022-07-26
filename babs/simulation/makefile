@@ -1,4 +1,4 @@
-include ../config/global.mk
+include ../global.mk
 include local.mk
 -include ../ingress/*.config
 -include *.config

@@ -1,4 +1,4 @@
-include ../config/global.mk
+include ../global.mk
 include local.mk
 -include $(confs_dir)/*.config
 -include *.config

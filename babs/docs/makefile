@@ -1,4 +1,4 @@
-include ../config/global.mk
+include ../global.mk
 
 checklist := specfiles experiment_table configs asf_samplesheet
 

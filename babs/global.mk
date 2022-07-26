@@ -6,8 +6,9 @@ samplesheet_id_column := sample
 metadata_id_column := ID
 name_column  = "sample_label","name","label","sample","filename","$(meta2asf)"
 
-babsid=$(shell sed -n  "s/ *Hash: *//p" ../../.babs || printf "no-babs-%s-%s" ${USER} `basename ${PWD}`)
-babsproject=$(shell sed -n  "s/ *Project: *//p" ../../.babs || printf "%s-%s" ${USER} `basename ${PWD}`))
+babsfile := $(shell x=`pwd` ;while [ "$$x" != "/" ] ; do  if [ -f "$$x"/.babs ] ; then echo "$$x"/.babs ; break ; else   x=`dirname "$$x"`; fi; done)
+babsid=$(shell sed -n  "s/ *Hash: *//p" $(babsfile) || printf "no-babs-%s-%s" ${USER} `basename ${PWD}`)
+babsproject=$(shell sed -n  "s/ *Project: *//p" $(babsfile) || printf "%s-%s" ${USER} `basename ${PWD}`)
 
 #Executibles (can be overridden in local.mk's)
 NEXTFLOW := ml purge; ml Nextflow/21.10.3; ml Singularity/3.4.2; ml CAMP_proxy; nextflow
@@ -15,7 +16,7 @@ R := module load pandoc/2.2.3.2-foss-2016b; module load R/4.1.2-foss-2021b; comm
 SQLITE := ml SQLite/3.36-GCCcore-11.2.0; sqlite3
 
 #Debugging tool - `make print-varname` will show variable's value
-print-%: ; @echo $*=$($*)
+print-%: ; @echo "$*"="$($*)"
 
 #Set V=true to suppress silent mode
 $(V).SILENT:

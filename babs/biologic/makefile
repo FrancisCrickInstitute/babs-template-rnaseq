@@ -1,4 +1,4 @@
-include ../config/global.mk
+include ../global.mk
 -include ../ingress/*.config
 
 .PHONY: run build
