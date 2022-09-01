@@ -47,7 +47,7 @@ $(samplesheets): samplesheet_%.csv: ../ingress/%.config | samples.db
 	$(SQLITE) samples.db "DROP TABLE IF EXISTS 'config_$*';"
 	$(SQLITE) samples.db 'CREATE TABLE "config_$*" ($(field));' 
 	$(SQLITE) samples.db 'INSERT INTO "config_$*" ($(insfield)) VALUES ($(vals));' 
-	$(SQLITE) -header -csv  samples.db 'SELECT * FROM fastqs NATURAL JOIN "config_$*" ;' > $@ 
+	$(SQLITE) -header -csv  samples.db 'SELECT $(samplesheet_id_column) AS sample, fastq_1, fastq_2, strandedness FROM fastqs NATURAL JOIN "config_$*" ;' > $@ 
 	$(SQLITE) samples.db 'UPDATE fastqs SET _babs_config_file="$*" WHERE fastqs.$(samplesheet_id_column) IN (SELECT $(samplesheet_id_column) FROM fastqs NATURAL JOIN "config_$*") ;'
 
 samples.db: ../ingress/samples.db
