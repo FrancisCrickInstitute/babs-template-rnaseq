@@ -29,6 +29,7 @@ results/$(alignments) : results/% : samplesheet_%.csv
 ################################################################
 
 build: samplesheets ## Build all necessary inputs: samplesheets for each matching alignment '.config' from 'docs'.
+	$(NEXTFLOW) pull nf-core/rnaseq
 	mkdir -p ${nf_work}
 	ln -sf ${nf_work} nf_work
 	make -n -s run > run.sh

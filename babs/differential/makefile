@@ -10,7 +10,7 @@ run: analyses  ## Create objects in `data` that store the results of applying ea
 
 alignments = $(patsubst ${my_counts_dir}/%,%,$(wildcard ${my_counts_dir}/*))
 specfiles = $(patsubst %.spec,%,$(wildcard *.spec))
-result_objs = $(foreach alignment,$(alignments),$(foreach spec,$(specfiles),data/$(spec)_x_$(alignment).dda))
+result_objs = $(foreach alignment,$(alignments),$(foreach spec,$(specfiles),data/$(spec)_x_$(alignment).rda))
 
 .PHONY: analyses
 analyses: $(result_objs)
@@ -24,8 +24,8 @@ submit:  ## Do 'run' but submit to slurm rather than run locally
 	rm -f $(tmp_script)
 
 define RESULT_RULE
-data/$(spec)_x_$(alignment).dda : resdir = $(results)/$(VERSION)/$(alignment)/$(spec)
-data/$(spec)_x_$(alignment).dda : 01_analyse.r $(spec).spec data/counts_$(alignment).rda R.bib
+data/$(spec)_x_$(alignment).rda : resdir = $(results)/$(VERSION)/$(alignment)/$(spec)
+data/$(spec)_x_$(alignment).rda : 01_analyse.r $(spec).spec data/counts_$(alignment).rda R.bib
 	mkdir -p "$$(resdir)" 
 	$(R) -e "rmarkdown::render('01_analyse.rmd',\
 	 output_file='$(spec)_x_$(alignment)_$(TAG).html',\
@@ -136,7 +136,7 @@ renv.lock: .renv.lock | logs
 	sed -i 's/^Imports:/Imports:\n    $(orgs)/' DESCRIPTION
 	module purge ;\
 	export RENV_PATHS_LIBRARY=renv/library ;\
-	$(R) -e 'library(renv); renv::restore(); renv::install(strsplit("$(orgs)", ",")[[1]])' >logs/renv.log 2>&1
+	$(R) -e 'library(renv); renv::restore(); renv::install(paste0("bioc::", strsplit("$(orgs)", ",")[[1]]))' >logs/renv.log 2>&1
 	git add renv.lock
 	git commit -m "Pipeline creates renv environment"  >/dev/null 2>&1 || echo "renv.lock already in git"
 
