@@ -83,6 +83,11 @@ samples_db = $(patsubst ../nfcore/samples.db,%,$(wildcard ../nfcore/samples.db))
 genes_results = $(patsubst %,$(my_counts_dir)/%,$(nfcore_alignments))
 
 build: $(specfiles0) $(samplesheets) $(genes_results) scripts ## Create experimental tables that reflect the samples actually run. Generate R scripts and environment that will analyse the data. Copy the required nfcore count files into the `inst/extdata` area.
+	git stash -m "Pipeline stashed specfiles and samplesheets. Use 'git stash pop' to retrieve them" 2>/dev/null -- $(specfiles0) $(samplesheets) || true
+	git add $(specfiles0) $(samplesheets)
+	echo -e 'Specfiles and samplesheets automatically added' | git commit -F - || true
+	git stash list
+
 
 $(specfiles0): %: $(docs_dir)/%
 	cp $< $@
