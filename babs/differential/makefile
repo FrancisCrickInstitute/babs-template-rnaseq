@@ -79,7 +79,7 @@ geo/md5.txt:
 nfcore_alignments = $(patsubst $(strip $(nfcore_dir))/%,%,$(wildcard $(strip $(nfcore_dir))/*))
 specfiles0 = $(patsubst $(docs_dir)/%,%,$(wildcard $(docs_dir)/*.spec))
 samplesheets = $(patsubst %,$(strip $(my_metadata))_%.csv,$(nfcore_alignments))
-samples_db = $(patsubst ../nfcore/samples.db,%,$(wildcard ../nfcore/samples.db))
+samples_db = samples.db
 genes_results = $(patsubst %,$(my_counts_dir)/%,$(nfcore_alignments))
 
 build: $(specfiles0) $(samplesheets) $(genes_results) scripts ## Create experimental tables that reflect the samples actually run. Generate R scripts and environment that will analyse the data. Copy the required nfcore count files into the `inst/extdata` area.
