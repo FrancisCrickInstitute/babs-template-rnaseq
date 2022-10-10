@@ -150,7 +150,7 @@ logs:
 	mkdir $@
 
 configs=$(patsubst $(confs_dir)/%.config,%.config,$(wildcard $(confs_dir)/*.config))
-$(configs):%.config: $(ingress_dir)/%.config
+$(configs):%.config: $(confs_dir)/%.config
 	cp $< $@
 
 .PHONY: R-local
