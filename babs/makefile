@@ -1,3 +1,4 @@
+include global.mk
 .PHONY: all simulate clean update-pipeline help
 
 all: differential.log ## Run the whole pipeline 
@@ -27,11 +28,11 @@ $(cleaners): clean-%:
 ################################################################
 
 update-pipeline: ## Update the pipeline
-	git stash -m "Stashing state prior to pipeline update"
+	$(GIT) stash -m "Stashing state prior to pipeline update"
 	cp -r --no-preserve=mode /camp/stp/babs/working/bioinformatics/templates/rnaseq/babs/. .
 
 update-pm: ## Update the project management scripts
-	git stash -m "Stashing state prior to updating .github"
+	$(GIT) stash -m "Stashing state prior to updating .github"
 	cp -r --no-preserve=mode /camp/stp/babs/working/bioinformatics/templates/generic/.github/. ../.github/
 
 help: ## Show help message

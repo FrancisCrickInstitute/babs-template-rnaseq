@@ -91,17 +91,17 @@ scripts: $(scripts) ## Generate (or reinstate) the default analysis scripts
 
 $(scripts) &:  | renv.lock
 	for file in $(scripts) ; do \
-	  [ -f $${file} ] && git add -f "$${file}" || true;\
+	  [ -f $${file} ] && $(GIT) add -f "$${file}" || true;\
 	done ;\
-	if [ ! -z "$$(git diff --staged)" ] ; then \
-	  git status ;\
+	if [ ! -z "$$($(GIT) diff --staged)" ] ; then \
+	  $(GIT) status ;\
 	  echo "Please commit changes before re-running 'prepare_scripts'" ; exit 1 ;\
 	fi ;\
 	$(R) -e 'DESdemonA::get_started(files=commandArgs(trailing=TRUE),nfcore="", metadata="$(my_metadata)_$(alignments).csv", file_col="$(metadata_id_column)",name_col=c($(name_column)), counts="$(my_counts_dir)/$(alignments)/", org_package="$($(alignments).org.db)", count_source="$(alignments)", specfile="$(spec1)",  project="$(babsproject)", overwrite=TRUE)' --args $(scripts) >logs/get_started.log 2>&1
 	sed -i '376i knitr::knit_exit()' 01_analyse.r
-	git add $(scripts)
-	echo -e 'Initialised by DESdemonA\n\n' `grep -A 4 DESdemonA renv.lock` | git commit -F - || true
-	git rev-parse "v0.0.1" >/dev/null 2>&1 || git tag v0.0.1
+	$(GIT) add $(scripts)
+	echo -e 'Initialised by DESdemonA\n\n' `grep -A 4 DESdemonA renv.lock` | $(GIT) commit -F - || true
+	$(GIT) rev-parse "v0.0.1" >/dev/null 2>&1 || $(GIT) tag v0.0.1
 
 renv.lock:orgs=$(subst $(space),$(comma),$(foreach align,$(nfcore_alignments),$($(align).org.db))),
 renv.lock: .renv.lock| logs
@@ -109,8 +109,8 @@ renv.lock: .renv.lock| logs
 	module purge ;\
 	export RENV_PATHS_LIBRARY=renv/library ;\
 	$(R) -e 'library(renv); renv::restore() ' >logs/renv.log 2>&1
-	git add renv.lock
-	git commit -m "Pipeline creates renv environment"
+	$(GIT) add renv.lock
+	$(GIT) commit -m "Pipeline creates renv environment"
 
 logs:
 	mkdir $@

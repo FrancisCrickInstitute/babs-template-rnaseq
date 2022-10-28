@@ -53,8 +53,8 @@ scripts = 00_init.r 01_analyse.rmd
 contained    = TRUE
 
 # Git variables
-TAG = $(shell git describe --tags --dirty=_altered --always --long)# e.g. v1.0.2-2-ace1729a
-VERSION = $(shell git describe --tags --abbrev=0)#e.g. v1.0.2
+TAG = $(shell $(GIT) describe --tags --dirty=_altered --always --long)# e.g. v1.0.2-2-ace1729a
+VERSION = $(shell $(GIT) describe --tags --abbrev=0)#e.g. v1.0.2
 
 define slurm
 #! /usr/bin/bash

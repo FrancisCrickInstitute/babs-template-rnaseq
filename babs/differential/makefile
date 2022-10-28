@@ -83,10 +83,10 @@ samples_db = samples.db
 genes_results = $(patsubst %,$(my_counts_dir)/%,$(nfcore_alignments))
 
 build: $(specfiles0) $(samplesheets) $(genes_results) scripts ## Create experimental tables that reflect the samples actually run. Generate R scripts and environment that will analyse the data. Copy the required nfcore count files into the `inst/extdata` area.
-	git stash -m "Pipeline stashed specfiles and samplesheets. Use 'git stash pop' to retrieve them" 2>/dev/null -- $(specfiles0) $(samplesheets) || true
-	git add $(specfiles0) $(samplesheets)
-	echo -e 'Specfiles and samplesheets automatically added' | git commit -F - || true
-	git stash list
+	$(GIT) stash -m "Pipeline stashed specfiles and samplesheets. Use 'git stash pop' to retrieve them" 2>/dev/null -- $(specfiles0) $(samplesheets) || true
+	$(GIT) add $(specfiles0) $(samplesheets)
+	echo -e 'Specfiles and samplesheets automatically added' | $(GIT) commit -F - || true
+	$(GIT) stash list
 
 
 $(specfiles0): %: $(docs_dir)/%
@@ -117,7 +117,7 @@ align1 = $(firstword $(nfcore_alignments))
 spec1 = $(firstword $(specfiles0) $(specfiles))
 
 $(scripts) &: $(align1).config | renv.lock
-	git stash -m "DESdemonA stashed your scripts. Use 'git stash pop' to retrieve them" 2>/dev/null -- $(scripts) || true
+	$(GIT) stash -m "DESdemonA stashed your scripts. Use 'git stash pop' to retrieve them" 2>/dev/null -- $(scripts) || true
 	$(R) -e "DESdemonA::get_started(files=commandArgs(trailing=TRUE),\
 	  nfcore='$(strip $(nfcore_dir))/$(align1)',\
 	  metadata='$(strip $(my_metadata))_$(align1).csv',\
@@ -129,21 +129,21 @@ $(scripts) &: $(align1).config | renv.lock
 	  specfile='$(spec1)',\
 	  project='$(babsproject)',\
 	  overwrite=TRUE)" --args $(scripts) >logs/get_started.log 2>&1
-	git add $(scripts)
-	echo -e 'Initialised by DESdemonA\n\n' `grep -A 4 DESdemonA renv.lock` | git commit -F - || true
-	git rev-parse "v0.0.1" >/dev/null 2>&1 || git tag v0.0.1
-	git stash list
+	$(GIT) add $(scripts)
+	echo -e 'Initialised by DESdemonA\n\n' `grep -A 4 DESdemonA renv.lock` | $(GIT) commit -F - || true
+	$(GIT) rev-parse "v0.0.1" >/dev/null 2>&1 || $(GIT) tag v0.0.1
+	$(GIT) stash list
 
 renv.lock:orgs=$(subst $(space),$(comma),$(foreach align,$(nfcore_alignments),$($(align).org.db))),
 renv.lock: .renv.lock | logs
-	git stash push -m "DESdemonA stashed your lock file. Use 'git stash pop' to retrieve it" 2>/dev/null -- $@ || true
+	$(GIT) stash push -m "DESdemonA stashed your lock file. Use 'git stash pop' to retrieve it" 2>/dev/null -- $@ || true
 	cp $< $@
 	sed -i 's/^Imports:/Imports:\n    $(orgs)/' DESCRIPTION
 	module purge ;\
 	export RENV_PATHS_LIBRARY=renv/library ;\
 	$(R) -e 'library(renv); renv::restore(); renv::install(paste0("bioc::", strsplit("$(orgs)", ",")[[1]]))' >logs/renv.log 2>&1
-	git add renv.lock
-	git commit -m "Pipeline creates renv environment"  >/dev/null 2>&1 || echo "renv.lock already in git"
+	$(GIT) add renv.lock
+	$(GIT) commit -m "Pipeline creates renv environment"  >/dev/null 2>&1 || echo "renv.lock already in git"
 
 
 logs:
