@@ -25,7 +25,7 @@ submit:  ## Do 'run' but submit to slurm rather than run locally
 
 define RESULT_RULE
 data/$(spec)_x_$(alignment).rda : resdir = $(results)/$(VERSION)/$(alignment)/$(spec)
-data/$(spec)_x_$(alignment).rda : 01_analyse.r $(spec).spec data/counts_$(alignment).rda R.bib
+data/$(spec)_x_$(alignment).rda : 01_analyse.rmd $(spec).spec data/counts_$(alignment).rda R.bib
 	mkdir -p "$$(resdir)" 
 	$(R) -e "rmarkdown::render('01_analyse.rmd',\
 	 output_file='$(spec)_x_$(alignment)_$(TAG).html',\
@@ -42,6 +42,22 @@ $(foreach spec,$(specfiles), \
      $(eval $(RESULT_RULE)) \
    ) \
 )
+
+# UNTESTED START AT quatro-fying
+# define QMD_RESULT_RULE
+# data/$(spec)_x_$(alignment).rda : resdir = $(results)/$(VERSION)/$(alignment)/$(spec)
+# data/$(spec)_x_$(alignment).rda : spec = $(spec)
+# data/$(spec)_x_$(alignment).rda : alignment = $(alignment)
+# data/$(spec)_x_$(alignment).rda : $(spec)_x_$(alignment)_$(TAG).qmd $(spec).spec data/counts_$(alignment).rda R.bib
+# endef
+
+# $(qmds): data/%.rda : %_$(TAG).qmd
+# 	$(QUARTO) render '$*_$(TAG).qmd' \
+# 	  --output-dir $(RESULTS_DIR)/$(VERSION) \
+# 	  -P res_dir:'$(RESULTS_DIR)/$(VERSION)' \
+# 	  -P spec_file:'$(spec).spec' \
+# 	  -P count_source:'$(alignment)' \
+# 	  >logs/01_analyse.log 2>&1
 
 
 count_objs = $(patsubst %,data/counts_%.rda,$(alignments))
