@@ -1,0 +1,161 @@
+.DEFAULT_GOAL=help
+
+## Binaries
+QUARTO=quarto
+R=R
+RVERSION=4.2.2
+GIT=git
+
+EXECUTOR = singularity
+
+DOCKER = gavinpaulkelly/verse-boost
+BIND_DIR = $(shell ${GIT} rev-parse --show-toplevel || echo ${CURDIR})
+
+################################################################
+## Directories
+################################################################
+## Location of qmds and multi-yaml files
+source_dir=resources
+## Place where qmds will be generated
+staging_dir=staging
+## place within the staging directory where renders will be placed
+RESULTS_DIR = results
+#Probably set in 'secrets' file, but if not then:
+RENV_PATHS_ROOT ?= ~/.local/share/renv
+RENV_PATHS_PREFIX=rocker
+#Another 'secret', but in case not:
+SINGULARITY_ROOT ?= ./
+publish_results=results
+publish_intranet=www_internal
+publish_internet=www_external
+publish_outputs=outputs
+log_dir=logs
+location=results
+
+docs_dir=$(strip ../docs)
+nfcore_dir=$(strip ../nfcore/results)
+
+my_counts_dir=inst/extdata/genes.results
+geo_dir=/camp/stp/babs/scratch/bioinformatics/projects/${babsid}/geo/
+my_metadata=inst/extdata/metadata
+samples_db = samples.db
+
+################################################################
+## Placeholders
+##
+## We need to insert lines into scripts at various places.
+## Here, we let 'make' know where we want those injections
+## to happen
+################################################################
+## If we need the filename of the yml file that contains the
+## parameters. File won't have the initial `params:`, nor will
+## the individual lines be indented
+yaml-filename-placeholder=my_params_yml
+
+## The (indented) parameters will be injected immediately after
+## every match of
+params-after-line=params:
+
+## The relevant metadata (title, etc) will replace the following line
+metadata-subst-line=metadata-files: *
+
+## Marker in the _quarto above which the sidebar info will be placed
+sections-before-line=\#sections get inserted above
+
+## Unlikely that anything below here needs setting by a user.
+
+################################################################
+## Reproducible containers
+##
+## Above, we set a default value of EXECUTOR. This can be over-
+## ridden at the command line, e.g.
+## `make target EXECUTOR=shell|singularity|docker`
+## 'shell' will run using the prevailing system executibles.
+################################################################
+CONTAINERED=false#An internal flag
+
+ifeq (${EXECUTOR},singularity)
+CONTAINER=module load Singularity/3.6.4; singularity
+CONTAINER_IMAGE=$(SINGULARITY_ROOT)/$(notdir $(DOCKER))_$(RVERSION).sif
+CONTAINER_FLAGS= exec --bind $(BIND_DIR),/tmp,$(RENV_PATHS_ROOT),$(PWD)/rocker.Renviron:/usr/local/lib/R/etc/Renviron.site --pwd $(PWD) --containall --cleanenv
+CONTAINER_FLAGS_INTERACTIVE=$(CONTAINER_FLAGS) --bind $${HOME}/.emacs.d,$${HOME}/.Xauthority --env DISPLAY=$${DISPLAY}
+$(CONTAINER_IMAGE): | rocker.Renviron
+	cd $(dir $(CONTAINER_IMAGE)) ;\
+	$(CONTAINER) pull docker://$(DOCKER):$(RVERSION)
+CONTAINERED=true
+
+else ifeq (${EXECUTOR},docker)
+CONTAINER=docker
+CONTAINER_IMAGE=$(DOCKER):$(RVERSION)
+CONTAINER_FLAGS=run \
+--mount type=bind,source="$(BIND_DIR)",target="$(BIND_DIR)" \
+--mount type=bind,source="/tmp",target="/tmp" \
+--mount type=bind,source="$(PWD)/rocker.Renviron",target="/usr/local/lib/R/etc/Renviron.site" \
+--workdir="$(PWD)" $(CONTAINER_IMAGE)
+	mkdir -p $(dir $(CONTAINER_IMAGE))
+	touch $(CONTAINER_IMAGE)
+CONTAINERED=true
+$(CONTAINER_IMAGE): | rocker.Renviron
+	$(CONTAINER) pull docker://$(DOCKER):$(RVERSION)
+	echo "Proxy for docker image" > $(DOCKER):$(RVERSION)
+
+else ifeq (${EXECUTOR},shell)
+  $(info " Not using containerisation so results are not necessarily reproducible")
+## Maybe setup different values for R, QUARTO, eg
+# R=module load R
+
+else ifeq (${EXECUTOR},make)
+# This is what we use as internal option - effectively means we're already in the container,
+# so no need for any action here.
+else
+  $(error "# Don't recognise '${EXECUTOR}' as an executor")
+endif
+
+
+
+make-args=$(shell echo "$(MAKEFLAGS)" | sed -rn 's/^.* -- (.*)/\1/p') TAG=$(TAG) VERSION=$(VERSION)
+
+
+# Git variables
+TAG := _$(shell $(GIT) describe --tags --dirty=_altered --always --long 2>/dev/null || echo "uncontrolled")# e.g. v1.0.2-2-ace1729a
+VERSION := $(shell $(GIT) describe --tags --abbrev=0 2>/dev/null || echo "vX.Y.Z")#e.g. v1.0.2
+git-ignore=touch .gitignore && grep -qxF '$(1)' .gitignore || echo '$(1)' >> .gitignore
+
+
+
+
+###################################################################################
+## To run just the differential module in isolation, you can uncomment
+## the lines marked CUSTOMISED below (by removing the initial '##' symbol)
+## Ideally read the MANUAL INSTRUCTIONS that precede such lines.
+## Then type `make build` and then `make run`.  This is only necessary if you've
+## run nfcore outside of the BABS RNASeq pipeline.
+##
+## If you're just making changes to, say, the spec files (or adding new ones),
+## then you should only ever need to type `make run`, without any changes to this
+## file.
+###################################################################################
+
+## MANUAL INSTRUCTIONS:
+## There must be another directory between `nfcore_dir` and star_rsem
+## so the above will work in the case of e.g.
+## ../nfcore/results/GRCh38/star_rsem/abc123.genes.results
+## which is the pipeline standard.
+## But if you've run nfcore without that intermediate directory such that
+## `/path/to/xxx/yyy/results/star_rsem/abc23.genes.results` is a file then
+## uncomment the line at the end of this, and ensure you have a file
+## called `./results.config` that contains the line
+## `results.org.db=org.Hs.eg.db` or whatever organism you have.
+##
+#nfcore_dir=/path/to/xxx/yyy#CUSTOMISED
+
+
+## I need a file in `my_metadata`_%.csv that is formatted
+## according to the 'experiment_table.csv' guidelines (ie ID and sample_label
+## as first two columns). That '%' placeholder is the 'zzz' of the
+## folder intermediate between `nfcore_dir` and `nfcoredir/zzz/star_rsem`
+## and so for the case described in the nfcore_dir instructions above, that
+## 'zzz' will be "results", so you might want to rename your experiment_table.csv to
+## be `./experiment_table_results.csv`, and uncomment the following line:
+##
+#my_metadata=experiment_table_results.csv#CUSTOMISED

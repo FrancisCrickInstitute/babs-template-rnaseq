@@ -1,0 +1,82 @@
+# csv file names (excluding ext)
+samplesheet_fname=asf_samplesheet
+experiment_table = experiment_table
+# Column names
+samplesheet_id_column := sample_lims
+metadata_id_column := ID
+name_col = sample_name
+
+babsfile := $(shell x=`pwd` ;while [ "$$x" != "/" ] ; do  if [ -f "$$x"/.babs ] ; then echo "$$x"/.babs ; break ; else   x=`dirname "$$x"`; fi; done)
+babsid=$(shell sed -n  "s/ *Hash: *//p" $(babsfile) || printf "no-babs-%s-%s" ${USER} `basename ${PWD}`)
+babsproject=$(shell sed -n  "s/ *Project: *//p" $(babsfile) || printf "%s-%s" ${USER} `basename ${PWD}`)
+
+#Executibles (can be overridden in local.mk's)
+ml = module is-loaded $1 || module load $1
+
+NEXTFLOW = $(call ml,Nextflow/21.10.3); $(call ml,Singularity/3.4.2); $(call ml,CAMP_proxy); nextflow
+R = $(call ml,pandoc/2.2.3.2-foss-2016b); $(call ml,R/4.1.2-foss-2021b); command R
+SQLITE = $(call ml,SQLite/3.36-GCCcore-11.2.0); sqlite3
+GIT=git
+
+################################################################
+## SLURM
+## 
+## Have default but customisable slurm parameters 
+################################################################
+## By default, run recipes in the usual manner rather than slurm etc.
+SUBMIT=false
+
+SLURM--time=0-02:00:00
+SLURM--mem=64G
+SLURM--cpus-per-task=8
+SLURM--partition=cpu
+
+define slurm
+#! /usr/bin/bash
+#SBATCH --partition=$(SLURM--partition)
+#SBATCH --time='$(SLURM--time)'
+#SBATCH --cpus-per-task=$(SLURM--cpus-per-task)
+#SBATCH --mem=$(SLURM--mem)
+#SBATCH --job-name=$(notdir $(CURDIR))
+#SBATCH --output=slurm-%x-%A_%a.out
+endef
+
+export slurm
+
+# Git variables
+PROJECT_HOME:=$(shell $(GIT) rev-parse --show-toplevel 2>/dev/null || echo $(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
+TAG := _$(shell $(GIT) describe --tags --dirty=_altered --always --long 2>/dev/null || echo "uncontrolled")# e.g. v1.0.2-2-ace1729a
+VERSION := $(shell $(GIT) describe --tags --abbrev=0 2>/dev/null || echo "vX.Y.Z")#e.g. v1.0.2
+git-ignore=touch .gitignore && grep -qxF '$(1)' .gitignore || echo '$(1)' >> .gitignore
+
+
+#Standard makefile hacks
+comma:= ,
+space:= $() $()
+empty:= $()
+define newline
+
+$(empty)
+endef
+
+ifdef NTFY
+notification= [[ $$r = 0 ]] && \
+curl -H "Title: SLURM submission complete" -H "Tags: +1" -d "Finished $*" ntfy.sh/$(NTFY) || \
+curl -H "Title: SLURM submission failed"   -H "Tags: warning" -d "Failed $*: status $$r" ntfy.sh/$(NTFY)
+endif
+
+
+################################################################
+## Standard Goals
+################################################################
+.PHONY: print-%
+print-%: ## `make print-varname` will show varname's value
+	@echo "$*"="$($*)"
+
+$(V).SILENT: 
+
+.PHONY: help
+help: ## Show help message
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m\033[0m\n"} /^[$$()% 0-9a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+
+

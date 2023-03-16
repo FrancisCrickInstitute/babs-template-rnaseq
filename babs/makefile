@@ -1,37 +1,22 @@
-include global.mk
-.PHONY: all simulate clean update-pipeline help
+all: differential
+.PHONY: all clean
 
-all: differential.log ## Run the whole pipeline 
+stages := ingress nfcore differential biologic 
+.PHONY: $(stages)
 
-differential.log: nfcore.log
-nfcore.log: ingress.log
-ingress.log: docs.log
-biologic.log: differential.log
+ingress: 
+nfcore: ingress
+differential: nfcore
+biologic: differential
 
-simulate: simulation.log
-
-
-%.log : %
-	$(MAKE) -C $* build > $*.err 2>&1
-	$(MAKE) -C $* run  >> $*.err 2>&1
-	mv $*.err $@
+$(stages):
+	cd $@ && $(MAKE) build && $(MAKE) run
 
 
-cleaners := $(patsubst %/,clean-%,$(wildcard */))
+
+cleaners := $(stages:%=clean-%)
+clean: $(cleaners)
 .PHONY: $(cleaners)
-clean: $(cleaners) ## 'clean' each module, then remove the log files
-	rm -f *.log
-$(cleaners): clean-%:
-	$(MAKE) -C $* clean || echo "Couldn't clean $*"
 
-
-################################################################
-
-update-pipeline: ## Update the pipeline
-	$(GIT) stash -m "Stashing state prior to pipeline update"
-	cp -r --no-preserve=mode /camp/stp/babs/working/bioinformatics/templates/rnaseq/babs/. .
-
-update-pm: ## Update the project management scripts
-	$(GIT) stash -m "Stashing state prior to updating .github"
-	cp -r --no-preserve=mode /camp/stp/babs/working/bioinformatics/templates/generic/.github/. ../.github/
-
+$(cleaners) : clean-% :
+	cd $* && $(MAKE) clean
