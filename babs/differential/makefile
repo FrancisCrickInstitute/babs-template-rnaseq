@@ -35,9 +35,10 @@ mk-no-yml = $(patsubst %,$(staging_dir)/%.mk,$(without-ymls))
 
 $(mk-with-yml): $(staging_dir)/%.mk : $(source_dir)/%.yml
 	mkdir -p $(staging_dir)
-	[[ $$(grep -c "^- title:" $<) == no ]] && \
-	awk -F': ' 'BEGIN {ORS=" "; print "$*_pages="}; /^- title/{print "$*"}' $<  > $@ || \
-	awk -F': ' 'BEGIN {ORS=" "; print "$*_pages="}; /^- title/{x=$$2;j=sprintf("%02d",i++); gsub(/[^[:alnum:]]/,"_",x); print "$*_"j"_"x;}' $< > $@
+	if [ $$(grep -c "^- title:" $<) == no ] ;\
+	 then awk -F': ' 'BEGIN {ORS=" "; print "$*_pages="}; /^- title/{print "$*"}' $<  > $@ ;\
+	 else awk -F': ' 'BEGIN {ORS=" "; print "$*_pages="}; /^- title/{x=$$2;j=sprintf("%02d",i++); gsub(/[^[:alnum:]]/,"_",x); print "$*_"j"_"x;}' $< > $@ ;\
+	fi
 	echo -e '\n$*_yamls = $$(patsubst %,$(staging_dir)/%.yml,$${$*_pages})'>> $@
 	echo -e '\n$${$*_yamls} : $<' >> $@
 
@@ -226,7 +227,7 @@ specfiles = $(patsubst $(docs_dir)/%,%,$(wildcard $(docs_dir)/*.spec))
 samples_db = samples.db
 genes_results = $(patsubst %,$(my_counts_dir)/%,$(nf_alignments))
 source_ymls=$(patsubst %,$(source_dir)/%.yml,$(sections))
-multiqc_results = $(patsubst %,$(RESULTS_DIR)/%-multiqc,$(nf_alignments))
+multiqc_results = $(patsubst %,$(RESULTS_DIR)/multiqc-%,$(nf_alignments))
 
 build: $(samplesheets) $(specfiles) $(genes_results) $(source_ymls) $(multiqc_results) | $(source_dir) $(staging_dir) ##  Copy the required nfcore count files into the `inst/extdata` area, and get the spec files.
 

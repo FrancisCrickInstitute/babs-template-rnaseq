@@ -75,10 +75,11 @@ sections-before-line=\#sections get inserted above
 CONTAINERED=false#An internal flag
 
 ifeq (${EXECUTOR},singularity)
-CONTAINER=module load Singularity/3.6.4; singularity
+CONTAINER= $(call ml,Singularity/3.6.4); singularity
 CONTAINER_IMAGE=$(SINGULARITY_ROOT)/$(notdir $(DOCKER))_$(RVERSION).sif
 CONTAINER_FLAGS= exec --bind $(BIND_DIR),/tmp,$(RENV_PATHS_ROOT),$(PWD)/rocker.Renviron:/usr/local/lib/R/etc/Renviron.site --pwd $(PWD) --containall --cleanenv
 CONTAINER_FLAGS_INTERACTIVE=$(CONTAINER_FLAGS) --bind $${HOME}/.emacs.d,$${HOME}/.Xauthority --env DISPLAY=$${DISPLAY}
+CONTAINER_SHELL = $(CONTAINER) $(patsubst exec,shell,$(CONTAINER_FLAGS_INTERACTIVE)) $(CONTAINER_IMAGE)
 $(CONTAINER_IMAGE): | rocker.Renviron
 	cd $(dir $(CONTAINER_IMAGE)) ;\
 	$(CONTAINER) pull docker://$(DOCKER):$(RVERSION)
@@ -94,6 +95,7 @@ CONTAINER_FLAGS=run \
 --workdir="$(PWD)" $(CONTAINER_IMAGE)
 	mkdir -p $(dir $(CONTAINER_IMAGE))
 	touch $(CONTAINER_IMAGE)
+CONTAINER_SHELL = $(CONTAINER) $(patsubst run,exec -it,$(CONTAINER_FLAGS_INTERACTIVE)) $(CONTAINER_IMAGE) /bin/bash
 CONTAINERED=true
 $(CONTAINER_IMAGE): | rocker.Renviron
 	$(CONTAINER) pull docker://$(DOCKER):$(RVERSION)
