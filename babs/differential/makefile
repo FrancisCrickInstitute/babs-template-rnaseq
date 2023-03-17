@@ -206,7 +206,7 @@ endif
 nf_alignments = $(patsubst $(nfcore_dir)/%,%,$(wildcard $(nfcore_dir)/*))
 
 # external specfiles union (local specfiles that aren't also external)
-specfiles = $(patsubst $(docs_dir)/%,%,$(wildcard $(docs_dir)/*.spec))
+specfiles =  $(patsubst $(docs_dir)/%,%,$(wildcard $(docs_dir)/*.spec))
 
 samples_db = samples.db
 genes_results = $(patsubst %,$(my_counts_dir)/%,$(nf_alignments))
@@ -267,10 +267,11 @@ $(source_dir)/00_init.yml: $(nf_alignments:=.config) | $(source_dir)
 	let oi=oi+1;\
 	done
 
-$(source_dir)/01_analyse.yml: $(specfiles) $(nf_alignments:=.config) | $(source_dir)
+local-specs = $(sort $(wildcard *.spec) $(specfiles))
+$(source_dir)/01_analyse.yml: $(local-specs) $(nf_alignments:=.config) | $(source_dir)
 	rm -f $@
 	for i in $(nf_alignments) ; do \
-	for j in $(patsubst $(docs_dir)/%,%,$(specfiles:.spec=)) ; do \
+	for j in $(local-specs:.spec=) ; do \
 	echo "- title: $$i $$j" >> $@ ;\
 	echo "  description: of $${i}-aligned data according to '$${j}'" >> $@ ;\
 	echo "  categories: [$${i}, $${j}]" >> $@ ;\
@@ -282,10 +283,46 @@ $(source_dir)/01_analyse.yml: $(specfiles) $(nf_alignments:=.config) | $(source_
 	echo "" >> $@ ;\
 	done; done 
 
-$(patsubst %,$(source_dir)/%.yml,$(filter-out 00_init 01_analyse,$(sections))) : $(source_dir)/%.yml : $(specfiles) $(alignments:=.config) | $(source_dir)
+define TWO_RULE
+$(source_dir)/$(sec)_$(spec)_$(alignment).yml : $(spec).spec $(alignment)
+	echo "- title: $(alignment) $(spec)" >> $@ 
+	echo "  description: of $(alignment)-aligned data according to '$(spec)'" >> $@
+	echo "  categories: [$(alignment), $(spec)]" >> $@
+	echo "  params:" >> $@
+	echo "    alignment: $(alignment)" >> $@
+	echo "    spec: $(spec)" >> $@
+	echo "$${all_params}" | sed $(sed-p2yml) >> $@
+	echo "$${params}" | sed $(sed-p2yml) >> $@
+	echo "" >> $@
+endef
+define ONE_RULE
+$(source_dir)/00_init_$(alignment).yml : $(alignment)
+	echo "- title: $(alignment)" >> $@ 
+	echo "  description: of $(alignment)-aligned data'" >> $@
+	echo "  categories: [$(alignment)]" >> $@
+	echo "  params:" >> $@
+	echo "    alignment: $(alignment)" >> $@
+	echo "$${all_params}" | sed $(sed-p2yml) >> $@
+	echo "$${params}" | sed $(sed-p2yml) >> $@
+	echo "" >> $@
+endef
+#$(foreach sec,$(filter-out 00_init,$(sections)), \
+#  $(foreach alignment,$(alignments), \
+#     $(foreach spec,$(specfiles), \
+#       $(eval $(TWO_RULE)) \
+#     ) \
+#  ) \
+#)
+#  $(foreach alignment,$(alignments), \
+#       $(eval $(ONE_RULE)) \
+# ) \
+
+
+
+$(patsubst %,$(source_dir)/%.yml,$(filter-out 00_init 01_analyse,$(sections))) : $(source_dir)/%.yml : $(local-specs) $(alignments:=.config) | $(source_dir)
 	rm -f $@
 	for i in $(alignments) ; do \
-	for j in $(patsubst $(docs_dir)/%,%,$(specfiles:.spec=)) ; do \
+	for j in $(local-specs:.spec=) ; do \
 	echo "title: $$i $$j" >> $@ ;\
 	echo "description: $${i}-aligned data according to '$${j}'" >> $@ ;\
 	echo "categories: [$${i}, $${j}]" >> $@ ;\
