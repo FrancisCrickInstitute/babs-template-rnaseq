@@ -54,7 +54,7 @@ makefiles=$(patsubst %,$(staging_dir)/%.mk,$(sections))
 ## that section.
 include $(makefiles)
 
-all_params=$(call params-of-section,) -P qmd_name:'$*'
+all_params=$(call params-of-section,) -P qmd_name:$*
 ## Set up dependencies and variables for each section
 ## The variables will contain the section_qmds and section_htmls
 ## The dependencies will contain the original qmd script and the

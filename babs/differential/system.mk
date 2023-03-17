@@ -52,12 +52,7 @@ samples_db = samples.db
 ## the individual lines be indented
 yaml-filename-placeholder=my_params_yml
 
-## The (indented) parameters will be injected immediately after
-## every match of
-params-after-line=params:
 
-## The relevant metadata (title, etc) will replace the following line
-metadata-subst-line=metadata-files: *
 
 ## Marker in the _quarto above which the sidebar info will be placed
 sections-before-line=\#sections get inserted above

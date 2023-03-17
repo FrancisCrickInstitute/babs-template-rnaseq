@@ -17,7 +17,7 @@ define section-dependency-template =
 $(1)_htmls=$(call htmls-of-section,$(1))
 $(1)_qmds=$(call qmds-of-section,$(1))
 $$($(1)_qmds): $(source_dir)/$(1).qmd
-$$($(1)_qmds): params=$(call params-of-section,$(1))
+$(source_dir)/$1.yml: params=$(call params-of-section,$(1))
 endef
 
 include project.mk  ## Provides analysis parametrisation
@@ -88,26 +88,10 @@ $(html_reports) : $(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%$(TAG).html : $(stag
 .PHONY: scripts
 scripts: $(qmds) ## Generate all the parametrised scripts, into the staging directory. But don't render
 
-$(qmds) : $(staging_dir)/%$(TAG).qmd : $(staging_dir)/%.yml $(staging_dir)/%.params.yml
-	cp $(filter %.qmd,$^) $@
-	sed -e '/params:/,$$d' $(staging_dir)/$*.yml | cut -c3- > $(staging_dir)/$*.tmp
-	sed -i -e '/^$(metadata-subst-line)$$/ {' -e 'r $(staging_dir)/$*.tmp' -e 'd' -e '}' $@
-	rm -f $(staging_dir)/$*.tmp
-	sed -i -e 's#$(yaml-filename-placeholder) <- .*$$#$(yaml-filename-placeholder) <- "$(staging_dir)/$*.params.yml"#' $@
-	sed -e 's/^/  /' $(staging_dir)/$*.params.yml > $(staging_dir)/$*.tmp
-	sed  -i -e "/^${params-after-line}$$/r $(staging_dir)/$*.tmp" $@
-	rm -f $(staging_dir)/$*.tmp
-	#$(QUARTO) run $(source_dir)/typescript/merge_yml.ts --script=$(filter %.qmd,$^) --yml=$(staging_dir)/$*.yml >> $@.tmp
+$(qmds) : $(staging_dir)/%$(TAG).qmd : $(staging_dir)/%.yml
+	$(QUARTO) run $(source_dir)/typescript/merge_yml.ts --script=$(filter %.qmd,$^) --yml=$(staging_dir)/$*.yml >> $@
+	sed -i -e 's#$(yaml-filename-placeholder) <- .*$$#$(yaml-filename-placeholder) <- "$(staging_dir)/$*.yml"#' $@
 
-
-## Combine global, section and specific parameters
-$(staging_dir)/%.params.yml: $(staging_dir)/%.yml
-	sed -e '1,/^ *params:/d' $< > $@
-	sed -i -e 's/^ *//' $@
-	echo "${params}" | sed 's/ *-P *//; s/: */: /g; s/ *-P */\n/g;' >> $@
-	echo "${all_params}" | sed 's/ *-P *//; s/: */: /g; s/ *-P */\n/g;' >> $@
-	sed -i -e '/^$$/d' $@
-	awk -F':' '!seen[$$1]++' $@ > $@.tmp && mv $@.tmp $@
 
 
 ${staging_dir}/_quarto.yml: $(source_dir)/_quarto.yml $(qmds)
@@ -245,7 +229,6 @@ $(my_metadata).csv: $(docs_dir)/$(experiment_table).csv | $(dir $(my_metadata))
 $(specfiles): % : $(docs_dir)/%
 	cp $< $@
 
-
 $(patsubst %,%.config,$(nf_alignments)): %.config: ../nfcore/%.config
 	cp $< $@
 
@@ -263,20 +246,23 @@ $(source_ymls) : %.yml : %.qmd
 $(patsubst %.yml,%.qmd,$(source_ymls)) :
 	touch $@
 
+sed-p2yml = 's/^ *-P */    /; s/: */: /g; s/ *-P */\n    /g;'
 $(source_dir)/00_init.yml: orgs=$(foreach align,$(nf_alignments),$($(align).org.db))
 $(source_dir)/00_init.yml: $(nf_alignments:=.config) | $(source_dir)
 	rm -f $@
 	orgs=($(orgs)) ;\
 	oi=0;\
 	for i in $(nf_alignments); do \
-	echo "- title: Init $$i" >> $@ ;\
-	echo "  description: Prepartion for analysis of $${i}-aligned data" >> $@ ;\
-	echo "  categories: [preparation, $${i}]" >> $@ ;\
+	echo "- title: $$i" >> $@ ;\
+	echo "  description: of $${i}-aligned data" >> $@ ;\
+	echo "  categories: [$${i}]" >> $@ ;\
 	echo "  params:" >> $@ ;\
 	echo "    alignment: $${i}" >> $@ ;\
 	echo "    metadata: $(my_metadata)_$${i}.csv" >> $@ ;\
 	echo "    counts: $(my_counts_dir)/$${i}/" >> $@ ;\
 	echo "    org_package: $${orgs[oi]}" >> $@ ;\
+	echo "${all_params}" | sed $(sed-p2yml) >> $@ ;\
+	echo "${params}" | sed $(sed-p2yml) >> $@ ;\
 	echo "" >> $@ ;\
 	let oi=oi+1;\
 	done
@@ -285,12 +271,14 @@ $(source_dir)/01_analyse.yml: $(specfiles) $(nf_alignments:=.config) | $(source_
 	rm -f $@
 	for i in $(nf_alignments) ; do \
 	for j in $(patsubst $(docs_dir)/%,%,$(specfiles:.spec=)) ; do \
-	echo "- title: Differential $$i $$j" >> $@ ;\
-	echo "  description: Differential analysis of $${i}-aligned data according to '$${j}'" >> $@ ;\
-	echo "  categories: [differential, $${i}, $${j}]" >> $@ ;\
+	echo "- title: $$i $$j" >> $@ ;\
+	echo "  description: of $${i}-aligned data according to '$${j}'" >> $@ ;\
+	echo "  categories: [$${i}, $${j}]" >> $@ ;\
 	echo "  params:" >> $@ ;\
 	echo "    alignment: $${i}" >> $@ ;\
 	echo "    spec: $${j}" >> $@ ;\
+	echo "${all_params}" | sed $(sed-p2yml) >> $@ ;\
+	echo "${params}" | sed $(sed-p2yml) >> $@ ;\
 	echo "" >> $@ ;\
 	done; done 
 
@@ -298,13 +286,14 @@ $(patsubst %,$(source_dir)/%.yml,$(filter-out 00_init 01_analyse,$(sections))) :
 	rm -f $@
 	for i in $(alignments) ; do \
 	for j in $(patsubst $(docs_dir)/%,%,$(specfiles:.spec=)) ; do \
-	s=$(shell echo $* | sed "s/^[0-9_]*//") ;\
-	echo "title: $${s^} $$i $$j" >> $@ ;\
-	echo "description: $${s^} analysis of $${i}-aligned data according to '$${j}'" >> $@ ;\
-	echo "categories: [$${s}, $${i}, $${j}]" >> $@ ;\
+	echo "title: $$i $$j" >> $@ ;\
+	echo "description: $${i}-aligned data according to '$${j}'" >> $@ ;\
+	echo "categories: [$${i}, $${j}]" >> $@ ;\
 	echo "params:" >> $@ ;\
 	echo "  alignment: $${i}" >> $@ ;\
 	echo "  spec: $${j}" >> $@ ;\
+	echo "${all_params}" | sed $(sed-p2yml) >> $@ ;\
+	echo "${params}" | sed $(sed-p2yml) >> $@ ;\
 	echo "" >> $@ ;\
 	done; done
 
