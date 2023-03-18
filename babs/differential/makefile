@@ -28,12 +28,18 @@ include project.mk  ## Provides analysis parametrisation
 # ensures the above rule will be invoked to generate the separate ymls
 #
 
+alignments = $(patsubst ${my_counts_dir}/%,%,$(wildcard ${my_counts_dir}/*))
+samplesheets = $(patsubst %,$(my_metadata)_%.csv,$(alignments))
+specfiles = $(patsubst %.spec,%,$(wildcard *.spec))
+
+new=no
+ifeq ($(new),no)
 with-ymls=$(filter $(sections),$(patsubst $(source_dir)/%.yml,%,$(wildcard $(source_dir)/*.yml)))
 mk-with-yml = $(patsubst %,$(staging_dir)/%.mk,$(with-ymls))
 without-ymls= $(filter-out $(with-ymls),$(sections))
 mk-no-yml = $(patsubst %,$(staging_dir)/%.mk,$(without-ymls))
 
-$(mk-with-yml): $(staging_dir)/%.mk : $(source_dir)/%.yml
+$(mk-with-yml): $(staging_dir)/%.mk : $(source_dir)/%.yml | $(patsubst %,%.spec,$(specfiles)) $(samplesheets)
 	mkdir -p $(staging_dir)
 	if [ $$(grep -c "^- title:" $<) == no ] ;\
 	 then awk -F': ' 'BEGIN {ORS=" "; print "$*_pages="}; /^- title/{print "$*"}' $<  > $@ ;\
@@ -46,8 +52,26 @@ $(mk-no-yml):  $(staging_dir)/%.mk :
 	mkdir -p $(staging_dir)
 	echo "$*_pages = $*" >> $@
 
-alignments = $(patsubst ${my_counts_dir}/%,%,$(wildcard ${my_counts_dir}/*))
-samplesheets = $(patsubst %,$(my_metadata)_%.csv,$(alignments))
+else
+mk-with-yml = $(patsubst %,$(staging_dir)/%.mk,$(sections))
+
+$(mk-with-yml): $(staging_dir)/%.mk :  | $(patsubst %,%.spec,$(specfiles)) $(samplesheets)
+	$(foreach ispec,$(specfiles),\
+	   $(foreach ialign,$(alignments),\
+	   echo -e "$(staging_dir)/$*_$(ispec)_$(ialign)$(TAG).qmd: alignment=$(ialign)" >> $@;\
+	   echo -e "$(staging_dir)/$*_$(ispec)_$(ialign)$(TAG).qmd: spec=$(ispec)" >> $@;\
+	   echo -e "$(staging_dir)/$*_$(ispec)_$(ialign)$(TAG).qmd: script=$*_$(ispec)_$(ialign)$(TAG)" >> $@;\
+	   echo -e "$(staging_dir)/$*_$(ispec)_$(ialign)$(TAG).qmd: section=$*" >> $@;\
+	   echo -e "$(staging_dir)/$*_$(ispec)_$(ialign)$(TAG).qmd: $(staging_dir)/$*_$(ispec)_$(ialign).yml" >> $@;\
+	   echo -e "$(staging_dir)/$*_$(ispec)_$(ialign)$(TAG).qmd: $(source_dir)/$*.qmd" >> $@;\
+	))
+	echo -e "$*_pages=$(foreach ispec,$(specfiles),$(foreach ialign,$(alignments),$*_$(ispec)_$(ialign)))" >> $@
+	echo -e '\n$*_yamls = $$(patsubst %,$(staging_dir)/%.yml,$${$*_pages})'>> $@
+	echo -e '\n$*_qmds = $$(patsubst %,$(staging_dir)/%$(TAG).qmd,$$($*_pages)))'>> $@
+	echo -e '\n$*_htmls = $$(patsubst %,$(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%$(TAG).html,$$($*_pages))'>> $@
+	echo -e '\n$*_params = $$(foreach p,$$($*_param_names),$$(patsubst %,-P %:$$($$(p)),$$(p)))'>> $@
+endif
+
 include $(patsubst %,%.config,$(alignments))
 
 ifeq ($(SUBMIT),false)
@@ -107,12 +131,13 @@ ${staging_dir}/index.qmd : $(source_dir)/index.qmd
 ## pointing at the multi-stanza yml (so if none, for singleton qmds,
 ## initialise and empty file)
 
-
+ifeq ($(new),no)
 $(ymls):$(staging_dir)/%.yml:
 	if [ -n "$<" ] ;\
 	 then awk -F': ' '/^- title/{x=$$2;j=sprintf("%02d",i++)}{gsub(/[^[:alnum:]]/,"_",x);  if ("${staging_dir}/$(patsubst $(source_dir)/%.yml,%,$(filter %.yml,$^))_"j"_"x".yml" == "$@") print;}' $<  >$@ ;\
 	 else touch $@ ;\
 	fi
+endif
 
 R.bib: renv.lock | $(log_dir)
 	$(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")' >$(log_dir)/bib.log 2>&1
@@ -205,15 +230,15 @@ endif
 ################################################################
 nf_alignments = $(patsubst $(nfcore_dir)/%,%,$(wildcard $(nfcore_dir)/*))
 
-# external specfiles union (local specfiles that aren't also external)
-specfiles =  $(patsubst $(docs_dir)/%,%,$(wildcard $(docs_dir)/*.spec))
+# external specfiles
+specfiles_ext =  $(patsubst $(docs_dir)/%,%,$(wildcard $(docs_dir)/*.spec))
 
 samples_db = samples.db
 genes_results = $(patsubst %,$(my_counts_dir)/%,$(nf_alignments))
 source_ymls=$(patsubst %,$(source_dir)/%.yml,$(sections))
 multiqc_results = $(patsubst %,$(RESULTS_DIR)/multiqc-%,$(nf_alignments))
 
-build: $(samplesheets) $(specfiles) $(genes_results) $(source_ymls) $(multiqc_results) | $(source_dir) $(staging_dir) ##  Copy the required nfcore count files into the `inst/extdata` area, and get the spec files.
+build: $(samplesheets) $(specfiles_ext) $(genes_results) $(source_ymls) $(multiqc_results) | $(source_dir) $(staging_dir) ##  Copy the required nfcore count files into the `inst/extdata` area, and get the spec files.
 
 
 $(samplesheets) : $(my_metadata)_%.csv : $(samples_db) 
@@ -226,7 +251,7 @@ $(samples_db): $(my_metadata).csv $(nfcore_dir)/../$(samples_db)
 $(my_metadata).csv: $(docs_dir)/$(experiment_table).csv | $(dir $(my_metadata))
 	cp $< $@
 
-$(specfiles): % : $(docs_dir)/%
+$(specfiles_ext): % : $(docs_dir)/%
 	cp $< $@
 
 $(patsubst %,%.config,$(nf_alignments)): %.config: ../nfcore/%.config
@@ -267,7 +292,7 @@ $(source_dir)/00_init.yml: $(nf_alignments:=.config) | $(source_dir)
 	let oi=oi+1;\
 	done
 
-local-specs = $(sort $(wildcard *.spec) $(specfiles))
+local-specs = $(sort $(wildcard *.spec) $(specfiles_ext))
 $(source_dir)/01_analyse.yml: $(local-specs) $(nf_alignments:=.config) | $(source_dir)
 	rm -f $@
 	for i in $(nf_alignments) ; do \
@@ -283,41 +308,33 @@ $(source_dir)/01_analyse.yml: $(local-specs) $(nf_alignments:=.config) | $(sourc
 	echo "" >> $@ ;\
 	done; done 
 
-define TWO_RULE
-$(source_dir)/$(sec)_$(spec)_$(alignment).yml : $(spec).spec $(alignment)
+ifeq ($(new),yes)
+tmp=$(patsubst %,$(staging_dir)/%$(TAG).qmd,$(01_analyse_pages) $(00_init_pages))
+tmp: $(tmp)
+$(tmp):
+	touch $@
+
+$(01_analyse_yamls):
 	echo "- title: $(alignment) $(spec)" >> $@ 
 	echo "  description: of $(alignment)-aligned data according to '$(spec)'" >> $@
 	echo "  categories: [$(alignment), $(spec)]" >> $@
 	echo "  params:" >> $@
 	echo "    alignment: $(alignment)" >> $@
 	echo "    spec: $(spec)" >> $@
-	echo "$${all_params}" | sed $(sed-p2yml) >> $@
-	echo "$${params}" | sed $(sed-p2yml) >> $@
+	echo "${all_params}" | sed $(sed-p2yml) >> $@
+	echo "$(call params-of-section,$(section))" | sed $(sed-p2yml) >> $@
 	echo "" >> $@
-endef
-define ONE_RULE
-$(source_dir)/00_init_$(alignment).yml : $(alignment)
+
+$(00_init_yamls):
 	echo "- title: $(alignment)" >> $@ 
 	echo "  description: of $(alignment)-aligned data'" >> $@
 	echo "  categories: [$(alignment)]" >> $@
 	echo "  params:" >> $@
 	echo "    alignment: $(alignment)" >> $@
-	echo "$${all_params}" | sed $(sed-p2yml) >> $@
-	echo "$${params}" | sed $(sed-p2yml) >> $@
+	echo "${all_params}" | sed $(sed-p2yml) >> $@
+	echo "$(call params-of-section,$(section))" | sed $(sed-p2yml) >> $@
 	echo "" >> $@
-endef
-#$(foreach sec,$(filter-out 00_init,$(sections)), \
-#  $(foreach alignment,$(alignments), \
-#     $(foreach spec,$(specfiles), \
-#       $(eval $(TWO_RULE)) \
-#     ) \
-#  ) \
-#)
-#  $(foreach alignment,$(alignments), \
-#       $(eval $(ONE_RULE)) \
-# ) \
-
-
+endif
 
 $(patsubst %,$(source_dir)/%.yml,$(filter-out 00_init 01_analyse,$(sections))) : $(source_dir)/%.yml : $(local-specs) $(alignments:=.config) | $(source_dir)
 	rm -f $@
@@ -334,8 +351,6 @@ $(patsubst %,$(source_dir)/%.yml,$(filter-out 00_init 01_analyse,$(sections))) :
 	echo "" >> $@ ;\
 	done; done
 
-#l=$(foreach looper,$1,for $(looper) in $($(looper)) ; do )
-#s=$(call l,alignments specfiles)
 
 $(log_dir) $(source_dir) $(staging_dir) $(dir $(my_metadata)) data $(RESULTS_DIR)/$(VERSION) $(RESULTS_DIR):
 	mkdir -p $@
