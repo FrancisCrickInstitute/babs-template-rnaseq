@@ -53,23 +53,36 @@ $(mk-no-yml):  $(staging_dir)/%.mk :
 	echo "$*_pages = $*" >> $@
 
 else
-mk-with-yml = $(patsubst %,$(staging_dir)/%.mk,$(sections))
 
-$(mk-with-yml): $(staging_dir)/%.mk :  | $(patsubst %,%.spec,$(specfiles)) $(samplesheets)
+mk1 = $(patsubst %,$(staging_dir)/%.mk,$(filter 00_%,$(sections)))
+mk2 = $(patsubst %,$(staging_dir)/%.mk,$(filter-out 00_%,$(sections)))
+
+$(mk2): $(staging_dir)/%.mk : | $(patsubst %,%.spec,$(specfiles)) $(samplesheets) $(staging_dir)
 	$(foreach ispec,$(specfiles),\
 	   $(foreach ialign,$(alignments),\
 	   echo -e "$(staging_dir)/$*_$(ispec)_$(ialign)$(TAG).qmd: alignment=$(ialign)" >> $@;\
 	   echo -e "$(staging_dir)/$*_$(ispec)_$(ialign)$(TAG).qmd: spec=$(ispec)" >> $@;\
 	   echo -e "$(staging_dir)/$*_$(ispec)_$(ialign)$(TAG).qmd: script=$*_$(ispec)_$(ialign)$(TAG)" >> $@;\
 	   echo -e "$(staging_dir)/$*_$(ispec)_$(ialign)$(TAG).qmd: section=$*" >> $@;\
-	   echo -e "$(staging_dir)/$*_$(ispec)_$(ialign)$(TAG).qmd: $(staging_dir)/$*_$(ispec)_$(ialign).yml" >> $@;\
-	   echo -e "$(staging_dir)/$*_$(ispec)_$(ialign)$(TAG).qmd: $(source_dir)/$*.qmd" >> $@;\
+	   echo -e "$(staging_dir)/$*_$(ispec)_$(ialign)$(TAG).qmd: $(source_dir)/$*.qmd $(staging_dir)/$*_$(ispec)_$(ialign).yml" >> $@;\
 	))
-	echo -e "$*_pages=$(foreach ispec,$(specfiles),$(foreach ialign,$(alignments),$*_$(ispec)_$(ialign)))" >> $@
-	echo -e '\n$*_yamls = $$(patsubst %,$(staging_dir)/%.yml,$${$*_pages})'>> $@
-	echo -e '\n$*_qmds = $$(patsubst %,$(staging_dir)/%$(TAG).qmd,$$($*_pages)))'>> $@
-	echo -e '\n$*_htmls = $$(patsubst %,$(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%$(TAG).html,$$($*_pages))'>> $@
-	echo -e '\n$*_params = $$(foreach p,$$($*_param_names),$$(patsubst %,-P %:$$($$(p)),$$(p)))'>> $@
+	echo -e "\n$*_pages=$(foreach ispec,$(specfiles),$(foreach ialign,$(alignments),$*_$(ispec)_$(ialign)))" >> $@
+	echo -e '$*_yamls = $$(patsubst %,$(staging_dir)/%.yml,$${$*_pages})'>> $@
+	echo -e '$*_qmds = $$(patsubst %,$(staging_dir)/%$(TAG).qmd,$$($*_pages)))'>> $@
+	echo -e '$*_htmls = $$(patsubst %,$(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%$(TAG).html,$$($*_pages))'>> $@
+	echo -e '$*_params = $$(foreach p,$$($*_param_names),$$(patsubst %,-P %:$$($$(p)),$$(p)))'>> $@
+$(mk1): $(staging_dir)/%.mk : | $(samplesheets) $(staging_dir)
+	$(foreach ialign,$(alignments),\
+	 echo -e "$(staging_dir)/$*_$(ialign)$(TAG).qmd: alignment=$(ialign)" >> $@;\
+	 echo -e "$(staging_dir)/$*_$(ialign)$(TAG).qmd: script=$*_$(ialign)$(TAG)" >> $@;\
+	 echo -e "$(staging_dir)/$*_$(ialign)$(TAG).qmd: section=$*" >> $@;\
+	 echo -e "$(staging_dir)/$*_$(ialign)$(TAG).qmd: $(staging_dir)/$*_$(ialign).yml $(source_dir)/$*.qmd" >> $@;\
+	)
+	echo -e "\n$*_pages=$(foreach ialign,$(alignments),$*_$(ialign))" >> $@
+	echo -e '$*_yamls = $$(patsubst %,$(staging_dir)/%.yml,$${$*_pages})'>> $@
+	echo -e '$*_qmds = $$(patsubst %,$(staging_dir)/%$(TAG).qmd,$$($*_pages)))'>> $@
+	echo -e '$*_htmls = $$(patsubst %,$(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%$(TAG).html,$$($*_pages))'>> $@
+	echo -e '$*_params = $$(foreach p,$$($*_param_names),$$(patsubst %,-P %:$$($$(p)),$$(p)))'>> $@
 endif
 
 include $(patsubst %,%.config,$(alignments))
@@ -115,8 +128,6 @@ scripts: $(qmds) ## Generate all the parametrised scripts, into the staging dire
 $(qmds) : $(staging_dir)/%$(TAG).qmd : $(staging_dir)/%.yml
 	$(QUARTO) run $(source_dir)/typescript/merge_yml.ts --script=$(filter %.qmd,$^) --yml=$(staging_dir)/$*.yml >> $@
 	sed -i -e 's#$(yaml-filename-placeholder) <- .*$$#$(yaml-filename-placeholder) <- "$(staging_dir)/$*.yml"#' $@
-
-
 
 ${staging_dir}/_quarto.yml: $(source_dir)/_quarto.yml $(qmds)
 	$(QUARTO) run $(source_dir)/typescript/sidebar.ts --template=$< --tag=$(TAG) --staging=$(staging_dir) > $@
@@ -223,7 +234,7 @@ endif
 	cp --no-preserve=mode -r .htaccess $(publish_$(location))/latest/
 	ln -sfn $(PWD)/$(publish_$(location))/$(VERSION) $(RESULTS_DIR)/published_$(location)
 	cp -Lr --no-preserve=mode $(patsubst %,$(RESULTS_DIR)/multiqc-%,$(alignments)) $(publish_$(location))
-## TODO - won't work when we do a group-by of alignments
+## TODO - won't work when we do a group-as of alignments
 
 ################################################################
 #### Bootrap all relevant data from outside
@@ -309,10 +320,6 @@ $(source_dir)/01_analyse.yml: $(local-specs) $(nf_alignments:=.config) | $(sourc
 	done; done 
 
 ifeq ($(new),yes)
-tmp=$(patsubst %,$(staging_dir)/%$(TAG).qmd,$(01_analyse_pages) $(00_init_pages))
-tmp: $(tmp)
-$(tmp):
-	touch $@
 
 $(01_analyse_yamls):
 	echo "- title: $(alignment) $(spec)" >> $@ 
@@ -331,9 +338,14 @@ $(00_init_yamls):
 	echo "  categories: [$(alignment)]" >> $@
 	echo "  params:" >> $@
 	echo "    alignment: $(alignment)" >> $@
+	echo "    metadata: $(my_metadata)_${alignment}.csv" >> $@ ;\
+	echo "    counts: $(my_counts_dir)/${alignment}/" >> $@ ;\
+	echo "    org_package: ${${alignment}.org.db}" >> $@ ;\
 	echo "${all_params}" | sed $(sed-p2yml) >> $@
 	echo "$(call params-of-section,$(section))" | sed $(sed-p2yml) >> $@
 	echo "" >> $@
+
+
 endif
 
 $(patsubst %,$(source_dir)/%.yml,$(filter-out 00_init 01_analyse,$(sections))) : $(source_dir)/%.yml : $(local-specs) $(alignments:=.config) | $(source_dir)
