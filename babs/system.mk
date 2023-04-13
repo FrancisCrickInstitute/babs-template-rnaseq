@@ -1,8 +1,8 @@
 # csv file names (excluding ext)
-samplesheet_fname=asf_samplesheet
+samplesheet_fname=samplesheet
 experiment_table = experiment_table
 # Column names
-samplesheet_id_column := sample_lims
+samplesheet_id_column := sample
 metadata_id_column := ID
 name_col = sample_name
 

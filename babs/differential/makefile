@@ -1,104 +1,76 @@
 .PHONY: makefile project.mk system.mk ../system.mk
-.PHONY: build clean
+.PHONY: build clean geo R-local
+
 -include secrets
 include ../system.mk
 include system.mk
 
-## Macros to turn section heading into qmd/html filenames
-## $(1)_pages is a variable that will get set by the `section`.mk file
-## and will contain the page names derived from the multi-stanza
-## yml source file for that section.
-qmds-of-section = $(patsubst %,$(staging_dir)/%$(TAG).qmd,$($(1)_pages))
-htmls-of-section = $(patsubst %,$(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%$(TAG).html,$($(1)_pages))
-params-of-section = $(foreach p,$($(1)_param_names),$(patsubst %,-P %:$($(p)),$(p)))
-ymls = $(foreach section,$(sections),$(patsubst %,$(staging_dir)/%.yml,$($(section)_pages)))
-
-define section-dependency-template = 
-$(1)_htmls=$(call htmls-of-section,$(1))
-$(1)_qmds=$(call qmds-of-section,$(1))
-$$($(1)_qmds): $(source_dir)/$(1).qmd
-$(source_dir)/$1.yml: params=$(call params-of-section,$(1))
-endef
-
 include project.mk  ## Provides analysis parametrisation
-
-# Create a makefile per section, that contains a variable derived from the
-# source-file yaml stanzas.  The variable, named after the section, will
-# contain a list of all the yaml files in that section. And a rule that
-# ensures the above rule will be invoked to generate the separate ymls
-#
+include $(patsubst %,$(staging_dir)/%.mk,$(sections))
 
 alignments = $(patsubst ${my_counts_dir}/%,%,$(wildcard ${my_counts_dir}/*))
 samplesheets = $(patsubst %,$(my_metadata)_%.csv,$(alignments))
 specfiles = $(patsubst %.spec,%,$(wildcard *.spec))
 
-new=no
-ifeq ($(new),no)
-with-ymls=$(filter $(sections),$(patsubst $(source_dir)/%.yml,%,$(wildcard $(source_dir)/*.yml)))
-mk-with-yml = $(patsubst %,$(staging_dir)/%.mk,$(with-ymls))
-without-ymls= $(filter-out $(with-ymls),$(sections))
-mk-no-yml = $(patsubst %,$(staging_dir)/%.mk,$(without-ymls))
+## Create a makefile per section. It will set up target-specific
+## variables to inform subsequent targets of the alignment, spec-file,
+## and section for each alignment:spec combo. It will also set up the
+## global variables 'section'_(pages|yamls|qmds|htmls|params) which
+## enumerate the individual combos.  Because these makefiles are
+## 'included' they will automatically get remade as necessary, and if
+## changed will cause the whole 'make' process to be repeated.
 
-$(mk-with-yml): $(staging_dir)/%.mk : $(source_dir)/%.yml | $(patsubst %,%.spec,$(specfiles)) $(samplesheets)
-	mkdir -p $(staging_dir)
-	if [ $$(grep -c "^- title:" $<) == no ] ;\
-	 then awk -F': ' 'BEGIN {ORS=" "; print "$*_pages="}; /^- title/{print "$*"}' $<  > $@ ;\
-	 else awk -F': ' 'BEGIN {ORS=" "; print "$*_pages="}; /^- title/{x=$$2;j=sprintf("%02d",i++); gsub(/[^[:alnum:]]/,"_",x); print "$*_"j"_"x;}' $< > $@ ;\
-	fi
-	echo -e '\n$*_yamls = $$(patsubst %,$(staging_dir)/%.yml,$${$*_pages})'>> $@
-	echo -e '\n$${$*_yamls} : $<' >> $@
+mk0 = $(patsubst %,$(staging_dir)/%.mk,$(filter 00_%,$(sections)))
+mk = $(patsubst %,$(staging_dir)/%.mk,$(filter-out 00_%,$(sections)))
+qmd_path=$(staging_dir)/$*_$(ispec)_$(ialign)$$(TAG).qmd
+qmd0_path=$(staging_dir)/$*_$(ialign)$$(TAG).qmd
 
-$(mk-no-yml):  $(staging_dir)/%.mk :
-	mkdir -p $(staging_dir)
-	echo "$*_pages = $*" >> $@
-
-else
-
-mk1 = $(patsubst %,$(staging_dir)/%.mk,$(filter 00_%,$(sections)))
-mk2 = $(patsubst %,$(staging_dir)/%.mk,$(filter-out 00_%,$(sections)))
-
-$(mk2): $(staging_dir)/%.mk : | $(patsubst %,%.spec,$(specfiles)) $(samplesheets) $(staging_dir)
+$(mk): $(staging_dir)/%.mk : $(patsubst %,%.spec,$(specfiles)) $(samplesheets) | $(staging_dir)
 	$(foreach ispec,$(specfiles),\
 	   $(foreach ialign,$(alignments),\
-	   echo -e "$(staging_dir)/$*_$(ispec)_$(ialign)$(TAG).qmd: alignment=$(ialign)" >> $@;\
-	   echo -e "$(staging_dir)/$*_$(ispec)_$(ialign)$(TAG).qmd: spec=$(ispec)" >> $@;\
-	   echo -e "$(staging_dir)/$*_$(ispec)_$(ialign)$(TAG).qmd: script=$*_$(ispec)_$(ialign)$(TAG)" >> $@;\
-	   echo -e "$(staging_dir)/$*_$(ispec)_$(ialign)$(TAG).qmd: section=$*" >> $@;\
-	   echo -e "$(staging_dir)/$*_$(ispec)_$(ialign)$(TAG).qmd: $(source_dir)/$*.qmd $(staging_dir)/$*_$(ispec)_$(ialign).yml" >> $@;\
+	   echo '$(qmd_path): alignment=$(ialign)' >> $@;\
+	   echo '$(qmd_path): spec=$(ispec)' >> $@;\
+	   echo '$(qmd_path): script=$*_$(ispec)_$(ialign)$$(TAG)' >> $@;\
+	   echo '$(qmd_path): section=$*' >> $@;\
+	   echo '$(qmd_path): $(source_dir)/$*.qmd' >> $@;\
+	   echo '$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$*_$(ispec)_$(ialign)$$(TAG).html: $(ispec).spec $(my_metadata)_$(ialign).csv $(qmd_path) $(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$($*_parent)$$(TAG).html' >> $@ ;\
+	   echo '' >> $@ ;\
 	))
-	echo -e "\n$*_pages=$(foreach ispec,$(specfiles),$(foreach ialign,$(alignments),$*_$(ispec)_$(ialign)))" >> $@
-	echo -e '$*_yamls = $$(patsubst %,$(staging_dir)/%.yml,$${$*_pages})'>> $@
-	echo -e '$*_qmds = $$(patsubst %,$(staging_dir)/%$(TAG).qmd,$$($*_pages)))'>> $@
-	echo -e '$*_htmls = $$(patsubst %,$(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%$(TAG).html,$$($*_pages))'>> $@
-	echo -e '$*_params = $$(foreach p,$$($*_param_names),$$(patsubst %,-P %:$$($$(p)),$$(p)))'>> $@
-$(mk1): $(staging_dir)/%.mk : | $(samplesheets) $(staging_dir)
+	echo '$*_pages=$(foreach ispec,$(specfiles),$(foreach ialign,$(alignments),$*_$(ispec)_$(ialign)))' >> $@
+	echo '$*_yamls = $$(patsubst %,$(staging_dir)/%.yml,$${$*_pages})'>> $@
+	echo '$*_qmds = $$(patsubst %,$(staging_dir)/%$$(TAG).qmd,$$($*_pages))'>> $@
+	echo '$*_params = $$(foreach p,$$($*_param_names),$$(patsubst %,-P %:$$($$(p)),$$(p)))'>> $@
+	echo '$*_htmls = $$(patsubst %,$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/%$$(TAG).html,$$($*_pages))'>> $@
+	echo '$*_htmls: $$($*_htmls)'>> $@
+
+$(mk0): $(staging_dir)/%.mk : $(samplesheets) | $(staging_dir)
 	$(foreach ialign,$(alignments),\
-	 echo -e "$(staging_dir)/$*_$(ialign)$(TAG).qmd: alignment=$(ialign)" >> $@;\
-	 echo -e "$(staging_dir)/$*_$(ialign)$(TAG).qmd: script=$*_$(ialign)$(TAG)" >> $@;\
-	 echo -e "$(staging_dir)/$*_$(ialign)$(TAG).qmd: section=$*" >> $@;\
-	 echo -e "$(staging_dir)/$*_$(ialign)$(TAG).qmd: $(staging_dir)/$*_$(ialign).yml $(source_dir)/$*.qmd" >> $@;\
+	 echo '$(qmd0_path): alignment=$(ialign)' >> $@;\
+	 echo '$(qmd0_path): script=$*_$(ialign)$$(TAG)' >> $@;\
+	 echo '$(qmd0_path): section=$*' >> $@;\
+	 echo '$(qmd0_path): $(source_dir)/$*.qmd' >> $@;\
+	 echo '$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$*_$(ialign)$$(TAG).html: $(my_metadata)_$(ialign).csv $(qmd0_path)' >> $@ ;\
+	 echo '' >> $@ ;\
 	)
-	echo -e "\n$*_pages=$(foreach ialign,$(alignments),$*_$(ialign))" >> $@
-	echo -e '$*_yamls = $$(patsubst %,$(staging_dir)/%.yml,$${$*_pages})'>> $@
-	echo -e '$*_qmds = $$(patsubst %,$(staging_dir)/%$(TAG).qmd,$$($*_pages)))'>> $@
-	echo -e '$*_htmls = $$(patsubst %,$(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%$(TAG).html,$$($*_pages))'>> $@
-	echo -e '$*_params = $$(foreach p,$$($*_param_names),$$(patsubst %,-P %:$$($$(p)),$$(p)))'>> $@
-endif
+	echo '$*_pages=$(foreach ialign,$(alignments),$*_$(ialign))' >> $@
+	echo '$*_yamls = $$(patsubst %,$(staging_dir)/%.yml,$${$*_pages})'>> $@
+	echo '$*_qmds = $$(patsubst %,$(staging_dir)/%$$(TAG).qmd,$$($*_pages))'>> $@
+	echo '$*_params = $$(foreach p,$$($*_param_names),$$(patsubst %,-P %:$$($$(p)),$$(p)))'>> $@
+	echo '$*_htmls = $$(patsubst %,$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/%$$(TAG).html,$$($*_pages))'>> $@
+	echo '$*_htmls: $$($*_htmls)'>> $@
 
 include $(patsubst %,%.config,$(alignments))
 
 ifeq ($(SUBMIT),false)
     ifeq ($(CONTAINERED),false)
 ##     Being executed directly - no submission or containerisation
+.PHONY: run render pages scripts
 
-.PHONY: run
 run: render  ## Create objects in `data` that store the results of applying each spec file, along with a versioned html report in `results`.  Requires 'make build' be done first.
 
-
-
+qmds=$(strip $(foreach section,$(sections),$($(section)_qmds)))
 
 ## Render the qmds to html in one quarto call
-.PHONY: render
 render: $(qmds)  $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(samplesheets)| $(log_dir) data $(RESULTS_DIR)/$(VERSION) ## Render the whole directory of generated qmds
 	sed  -i 's#^  contents: .*#  contents: [$(subst $(space),$(comma),$(patsubst $(staging_dir)/%,%,$(qmds)))]#' $(staging_dir)/index.qmd
 	$(QUARTO) render '$(staging_dir)' --output-dir $(RESULTS_DIR)/$(VERSION) --execute-dir $(CURDIR) >$(log_dir)/render.log 2>&1
@@ -108,7 +80,7 @@ render: $(qmds)  $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(sampleshe
 
 ## Alternative is to render pages individually
 ## Possibly parallelisable, but seems to have a race condition
-.PHONY: pages
+html_reports=$(strip $(foreach section,$(sections),$($(section)_htmls)))
 pages: $(html_reports) ## Generate the renders individually
 	sed  -i 's#^  contents: .*#  contents: [$(subst $(space),$(comma),$(patsubst $(staging_dir)/%,%,$(qmds)))]#' $(staging_dir)/index.qmd
 	$(QUARTO) render '$(staging_dir)/index.qmd' --output-dir $(RESULTS_DIR)/$(VERSION) --execute-dir $(CURDIR)
@@ -116,13 +88,12 @@ pages: $(html_reports) ## Generate the renders individually
 	ln -sfn  $(VERSION) $(RESULTS_DIR)/latest
 
 ## Render an individual page
-$(html_reports) : $(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%$(TAG).html : $(staging_dir)/%$(TAG).qmd $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(samplesheets)| $(log_dir) $(RESULTS_DIR)/$(VERSION)
+$(html_reports) : $(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%$(TAG).html : $(staging_dir)/%$(TAG).qmd $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(samplesheets)| $(log_dir) $(RESULTS_DIR)/$(VERSION) $(staging_dir)/$(RESULTS_DIR)/$(VERSION)
 	$(QUARTO) render '$<' \
 	  --output-dir $(RESULTS_DIR)/$(VERSION)/ \
 	  --execute-dir $(CURDIR) >$(log_dir)/html-$*.log 2>&1
 
 
-.PHONY: scripts
 scripts: $(qmds) ## Generate all the parametrised scripts, into the staging directory. But don't render
 
 $(qmds) : $(staging_dir)/%$(TAG).qmd : $(staging_dir)/%.yml
@@ -130,30 +101,44 @@ $(qmds) : $(staging_dir)/%$(TAG).qmd : $(staging_dir)/%.yml
 	sed -i -e 's#$(yaml-filename-placeholder) <- .*$$#$(yaml-filename-placeholder) <- "$(staging_dir)/$*.yml"#' $@
 
 ${staging_dir}/_quarto.yml: $(source_dir)/_quarto.yml $(qmds)
-	$(QUARTO) run $(source_dir)/typescript/sidebar.ts --template=$< --tag=$(TAG) --staging=$(staging_dir) > $@
+	$(QUARTO) run $(source_dir)/typescript/sidebar.ts --template=$< --tag=$(TAG) --staging=$(staging_dir) --repo="$(repo)" > $@
 
 ${staging_dir}/index.qmd : $(source_dir)/index.qmd
 	cp $< $@
 
+all_params=$(foreach p,$(param_names),$(patsubst %,-P %:$($(p)),$(p))) -P qmd_name:$(script)
 
-## Separate a section-wide yml with a chunk per page into separate yml
-## files. Chunks delimited by a title field. The '$<' prerequisite
-## will have been set in the autogenerated section-specific makefile,
-## pointing at the multi-stanza yml (so if none, for singleton qmds,
-## initialise and empty file)
+yaml0 = $(filter $(staging_dir)/00_%.yml,$(foreach s,$(sections),$($(s)_yamls)))
+yaml = $(filter-out $(staging_dir)/00_%.yml,$(foreach s,$(sections),$($(s)_yamls)))
+sed-p2yml = 's/^ *-P */    /; s/: */: /g; s/ *-P */\n    /g;'
 
-ifeq ($(new),no)
-$(ymls):$(staging_dir)/%.yml:
-	if [ -n "$<" ] ;\
-	 then awk -F': ' '/^- title/{x=$$2;j=sprintf("%02d",i++)}{gsub(/[^[:alnum:]]/,"_",x);  if ("${staging_dir}/$(patsubst $(source_dir)/%.yml,%,$(filter %.yml,$^))_"j"_"x".yml" == "$@") print;}' $<  >$@ ;\
-	 else touch $@ ;\
-	fi
-endif
+$(yaml):
+	echo "- title: $(alignment) $(spec)" >> $@ 
+	echo "  description: of $(alignment)-aligned data according to '$(spec)'" >> $@
+	echo "  categories: [$(alignment), $(spec)]" >> $@
+	echo "  params:" >> $@
+	echo "    alignment: $(alignment)" >> $@
+	echo "    spec: $(spec)" >> $@
+	echo "${all_params}" | sed $(sed-p2yml) >> $@
+	echo "$($(section)_params)" | sed $(sed-p2yml) >> $@
+	echo "" >> $@
+
+$(yaml0):
+	echo "- title: $(alignment)" >> $@ 
+	echo "  description: of $(alignment)-aligned data" >> $@
+	echo "  categories: [$(alignment)]" >> $@
+	echo "  params:" >> $@
+	echo "    alignment: $(alignment)" >> $@
+	echo "    metadata: $(my_metadata)_${alignment}.csv" >> $@ ;\
+	echo "    counts: $(my_counts_dir)/${alignment}/" >> $@ ;\
+	echo "    org_package: ${${alignment}.org.db}" >> $@ ;\
+	echo "${all_params}" | sed $(sed-p2yml) >> $@
+	echo "$($(section)_params)" | sed $(sed-p2yml) >> $@
+	echo "" >> $@
 
 R.bib: renv.lock | $(log_dir)
 	$(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")' >$(log_dir)/bib.log 2>&1
 	$(call git-ignore,/$@)
-
 
 renv.lock:orgs=$(subst $(space),$(comma),$(foreach align,$(alignments),$($(align).org.db))),
 renv.lock: | rocker.Renviron  $(log_dir)
@@ -174,8 +159,7 @@ renv.lock: | rocker.Renviron  $(log_dir)
 %: $(CONTAINER_IMAGE)
 	bash_script=$$(mktemp -u $(staging_dir)/bash_script_XXXXX) ;\
 	make -n -s $* SUBMIT=false EXECUTOR=make > $${bash_script} ;\
-	$(CONTAINER) $(CONTAINER_FLAGS) $(CONTAINER_IMAGE) bash "$${bash_script}" ;\
-	r=$$? ;\
+	$(CONTAINER) $(CONTAINER_FLAGS) $(CONTAINER_IMAGE) bash "$${bash_script}" && r=$$? || echo "Failed - tidying up temporary bash script";\
 	rm -f $${bash_script}} ;\
 	exit $$r
     endif
@@ -204,21 +188,15 @@ endif
 
 ## Back outside the executor/submission 
 
-.PHONY: geo
 geo: geo/md5.txt  ## Gather everything into the 'geo' folder. Specify `geo_version=`, `geo_alignment=` and `geo_spec=` to customise. Remember to `make clean-geo` when the files have been upload.
-
-
-geo_version=latest
-geo_alignment=$(firstword $(aligments))
-geo_spec=$(firstword $(specs))
 geo/md5.txt:
 	mkdir -p $(geo_dir)
 	ln -s $(geo_dir) geo
-	ln -f $(my_counts_dir)/$(geo_alignment)/*.genes.results geo/
-	ln -f $(results)/$(geo_version)/$(geo_alignment)/$(geo_spec)/*.xlsx geo/
-	$(SQLITE) $(samples_db) 'select fastq_1 from fastqs  where _babs_config_file="$(geo_alignment)";' | \
+	ln -f $(my_counts_dir)/$(alignment)/*.genes.results geo/
+	ln -f $(results)/$(version)/$(alignment)/$(spec)/*.xlsx geo/
+	$(SQLITE) $(samples_db) 'select fastq_1 from fastqs  where config_file="$(alignment)";' | \
 	while read -r fq ; do cp ${fq} geo/ ; done
-	$(SQLITE) $(samples_db) 'select fastq_2 from fastqs  where _babs_config_file="$(geo_alignment)";' | \
+	$(SQLITE) $(samples_db) 'select fastq_2 from fastqs  where config_file="$(alignment)";' | \
 	while read -r fq ; do cp ${fq} geo/ ; done
 	pushd geo; md5sum *.* > geo.md5.txt; popd
 
@@ -239,21 +217,19 @@ endif
 ################################################################
 #### Bootrap all relevant data from outside
 ################################################################
-nf_alignments = $(patsubst $(nfcore_dir)/%,%,$(wildcard $(nfcore_dir)/*))
-
-# external specfiles
+alignments_ext = $(patsubst $(nfcore_dir)/%,%,$(wildcard $(nfcore_dir)/*))
 specfiles_ext =  $(patsubst $(docs_dir)/%,%,$(wildcard $(docs_dir)/*.spec))
 
+samplesheets_ext = $(patsubst %,$(my_metadata)_%.csv,$(alignments_ext))
+genes_results = $(patsubst %,$(my_counts_dir)/%,$(alignments_ext))
+multiqc_results = $(patsubst %,$(RESULTS_DIR)/multiqc-%,$(alignments_ext))
 samples_db = samples.db
-genes_results = $(patsubst %,$(my_counts_dir)/%,$(nf_alignments))
-source_ymls=$(patsubst %,$(source_dir)/%.yml,$(sections))
-multiqc_results = $(patsubst %,$(RESULTS_DIR)/multiqc-%,$(nf_alignments))
 
-build: $(samplesheets) $(specfiles_ext) $(genes_results) $(source_ymls) $(multiqc_results) | $(source_dir) $(staging_dir) ##  Copy the required nfcore count files into the `inst/extdata` area, and get the spec files.
+build: $(samplesheets_ext) $(specfiles_ext) $(genes_results)  $(multiqc_results) | $(source_dir) $(staging_dir) ##  Copy the required nfcore count files into the `inst/extdata` area, and get the spec files.
 
 
-$(samplesheets) : $(my_metadata)_%.csv : $(samples_db) 
-	$(SQLITE) -header -csv  $(samples_db) 'SELECT metadata.* FROM metadata INNER JOIN (SELECT * FROM fastqs GROUP BY $(samplesheet_id_column)) AS asf on metadata.$(metadata_id_column)=asf.$(samplesheet_id_column) WHERE asf._babs_config_file="$*";' > $@
+$(samplesheets_ext) : $(my_metadata)_%.csv : $(samples_db) 
+	$(SQLITE) -header -csv  $(samples_db) 'SELECT metadata.* FROM metadata INNER JOIN (SELECT * FROM "fastq_$*" GROUP BY $(samplesheet_id_column)) AS nfcore on metadata.$(metadata_id_column)=nfcore.$(samplesheet_id_column);' > $@
 
 $(samples_db): $(my_metadata).csv $(nfcore_dir)/../$(samples_db)
 	cp $(nfcore_dir)/../$(samples_db) $@ || echo "No samples database in nfcore directory"
@@ -265,10 +241,10 @@ $(my_metadata).csv: $(docs_dir)/$(experiment_table).csv | $(dir $(my_metadata))
 $(specfiles_ext): % : $(docs_dir)/%
 	cp $< $@
 
-$(patsubst %,%.config,$(nf_alignments)): %.config: ../nfcore/%.config
+$(patsubst %,%.config,$(alignments_ext)): %.config: ../nfcore/%.config
 	cp $< $@
 
-include $(patsubst %,%.config,$(filter-out $(alignments),$(nf_alignments)))
+-include $(patsubst %,%.config,$(filter-out $(alignments),$(alignments_ext)))
 
 $(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/% %.config
 	dir=$(if $($*.group-as),$($*.group-as),$*);\
@@ -278,103 +254,14 @@ $(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/% %.config
 $(multiqc_results) : $(RESULTS_DIR)/multiqc-% : $(nfcore_dir)/% | $(RESULTS_DIR)
 	ln -sfn ../$</multiqc/star_rsem $@
 
-$(source_ymls) : %.yml : %.qmd
-$(patsubst %.yml,%.qmd,$(source_ymls)) :
-	touch $@
-
-sed-p2yml = 's/^ *-P */    /; s/: */: /g; s/ *-P */\n    /g;'
-$(source_dir)/00_init.yml: orgs=$(foreach align,$(nf_alignments),$($(align).org.db))
-$(source_dir)/00_init.yml: $(nf_alignments:=.config) | $(source_dir)
-	rm -f $@
-	orgs=($(orgs)) ;\
-	oi=0;\
-	for i in $(nf_alignments); do \
-	echo "- title: $$i" >> $@ ;\
-	echo "  description: of $${i}-aligned data" >> $@ ;\
-	echo "  categories: [$${i}]" >> $@ ;\
-	echo "  params:" >> $@ ;\
-	echo "    alignment: $${i}" >> $@ ;\
-	echo "    metadata: $(my_metadata)_$${i}.csv" >> $@ ;\
-	echo "    counts: $(my_counts_dir)/$${i}/" >> $@ ;\
-	echo "    org_package: $${orgs[oi]}" >> $@ ;\
-	echo "${all_params}" | sed $(sed-p2yml) >> $@ ;\
-	echo "${params}" | sed $(sed-p2yml) >> $@ ;\
-	echo "" >> $@ ;\
-	let oi=oi+1;\
-	done
-
-local-specs = $(sort $(wildcard *.spec) $(specfiles_ext))
-$(source_dir)/01_analyse.yml: $(local-specs) $(nf_alignments:=.config) | $(source_dir)
-	rm -f $@
-	for i in $(nf_alignments) ; do \
-	for j in $(local-specs:.spec=) ; do \
-	echo "- title: $$i $$j" >> $@ ;\
-	echo "  description: of $${i}-aligned data according to '$${j}'" >> $@ ;\
-	echo "  categories: [$${i}, $${j}]" >> $@ ;\
-	echo "  params:" >> $@ ;\
-	echo "    alignment: $${i}" >> $@ ;\
-	echo "    spec: $${j}" >> $@ ;\
-	echo "${all_params}" | sed $(sed-p2yml) >> $@ ;\
-	echo "${params}" | sed $(sed-p2yml) >> $@ ;\
-	echo "" >> $@ ;\
-	done; done 
-
-ifeq ($(new),yes)
-
-$(01_analyse_yamls):
-	echo "- title: $(alignment) $(spec)" >> $@ 
-	echo "  description: of $(alignment)-aligned data according to '$(spec)'" >> $@
-	echo "  categories: [$(alignment), $(spec)]" >> $@
-	echo "  params:" >> $@
-	echo "    alignment: $(alignment)" >> $@
-	echo "    spec: $(spec)" >> $@
-	echo "${all_params}" | sed $(sed-p2yml) >> $@
-	echo "$(call params-of-section,$(section))" | sed $(sed-p2yml) >> $@
-	echo "" >> $@
-
-$(00_init_yamls):
-	echo "- title: $(alignment)" >> $@ 
-	echo "  description: of $(alignment)-aligned data'" >> $@
-	echo "  categories: [$(alignment)]" >> $@
-	echo "  params:" >> $@
-	echo "    alignment: $(alignment)" >> $@
-	echo "    metadata: $(my_metadata)_${alignment}.csv" >> $@ ;\
-	echo "    counts: $(my_counts_dir)/${alignment}/" >> $@ ;\
-	echo "    org_package: ${${alignment}.org.db}" >> $@ ;\
-	echo "${all_params}" | sed $(sed-p2yml) >> $@
-	echo "$(call params-of-section,$(section))" | sed $(sed-p2yml) >> $@
-	echo "" >> $@
-
-
-endif
-
-$(patsubst %,$(source_dir)/%.yml,$(filter-out 00_init 01_analyse,$(sections))) : $(source_dir)/%.yml : $(local-specs) $(alignments:=.config) | $(source_dir)
-	rm -f $@
-	for i in $(alignments) ; do \
-	for j in $(local-specs:.spec=) ; do \
-	echo "title: $$i $$j" >> $@ ;\
-	echo "description: $${i}-aligned data according to '$${j}'" >> $@ ;\
-	echo "categories: [$${i}, $${j}]" >> $@ ;\
-	echo "params:" >> $@ ;\
-	echo "  alignment: $${i}" >> $@ ;\
-	echo "  spec: $${j}" >> $@ ;\
-	echo "${all_params}" | sed $(sed-p2yml) >> $@ ;\
-	echo "${params}" | sed $(sed-p2yml) >> $@ ;\
-	echo "" >> $@ ;\
-	done; done
-
-
-$(log_dir) $(source_dir) $(staging_dir) $(dir $(my_metadata)) data $(RESULTS_DIR)/$(VERSION) $(RESULTS_DIR):
+$(log_dir) $(source_dir) $(staging_dir) $(dir $(my_metadata)) data $(RESULTS_DIR)/$(VERSION) $(RESULTS_DIR) $(staging_dir)/$(RESULTS_DIR)/$(VERSION):
 	mkdir -p $@
-
 
 rocker.Renviron: 
 	echo "RENV_PATHS_PREFIX=$(RENV_PATHS_PREFIX)" > $@
 	echo "RENV_PATHS_ROOT=$(RENV_PATHS_ROOT)" >> $@
 	echo "RENV_PATHS_LIBRARY=renv/library" >> $@
 
-
-.PHONY: R-local
 R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses)
 R-$(RVERSION): $(CONTAINER_IMAGE)
 	echo "#!/bin/bash" > $@
@@ -384,8 +271,6 @@ R-$(RVERSION): $(CONTAINER_IMAGE)
 	echo "[[ "'$$BASH_SOURCE'" == "'$$0'" ]] && R " \$$@ >> $@
 	setfacl -m u::rwx $@
 	$(call git-ignore,$@)
-
-
 
 clean:
 clean-geo:  ## Remove the GEO files from scratch

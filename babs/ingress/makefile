@@ -8,7 +8,9 @@ run: samples.db ## Generate a database of samples for downstream convenience
 samples.db: $(samplesheet_fname).csv
 	rm -f $@
 	$(SQLITE) $@ -csv ".import $< fastqs" \
-	"ALTER TABLE fastqs ADD COLUMN _babs_config_file text;"
+	"ALTER TABLE fastqs ADD COLUMN config_file text;" \
+	"ALTER TABLE fastqs ADD COLUMN universal text;" \
+	"UPDATE fastqs SET universal='yes';"
 
 
 
@@ -26,6 +28,8 @@ $(samplesheet_fname).csv: ../docs/$(samplesheet_fname).csv
 
 $(configs): %.config: ../docs/%.config
 	cp $< $@
+	grep -q "^universal" $@ || sed -i -e '$$auniversal=yes' $@
+	grep -q "^strandedness" $@ || sed -i -e '$$astrandedness=auto' $@
 	sed -i 's/^/$*./' $@
 
 copy:

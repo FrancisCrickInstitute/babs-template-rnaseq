@@ -2,7 +2,7 @@ import { parse, stringify } from "https://deno.land/std/encoding/yaml.ts";
 import { parse as flag} from "https://deno.land/std/flags/mod.ts";
 
 const flags = flag(Deno.args, {
-    string: ["template", "staging", "tag"]
+    string: ["template", "staging", "tag", "repo"]
 });
 
 const quarto = parse(Deno.readTextFileSync(flags.template));
@@ -18,7 +18,12 @@ for (const q in qmds) {
     if (! ('alignment' in yml.params) ) { continue; }
     let align_i: bigint = contents.findIndex(s => s.section==yml.params.alignment);
     if (align_i == -1) {
-	contents.push({section: yml.params.alignment, contents:[]});
+	contents.push({
+	    section: yml.params.alignment,
+	    contents:[{
+		href: "../multiqc-" + yml.params.alignment + "/multiqc_report.html",
+		text: "MultiQC Report",
+		target: "_blank"}]});
 	align_i=contents.length-1;
     }
     if ('spec' in yml.params) {
@@ -31,6 +36,10 @@ for (const q in qmds) {
     } else {
 	contents[align_i].contents.push(qmds[q].qmd);
     }
-
 }
+const gh=quarto.website.navbar.right.findIndex(s => s.text=="Github repository");
+if (gh != -1) {
+    quarto.website.navbar.right[gh].href = flags.repo;
+}
+quarto.project.render = ["index.qmd"].concat(qmds.map(q => q.qmd));
 console.log(stringify(quarto));

@@ -72,8 +72,10 @@ CONTAINERED=false#An internal flag
 ifeq (${EXECUTOR},singularity)
 CONTAINER= $(call ml,Singularity/3.6.4); singularity
 CONTAINER_IMAGE=$(SINGULARITY_ROOT)/$(notdir $(DOCKER))_$(RVERSION).sif
-CONTAINER_FLAGS= exec --bind $(BIND_DIR),/tmp,$(RENV_PATHS_ROOT),$(PWD)/rocker.Renviron:/usr/local/lib/R/etc/Renviron.site --pwd $(PWD) --containall --cleanenv
-CONTAINER_FLAGS_INTERACTIVE=$(CONTAINER_FLAGS) --bind $${HOME}/.emacs.d,$${HOME}/.Xauthority --env DISPLAY=$${DISPLAY}
+CONTAINER_BIND=--bind $(BIND_DIR),/tmp,$(RENV_PATHS_ROOT),$(PWD)/rocker.Renviron:/usr/local/lib/R/etc/Renviron.site
+CONTAINER_ENV=--env SQLITE_TMPDIR=$(TMPDIR)
+CONTAINER_FLAGS= exec $(CONTAINER_BIND) --pwd $(PWD) --containall --cleanenv $(CONTAINER_ENV)
+CONTAINER_FLAGS_INTERACTIVE= exec $(CONTAINER_BIND),$${HOME}/.emacs.d,$${HOME}/.Xauthority --pwd $(PWD) --containall --cleanenv $(CONTAINER_ENV),DISPLAY=$${DISPLAY}
 CONTAINER_SHELL = $(CONTAINER) $(patsubst exec,shell,$(CONTAINER_FLAGS_INTERACTIVE)) $(CONTAINER_IMAGE)
 $(CONTAINER_IMAGE): | rocker.Renviron
 	cd $(dir $(CONTAINER_IMAGE)) ;\

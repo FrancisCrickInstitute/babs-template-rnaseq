@@ -13,12 +13,12 @@ $(alignments) : results/%/pipeline_info/execution_report.html : samplesheet_%.cs
 	export NXF_SINGULARITY_CACHEDIR="${nf_cache_dir}" ;\
 	$(NEXTFLOW) run nf-core/rnaseq \
 	--input $< \
-	--outdir $@/ \
+	--outdir results/$*/ \
 	--aligner star_rsem \
 	--fasta "$($*.genome_fasta)" \
 	--gtf "$($*.gtf)" \
 	-w "${nf_work}" \
-	$(nf_options)
+	$($*.nfcore)
 
 
 ################################################################
@@ -40,8 +40,8 @@ $(samplesheets): samplesheet_%.csv: %.config  samples.db
 	$(SQLITE) samples.db 'DROP TABLE IF EXISTS "config_$*";' \
 	'CREATE TABLE "config_$*" ($(field));' \
 	'INSERT INTO "config_$*" ($(insfield)) VALUES ($(vals));' \
-	'UPDATE fastqs SET _babs_config_file="$*" WHERE fastqs.$(samplesheet_id_column) IN (SELECT $(samplesheet_id_column) FROM fastqs NATURAL JOIN "config_$*") ;'
-	$(SQLITE) -header -csv  samples.db 'SELECT $(samplesheet_id_column) AS sample, fastq_1, fastq_2, strandedness FROM fastqs NATURAL JOIN "config_$*" ;' > $@
+	'CREATE TABLE "fastq_$*" AS SELECT * FROM fastqs NATURAL JOIN "config_$*" ;'; \
+	$(SQLITE) -header -csv  samples.db 'SELECT $(samplesheet_id_column) AS sample, fastq_1, fastq_2, strandedness FROM "fastq_$*";' > $@
 
 $(configs) : %.config : ../ingress/%.config
 	cp $< $@
