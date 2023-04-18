@@ -1,3 +1,5 @@
+.DEFAULT_GOAL=help
+
 # csv file names (excluding ext)
 samplesheet_fname=samplesheet
 experiment_table = experiment_table
@@ -5,10 +7,8 @@ experiment_table = experiment_table
 samplesheet_id_column := sample
 metadata_id_column := ID
 name_col = sample_name
+V:=1#switches _off_ SILENT mode - delete for SILENT to be default
 
-babsfile := $(shell x=`pwd` ;while [ "$$x" != "/" ] ; do  if [ -f "$$x"/.babs ] ; then echo "$$x"/.babs ; break ; else   x=`dirname "$$x"`; fi; done)
-babsid=$(shell sed -n  "s/ *Hash: *//p" $(babsfile) || printf "no-babs-%s-%s" ${USER} `basename ${PWD}`)
-babsproject=$(shell sed -n  "s/ *Project: *//p" $(babsfile) || printf "%s-%s" ${USER} `basename ${PWD}`)
 
 #Executibles (can be overridden in local.mk's)
 ml = module is-loaded $1 || module load $1
@@ -78,5 +78,4 @@ $(V).SILENT:
 .PHONY: help
 help: ## Show help message
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m\033[0m\n"} /^[$$()% 0-9a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
-
 

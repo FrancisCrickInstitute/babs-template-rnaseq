@@ -1,12 +1,14 @@
-.PHONY: makefile project.mk system.mk ../system.mk
+.PHONY: makefile project.mk local.mk 
 .PHONY: build clean geo R-local
 
--include secrets
-include ../system.mk
-include system.mk
+include secrets
+include global.mk
+include local.mk
 
 include project.mk  ## Provides analysis parametrisation
 include $(patsubst %,$(staging_dir)/%.mk,$(sections))
+log=2>&1 | tee $2 $(log_dir)/$1.log
+#log=>$(log_dir)/$1.log 2$(subst -a,>)>&1
 
 alignments = $(patsubst ${my_counts_dir}/%,%,$(wildcard ${my_counts_dir}/*))
 samplesheets = $(patsubst %,$(my_metadata)_%.csv,$(alignments))
@@ -71,9 +73,9 @@ run: render  ## Create objects in `data` that store the results of applying each
 qmds=$(strip $(foreach section,$(sections),$($(section)_qmds)))
 
 ## Render the qmds to html in one quarto call
-render: $(qmds)  $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(samplesheets)| $(log_dir) data $(RESULTS_DIR)/$(VERSION) ## Render the whole directory of generated qmds
+render: $(qmds)  $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(samplesheets)| $(log_dir) data $(RESULTS_DIR)/$(VERSION) R.bib## Render the whole directory of generated qmds
 	sed  -i 's#^  contents: .*#  contents: [$(subst $(space),$(comma),$(patsubst $(staging_dir)/%,%,$(qmds)))]#' $(staging_dir)/index.qmd
-	$(QUARTO) render '$(staging_dir)' --output-dir $(RESULTS_DIR)/$(VERSION) --execute-dir $(CURDIR) >$(log_dir)/render.log 2>&1
+	$(QUARTO) render '$(staging_dir)' --output-dir $(RESULTS_DIR)/$(VERSION) --execute-dir $(CURDIR) $(call log,render)
 	cp -rT $(staging_dir)/$(RESULTS_DIR)/$(VERSION) $(RESULTS_DIR)/$(VERSION)
 	ln -sfn  $(VERSION) $(RESULTS_DIR)/latest
 
@@ -88,16 +90,16 @@ pages: $(html_reports) ## Generate the renders individually
 	ln -sfn  $(VERSION) $(RESULTS_DIR)/latest
 
 ## Render an individual page
-$(html_reports) : $(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%$(TAG).html : $(staging_dir)/%$(TAG).qmd $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(samplesheets)| $(log_dir) $(RESULTS_DIR)/$(VERSION) $(staging_dir)/$(RESULTS_DIR)/$(VERSION)
+$(html_reports) : $(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%$(TAG).html : $(staging_dir)/%$(TAG).qmd $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(samplesheets)| $(log_dir) $(RESULTS_DIR)/$(VERSION) $(staging_dir)/$(RESULTS_DIR)/$(VERSION) R.bib
 	$(QUARTO) render '$<' \
 	  --output-dir $(RESULTS_DIR)/$(VERSION)/ \
-	  --execute-dir $(CURDIR) >$(log_dir)/html-$*.log 2>&1
+	  --execute-dir $(CURDIR) $(call log,html-$*)
 
 
 scripts: $(qmds) ## Generate all the parametrised scripts, into the staging directory. But don't render
 
 $(qmds) : $(staging_dir)/%$(TAG).qmd : $(staging_dir)/%.yml
-	$(QUARTO) run $(source_dir)/typescript/merge_yml.ts --script=$(filter %.qmd,$^) --yml=$(staging_dir)/$*.yml >> $@
+	$(QUARTO) run $(source_dir)/typescript/merge_yml.ts --script=$(filter %.qmd,$^) --yml=$(staging_dir)/$*.yml > $@
 	sed -i -e 's#$(yaml-filename-placeholder) <- .*$$#$(yaml-filename-placeholder) <- "$(staging_dir)/$*.yml"#' $@
 
 ${staging_dir}/_quarto.yml: $(source_dir)/_quarto.yml $(qmds)
@@ -136,21 +138,20 @@ $(yaml0):
 	echo "$($(section)_params)" | sed $(sed-p2yml) >> $@
 	echo "" >> $@
 
+R.bib: orgs=$(foreach align,$(alignments),$($(align).org.db))
 R.bib: renv.lock | $(log_dir)
-	$(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")' >$(log_dir)/bib.log 2>&1
+	for o in $(orgs); do grep -F -q $$o resources/_dependencies.R || echo "library($$o)" >> resources/_dependences.R; done 
+	$(R) -e 'library(renv); init(bioconductor=TRUE, bare=TRUE); options(repos=BiocManager::repositories()); restore(); hydrate()' $(call log,renv,-a)
+	$(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")' $(call log,bib)
 	$(call git-ignore,/$@)
 
-renv.lock:orgs=$(subst $(space),$(comma),$(foreach align,$(alignments),$($(align).org.db))),
 renv.lock: | rocker.Renviron  $(log_dir)
-	( $(GIT) stash push -m "DESdemonA stashed. Use 'git stash pop' to retrieve it" -- $@ || echo "Couldn't stash changes" ) >$(log_dir)/renv.log 2>&1
-	for o in $(orgs); do grep -F -q $$o DESCRIPTION || sed -i "s/^Imports:/Imports:\n    $$o/" DESCRIPTION; done 
-	$(R) -e 'library(renv); init(bioconductor=TRUE); options(repos=BiocManager::repositories()); install(); snapshot(type="all")' >>$(log_dir)/renv.log 2>&1
-	$(R) -e "DESdemonA::get_started(c(\
-	  $(subst $(space),$(comma),$(patsubst %,'%',$(notdir $(template_scripts)))) ),\
-	  dest='$(source_dir)' )" >$(log_dir)/renv.log 2>&1
-	( $(GIT) add renv.lock $(template_scripts) || echo "Coudn't add renv.lock/scripts to version control") >>$(log_dir)/renv.log 2>&1
-	( $(GIT) rev-parse "v0.0.1" >/dev/null 2>&1 || $(GIT) tag v0.0.1 || echo "Couldn't tag" ) >>$(log_dir)/renv.log 2>&1
-	( $(GIT) commit -m 'Initialised by DESdemonA\n\n' `grep -A 4 DESdemonA renv.lock`   || echo "Couldn't commit" ) >>$(log_dir)/renv.log 2>&1
+	( $(GIT) stash push -m "DESdemonA stashed. Use 'git stash pop' to retrieve it" -- $@ || echo "Couldn't stash changes" ) $(call log,renv)
+	for o in $(orgs); do grep -F -q $$o DESCRIPTION || sed -i "s/^Imports:/Imports:\n    $$o,/" DESCRIPTION; done 
+	$(R) -e 'library(renv); init(bioconductor=TRUE); options(repos=BiocManager::repositories()); install(); snapshot(type="all")' $(call log,renv,-a)
+	( $(GIT) add renv.lock $(template_scripts) || echo "Coudn't add renv.lock/scripts to version control") $(call log,renv,-a)
+	( $(GIT) rev-parse "v0.0.1" >/dev/null 2>&1 || $(GIT) tag v0.0.1 || echo "Couldn't tag" ) $(call log,renv,-a)
+	( $(GIT) commit -m 'Initialised by DESdemonA\n\n' `grep -A 4 DESdemonA renv.lock`   || echo "Couldn't commit" ) $(call log,renv,-a)
 
     else
 ##   being executed by container without slurm, so put what 'make' would normally execute in a temporary
@@ -276,6 +277,13 @@ clean:
 clean-geo:  ## Remove the GEO files from scratch
 	rm -rf $(geo_dir)
 	rm geo
+
+global.mk: ../system.mk
+	cp $< $@
+.SECONDARY: ../system.mk
+secrets: ../secrets
+	cp $< $@
+.SECONDARY: ../secrets
 
 
 MAKEFLAGS += --no-builtin-rules

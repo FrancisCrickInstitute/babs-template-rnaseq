@@ -1,4 +1,5 @@
-include ../system.mk
+include secrets
+include global.mk
 include local.mk
 
 .PHONY: run build copy publish clean run-clean build-clean
@@ -31,6 +32,13 @@ $(configs): %.config: ../docs/%.config
 	grep -q "^universal" $@ || sed -i -e '$$auniversal=yes' $@
 	grep -q "^strandedness" $@ || sed -i -e '$$astrandedness=auto' $@
 	sed -i 's/^/$*./' $@
+
+global.mk: ../system.mk
+	cp $< $@
+.SECONDARY: ../system.mk
+secrets: ../secrets
+	cp $< $@
+.SECONDARY: ../secrets
 
 copy:
 

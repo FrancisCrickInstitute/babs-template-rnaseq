@@ -1,0 +1,573 @@
+---
+title: Differential analysis
+description: Visualisation and differential analysis
+categories: [Differential]
+author: 
+  - name: Gavin Kelly
+    affiliations: BABS - Francis Crick Institute
+format:
+  html:
+    theme: cerulean
+    fontsize: 1.1em
+    linestretch: 1.7
+code-fold: true
+execute:
+  output: asis
+  echo: false
+code-summary: "Show the code"
+params:
+
+---
+
+
+# Preface
+
+We load in all the necessary additional R packages, and set up some initial parameters.
+
+
+```{r}
+#| label: load-01
+#| output: false
+#| warning: false
+#| error: false
+
+library(tidyverse)       # Language
+library(devtools)
+library(openxlsx)        # IO
+library(ggrepel)         # General Vis.
+library(RColorBrewer)
+library(ComplexHeatmap)
+library(gt)
+library(DESeq2)          # Assay-specific
+library(PoiClaClu)
+library(rtracklayer)
+library(tximport)
+library(clusterProfiler)
+library(ReactomePA)
+library(GO.db)
+library(IHW)
+library(equatiomatic)
+library(DESdemonA)
+
+fig_caption <- captioner()
+set.seed(1)
+
+
+knitr::opts_chunk$set(
+  warning=FALSE, error=TRUE, message=FALSE,
+  dev=c("ragg_png","pdf"), out.width="100%",
+  fig.width=14, fig.height=10,
+  results='asis', fig.cap=expression(fig_caption())
+)
+knitr::knit_hooks$set(
+  error = function(x, options) {
+    ERROR <<- x
+    knitr::knit_exit()
+  },
+  chunk = function(x, options){
+    if(exists('ERROR')) paste0(x,'```\n',ERROR,'```\n\n**Script stopped with error**')
+    else x
+  })
+
+
+link2path <- function(lname) {  file.path(knitr::opts_knit$get("output.dir"),lname) }
+
+```
+
+
+
+```{r}
+#| label: tbl-load2
+#| tbl-cap: Context
+if (!isTRUE(getOption('knitr.in.progress'))) {
+  my_params_yml <- "resources/01_analyse.yml"
+  if (file.exists(my_params_yml)) {
+    params <- yaml::read_yaml(my_params_yml)
+    if (is.null(names(params))) {
+      params <- params[[1]]$params
+    }
+  } else {
+    params <- list()
+  }
+} else {
+  data.frame(
+  Option=names(params),
+  Value=unlist(params)
+) %>%
+  gt() %>%
+  as_raw_html()
+}
+
+
+
+```
+
+```{r}
+#| label: read
+if (is.character(params$alignment)) {
+  data(list=paste0("counts_", params$alignment))
+} else {
+  dds <- params$alignment
+}
+
+if (!is.null(metadata(dds)$organism$org)) {
+  library(metadata(dds)$organism$org, character.only=TRUE)
+}
+metadata(dds)$template_git <- packageDescription("DESdemonA")$git_last_commit
+
+specs   <- DESdemonA::load_specs(file=paste0(params$spec, ".spec"), context=dds)
+
+param <- DESdemonA::ParamList$new(defaults=specs$settings)
+# Calling the setter without a value will pick up the default (from the spec), _and_ alert it in the markdown, and return the default
+set.seed(param$set("seed"))
+param$set("title", "{{{project}}}")
+param$set("script", file.path(getwd(),"01_analyse.r"))
+param$set("spec",  params$spec, "Using analysis plan '{}'.")
+if (is.character(params$alignment)) {
+  param$set("alignment", params$alignment, "Using alignment settings '{}'")
+} else {
+  param$set("alignment", params$param_call$alignment, "Using counts from '{}'")
+}  
+  
+ddsList <- DESdemonA::build_dds_list(dds, specs)
+
+
+#Which features are zero across all samples in all datasets
+all_zero <- Reduce(f=`&`,
+                  x=map_des(ddsList, function(x) apply(counts(x)==0,1, all)),
+                  init=TRUE)
+ddsList <- map_des(ddsList, function(dds) dds[!all_zero,])
+
+
+## Calculate size factors, separately for each sample-set
+ddsList <- mapply(
+  function(samp, dds) {
+    if ("controlGenes" %in% names(samp)) {
+      controlGenes <- eval(samp$controlGenes, transform(rowData(dds), ID=row.names(dds)))
+      estimateSizeFactors(dds, controlGenes=controlGenes)
+    } else {
+      estimateSizeFactors(dds)
+    }
+  },
+  specs$sample_sets,
+  ddsList,
+  SIMPLIFY=FALSE
+)
+
+
+param$set("baseMeanMin")
+if (param$get("baseMeanMin")>0) {
+  ddsList <- map_des(ddsList,
+                   function(x) x[rowMeans(counts(x, normalized=TRUE)) >= param$get("baseMeanMin"),]
+                   )
+}
+```
+
+# Input Summary
+
+The sample annotations are as follows:
+
+
+```{r}
+#| label: tbl-inputs
+#| tbl-cap: Sample Annotation
+table1 <- function(dds, ddsList) {
+  samp <- as.data.frame(colData(dds))
+  # Extra columns introduced by datasets
+  extra_meta <- lapply(
+    names(ddsList),
+    function(x) merge(
+      setNames(data.frame(ifelse(colnames(dds) %in% colnames(ddsList[[x]]), "✓", ""), row.names=row.names(colData(dds))), x),
+      as.data.frame(colData(ddsList[[x]])[, setdiff(names(colData(ddsList[[x]])), names(colData(dds)))]),
+      by=0, all.x=TRUE
+    )[,-1,drop=FALSE]
+  )
+  
+  extra_meta <- extra_meta[sapply(extra_meta, function(x) ncol(x)!=0 & nrow(x)!=0)]
+  # Generate tab_spanner parameters for each datasets extra columns
+  ts_extra <- lapply(names(extra_meta),
+                    function(x) list(name=x,
+                              cols=1:ncol(extra_meta[[x]]))
+                    )
+  # Cummulatively offset the columns to be spanned
+  ts_extra <- Reduce(function(ts, x) {
+    x$cols <- x$cols+max(ts$cols)
+    x},
+    ts_extra,
+    accumulate=TRUE)
+  
+  df <- cbind(samp, do.call(cbind, unname(extra_meta)))
+  clabel <- setNames(as.list(names(df)), 1:ncol(df))
+  names(df) <- names(clabel)
+  gt(data=df) %>%
+    cols_label(.list=clabel) %>%
+    tab_spanner(label="Metadata",
+                columns=seq_along(samp)) %>%
+    Reduce(f=function(gti, x) tab_spanner(gti, label=x$name,columns=x$cols + ncol(samp)), x=ts_extra, init=.)
+}
+
+table1(dds, ddsList) %>%
+  as_raw_html()
+
+```
+
+We may examine the samples in different combinations, and leave out
+certain samples.  In the above table, the columns under the 'In
+Subset' group indicate these combinations are listed, and the
+samples' inclusions are indicated.  Each of those combinations may be analysed in
+potentially several ways, as formulated here:
+
+
+```{r}
+#| label: formulae
+for (dataset in names(specs$sample_sets)) {
+  mdls <- lapply(specs$sample_sets[[dataset]]$models, function(x) x$design)
+  mdls <- mdls[sapply(specs$sample_sets[[dataset]]$model, function(x) "comparisons" %in% names(x))]
+  for (mdl in names(mdls)) {
+    cat("\n\n####", dataset, mdl, "{-}\n\n")
+    print(extract_eq(lm(
+      update(mdls[[mdl]], Expression ~ .),
+      data=cbind(data.frame(colData(ddsList[[dataset]]), check.names=FALSE), Expression=1:ncol(ddsList[[dataset]])),
+      wrap=TRUE
+    )
+    ))
+  }
+}
+
+```
+
+
+We also have the following defaults set.  Whenever they are used
+or changed in the, analysis that will be highlighted in the text
+alongside a 'wrench' icon:
+
+
+```{r}
+#| label: tbl-settings
+#| tbl-cap: Analysis Settings
+
+data.frame(
+  Option=names(specs$settings),
+  Value=sapply(specs$settings, deparse)
+) %>%
+  gt() %>%
+  as_raw_html()
+
+```
+
+
+# QC Visualisation {.tabset}
+
+These visualisations are carried out blind to the experimental
+design. For the heatmap @fig-qc-visualisation-1, we select a subset of
+genes removing the (assumed uninformative) genes with flat expression
+levels across the whole sample set. We'd expect samples from the same
+experimental group to cluster together, in the sense that they are on
+the same branch of the tree. But this is a transcriptome-wide picture,
+and even if the clustering is not perfect, there will still be genes
+that are consistent with the expected expression profiles, and they
+will be revealed in the differential analysis.
+
+The second heatmap @fig-qc-visualisation-2 focuses on the pairwise
+similarity of samples, using a slightly different metric than the
+first, to emphasise that there's not one way of calculating how
+similar two samples are, transcriptome-wide.  The colours in the first
+heatmap are a gene's expression in a sample, relative to its average
+expression.  The second heatmap represents the similarity of each pair
+of samples.
+
+The come a series of (pairs of) scatter plots of the first two
+Principal Components - a way of summarising all the genes down to just
+two 'metagenes' that attempt to encapsulate the variability across the
+samples in as faithful way as possible. The first of each pair
+(e.g. @fig-qc-visualisation-3) takes the PCs from the unadjusted data,
+and colours them by each of your covariates/treatments in turn. They
+alternate with 'focussed' PC adjustments, such as
+@fig-qc-visualisation-4 which regress out ('normalise away') the
+effect of all experimental factors except the one being focussed
+on. This 'realigns' the principal components, and may be useful if
+there's one experimental factor (e.g. strong batch effect) that
+dominates the transcriptional profile and masking a less dominant
+factor: we then colour by the one experimental factor that hasn't been
+regressed out, hopefully allowing its effect to emerge.
+
+We then revert to the PCA picture that is unadjusted for any
+covariates. In this plot the columns explore the lower-order principal
+components (which although not providing a universally strong signal
+transcriptome wide, might still detect biology that is affecting a
+smaller subset of genes, or a reasonably large set of genes to a
+lesser extent than happens in the higher-order PCS). The rows
+represent the experimental factors we have recorded, and the depth of
+colour of the cell records the degree of 'association' that factor has
+with the give PC (and grey says there was no statistically significant
+association.) This being an automated report, we've had to make
+various compromises so please don't read too much into this chart: it
+primarily guides which other plots we should generate to look at how
+samples associate with each other.
+
+We use that information to derive the remaining plots in this section,
+where we these components in the context of the various experimental
+factors, producing 'partial residual plots' of two selected PCs, being
+selected by the criteria of: 'best' being the PC most strongly
+associated with the experimental factor; 'first' being the
+highest-order PC associated with the experimental factor; and then
+resorting to the first and second PCs in the case where we haven't
+already generated two plots. 'Partial residual plots' are effectively
+plots of the PC against the experimental factor, where once again we
+have 'regressed out' the effect of all _other_ experimental factors at
+play.
+
+
+```{r}
+#| label: fig-qc-visualisation
+
+
+ddsList <- map_des(ddsList, function(x) DESdemonA::add_dim_reduct(x))
+
+for (assay in c("counts", "norm", "vst")) {
+  DESdemonA::write_assay(ddsList, assay=assay, path=params$res_dir)
+}
+                       
+param$set("top_n_variable")
+param$set("clustering_distance_rows")
+param$set("clustering_distance_columns")
+
+map_des(ddsList, 
+        ~DESdemonA::qc_heatmap(
+          .x,
+          title=dataset_name(.x),
+          caption=fig_caption,
+          param=param$publish()
+        )
+        )
+```
+
+
+# Find differential genes
+
+ We use DESeq2 [@pkg_DESeq2] to find differential genes using the
+negative binomial distribution to model counts, with IHW [@pkg_IHW]
+for multiple-testing correction with greater power than
+Benjamini-Hochberg, and ashr [@pkg_ashr] for effect-size shrinkage
+to ensure reported fold-changes are more robust.
+
+
+```{r}
+#| label: differential
+
+param$set("alpha")
+param$set("lfcThreshold")
+param$set("filterFun")
+
+## For each dataset, fit all its models
+dds_model_comp <- map_des(
+  ddsList,
+  function(x) DESdemonA::fit_models(x,
+                             minReplicatesForReplace = Inf)
+)
+
+
+## Now put results in each 3rd level mcols(dds)$results
+dds_model_comp <- map_des(
+  dds_model_comp,
+  DESdemonA::get_result,
+  filterFun=param$get("filterFun"),
+  alpha=param$get("alpha"),
+  lfcThreshold=param$get("lfcThreshold")
+)
+
+
+
+dds_name <- paste0(basename(params$spec),"_x_", params$alignment)
+save(dds_model_comp,
+     file=file.path("data", paste0(dds_name, ".rda")),
+     eval.promises=FALSE
+     )
+saveRDS(dds_model_comp, file=file.path("data", paste0(dds_name, ".rds")))
+
+
+xl_files <- DESdemonA::write_results(dds_model_comp, param, dir=params$res_dir)
+iwalk(xl_files,
+     ~cat("\n\n<a class=\"download-excel btn btn-primary\" href=\"", sub(paste0("^", params$res_dir, "/?"), "", .x), "\"> Open Spreadsheet '", .y,"'</a>", sep="")
+     )
+
+#DESdemonA::write_all_results(dds_model_comp, dir=params$res_dir)
+```
+
+
+## Summary Tables {.tabset}
+
+Here we summarise the results of the differential testing. Each
+sample-set gets its own table (flick between tabs to choose which),
+within which the different models, and their null hypotheses, are
+enumerated.
+
+In the 'Significant' column we tally the number of significant
+genes (for pairwise comparisons, separated into up or down, where
+A-B being labelled up means expression is higher in A; for omnibus
+comparisons, a broad categorisation of the most extreme groups, as
+described above.) We also tally the total number of genes
+exhibiting that behaviour (ie not necessarily statistically
+signficant) - these might not always add up to the same value, as
+there is an independent filter of low-signal genes whose effect
+varies from comparison to comparison.
+
+Our naming convention for a comparison often looks like `A-B|M` -
+again, because this is an semi-automated report, this mightn't be
+optimal, but the rationale is `A-B` refers to the two experimental
+conditions being compared (a 'upward' fold change will be reported
+if the expression is higher in `A` than it is in `B`). The `|M` part
+refers to the fact that we may have looked at that `A-B` comparison
+conditional upon some other variable (which in this example takes the
+value `M`):  anything before the `|` symbol identifies the
+experimental conditions that are being contrasted, and the part after
+the `|` identifies any stratification/conditioning of the data.
+
+In @fig-summary we present some diagnostic plots of the observed
+p-values. Theoretically we want the pink part of the plot to have a
+solid peak on the left, and then make a reasonable plateau across
+higher p-values: gross deviations from this can indicate an absence of
+differential behaviour (lack of left-peak) or a model
+mis-specification that might need investigating. The blue tracks
+indicate p-values corresponding to very lowly expressed genes, which
+would typically struggle to provide evidence of differential
+behaviour, and so show an example of what a 'bad' pink trace might
+look like.
+
+```{r}
+#| label: tbl-summary
+#| tbl-cap: Summaries
+
+summaries <- dds_model_comp %>%
+  map_des(DESdemonA::summarise_results) %>%
+  map_des(function(x) {bind_rows(x, .id="Comparison")}, depth="model") %>%
+  map_des(function(x) {bind_rows(x, .id="Model")}, depth="dataset") %>%
+  map(function(x) {
+    levels(x$Group) <- sub(".*<(.+<.+<0)$", "\\1", levels(x$Group))
+    levels(x$Group) <- sub("^(0<.+?<.+?)<.*$", "\\1", levels(x$Group))
+    levels(x$Group) <- sub("(.*?<)(.*0.*)(<.*)", "\\10\\3", levels(x$Group))
+    droplevels(subset(x, Group!="Zero Count" & Group!="Low Count"))
+  }
+  )
+
+pval_frame <- dds_model_comp %>%
+  map_des(~as.data.frame(mcols(.x)$results)) %>%
+  map_des(function(x) {bind_rows(x, .id="Comparison")}, depth="model")
+                      
+                      
+
+## for (dataset in names(summaries)) {
+##   #options(htmltools.preserve.raw=TRUE)
+##   #cat("### ", dataset, " \n", sep="")
+##   #caption=paste0("Size of gene-lists for ", dataset),
+##   summaries[[dataset]] %>%
+##     gt(groupname_col="Model") %>%
+##     tab_header(title="Genelist summary",
+##                subtitle=dataset) %>%
+##     as_raw_html()
+## }
+
+
+for (dataset in names(summaries)) {
+  res <- knitr::knit_child(
+    text = c(
+      "```{r}",
+      "#| echo: false",
+      paste0("#| label: tbl-summary-",dataset),
+      paste0("#| tbl-cap: ",dataset),
+      "summaries[[dataset]] %>%",
+      "gt(groupname_col=\"Model\") %>%",
+      "tab_header(title=\"Genelist summary\", subtitle=dataset)",
+      "```",
+      "",
+      ""
+    ), envir = environment(), quiet = TRUE)
+  cat(res, sep = '\n')
+}
+
+
+```
+
+
+```{r}
+#| label: fig-summary
+  
+for (dataset in names(summaries)) {
+  for (model in names(pval_frame[[dataset]])) {
+    pl <- ggplot(pval_frame[[dataset]][[model]], aes(x=pvalue, fill=baseMean<1)) +
+      geom_density(alpha=0.5) +
+      facet_wrap(~Comparison) +
+      theme_bw()
+    print(pl)
+    fig_caption(caption=paste0("p-Diagnostic for", dataset, model))
+  }
+}
+```
+
+# Scatterplot of differential genes {.tabset}
+
+Here we plot the fold-change across all genes on the vertical axis,
+against their overall expression on the horizontal. Statistically
+significant genes are highlighted in colour, and we attempt to
+auto-label as many gene symbols as might be legible.
+
+The fold-changes are regularised ('shrunk') to reflect their
+reliability: genes with large variability between replicates are
+moved towards the horizontal axis, to de-emphasise them and to
+provide a more reliable prediction of behaviour in future
+replications.
+
+Again, select the dataset you wish to examine via the tabs - there
+are sub-tabs for different experimental designs, if any
+(e.g. removing/ignoring batch effects).
+
+
+```{r}
+#| label: fig-differential-MA
+
+for (dataset in names(dds_model_comp)) {
+  cat("## ", dataset, " {.tabset} \n", sep="") 
+  for (mdl in names(dds_model_comp[[dataset]])) {
+    cat("### ", mdl, "\n", sep="") 
+    differential_MA(dds_model_comp[[dataset]][[mdl]], caption=fig_caption)
+  }
+}
+```
+
+
+# Differential Heatmaps {.tabset}
+
+Here we present heatmaps of the differential genelists.  Note
+that these will, by definition, divide the samples along lines
+of the experimental groups, so should be interpreted differently
+from the QC heatmaps which were blind to the experimental design.
+
+```{r}
+#| label: fig-differential-heatmap
+for (dataset in names(dds_model_comp)) {
+  cat("## ", dataset, " {.tabset} \n", sep="") 
+  for (mdl in names(dds_model_comp[[dataset]])) {
+    cat("### ", mdl, "\n", sep="")
+    DESdemonA::differential_heatmap(
+      ddsList=dds_model_comp[[dataset]][[mdl]],
+      param=param$publish(),
+      caption=fig_caption
+    )
+  }
+}
+```
+
+# Terms Of Use
+
+The Crick has a [publication
+policy](https://intranet.crick.ac.uk/our-crick/library-information-services/pages/guidelines-publication)
+and we expect to be included on publications, regardless of funding
+arrangements. Any use of these results in publication must be
+discussed with BABS regarding authorship. If not authorship then
+the BABS analyst must receive a named acknowledgement. Please also
+cite the following sources which have enabled the analysis to be
+carried out.
+
+# Bibliography
+
+

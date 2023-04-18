@@ -1,5 +1,3 @@
-.DEFAULT_GOAL=help
-
 ## Binaries
 QUARTO=quarto
 R=R

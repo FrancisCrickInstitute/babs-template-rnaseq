@@ -1,16 +1,18 @@
-include ../system.mk
+include secrets
+include global.mk
 include local.mk
 -include *.config
 
 .PHONY: run build copy publish clean
 
-alignments = $(patsubst samplesheet_%.csv, results/%/pipeline_info/execution_report.html, $(wildcard samplesheet_*.csv))
+alignments = $(patsubst samplesheet_%.csv, results/%/star_rsem/rsem.merged.gene_counts.tsv, $(wildcard samplesheet_*.csv))
 
 run: $(alignments) ## Generate NF-CORE alignments, one folder for each config-specific samplesheet from the `build` process.
 
-$(alignments) : results/%/pipeline_info/execution_report.html : samplesheet_%.csv
+$(alignments) : results/%/star_rsem/rsem.merged.gene_counts.tsv : samplesheet_%.csv
 	mkdir -p $@
 	export NXF_SINGULARITY_CACHEDIR="${nf_cache_dir}" ;\
+	export NXF_HOME=$$PWD ;\
 	$(NEXTFLOW) run nf-core/rnaseq \
 	--input $< \
 	--outdir results/$*/ \
@@ -48,6 +50,13 @@ $(configs) : %.config : ../ingress/%.config
 
 samples.db: ../ingress/samples.db
 	cp $< $@
+
+global.mk: ../system.mk
+	cp $< $@
+.SECONDARY: ../system.mk
+secrets: ../secrets
+	cp $< $@
+.SECONDARY: ../secrets
 
 clean: ## Remove working files from scratch
 	rm -rf ${nf_work}

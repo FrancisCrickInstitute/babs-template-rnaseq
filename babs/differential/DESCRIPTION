@@ -6,7 +6,6 @@ Description: BABS Analysis Package
 biocViews: RNASeq
 Depends: R (>= 3.1.0)
 Imports:
-    org.Mm.eg.db,
     ashr,
     BiocManager,
     circlize,
