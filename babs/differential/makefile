@@ -7,8 +7,6 @@ include local.mk
 
 include project.mk  ## Provides analysis parametrisation
 include $(patsubst %,$(staging_dir)/%.mk,$(sections))
-log=2>&1 | tee $2 $(log_dir)/$1.log
-#log=>$(log_dir)/$1.log 2$(subst -a,>)>&1
 
 alignments = $(patsubst ${my_counts_dir}/%,%,$(wildcard ${my_counts_dir}/*))
 samplesheets = $(patsubst %,$(my_metadata)_%.csv,$(alignments))
@@ -228,6 +226,10 @@ samples_db = samples.db
 
 build: $(samplesheets_ext) $(specfiles_ext) $(genes_results)  $(multiqc_results) | $(source_dir) $(staging_dir) ##  Copy the required nfcore count files into the `inst/extdata` area, and get the spec files.
 
+ifneq (,$(filter build,$(MAKECMDGOALS))
+## Only do build-like things if build actually called.
+## Otherwise, metadata samplesheets will trigger an
+## attempt to rebuild the external samples.db etc.
 
 $(samplesheets_ext) : $(my_metadata)_%.csv : $(samples_db) 
 	$(SQLITE) -header -csv  $(samples_db) 'SELECT metadata.* FROM metadata INNER JOIN (SELECT * FROM "fastq_$*" GROUP BY $(samplesheet_id_column)) AS nfcore on metadata.$(metadata_id_column)=nfcore.$(samplesheet_id_column);' > $@
@@ -254,6 +256,12 @@ $(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/% %.config
 
 $(multiqc_results) : $(RESULTS_DIR)/multiqc-% : $(nfcore_dir)/% | $(RESULTS_DIR)
 	ln -sfn ../$</multiqc/star_rsem $@
+endif
+
+################################################################
+#### Helper goals
+################################################################
+
 
 $(log_dir) $(source_dir) $(staging_dir) $(dir $(my_metadata)) data $(RESULTS_DIR)/$(VERSION) $(RESULTS_DIR) $(staging_dir)/$(RESULTS_DIR)/$(VERSION):
 	mkdir -p $@
