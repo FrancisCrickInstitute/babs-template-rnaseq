@@ -226,7 +226,7 @@ samples_db = samples.db
 
 build: $(samplesheets_ext) $(specfiles_ext) $(genes_results)  $(multiqc_results) | $(source_dir) $(staging_dir) ##  Copy the required nfcore count files into the `inst/extdata` area, and get the spec files.
 
-ifneq (,$(filter build,$(MAKECMDGOALS))
+ifneq (,$(filter build,$(MAKECMDGOALS)))
 ## Only do build-like things if build actually called.
 ## Otherwise, metadata samplesheets will trigger an
 ## attempt to rebuild the external samples.db etc.
