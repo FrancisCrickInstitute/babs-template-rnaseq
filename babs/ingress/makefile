@@ -33,12 +33,11 @@ $(configs): %.config: ../docs/%.config
 	grep -q "^strandedness" $@ || sed -i -e '$$astrandedness=auto' $@
 	sed -i 's/^/$*./' $@
 
-global.mk: ../system.mk
-	cp $< $@
-.SECONDARY: ../system.mk
-secrets: ../secrets
-	cp $< $@
-.SECONDARY: ../secrets
+global.mk: $(wildcard ../system.mk)
+	[[ -f ../system.mk ]] && cp ../system.mk $@ || touch $@
+
+secrets: $(wildcard ../secrets)
+	[[ -f ../secrets ]] && cp ../secrets $@ || touch $@
 
 copy:
 

@@ -59,10 +59,13 @@ file_col <- params$file_col[params$file_col %in% names(sample_sheet)][1]
 if (is.na(file_col)) {
   stop("Metadata has none of: ", paste(params$file_col, collapse=", "))
 }
-name_col <- params$name_col[params$name_col %in% names(sample_sheet)][1]
-if (is.na(name_col)) {
-  stop("Metadata has none of: ", paste(params$name_col, collapse=", "))
-}
+
+potential_label <- sapply(sample_sheet, function(x) length(unique(x)))==nrow(sample_sheet)
+name_col <- c(
+  params$name_col[params$name_col %in% names(sample_sheet)],
+  setdiff(names(sample_sheet)[potential_label], file_col),
+  file_col
+)[1]
 
 
 sample_sheet[sapply(sample_sheet, is.character)] <- lapply(

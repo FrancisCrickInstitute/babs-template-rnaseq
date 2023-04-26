@@ -142,6 +142,9 @@ ddsList <- map_des(ddsList, function(dds) dds[!all_zero,])
 ## Calculate size factors, separately for each sample-set
 ddsList <- mapply(
   function(samp, dds) {
+    if ("subsetGenes" %in% names(samp)) {
+      dds <- dds[eval(samp$subsetGenes, transform(rowData(dds), ID=row.names(dds))),]
+    }
     if ("controlGenes" %in% names(samp)) {
       controlGenes <- eval(samp$controlGenes, transform(rowData(dds), ID=row.names(dds)))
       estimateSizeFactors(dds, controlGenes=controlGenes)

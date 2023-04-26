@@ -34,7 +34,6 @@ docs_dir=$(strip ../docs)
 nfcore_dir=$(strip ../nfcore/results)
 
 my_counts_dir=inst/extdata/genes.results
-geo_dir=/camp/stp/babs/scratch/bioinformatics/projects/${babsid}/geo/
 my_metadata=inst/extdata/metadata
 samples_db = samples.db
 

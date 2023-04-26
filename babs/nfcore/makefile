@@ -11,7 +11,7 @@ run: $(alignments) ## Generate NF-CORE alignments, one folder for each config-sp
 
 $(alignments) : results/%/star_rsem/rsem.merged.gene_counts.tsv : samplesheet_%.csv
 	mkdir -p $@
-	export NXF_SINGULARITY_CACHEDIR="${nf_cache_dir}" ;\
+	export NXF_SINGULARITY_CACHEDIR="$(NXF_SINGULARITY_CACHEDIR)" ;\
 	export NXF_HOME=$$PWD ;\
 	$(NEXTFLOW) run nf-core/rnaseq \
 	--input $< \
@@ -19,7 +19,7 @@ $(alignments) : results/%/star_rsem/rsem.merged.gene_counts.tsv : samplesheet_%.
 	--aligner star_rsem \
 	--fasta "$($*.genome_fasta)" \
 	--gtf "$($*.gtf)" \
-	-w "${nf_work}" \
+	-w "nf_work/" \
 	$($*.nfcore)
 
 
@@ -30,8 +30,8 @@ configs = $(patsubst ../ingress/%.config,%.config,$(wildcard ../ingress/*.config
 samplesheets = $(patsubst %.config,samplesheet_%.csv,$(configs))
 
 build: $(samplesheets) ## Build all necessary inputs: samplesheets for each matching alignment '.config' from 'docs'.
-	mkdir -p ${nf_work}
-	ln -sf ${nf_work} nf_work
+	mkdir -p $(SCRATCH_DIR)nf_work/
+	[ -z "$(SCRATCH_DIR)" ] || ln -s $(SCRATCH_DIR)nf_work nf_work
 
 
 field=$(shell sed '/^$$/d; s/^$*./"/;s/=.*/" TEXT/' "$*.config" | paste -sd ',')
@@ -51,15 +51,14 @@ $(configs) : %.config : ../ingress/%.config
 samples.db: ../ingress/samples.db
 	cp $< $@
 
-global.mk: ../system.mk
-	cp $< $@
-.SECONDARY: ../system.mk
-secrets: ../secrets
-	cp $< $@
-.SECONDARY: ../secrets
+global.mk: $(wildcard ../system.mk)
+	[[ -f ../system.mk ]] && cp ../system.mk $@ || touch $@
+
+secrets: $(wildcard ../secrets)
+	[[ -f ../secrets ]] && cp ../secrets $@ || touch $@
 
 clean: ## Remove working files from scratch
-	rm -rf ${nf_work}
+	rm -rf $(SCRATCH_DIR)nf_work
 	rm -f nf_work
 
 run-clean:

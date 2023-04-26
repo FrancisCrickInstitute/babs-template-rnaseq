@@ -189,8 +189,8 @@ endif
 
 geo: geo/md5.txt  ## Gather everything into the 'geo' folder. Specify `geo_version=`, `geo_alignment=` and `geo_spec=` to customise. Remember to `make clean-geo` when the files have been upload.
 geo/md5.txt:
-	mkdir -p $(geo_dir)
-	ln -s $(geo_dir) geo
+	mkdir -p $(SCRATCH_DIR)geo
+	[ -z "$(SCRATCH_DIR)" ] || ln -s $(SCRATCH_DIR)geo geo
 	ln -f $(my_counts_dir)/$(alignment)/*.genes.results geo/
 	ln -f $(results)/$(version)/$(alignment)/$(spec)/*.xlsx geo/
 	$(SQLITE) $(samples_db) 'select fastq_1 from fastqs  where config_file="$(alignment)";' | \
@@ -286,12 +286,13 @@ clean-geo:  ## Remove the GEO files from scratch
 	rm -rf $(geo_dir)
 	rm geo
 
-global.mk: ../system.mk
-	cp $< $@
-.SECONDARY: ../system.mk
-secrets: ../secrets
-	cp $< $@
-.SECONDARY: ../secrets
+global.mk: $(wildcard ../system.mk)
+	[[ -f ../system.mk ]] && cp ../system.mk $@ || touch $@
+
+secrets: $(wildcard ../secrets)
+	[[ -f ../secrets ]] && cp ../secrets $@ || touch $@
+
+
 
 
 MAKEFLAGS += --no-builtin-rules
