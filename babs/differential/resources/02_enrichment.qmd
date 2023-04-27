@@ -106,6 +106,18 @@ param$set("script", params$script)
 param$set("spec",  params$spec, "Using analysis plan '{}'.")
 param$set("alignment", params$alignment, "Using alignment settings '{}'")
 data(list=paste0(params$spec, "_x_", params$alignment))
+dds_model_comp <-  lapply(dds_model_comp,
+                    function(d) {
+                    lapply(d,
+                           function(m) {
+                             lapply(m$comps, function(comp) {
+                               dds <- m$dds
+                               mcols(dds)$results <- comp
+                               metadata(dds) <- metadata(comp)
+                               dds
+                             })
+                           })
+                    })
 
 or_pipe <-  . %>%
   filter(p.adjust<0.05) %>%
