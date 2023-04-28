@@ -1,3 +1,9 @@
+global.mk: $(wildcard ../system.mk)
+	[[ -f ../system.mk ]] && cp ../system.mk $@ || touch $@
+
+secrets: $(wildcard ../secrets)
+	[[ -f ../secrets ]] && cp ../secrets $@ || touch $@
+
 .PHONY: makefile project.mk local.mk 
 .PHONY: build clean geo R-local
 
@@ -194,8 +200,8 @@ geo: geo/md5.txt  ## Gather everything into the 'geo' folder. Specify `geo_versi
 geo/md5.txt:
 	mkdir -p $(SCRATCH_DIR)geo
 	[ -z "$(SCRATCH_DIR)" ] || ln -s $(SCRATCH_DIR)geo geo
-	ln -f $(my_counts_dir)/$(alignment)/*.genes.results geo/
-	ln -f $(results)/$(version)/$(alignment)/$(spec)/*.xlsx geo/
+	ln -fn $(my_counts_dir)/$(alignment)/*.genes.results geo/
+	ln -fn $(results)/$(version)/$(alignment)/$(spec)/*.xlsx geo/
 	$(SQLITE) $(samples_db) 'select fastq_1 from fastqs  where config_file="$(alignment)";' | \
 	while read -r fq ; do cp ${fq} geo/ ; done
 	$(SQLITE) $(samples_db) 'select fastq_2 from fastqs  where config_file="$(alignment)";' | \
@@ -255,10 +261,10 @@ $(patsubst %,%.config,$(alignments_ext)): %.config: ../nfcore/%.config
 $(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/% %.config
 	dir=$(if $($*.group-as),$($*.group-as),$*);\
 	mkdir -p $(my_counts_dir)/$${dir} ;\
-	ln -f $(nfcore_dir)/$${dir}/star_rsem/*.genes.results $(my_counts_dir)/$${dir}/
+	ln -fn $(nfcore_dir)/$${dir}/star_rsem/*.genes.results $(my_counts_dir)/$${dir}/
 
 $(multiqc_results) : $(RESULTS_DIR)/multiqc-% : $(nfcore_dir)/% | $(RESULTS_DIR)
-	ln -sfn ../$</multiqc/star_rsem $@
+	ln -fn ../$</multiqc/star_rsem $@
 endif
 
 ################################################################
@@ -288,12 +294,6 @@ clean:
 clean-geo:  ## Remove the GEO files from scratch
 	rm -rf $(geo_dir)
 	rm geo
-
-global.mk: $(wildcard ../system.mk)
-	[[ -f ../system.mk ]] && cp ../system.mk $@ || touch $@
-
-secrets: $(wildcard ../secrets)
-	[[ -f ../secrets ]] && cp ../secrets $@ || touch $@
 
 
 

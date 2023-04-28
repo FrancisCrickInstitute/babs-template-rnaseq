@@ -1,3 +1,9 @@
+global.mk: $(wildcard ../system.mk)
+	[[ -f ../system.mk ]] && cp ../system.mk $@ || touch $@
+
+secrets: $(wildcard ../secrets)
+	[[ -f ../secrets ]] && cp ../secrets $@ || touch $@
+
 include secrets
 include global.mk
 include local.mk
@@ -32,12 +38,6 @@ $(configs): %.config: ../docs/%.config
 	grep -q "^universal" $@ || sed -i -e '$$auniversal=yes' $@
 	grep -q "^strandedness" $@ || sed -i -e '$$astrandedness=auto' $@
 	sed -i 's/^/$*./' $@
-
-global.mk: $(wildcard ../system.mk)
-	[[ -f ../system.mk ]] && cp ../system.mk $@ || touch $@
-
-secrets: $(wildcard ../secrets)
-	[[ -f ../secrets ]] && cp ../secrets $@ || touch $@
 
 copy:
 

@@ -1,3 +1,8 @@
+global.mk: $(wildcard ../system.mk)
+	[[ -f ../system.mk ]] && cp ../system.mk $@ || touch $@
+
+secrets: $(wildcard ../secrets)
+	[[ -f ../secrets ]] && cp ../secrets $@ || touch $@
 include secrets
 include global.mk
 include local.mk
@@ -9,8 +14,8 @@ alignments = $(patsubst samplesheet_%.csv, results/%/star_rsem/rsem.merged.gene_
 
 run: $(alignments) ## Generate NF-CORE alignments, one folder for each config-specific samplesheet from the `build` process.
 
-$(alignments) : results/%/star_rsem/rsem.merged.gene_counts.tsv : samplesheet_%.csv
-	mkdir -p $@
+$(alignments) : results/%/star_rsem/rsem.merged.gene_counts.tsv : samplesheet_%.csv | log
+	mkdir -p results/$*
 	export NXF_VERSION=`echo "$($*.nfcore)" | sed 's/.*-r \([0-9]\+\.[0-9]\+\).*/\1/'` ;\
 	export NXF_SINGULARITY_CACHEDIR="$(NXF_SINGULARITY_CACHEDIR)" ;\
 	export NXF_HOME=$$PWD ;\
@@ -21,7 +26,7 @@ $(alignments) : results/%/star_rsem/rsem.merged.gene_counts.tsv : samplesheet_%.
 	--fasta "$($*.genome_fasta)" \
 	--gtf "$($*.gtf)" \
 	-w "nf_work/" \
-	$($*.nfcore)
+	$($*.nfcore) $(call log,nfcore)
 
 
 ################################################################
@@ -32,7 +37,7 @@ samplesheets = $(patsubst %.config,samplesheet_%.csv,$(configs))
 
 build: $(samplesheets) ## Build all necessary inputs: samplesheets for each matching alignment '.config' from 'docs'.
 	mkdir -p $(SCRATCH_DIR)nf_work/
-	[ -z "$(SCRATCH_DIR)" ] || ln -s $(SCRATCH_DIR)nf_work nf_work
+	[ -z "$(SCRATCH_DIR)" ] || ln -sf $(SCRATCH_DIR)nf_work nf_work
 
 
 field=$(shell sed '/^$$/d; s/^$*./"/;s/=.*/" TEXT/' "$*.config" | paste -sd ',')
@@ -52,12 +57,8 @@ $(configs) : %.config : ../ingress/%.config
 samples.db: ../ingress/samples.db
 	cp $< $@
 
-global.mk: $(wildcard ../system.mk)
-	[[ -f ../system.mk ]] && cp ../system.mk $@ || touch $@
-
-secrets: $(wildcard ../secrets)
-	[[ -f ../secrets ]] && cp ../secrets $@ || touch $@
-
+log:
+	mkdir $@
 clean: ## Remove working files from scratch
 	rm -rf $(SCRATCH_DIR)nf_work
 	rm -f nf_work

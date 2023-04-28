@@ -1,16 +1,22 @@
+include secrets
 all: differential
 .PHONY: all clean
 
 stages := ingress nfcore differential biologic 
 .PHONY: $(stages)
+$(stages): % : %.log
 
-ingress: 
-nfcore: ingress
 differential: nfcore
+nfcore: ingress
+ingress: docs
 biologic: differential
 
-$(stages):
-	cd $@ && $(MAKE) build && $(MAKE) run
+simulate: simulation.log
+
+%.log : %
+	$(MAKE) -C $* build > $*.err 2>&1
+	$(MAKE) -C $* run  >> $*.err 2>&1
+	mv $*.err $@
 
 
 
