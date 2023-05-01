@@ -225,11 +225,11 @@ func_df <- cross_join(
   dds_df)
 func_df <- rowwise(func_df) %>%
   mutate(func_res=list(do.call(functional, modifyList(func_params, list(dds=dds, group=NULL, pipe=NULL))))) %>%
-  filter(nrow(func_res)!=0) %>%
+  filter(!is.null(func_res) && nrow(func_res)!=0) %>%
   ungroup()
 
 func_res_list <- lapply(
-  unique(func_df$func_name) |> (function(x) setNames(x,x))(),
+  unique(func_df$func_name) |> (function(x) setNames(x,x))(),o
   function(f) {
     grp_vars <- all.vars(funcs[[f]]$group)
     within_vars <- setdiff(c("dataset","model","comparison"), grp_vars)
