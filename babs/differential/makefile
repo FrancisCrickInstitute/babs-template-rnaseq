@@ -183,7 +183,7 @@ slurm-container-prefix=
 #JFLAG= -j $(SLURM--cpus-per-task)# Haven't got parallel make working with quarto. race condition?
 %:
 	slurm_script=$$(mktemp -u $(staging_dir)/slurm_script_XXXXX) ;\
-	echo "${slurm}" > $${slurm_script} ;\
+	echo "$$slurm" > $${slurm_script} ;\
 	make -n -s $* SUBMIT=false EXECUTOR=make > $${slurm_script}.sh ;\
 #	echo "$(slurm-container-prefix) make $(JFLAG) $* $(make-args) EXECUTOR=make SUBMIT=false" >> $${slurm_script} ;\
 	echo "$(slurm-container-prefix) $${slurm_script}.sh" >> $${slurm_script} ;\
