@@ -182,7 +182,7 @@ slurm-container-prefix=
 run render pages $(html_reports) scripts $(qmds) ${staging_dir}/_quarto.yml ${staging_dir}/index.qmd $(yaml) $(yaml0) R.bib renv.lock: $(CONTAINER_IMAGE)
 	slurm_script=$$(mktemp -u $(staging_dir)/slurm_script_XXXXX) ;\
 	echo "$$slurm" > $${slurm_script} ;\
-	make -n -s $* SUBMIT=false EXECUTOR=make > $${slurm_script}.sh ;\
+	make -n -s $@ SUBMIT=false EXECUTOR=make > $${slurm_script}.sh ;\
 	echo "$(slurm-container-prefix) $${slurm_script}.sh" >> $${slurm_script} ;\
 	echo 'r=$$?' >>  $${slurm_script} ;\
 	echo '$(notification)' >> $${slurm_script} ;\
@@ -263,7 +263,7 @@ $(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/% %.config
 	ln -fn $(nfcore_dir)/$${dir}/star_rsem/*.genes.results $(my_counts_dir)/$${dir}/
 
 $(multiqc_results) : $(RESULTS_DIR)/multiqc-% : $(nfcore_dir)/% | $(RESULTS_DIR)
-	ln -fn ../$</multiqc/star_rsem $@
+	ln -sfn ../$(nfcore_dir)/$*/multiqc/star_rsem $@
 endif
 
 ################################################################

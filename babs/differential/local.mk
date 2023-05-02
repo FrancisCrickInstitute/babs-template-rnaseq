@@ -70,7 +70,7 @@ ifeq (${EXECUTOR},singularity)
 CONTAINER= $(call ml,Singularity/3.6.4); singularity
 CONTAINER_IMAGE=$(SINGULARITY_ROOT)/$(notdir $(DOCKER))_$(RVERSION).sif
 CONTAINER_BIND=--bind $(BIND_DIR),/tmp,$(RENV_PATHS_ROOT),$(PWD)/rocker.Renviron:/usr/local/lib/R/etc/Renviron.site
-CONTAINER_ENV=--env SQLITE_TMPDIR=$(TMPDIR)
+CONTAINER_ENV=--env SQLITE_TMPDIR=/tmp
 CONTAINER_FLAGS= exec $(CONTAINER_BIND) --pwd $(PWD) --containall --cleanenv $(CONTAINER_ENV)
 CONTAINER_FLAGS_INTERACTIVE= exec $(CONTAINER_BIND),$${HOME}/.emacs.d,$${HOME}/.Xauthority --pwd $(PWD) --containall --cleanenv $(CONTAINER_ENV),DISPLAY=$${DISPLAY}
 CONTAINER_SHELL = $(CONTAINER) $(patsubst exec,shell,$(CONTAINER_FLAGS_INTERACTIVE)) $(CONTAINER_IMAGE)
