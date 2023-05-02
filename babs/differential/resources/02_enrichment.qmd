@@ -229,7 +229,7 @@ func_df <- rowwise(func_df) %>%
   ungroup()
 
 func_res_list <- lapply(
-  unique(func_df$func_name) |> (function(x) setNames(x,x))(),o
+  unique(func_df$func_name) |> (function(x) setNames(x,x))(),
   function(f) {
     grp_vars <- all.vars(funcs[[f]]$group)
     within_vars <- setdiff(c("dataset","model","comparison"), grp_vars)

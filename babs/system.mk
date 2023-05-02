@@ -17,6 +17,7 @@ NEXTFLOW = $(call ml,Nextflow/21.10.3); $(call ml,Singularity/3.4.2); $(call ml,
 R = $(call ml,pandoc/2.2.3.2-foss-2016b); $(call ml,R/4.1.2-foss-2021b); command R
 SQLITE = $(call ml,SQLite/3.36-GCCcore-11.2.0); sqlite3
 GIT=git
+make_rwx = setfacl -m u::rwx
 
 ################################################################
 ## SLURM

@@ -189,6 +189,8 @@ slurm-container-prefix=
 	echo "$(slurm-container-prefix) $${slurm_script}.sh" >> $${slurm_script} ;\
 	echo 'r=$$?' >>  $${slurm_script} ;\
 	echo '$(notification)' >> $${slurm_script} ;\
+	$(make_rwx) $${slurm_script} ;\
+	$(make_rwx) $${slurm_script}.sh ;\
 	sbatch $${slurm_script} 
 
 endif
