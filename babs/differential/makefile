@@ -66,6 +66,13 @@ $(mk0): $(staging_dir)/%.mk : $(samplesheets) | $(staging_dir)
 	echo '$*_htmls: $$($*_htmls)'>> $@
 
 include $(patsubst %,%.config,$(alignments))
+qmds=$(strip $(foreach section,$(sections),$($(section)_qmds)))
+all_params=$(foreach p,$(param_names),$(patsubst %,-P %:$($(p)),$(p))) -P qmd_name:$(script)
+
+yaml0 = $(filter $(staging_dir)/00_%.yml,$(foreach s,$(sections),$($(s)_yamls)))
+yaml = $(filter-out $(staging_dir)/00_%.yml,$(foreach s,$(sections),$($(s)_yamls)))
+sed-p2yml = 's/^ *-P */    /; s/: */: /g; s/ *-P */\n    /g;'
+html_reports=$(strip $(foreach section,$(sections),$($(section)_htmls)))
 
 ifeq ($(SUBMIT),false)
     ifeq ($(CONTAINERED),false)
@@ -73,8 +80,6 @@ ifeq ($(SUBMIT),false)
 .PHONY: run render pages scripts
 
 run: render  ## Create objects in `data` that store the results of applying each spec file, along with a versioned html report in `results`.  Requires 'make build' be done first.
-
-qmds=$(strip $(foreach section,$(sections),$($(section)_qmds)))
 
 ## Render the qmds to html in one quarto call
 render: $(qmds)  $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(samplesheets)| $(log_dir) data $(RESULTS_DIR)/$(VERSION) R.bib## Render the whole directory of generated qmds
@@ -86,7 +91,6 @@ render: $(qmds)  $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(sampleshe
 
 ## Alternative is to render pages individually
 ## Possibly parallelisable, but seems to have a race condition
-html_reports=$(strip $(foreach section,$(sections),$($(section)_htmls)))
 pages: $(html_reports) ## Generate the renders individually
 	sed  -i 's#^  contents: .*#  contents: [$(subst $(space),$(comma),$(patsubst $(staging_dir)/%,%,$(qmds)))]#' $(staging_dir)/index.qmd
 	$(QUARTO) render '$(staging_dir)/index.qmd' --output-dir $(RESULTS_DIR)/$(VERSION) --execute-dir $(CURDIR)
@@ -112,11 +116,6 @@ ${staging_dir}/_quarto.yml: $(source_dir)/_quarto.yml $(qmds)
 ${staging_dir}/index.qmd : $(source_dir)/index.qmd
 	cp $< $@
 
-all_params=$(foreach p,$(param_names),$(patsubst %,-P %:$($(p)),$(p))) -P qmd_name:$(script)
-
-yaml0 = $(filter $(staging_dir)/00_%.yml,$(foreach s,$(sections),$($(s)_yamls)))
-yaml = $(filter-out $(staging_dir)/00_%.yml,$(foreach s,$(sections),$($(s)_yamls)))
-sed-p2yml = 's/^ *-P */    /; s/: */: /g; s/ *-P */\n    /g;'
 
 $(yaml):
 	echo "- title: $(alignment) $(spec)" >> $@ 
@@ -161,9 +160,9 @@ renv.lock: | rocker.Renviron  $(log_dir)
 ##   being executed by container without slurm, so put what 'make' would normally execute in a temporary
 ##   shell script, and get container to call that script (so it naturally inherits all the command line
 ##   arguments etc)
-%: $(CONTAINER_IMAGE)
+run render pages $(html_reports) scripts $(qmds) ${staging_dir}/_quarto.yml ${staging_dir}/index.qmd $(yaml) $(yaml0) R.bib renv.lock: $(CONTAINER_IMAGE)
 	bash_script=$$(mktemp -u $(staging_dir)/bash_script_XXXXX) ;\
-	make -n -s $* SUBMIT=false EXECUTOR=make > $${bash_script} ;\
+	make -n -s $@ SUBMIT=false EXECUTOR=make > $${bash_script} ;\
 	$(CONTAINER) $(CONTAINER_FLAGS) $(CONTAINER_IMAGE) bash "$${bash_script}" && r=$$? || echo "Failed - tidying up temporary bash script";\
 	rm -f $${bash_script}} ;\
 	exit $$r
@@ -176,16 +175,14 @@ else
 
     ifeq ($(CONTAINERED),true)
 slurm-container-prefix=$(CONTAINER) $(CONTAINER_FLAGS) $(CONTAINER_IMAGE) 
-%: $(CONTAINER_IMAGE)
     else
 slurm-container-prefix=
     endif
 #JFLAG= -j $(SLURM--cpus-per-task)# Haven't got parallel make working with quarto. race condition?
-%:
+run render pages $(html_reports) scripts $(qmds) ${staging_dir}/_quarto.yml ${staging_dir}/index.qmd $(yaml) $(yaml0) R.bib renv.lock: $(CONTAINER_IMAGE)
 	slurm_script=$$(mktemp -u $(staging_dir)/slurm_script_XXXXX) ;\
 	echo "$$slurm" > $${slurm_script} ;\
 	make -n -s $* SUBMIT=false EXECUTOR=make > $${slurm_script}.sh ;\
-#	echo "$(slurm-container-prefix) make $(JFLAG) $* $(make-args) EXECUTOR=make SUBMIT=false" >> $${slurm_script} ;\
 	echo "$(slurm-container-prefix) $${slurm_script}.sh" >> $${slurm_script} ;\
 	echo 'r=$$?' >>  $${slurm_script} ;\
 	echo '$(notification)' >> $${slurm_script} ;\
