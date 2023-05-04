@@ -6,14 +6,14 @@ stages := ingress nfcore differential biologic
 .PHONY: $(stages)
 $(stages): % : %.log
 
-differential: nfcore
-nfcore: ingress
-ingress: docs
-biologic: differential
+differential.log: nfcore.log
+nfcore.log: ingress.log
+ingress.log: docs.log
+biologic.log: differential.log
 
 simulate: simulation.log
 
-%.log : %
+%.log : 
 	$(MAKE) -C $* build > $*.err 2>&1
 	$(MAKE) -C $* run  >> $*.err 2>&1
 	mv $*.err $@
