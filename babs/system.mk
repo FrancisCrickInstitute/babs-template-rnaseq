@@ -8,7 +8,7 @@ samplesheet_id_column := sample
 metadata_id_column := ID
 name_col = sample_name
 V:=1#switches _off_ SILENT mode - delete for SILENT to be default
-
+log_dir=logs
 
 #Executibles (can be overridden in local.mk's)
 ml = module is-loaded $1 || module load $1
