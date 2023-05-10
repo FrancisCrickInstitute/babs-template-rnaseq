@@ -1,10 +1,13 @@
 .DEFAULT_GOAL=help
 
 template_dir := /camp/stp/babs/working/bioinformatics/templates
-template_dir := /camp/stp/babs/working/kellyg/test
 
 type = rnaseq
+
+ifndef version
 version = $(shell git describe --tags --abbrev=0)
+defaultVersion=true
+endif
 
 ################################################################
 #### Everything below should be kept as-is
@@ -12,11 +15,13 @@ version = $(shell git describe --tags --abbrev=0)
 
 .PHONY: deploy
 
-deploy: $(template_dir)/archive $(template_dir)/$(type) ## Copy all controlled files, except .git folder and things in .gitattributes, into area where tickets and pipeline can see it.
+deploy: $(template_dir)/archive ## Copy all controlled files, except .git folder and things in .gitattributes, into area where tickets and pipeline can see it. Setting `version=dev` will put it into the archive (where it can be retrieved) but not into the default area
 	git archive --format=tar.gz HEAD  > $(type)-$(version).tar.gz
-	tar -xzf $(type)-$(version).tar.gz -C $(template_dir)/$(type)
+ifeq ($(defaultVersion),true)
 	cp $(type)-$(version).tar.gz $(template_dir)/$(type).tar.gz
+endif
 	mv $(type)-$(version).tar.gz $(template_dir)/archive/$(type)-$(version).tar.gz
+
 
 
 $(template_dir)/archive $(template_dir)/$(type):
