@@ -1,6 +1,7 @@
-include secrets
+.DEFAULT_GOAL:=all
 all: differential
 .PHONY: all clean
+include secrets
 
 stages := ingress nfcore differential biologic 
 .PHONY: $(stages)
