@@ -1,6 +1,6 @@
 .DEFAULT_GOAL=help
 
-template_dir := /camp/stp/babs/working/bioinformatics/templates
+template_dir := /nemo/stp/babs/working/bioinformatics/templates
 
 type = rnaseq
 

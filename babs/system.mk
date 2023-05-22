@@ -66,8 +66,10 @@ curl -H "Title: SLURM submission complete" -H "Tags: +1" -d "Finished $*" ntfy.s
 curl -H "Title: SLURM submission failed"   -H "Tags: warning" -d "Failed $*: status $$r" ntfy.sh/$(NTFY)
 endif
 
-log=2>&1 | tee $2 $(log_dir)/$1.log# $(call log,test,-a) will append stderr+out to log.test and report to stdout
-#log=>$(subst -a,>)$(log_dir)/$1.log 2>&1# as above, but suppress stdout
+log=2>&1 | tee $2 $(log_dir)/$1.log
+# $(call log,test,-a) will append stderr+out to log.test and report to stdout
+#log=>$(subst -a,>)$(log_dir)/$1.log 2>&1
+# as above, but suppress stdout
 
 ################################################################
 ## Standard Goals

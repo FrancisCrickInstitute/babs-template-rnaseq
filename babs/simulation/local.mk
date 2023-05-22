@@ -5,7 +5,7 @@ R = module load pandoc/2.2.3.2-foss-2016b  R/$(Rversion) NLopt/2.7.0-GCCcore-11.
 my_counts_dir=inst/extdata/genes.results
 nfcore_dir=../nfcore/results
 my_metadata=inst/extdata/metadata
-geo_dir=nf_work = /camp/stp/babs/scratch/bioinformatics/projects/${babsid}/geo/
+geo_dir=nf_work = /nemo/stp/babs/scratch/bioinformatics/projects/${babsid}/geo/
 
 
 # Where to look for experimental design information
