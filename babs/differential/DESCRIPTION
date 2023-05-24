@@ -52,7 +52,6 @@ Suggests:
     rtracklayer,
     remotes,
     tximport
-biocViews: RNASeq
 Remotes:
     macroscian/DESdemonA@quarto
 License: GPL-3

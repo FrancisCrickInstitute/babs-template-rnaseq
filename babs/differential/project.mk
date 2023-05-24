@@ -20,10 +20,8 @@ param_names = res_dir
 ## These will get used to pick up script names, and  yml metadata,
 ## so name everything in the 'source-dir' (`./building-blocks` by default)
 ## after one one of these.
-sections=00_init 01_analyse 02_enrichment
+sections=00_init 01_exploratory 02_differential 03_enrichment
 
-## Which need to have the script pulled from DESdemonA templates?
-template_scripts=$(source_dir)/00_init.qmd $(source_dir)/01_analyse.qmd
 
 ## Section-specific variables
 ## `section`_param_names will determine which parameters get included
@@ -44,8 +42,9 @@ file_col = $(metadata_id_column)
 ## for 'make pages' we can specify a `section`_parent variable
 ################################################################
 
-01_analyse_parent = 00_init_$(ialign)
-02_enrichment_parent = 01_analyse_$(ispec)_$(ialign)
+01_exploratory_parent = 00_init_$(ialign)
+02_differential_parent = 01_exploratory_$(ispec)_$(ialign)
+03_enrichment_parent = 02_differential_$(ispec)_$(ialign)
 
 
 ################################################################

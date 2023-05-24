@@ -1,6 +1,6 @@
 ---
 title: Differential analysis
-description: Visualisation and differential analysis
+description: Differential analysis
 categories: [Differential]
 author: 
   - name: Gavin Kelly
@@ -80,7 +80,7 @@ link2path <- function(lname) {  file.path(knitr::opts_knit$get("output.dir"),lna
 #| label: tbl-load2
 #| tbl-cap: Context
 if (!isTRUE(getOption('knitr.in.progress'))) {
-  my_params_yml <- "resources/01_analyse.yml"
+  my_params_yml <- "resources/01_differential.yml"
   if (file.exists(my_params_yml)) {
     params <- yaml::read_yaml(my_params_yml)
     if (is.null(names(params))) {
@@ -89,26 +89,15 @@ if (!isTRUE(getOption('knitr.in.progress'))) {
   } else {
     params <- list()
   }
-} else {
-  data.frame(
-  Option=names(params),
-  Value=unlist(params)
-) %>%
-  gt() %>%
-  as_raw_html()
-}
-
+} 
 
 
 ```
 
 ```{r}
 #| label: read
-if (is.character(params$alignment)) {
-  data(list=paste0("counts_", params$alignment))
-} else {
-  dds <- params$alignment
-}
+data(list=paste0("counts_", params$alignment))
+data(list=paste0("pca_", params$alignment, "_", params$spec))
 
 if (!is.null(metadata(dds)$organism$org)) {
   library(metadata(dds)$organism$org, character.only=TRUE)
@@ -121,230 +110,11 @@ param <- DESdemonA::ParamList$new(defaults=specs$settings)
 # Calling the setter without a value will pick up the default (from the spec), _and_ alert it in the markdown, and return the default
 set.seed(param$set("seed"))
 param$set("title", "{{{project}}}")
-param$set("script", file.path(getwd(),"01_analyse.r"))
+param$set("script", file.path(getwd(),"01_differential.r"))
 param$set("spec",  params$spec, "Using analysis plan '{}'.")
-if (is.character(params$alignment)) {
-  param$set("alignment", params$alignment, "Using alignment settings '{}'")
-} else {
-  param$set("alignment", params$param_call$alignment, "Using counts from '{}'")
-}  
+param$set("alignment", params$alignment, "Using alignment settings '{}'")
   
-ddsList <- DESdemonA::build_dds_list(dds, specs)
-
-
-#Which features are zero across all samples in all datasets
-all_zero <- Reduce(f=`&`,
-                  x=map_des(ddsList, function(x) apply(counts(x)==0,1, all)),
-                  init=TRUE)
-ddsList <- map_des(ddsList, function(dds) dds[!all_zero,])
-
-
-## Calculate size factors, separately for each sample-set
-ddsList <- mapply(
-  function(samp, dds) {
-    if ("subsetGenes" %in% names(samp)) {
-      dds <- dds[eval(samp$subsetGenes, transform(rowData(dds), ID=row.names(dds))),]
-    }
-    if ("controlGenes" %in% names(samp)) {
-      controlGenes <- eval(samp$controlGenes, transform(rowData(dds), ID=row.names(dds)))
-      estimateSizeFactors(dds, controlGenes=controlGenes)
-    } else {
-      estimateSizeFactors(dds)
-    }
-  },
-  specs$sample_sets,
-  ddsList,
-  SIMPLIFY=FALSE
-)
-
-
-param$set("baseMeanMin")
-if (param$get("baseMeanMin")>0) {
-  ddsList <- map_des(ddsList,
-                   function(x) x[rowMeans(counts(x, normalized=TRUE)) >= param$get("baseMeanMin"),]
-                   )
-}
 ```
-
-# Input Summary
-
-The sample annotations are as follows:
-
-
-```{r}
-#| label: tbl-inputs
-#| tbl-cap: Sample Annotation
-table1 <- function(dds, ddsList) {
-  samp <- as.data.frame(colData(dds))
-  # Extra columns introduced by datasets
-  extra_meta <- lapply(
-    names(ddsList),
-    function(x) merge(
-      setNames(data.frame(ifelse(colnames(dds) %in% colnames(ddsList[[x]]), "✓", ""), row.names=row.names(colData(dds))), x),
-      as.data.frame(colData(ddsList[[x]])[, setdiff(names(colData(ddsList[[x]])), names(colData(dds)))]),
-      by=0, all.x=TRUE
-    )[,-1,drop=FALSE]
-  )
-  
-  extra_meta <- extra_meta[sapply(extra_meta, function(x) ncol(x)!=0 & nrow(x)!=0)]
-  # Generate tab_spanner parameters for each datasets extra columns
-  ts_extra <- lapply(names(extra_meta),
-                    function(x) list(name=x,
-                              cols=1:ncol(extra_meta[[x]]))
-                    )
-  # Cummulatively offset the columns to be spanned
-  ts_extra <- Reduce(function(ts, x) {
-    x$cols <- x$cols+max(ts$cols)
-    x},
-    ts_extra,
-    accumulate=TRUE)
-  
-  df <- cbind(samp, do.call(cbind, unname(extra_meta)))
-  clabel <- setNames(as.list(names(df)), 1:ncol(df))
-  names(df) <- names(clabel)
-  gt(data=df) %>%
-    cols_label(.list=clabel) %>%
-    tab_spanner(label="Metadata",
-                columns=seq_along(samp)) %>%
-    Reduce(f=function(gti, x) tab_spanner(gti, label=x$name,columns=x$cols + ncol(samp)), x=ts_extra, init=.)
-}
-
-table1(dds, ddsList) %>%
-  as_raw_html()
-
-```
-
-We may examine the samples in different combinations, and leave out
-certain samples.  In the above table, the columns under the 'In
-Subset' group indicate these combinations are listed, and the
-samples' inclusions are indicated.  Each of those combinations may be analysed in
-potentially several ways, as formulated here:
-
-
-```{r}
-#| label: formulae
-for (dataset in names(specs$sample_sets)) {
-  mdls <- lapply(specs$sample_sets[[dataset]]$models, function(x) x$design)
-  mdls <- mdls[sapply(specs$sample_sets[[dataset]]$model, function(x) "comparisons" %in% names(x))]
-  for (mdl in names(mdls)) {
-    cat("\n\n####", dataset, mdl, "{-}\n\n")
-    print(extract_eq(lm(
-      update(mdls[[mdl]], Expression ~ .),
-      data=cbind(data.frame(colData(ddsList[[dataset]]), check.names=FALSE), Expression=1:ncol(ddsList[[dataset]])),
-      wrap=TRUE
-    )
-    ))
-  }
-}
-
-```
-
-
-We also have the following defaults set.  Whenever they are used
-or changed in the, analysis that will be highlighted in the text
-alongside a 'wrench' icon:
-
-
-```{r}
-#| label: tbl-settings
-#| tbl-cap: Analysis Settings
-
-data.frame(
-  Option=names(specs$settings),
-  Value=sapply(specs$settings, deparse)
-) %>%
-  gt() %>%
-  as_raw_html()
-
-```
-
-
-# QC Visualisation {.tabset}
-
-These visualisations are carried out blind to the experimental
-design. For the heatmap @fig-qc-visualisation-1, we select a subset of
-genes removing the (assumed uninformative) genes with flat expression
-levels across the whole sample set. We'd expect samples from the same
-experimental group to cluster together, in the sense that they are on
-the same branch of the tree. But this is a transcriptome-wide picture,
-and even if the clustering is not perfect, there will still be genes
-that are consistent with the expected expression profiles, and they
-will be revealed in the differential analysis.
-
-The second heatmap @fig-qc-visualisation-2 focuses on the pairwise
-similarity of samples, using a slightly different metric than the
-first, to emphasise that there's not one way of calculating how
-similar two samples are, transcriptome-wide.  The colours in the first
-heatmap are a gene's expression in a sample, relative to its average
-expression.  The second heatmap represents the similarity of each pair
-of samples.
-
-The come a series of (pairs of) scatter plots of the first two
-Principal Components - a way of summarising all the genes down to just
-two 'metagenes' that attempt to encapsulate the variability across the
-samples in as faithful way as possible. The first of each pair
-(e.g. @fig-qc-visualisation-3) takes the PCs from the unadjusted data,
-and colours them by each of your covariates/treatments in turn. They
-alternate with 'focussed' PC adjustments, such as
-@fig-qc-visualisation-4 which regress out ('normalise away') the
-effect of all experimental factors except the one being focussed
-on. This 'realigns' the principal components, and may be useful if
-there's one experimental factor (e.g. strong batch effect) that
-dominates the transcriptional profile and masking a less dominant
-factor: we then colour by the one experimental factor that hasn't been
-regressed out, hopefully allowing its effect to emerge.
-
-We then revert to the PCA picture that is unadjusted for any
-covariates. In this plot the columns explore the lower-order principal
-components (which although not providing a universally strong signal
-transcriptome wide, might still detect biology that is affecting a
-smaller subset of genes, or a reasonably large set of genes to a
-lesser extent than happens in the higher-order PCS). The rows
-represent the experimental factors we have recorded, and the depth of
-colour of the cell records the degree of 'association' that factor has
-with the give PC (and grey says there was no statistically significant
-association.) This being an automated report, we've had to make
-various compromises so please don't read too much into this chart: it
-primarily guides which other plots we should generate to look at how
-samples associate with each other.
-
-We use that information to derive the remaining plots in this section,
-where we these components in the context of the various experimental
-factors, producing 'partial residual plots' of two selected PCs, being
-selected by the criteria of: 'best' being the PC most strongly
-associated with the experimental factor; 'first' being the
-highest-order PC associated with the experimental factor; and then
-resorting to the first and second PCs in the case where we haven't
-already generated two plots. 'Partial residual plots' are effectively
-plots of the PC against the experimental factor, where once again we
-have 'regressed out' the effect of all _other_ experimental factors at
-play.
-
-
-```{r}
-#| label: fig-qc-visualisation
-
-
-ddsList <- map_des(ddsList, function(x) DESdemonA::add_dim_reduct(x))
-
-for (assay in c("counts", "norm", "vst")) {
-  DESdemonA::write_assay(ddsList, assay=assay, path=params$res_dir)
-}
-                       
-param$set("top_n_variable")
-param$set("clustering_distance_rows")
-param$set("clustering_distance_columns")
-
-map_des(ddsList, 
-        ~DESdemonA::qc_heatmap(
-          .x,
-          title=dataset_name(.x),
-          caption=fig_caption,
-          param=param$publish()
-        )
-        )
-```
-
 
 # Find differential genes
 
@@ -561,6 +331,9 @@ from the QC heatmaps which were blind to the experimental design.
 
 ```{r}
 #| label: fig-differential-heatmap
+
+param$set("clustering_distance_rows")
+param$set("clustering_distance_columns")
 for (dataset in names(dds_model_comp)) {
   cat("## ", dataset, " {.tabset} \n", sep="") 
   for (mdl in names(dds_model_comp[[dataset]])) {
@@ -572,6 +345,7 @@ for (dataset in names(dds_model_comp)) {
     )
   }
 }
+
 ```
 
 # Terms Of Use
