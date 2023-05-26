@@ -23,9 +23,9 @@ $(alignments) : results/%/star_rsem/rsem.merged.gene_counts.tsv : samplesheet_%.
 	--input $< \
 	--outdir results/$*/ \
 	--aligner star_rsem \
-	--fasta "$($*.genome_fasta)" \
-	--gtf "$($*.gtf)" \
-	-w "nf_work/" \
+	--fasta `readlink -f "$($*.genome_fasta)"` \
+	--gtf `readlink -f "$($*.gtf)"` \
+	-w `readlink -f "nf_work"` \
 	$($*.nfcore) $(call log,nfcore)
 
 
@@ -37,7 +37,7 @@ samplesheets = $(patsubst %.config,samplesheet_%.csv,$(configs))
 
 build: $(samplesheets) ## Build all necessary inputs: samplesheets for each matching alignment '.config' from 'docs'.
 	mkdir -p $(SCRATCH_DIR)nf_work/
-	[ -z "$(SCRATCH_DIR)" ] || ln -sf $(SCRATCH_DIR)nf_work nf_work
+	[ -z "$(SCRATCH_DIR)" ] || ln -sfn $(SCRATCH_DIR)nf_work nf_work
 
 
 field=$(shell sed '/^$$/d; s/^$*./"/;s/=.*/" TEXT/' "$*.config" | paste -sd ',')
