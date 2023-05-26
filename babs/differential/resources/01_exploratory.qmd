@@ -314,7 +314,7 @@ regressed out, hopefully allowing its effect to emerge.
 ## PC-Covariate assocation
 
 We then revert to the PCA picture that is unadjusted for any
-covariates. In @fig-02-covar-1 the columns explore the lower-order principal
+covariates. In @fig-01-covar-1 the columns explore the lower-order principal
 components (which although not providing a universally strong signal
 transcriptome wide, might still detect biology that is affecting a
 smaller subset of genes, or a reasonably large set of genes to a
@@ -329,7 +329,7 @@ samples associate with each other.
 
 ## Partial Residuals of PCAs
 
-We use that information to derive the remaining plots such as @fig-02-covariate-01,
+We use that information to derive the remaining plots such as @fig-01-covariate-1,
 where we these components in the context of the various experimental
 factors, producing 'partial residual plots' of two selected PCs, being
 selected by the criteria of: 'best' being the PC most strongly
@@ -523,7 +523,7 @@ for (dname_i in seq_along(ddsList)) {
         pl <- pl + geom_text_repel(aes(label = sample))
       }
       do_plot(pl,
-              label=label("02-focus"),
+              label=label("01-focus"),
               caption=paste("Focussed on ", covar, "in", dname)
               )
       cat("\n\n---\n\n")
@@ -569,7 +569,7 @@ for (dname_i in seq_along(ddsList)) {
       theme_bw() + 
       theme(aspect.ratio = length(unique(plotFrame$Covariate))/min(20, npc))
     do_plot(pl,
-            label=label("02-covar"),
+            label=label("01-covar"),
             caption=paste("Covariate association in", dname)
             )
     
@@ -651,7 +651,7 @@ for (dname_i in seq_along(ddsList)) {
         pl <- pl + geom_text_repel(aes(label = sample))
       }
       do_plot(pl,
-              label= label("02-covariate"),
+              label= label("01-covariate"),
               caption=paste("Against ", covar, "in", dname)
               )
       cat("\n\n---\n\n")

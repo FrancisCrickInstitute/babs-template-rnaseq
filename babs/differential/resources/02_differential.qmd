@@ -218,7 +218,7 @@ value `M`):  anything before the `|` symbol identifies the
 experimental conditions that are being contrasted, and the part after
 the `|` identifies any stratification/conditioning of the data.
 
-In @fig-summary we present some diagnostic plots of the observed
+In @fig-summary-p-1 we present some diagnostic plots of the observed
 p-values. Theoretically we want the pink part of the plot to have a
 solid peak on the left, and then make a reasonable plateau across
 higher p-values: gross deviations from this can indicate an absence of
@@ -293,8 +293,11 @@ for (dataset in names(summaries)) {
       geom_density(alpha=0.5) +
       facet_wrap(~Comparison) +
       theme_bw()
-    print(pl)
-    fig_caption(caption=paste0("p-Diagnostic for", dataset, model))
+    do_plot(pl,
+            label=paste("fig-summary-p"),
+            caption=paste0("p-Diagnostic for", dataset, model)
+            )
+    cat("\n\n---\n\n")
   }
 }
 ```
@@ -366,6 +369,7 @@ for (dataset in names(dds_model_comp)) {
               label=label("02-MA"),
               caption=paste0("MA plot of differential genes ", sub(".*\\t", "", i))
               )
+      cat("\n\n---\n\n")
     } # next comparison
   }   # next model
 }     # next dataset
@@ -473,6 +477,7 @@ for (dataset in names(dds_model_comp)) {
                   label=label("02-focussed"),
                   caption=paste0("Heatmap on differential genes ", name, ", ", term_name, "-focussed")
                   )
+          cat("\n\n---\n\n")
         }
       }
     } # next comparison
