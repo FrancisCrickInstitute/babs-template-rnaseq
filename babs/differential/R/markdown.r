@@ -31,6 +31,8 @@ captioner <- function() {
   })
 }
 
+if (include_from_package <- FALSE) {
+
 ##' Link GT tables to a csv file
 ##'
 ##' To be used in a `GT` pipeline, it will store the underlying table
@@ -85,3 +87,4 @@ bookdown_label <- function(data, label="") {
     
     
 
+}

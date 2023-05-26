@@ -47,10 +47,16 @@ library(ReactomePA)
 library(GO.db)
 library(IHW)
 library(equatiomatic)
-library(DESdemonA)
+#library(DESdemonA)
 
 source("R/plot.r")
+source("R/markdown.r")
+source("R/rnaseq.r")
+source("R/helpers.r")
+source("R/output.r")
+
 fig_caption <- captioner()
+label <- counter()
 set.seed(1)
 
 
@@ -79,7 +85,7 @@ link2path <- function(lname) {  file.path(knitr::opts_knit$get("output.dir"),lna
 
 
 ```{r}
-#| label: tbl-load2-01
+#| label: tbl-load2
 #| tbl-cap: Context
 
 if (!isTRUE(getOption('knitr.in.progress'))) {
@@ -104,7 +110,7 @@ if (!isTRUE(getOption('knitr.in.progress'))) {
 ```
 
 ```{r}
-#| label: read-01
+#| label: read
 
 data(list=paste0("counts_", params$alignment))
 
@@ -113,28 +119,25 @@ if (!is.null(metadata(dds)$organism$org)) {
 }
 metadata(dds)$template_git <- packageDescription("DESdemonA")$git_last_commit
 
-specs   <- DESdemonA::load_specs(file=paste0(params$spec, ".spec"), context=dds)
+specs   <- load_specs(file=paste0(params$spec, ".spec"), context=dds)
+param <- ParamList$new(defaults=specs$settings)
 
-param <- DESdemonA::ParamList$new(defaults=specs$settings)
 # Calling the setter without a value will pick up the default (from the spec), _and_ alert it in the markdown, and return the default
 set.seed(param$set("seed"))
 param$set("title", "{{{project}}}")
 param$set("script", file.path(getwd(),"01_analyse.r"))
 param$set("spec",  params$spec, "Using analysis plan '{}'.")
-if (is.character(params$alignment)) {
-  param$set("alignment", params$alignment, "Using alignment settings '{}'")
-} else {
-  param$set("alignment", params$param_call$alignment, "Using counts from '{}'")
-}  
+param$set("alignment", params$alignment, "Using alignment settings '{}'")
 
-ddsList <- DESdemonA::build_dds_list(dds, specs)
+
+ddsList <- build_dds_list(dds, specs)
 
 
 #Which features are zero across all samples in all datasets
 all_zero <- Reduce(f=`&`,
-                  x=map_des(ddsList, function(x) apply(counts(x)==0,1, all)),
+                  x=lapply(ddsList, function(x) apply(counts(x)==0,1, all)),
                   init=TRUE)
-ddsList <- map_des(ddsList, function(dds) dds[!all_zero,])
+ddsList <- lapply(ddsList, function(dds) dds[!all_zero,])
 
 
 ## Calculate size factors, separately for each sample-set
@@ -158,7 +161,7 @@ ddsList <- mapply(
 
 param$set("baseMeanMin")
 if (param$get("baseMeanMin")>0) {
-  ddsList <- map_des(ddsList,
+  ddsList <- lapply(ddsList,
                    function(x) x[rowMeans(counts(x, normalized=TRUE)) >= param$get("baseMeanMin"),]
                    )
 }
@@ -171,7 +174,7 @@ The sample annotations are as follows:
 
 
 ```{r}
-#| label: tbl-inputs-01
+#| label: tbl-inputs
 #| tbl-cap: Sample Annotation
 
 table1 <- function(dds, ddsList) {
@@ -212,13 +215,14 @@ table1 <- function(dds, ddsList) {
 table1(dds, ddsList) %>%
   as_raw_html()
 
-ddsList <- map_des(ddsList, function(x) DESdemonA::add_dim_reduct(x))
+ddsList <- lapply(ddsList, function(x) add_dim_reduct(x))
 
 for (assay in c("counts", "norm", "vst")) {
-  DESdemonA::write_assay(ddsList, assay=assay, path=params$res_dir)
+  write_assay(ddsList, assay=assay, path=params$res_dir)
 }
 
-save(ddsList, file=file.path("data",paste0("pca_", params$alignment, "_", params$spec, ".rda")))
+save(ddsList,
+     file=file.path("data",paste0("pca_", params$alignment, "_", params$spec, ".rda")))
 
 ```
 
@@ -230,7 +234,7 @@ potentially several ways, as formulated here:
 
 
 ```{r}
-#| label: formulae-01
+#| label: formulae
 
 for (dataset in names(specs$sample_sets)) {
   mdls <- lapply(specs$sample_sets[[dataset]]$models, function(x) x$design)
@@ -255,7 +259,7 @@ alongside a 'wrench' icon:
 
 
 ```{r}
-#| label: tbl-settings-01
+#| label: tbl-settings
 #| tbl-cap: Analysis Settings
 
 data.frame(
@@ -273,7 +277,7 @@ data.frame(
 ## Overall Heatmaps
 
 These visualisations are carried out blind to the experimental
-design. For the heatmap @fig-qc-1-Heatmap, we select a subset of
+design. For the heatmap @fig-01-Heatmap-1, we select a subset of
 genes removing the (assumed uninformative) genes with flat expression
 levels across the whole sample set. We'd expect samples from the same
 experimental group to cluster together, in the sense that they are on
@@ -282,7 +286,7 @@ and even if the clustering is not perfect, there will still be genes
 that are consistent with the expected expression profiles, and they
 will be revealed in the differential analysis.
 
-The second heatmap @fig-qc-1-sampDist focuses on the pairwise
+The second heatmap @fig-01-sampDist-1 focuses on the pairwise
 similarity of samples, using a slightly different metric than the
 first, to emphasise that there's not one way of calculating how
 similar two samples are, transcriptome-wide.  The colours in the first
@@ -296,10 +300,10 @@ The come a series of (pairs of) scatter plots of the first two
 Principal Components - a way of summarising all the genes down to just
 two 'metagenes' that attempt to encapsulate the variability across the
 samples in as faithful way as possible. The first of each pair
-(e.g. @fig-qc-1-color-1) takes the PCs from the unadjusted data,
+(e.g. @fig-01-color-1) takes the PCs from the unadjusted data,
 and colours them by each of your covariates/treatments in turn. They
 alternate with 'focussed' PC adjustments, such as
-@fig-qc-1-focus-1 which regress out ('normalise away') the
+@fig-01-focus-1 which regress out ('normalise away') the
 effect of all experimental factors except the one being focussed
 on. This 'realigns' the principal components, and may be useful if
 there's one experimental factor (e.g. strong batch effect) that
@@ -310,7 +314,7 @@ regressed out, hopefully allowing its effect to emerge.
 ## PC-Covariate assocation
 
 We then revert to the PCA picture that is unadjusted for any
-covariates. In this plot the columns explore the lower-order principal
+covariates. In @fig-02-covar-1 the columns explore the lower-order principal
 components (which although not providing a universally strong signal
 transcriptome wide, might still detect biology that is affecting a
 smaller subset of genes, or a reasonably large set of genes to a
@@ -325,7 +329,7 @@ samples associate with each other.
 
 ## Partial Residuals of PCAs
 
-We use that information to derive the remaining plots in this section,
+We use that information to derive the remaining plots such as @fig-02-covariate-01,
 where we these components in the context of the various experimental
 factors, producing 'partial residual plots' of two selected PCs, being
 selected by the criteria of: 'best' being the PC most strongly
@@ -339,7 +343,7 @@ play.
 
 
 ```{r}
-#| label: fig-qc-visualisation-01
+#| label: fig-qc-visualisation
 
                        
 param$set("top_n_variable")
@@ -356,15 +360,15 @@ for (dname_i in seq_along(ddsList)) {
   top <- order(apply(var_stab, 1, sd), decreasing = TRUE)[1:param$get("top_n_variable")]
   models_for_qc <- metadata(this_dds)$models[sapply(metadata(this_dds)$models, 
                                                "[[", "plot_qc")]
-  cat("\n## Overall Heatmap of Variable Genes in ", dname, "\n", sep = "")
+  cat("\n## Overall Heatmap of Variable Genes in ", dname, "\n\n", sep = "")
   plotDat <- var_stab[top, ]
   plotDat <- plotDat - rowMeans(plotDat)
-  vars <- DESdemonA:::get_terms(this_dds)
+  vars <- get_terms(this_dds)
   colDat <- as.data.frame(colData(this_dds))
   colnames(plotDat) <- rownames(colDat)
   pl <- ComplexHeatmap::Heatmap(
     plotDat, name = "Mean Centred", 
-    column_title = "Samples", row_title = "Genes", col = DESdemonA:::sym_colour(plotDat), 
+    column_title = "Samples", row_title = "Genes", col = sym_colour(plotDat), 
     clustering_distance_columns = param$get("clustering_distance_columns"), 
     clustering_distance_rows = param$get("clustering_distance_rows"), 
     heatmap_legend_param = list(direction = "horizontal"), 
@@ -373,7 +377,7 @@ for (dname_i in seq_along(ddsList)) {
       col = metadata(colData(this_dds))$palette$Heatmap[vars$fixed]), 
     show_row_names = FALSE, show_column_names = TRUE)
   do_plot(pl,
-          label= paste("qc", dname_i, "Heatmap"),
+          label= label("01-Heatmap"),
           caption=paste("Heatmap of variable genes,", dname))
   cat("\n\n---\n\n")
 
@@ -405,7 +409,7 @@ for (dname_i in seq_along(ddsList)) {
     top_annotation = ComplexHeatmap::HeatmapAnnotation(df = colDat[vars$fixed], 
                                                        col = metadata(colData(this_dds))$palette$Heatmap[vars$fixed]))
   do_plot(pl,
-          label= paste("qc", dname_i, "sampDist"),
+          label= label("01-sampDist"),
           caption=paste("Heatmap of sample distances,", dname))
   cat("\n\n---\n\n")
 
@@ -415,7 +419,7 @@ for (dname_i in seq_along(ddsList)) {
   do_focus <- length(vars$fixed) > 1
   do_batch <- FALSE
   if (do_focus) {
-    sample_gene_factor <- DESdemonA:::residual_heatmap_transform(
+    sample_gene_factor <- residual_heatmap_transform(
       assay(this_dds, 
             "vst"), colData(this_dds), models_for_qc[[1]]$design)
     if ("batch" %in% names(models_for_qc[[1]])) {
@@ -467,7 +471,7 @@ for (dname_i in seq_along(ddsList)) {
       pl <- pl + geom_text_repel(aes(label = sample))
     }
     do_plot(pl,
-            label=paste("qc", dname_i, "color", covar_i),
+            label=label("01_color"),
             caption=paste("Coloured by ", covar, "in", dname)
             )
     cat("\n\n---\n\n")
@@ -493,7 +497,7 @@ for (dname_i in seq_along(ddsList)) {
         pl <- pl + geom_text_repel(aes(label = sample))
       }
       do_plot(pl,
-              label= paste("qc", dname_i, "correct", covar_i),
+              label= label("02-correct"),
               caption=paste0("Coloured by ", covar, ", correcting for ", 
                              paste(batch_vars, collapse = ", "), "in", dname)
               )
@@ -519,7 +523,7 @@ for (dname_i in seq_along(ddsList)) {
         pl <- pl + geom_text_repel(aes(label = sample))
       }
       do_plot(pl,
-              label=paste("qc", dname_i, "focus", covar_i),
+              label=label("02-focus"),
               caption=paste("Focussed on ", covar, "in", dname)
               )
       cat("\n\n---\n\n")
@@ -565,7 +569,7 @@ for (dname_i in seq_along(ddsList)) {
       theme_bw() + 
       theme(aspect.ratio = length(unique(plotFrame$Covariate))/min(20, npc))
     do_plot(pl,
-            label=paste("qc", dname_i, "covar"),
+            label=label("02-covar"),
             caption=paste("Covariate association in", dname)
             )
     
@@ -647,7 +651,7 @@ for (dname_i in seq_along(ddsList)) {
         pl <- pl + geom_text_repel(aes(label = sample))
       }
       do_plot(pl,
-              label= paste("qc", dname_i, "covar", covar_i),
+              label= label("02-covariate"),
               caption=paste("Against ", covar, "in", dname)
               )
       cat("\n\n---\n\n")

@@ -1,25 +1,6 @@
 ## *** Useful Functions
 
 
-##' Adjust a nested batch effect
-##'
-##' When one covariate entirely predicts another, then including both in a
-##' linear model will result in an unspecified model.  This can happen if we
-##' have e.g. groups of cell-lines that represent a genotype.  If each of those
-##' cell-lines receives a treatment, then we need both the group-level information to
-##' test the interesting treatment x genotype interaction, but also the cell-line information
-##' to remove any batch effect they represent.  To achieve this, we can recode the batch effect
-##' so that each genotype has a common set of levels, and then we can include that batch effect
-##' in interaction with the grouping factor.
-##'
-##' If one group has a larger number of sub-treatments, then it will be necessary to remove
-##' the columns of the design matrix that are all zero separately
-##' @title Adjust a confounded batch effect
-##' @param inner A factor representing the variable to be recoded, e.g. the cell-line
-##' @param ... The parent factors that 'inner' is inside, e.g. the genotype of the cell-line
-##' @return A recoded factor that can now replace the inner (cell-line) variable in your model
-##' @author Gavin Kelly
-#' @export
 load_specs <- function(file="", context) {
   if (file.exists(file)) {
     e <- as.environment(as.data.frame(colData(context)))
@@ -108,7 +89,7 @@ build_dds_list <- function(dds, spec) {
   if (is.list(spec$settings$palette)) {
     default_palette <- spec$settings$palette
   } else {
-    default_palette<- DESdemonA:::df2colorspace(
+    default_palette<- df2colorspace(
       data.frame(colData(dds))[, intersect(modelled_terms, colnames(data.frame(colData(dds)))),drop=FALSE],
       spec$settings$palette
     )
@@ -151,7 +132,7 @@ build_dds_list <- function(dds, spec) {
         new_cols <- c(new_cols, old_cols[is_modified])
       }
       if (length(new_cols)>0) {
-        new_meta <- DESdemonA:::df2colorspace(
+        new_meta <- df2colorspace(
           colData(obj)[, new_cols, drop=FALSE],
           spec$settings$palette
         )
@@ -216,6 +197,7 @@ add_dim_reduct  <-  function(dds, n=Inf, family="norm", batch=~1) {
   dds
 }
 
+
 ##' Fit the models of expression
 ##'
 ##' Iterate through each model (stored in the 'models' metadata of a
@@ -230,7 +212,7 @@ add_dim_reduct  <-  function(dds, n=Inf, family="norm", batch=~1) {
 fit_models <- function(dds, ...) {
   model_comp <- lapply(
     metadata(dds)$models,
-    function(mdl) DESdemonA:::fit_model(mdl, dds, ...)
+    function(mdl) fit_model(mdl, dds, ...)
   )
   model_comp <- model_comp[sapply(model_comp, length)!=0]
   model_comp <- imap(model_comp, function(obj, mname) {
@@ -269,7 +251,7 @@ fit_model <- function(mdl, dds, ...) {
   }
   if (any(is_lrt)) {
     lrt <- lapply(mdl$comparisons[is_lrt],
-                 function(reduced) {DESdemonA:::fitLRT(this_dds, mdl=mdl, reduced=reduced, ...)}
+                 function(reduced) {fitLRT(this_dds, mdl=mdl, reduced=reduced, ...)}
                  )
     out <- c(out, lrt)
   }
@@ -306,7 +288,7 @@ check_model <- function(dds) {
   }
   if (any(mdl$dropped)) {
     mm <- model.matrix(mdl$design, as.data.frame(colData(dds)))[,!mdl$dropped]
-    colnames(mm) <- DESdemonA:::.resNames(colnames(mm))
+    colnames(mm) <- .resNames(colnames(mm))
     mdl$mat <- mm
   }
   metadata(dds)$model <- mdl
@@ -355,7 +337,7 @@ emcontrasts <- function(dds, spec, extra=NULL) {
   }
   contr_frame <- contr_frame[ind_est,1:(which(names(contr_frame)=="estimate")-1), drop=FALSE]
   contr_mat <- emfit$contrast@linfct[ind_est, !mdl$dropped, drop=FALSE]
-  colnames(contr_mat) <- DESdemonA:::.resNames(colnames(contr_mat))
+  colnames(contr_mat) <- .resNames(colnames(contr_mat))
   contr <- lapply(seq_len(nrow(contr_frame)), function(i) contr_mat[i,,drop=TRUE])
   contr <- lapply(contr, function(vect) {attr(vect, "spec") <- spec; vect})
   names(contr) <- do.call(paste, c(contr_frame,sep= "|"))
@@ -380,7 +362,7 @@ fitLRT <- function(dds, mdl, reduced, ...) {
     reduced <- model.matrix(reduced, colData(dds))
     ## unsupported_ind <- apply(reduced==0, 2, all)
     ## reduced <- reduced[, !unsupported_ind]
-    ## colnames(reduced) <- DESdemonA:::.resNames(colnames(reduced))
+    ## colnames(reduced) <- .resNames(colnames(reduced))
     reduced <- reduced[,colnames(reduced) %in% colnames(full)]
     metadata(dds)$reduced_mat <- reduced
   } else {

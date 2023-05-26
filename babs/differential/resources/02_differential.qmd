@@ -26,7 +26,7 @@ We load in all the necessary additional R packages, and set up some initial para
 
 
 ```{r}
-#| label: load-02
+#| label: load-01
 #| output: false
 #| warning: false
 #| error: false
@@ -47,9 +47,15 @@ library(ReactomePA)
 library(GO.db)
 library(IHW)
 library(equatiomatic)
-library(DESdemonA)
+
+source("R/plot.r")
+source("R/markdown.r")
+source("R/rnaseq.r")
+source("R/output.r")
+source("R/helpers.r")
 
 fig_caption <- captioner()
+label <- counter()
 set.seed(1)
 
 
@@ -77,7 +83,7 @@ link2path <- function(lname) {  file.path(knitr::opts_knit$get("output.dir"),lna
 
 
 ```{r}
-#| label: tbl-load2-02
+#| label: tbl-load2
 #| tbl-cap: Context
 if (!isTRUE(getOption('knitr.in.progress'))) {
   my_params_yml <- "resources/01_differential.yml"
@@ -95,7 +101,7 @@ if (!isTRUE(getOption('knitr.in.progress'))) {
 ```
 
 ```{r}
-#| label: read-02
+#| label: read
 data(list=paste0("counts_", params$alignment))
 data(list=paste0("pca_", params$alignment, "_", params$spec))
 
@@ -104,9 +110,9 @@ if (!is.null(metadata(dds)$organism$org)) {
 }
 metadata(dds)$template_git <- packageDescription("DESdemonA")$git_last_commit
 
-specs   <- DESdemonA::load_specs(file=paste0(params$spec, ".spec"), context=dds)
+specs   <- load_specs(file=paste0(params$spec, ".spec"), context=dds)
 
-param <- DESdemonA::ParamList$new(defaults=specs$settings)
+param <- ParamList$new(defaults=specs$settings)
 # Calling the setter without a value will pick up the default (from the spec), _and_ alert it in the markdown, and return the default
 set.seed(param$set("seed"))
 param$set("title", "{{{project}}}")
@@ -126,24 +132,25 @@ to ensure reported fold-changes are more robust.
 
 
 ```{r}
-#| label: differential-02
+#| label: differential
 
 param$set("alpha")
 param$set("lfcThreshold")
 param$set("filterFun")
 
 ## For each dataset, fit all its models
-dds_model_comp <- map_des(
+dds_model_comp <- lapply(
   ddsList,
-  function(x) DESdemonA::fit_models(x,
-                             minReplicatesForReplace = Inf)
+  function(x) fit_models(x,
+                  minReplicatesForReplace = Inf)
 )
 
 
 ## Now put results in each 3rd level mcols(dds)$results
-dds_model_comp <- map_des(
+dds_model_comp <- map_depth(
   dds_model_comp,
-  DESdemonA::get_result,
+  .depth=3,
+  get_result,
   filterFun=param$get("filterFun"),
   alpha=param$get("alpha"),
   lfcThreshold=param$get("lfcThreshold")
@@ -173,16 +180,17 @@ save(dds_model_comp,
 saveRDS(dds_model_comp, file=file.path("data", paste0(dds_name, ".rds")))
 dds_model_comp <- pre_save
 
-xl_files <- DESdemonA::write_results(dds_model_comp, param, dir=params$res_dir)
+xl_files <- write_results(dds_model_comp, param, dir=params$res_dir)
 iwalk(xl_files,
      ~cat("\n\n<a class=\"download-excel btn btn-primary\" href=\"", sub(paste0("^", params$res_dir, "/?"), "", .x), "\"> Open Spreadsheet '", .y,"'</a>", sep="")
      )
 
-#DESdemonA::write_all_results(dds_model_comp, dir=params$res_dir)
+#write_all_results(dds_model_comp, dir=params$res_dir)
+
 ```
 
 
-## Summary Tables {.tabset}
+## Summary Tables 
 
 Here we summarise the results of the differential testing. Each
 sample-set gets its own table (flick between tabs to choose which),
@@ -222,13 +230,13 @@ behaviour, and so show an example of what a 'bad' pink trace might
 look like.
 
 ```{r}
-#| label: tbl-summary-02
+#| label: tbl-summary
 #| tbl-cap: Summaries
 
 summaries <- dds_model_comp %>%
-  map_des(DESdemonA::summarise_results) %>%
-  map_des(function(x) {bind_rows(x, .id="Comparison")}, depth="model") %>%
-  map_des(function(x) {bind_rows(x, .id="Model")}, depth="dataset") %>%
+  map_dmc(summarise_results) %>%
+  map_dmc(function(x) {bind_rows(x, .id="Comparison")}, depth="model") %>%
+  map_dmc(function(x) {bind_rows(x, .id="Model")}, depth="dataset") %>%
   map(function(x) {
     levels(x$Group) <- sub(".*<(.+<.+<0)$", "\\1", levels(x$Group))
     levels(x$Group) <- sub("^(0<.+?<.+?)<.*$", "\\1", levels(x$Group))
@@ -238,8 +246,8 @@ summaries <- dds_model_comp %>%
   )
 
 pval_frame <- dds_model_comp %>%
-  map_des(~as.data.frame(mcols(.x)$results)) %>%
-  map_des(function(x) {bind_rows(x, .id="Comparison")}, depth="model")
+  map_dmc(~as.data.frame(mcols(.x)$results)) %>%
+  map_dmc(function(x) {bind_rows(x, .id="Comparison")}, depth="model")
                       
                       
 
@@ -277,7 +285,7 @@ for (dataset in names(summaries)) {
 
 
 ```{r}
-#| label: fig-summary-02
+#| label: fig-summary
   
 for (dataset in names(summaries)) {
   for (model in names(pval_frame[[dataset]])) {
@@ -291,7 +299,7 @@ for (dataset in names(summaries)) {
 }
 ```
 
-# Scatterplot of differential genes {.tabset}
+# Scatterplot of differential genes
 
 Here we plot the fold-change across all genes on the vertical axis,
 against their overall expression on the horizontal. Statistically
@@ -310,15 +318,58 @@ are sub-tabs for different experimental designs, if any
 
 
 ```{r}
-#| label: fig-differential-MA-02
+#| label: fig-differential-MA
 
 for (dataset in names(dds_model_comp)) {
-  cat("## ", dataset, " {.tabset} \n", sep="") 
+  cat("\n## ", dataset, "\n\n", sep="") 
   for (mdl in names(dds_model_comp[[dataset]])) {
-    cat("### ", mdl, "\n", sep="") 
-    differential_MA(dds_model_comp[[dataset]][[mdl]], caption=fig_caption)
-  }
-}
+    cat("\n### ", mdl, "\n\n", sep="") 
+    this_mdl <- dds_model_comp[[dataset]][[mdl]]
+    for (i in names(this_mdl)) {
+      res <- as.data.frame(mcols(this_mdl[[i]])$results)
+      md <- metadata(this_mdl[[i]])
+      pal <- RColorBrewer::brewer.pal(12, "Set3")
+      if (is_formula(md$comparison)) {
+        res$class <- ifelse(grepl("\\*", res$class),res$class, "None")
+        colind <- (seq(along=unique(res$class), from=0)) %% length(pal) + 1
+        yax <- "Largest fold change"
+        if (length(colind)>12) {
+          res$class <- ifelse(res$class=="None","None","Sig")
+          cols <- setNames(c("blue","grey"), c("Sig","None"))
+          lpos <- "none"
+        } else {
+          cols <- setNames(c(pal[colind]), unique(res$class))
+          cols["None"] <- "grey"
+          lpos <- "bottom"
+        }
+      } else {
+        res$class <- ifelse(grepl("\\*", res$class), "Sig", "Not")
+        cols <- setNames(c("blue","grey"), c("Sig","Not"))
+        yax <- "Log fold change (shrunk)"
+        lpos <- "none"
+      }
+      pl <- ggplot(res,
+                  aes(x=baseMean,
+                      y=shrunkLFC,
+                      colour=class,
+                      size=ifelse(class %in% c("Not","None"),.1 , .5),
+                      label=ifelse(class %in% c("Not","None"), "" , symbol)
+                      )
+                  ) +
+        geom_point() +
+        scale_x_log10() + scale_colour_manual(values=cols) + scale_size_identity() +
+        theme(legend.position=lpos) +
+        labs(x="Mean of normalised counts", y=yax)+ theme_bw()
+      ind <- order(res$shrunkLFC)[c(1:5, nrow(res)-(0:4))]
+      pl <- pl+ggrepel::geom_text_repel(size=4, data=res[ind,])
+      do_plot(pl,
+              label=label("02-MA"),
+              caption=paste0("MA plot of differential genes ", sub(".*\\t", "", i))
+              )
+    } # next comparison
+  }   # next model
+}     # next dataset
+
 ```
 
 
@@ -330,7 +381,7 @@ of the experimental groups, so should be interpreted differently
 from the QC heatmaps which were blind to the experimental design.
 
 ```{r}
-#| label: fig-differential-heatmap-02
+#| label: fig-differential-heatmap
 
 param$set("clustering_distance_rows")
 param$set("clustering_distance_columns")
@@ -338,13 +389,96 @@ for (dataset in names(dds_model_comp)) {
   cat("## ", dataset, " {.tabset} \n", sep="") 
   for (mdl in names(dds_model_comp[[dataset]])) {
     cat("### ", mdl, "\n", sep="")
-    DESdemonA::differential_heatmap(
-      ddsList=dds_model_comp[[dataset]][[mdl]],
-      param=param$publish(),
-      caption=fig_caption
-    )
-  }
-}
+    first_done <- FALSE
+    this_mdl <- dds_model_comp[[dataset]][[mdl]]
+    for (i in names(this_mdl)) {
+      if (!any(grepl("\\*$", mcols(this_mdl[[i]])$results$class))) {
+        next
+      }
+      comp <- metadata(this_mdl[[i]])$comparison
+      fml <- metadata(this_mdl[[i]])$model$design
+      mdl <- metadata(this_mdl[[i]])$model
+      if ("mat" %in% names(mdl)) {
+        mmat <- mdl$mat
+      } else {
+        mmat <- model.matrix(mdl$design, colData(this_mdl[[i]]))
+      }
+      if ("spec" %in% names(attributes(comp))) {
+        var_roles <- emmeans:::.parse.by.formula(attr(comp, "spec"))
+        var_roles$all <- c(var_roles$by, var_roles$rhs, setdiff(all.vars(fml), unlist(var_roles)))
+        most_decreasing <- which.min(metadata(this_mdl[[i]])$comparison %*% MASS::ginv(mmat))
+        weights <- apply(mmat, 1, function(x) all(x==mmat[most_decreasing,]))
+        weights <- weights/sum(weights)
+      } else if (is_formula(comp)) {
+        most_decreasing <- which.max(MASS::ginv(mmat)[1,])
+        weights <- apply(mmat, 1, function(x) all(x==mmat[most_decreasing,]))
+        weights <- weights/sum(weights)
+        var_roles <- list(lhs="", rhs=all.vars(fml), by=NULL, all=all.vars(fml))
+      } else {
+        var_roles <- list(lhs="", rhs=all.vars(fml), by=NULL, all=all.vars(fml))
+        most_decreasing <- which.min(retrieve_contrast(this_mdl[[i]]) %*% MASS::ginv(mmat))
+        weights <- apply(mmat, 1, function(x) all(x==mmat[most_decreasing,]))
+        weights <- weights/sum(weights)
+      }
+      baseline_list <- as.data.frame(colData(this_mdl[[i]])[most_decreasing, var_roles$all])
+      baseline_str <- paste(names(baseline_list), unlist(baseline_list), sep="=", collapse=",")
+      tidied_data <- tidy_significant_dds(this_mdl[[i]], mcols(this_mdl[[i]])$results, var_roles, weights=weights)
+      pdat <- tidied_data$pdat
+      pdat[sapply(pdat, is.character)] <- lapply(pdat[sapply(pdat, is.character)], 
+                                                as.factor)
+      colnames(tidied_data$mat) <- rownames(pdat)
+      name <- sub(".*\\t", "", i)
+      if (length(var_roles$by)==0) {
+        col_split <- NULL
+      } else {
+        col_split <- apply(sapply(pdat[, var_roles$by, drop=FALSE], as.character), 1, paste, collapse=" ")
+      }
+      
+      ha <- ComplexHeatmap::HeatmapAnnotation(
+        df=pdat,
+        col=metadata(colData(this_mdl[[i]]))$palette$Heatmap[names(pdat)])
+      pl <- ComplexHeatmap::Heatmap(
+        tidied_data$mat,
+        col=sym_colour(tidied_data$mat),
+        heatmap_legend_param = list(direction = "horizontal" ),
+        name=sub(".*\\t", "", i),
+        cluster_columns = FALSE,
+        show_column_names = TRUE,
+        clustering_distance_rows=param$get("clustering_distance_rows"),
+        column_split = col_split,
+        top_annotation = ha,
+        row_names_gp = gpar(fontsize = 6),
+        show_row_names = nrow(tidied_data$mat)<100)
+      do_plot(pl,
+              label=label("02-Heatmap"),
+              caption=paste0("Heatmap on ", name, "-differential genes. White for ", baseline_str))
+      if (do_residual_transform <- FALSE) {#length(all.vars(fml))>1) {
+        part_resid <- residual_heatmap_transform(tidied_data$mat, pdat, fml)
+        term_names <- intersect(dimnames(part_resid$terms)[[3]], var_roles$rhs)
+        for (term_name in term_names) {
+          tdat <- t(part_resid$terms[,,term_name, drop=TRUE]) +part_resid$const + t(part_resid$resid)
+          pl <- ComplexHeatmap::Heatmap(
+            tdat,
+            col=sym_colour(tdat),
+            heatmap_legend_param = list(direction = "horizontal" ),
+            name=paste(sub(".*\\t", "", i),term_name),
+            cluster_columns = FALSE,
+            show_column_names = TRUE,
+            column_split = col_split,
+            clustering_distance_rows=param$get("clustering_distance_rows"),
+            top_annotation = ha,
+            row_names_gp = gpar(fontsize = 6),
+            show_row_names = nrow(tidied_data$mat)<100)
+          do_plot(pl,
+                  label=label("02-focussed"),
+                  caption=paste0("Heatmap on differential genes ", name, ", ", term_name, "-focussed")
+                  )
+        }
+      }
+    } # next comparison
+  } # next model
+} #next dataset
+
 
 ```
 
