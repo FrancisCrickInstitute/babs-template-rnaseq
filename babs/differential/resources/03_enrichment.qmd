@@ -26,7 +26,7 @@ We load in all the necessary additional R packages, and set up some initial para
 
 
 ```{r}
-#| label: load-enrich
+#| label: load-enrich-03
 #| output: false
 #| warning: false
 #| error: false
@@ -71,7 +71,7 @@ link2path <- function(lname) {  file.path(knitr::opts_knit$get("output.dir"),lna
 
 
 ```{r}
-#| label: load2-enrich2
+#| label: load2-enrich2-03
 #| tbl-cap: Context
 if (!isTRUE(getOption('knitr.in.progress'))) {
   my_params_yml <- "resources/02_enrichment.yml"
@@ -95,7 +95,7 @@ if (!isTRUE(getOption('knitr.in.progress'))) {
 ```
 
 ```{r}
-#| label: read-enrich
+#| label: read-enrich-03
 data(list=paste0("counts_", params$alignment))
 specs   <- DESdemonA::load_specs(file=paste0(params$spec, ".spec"), context=dds)
 param <- DESdemonA::ParamList$new(defaults=specs$settings)
@@ -166,7 +166,7 @@ are over-represented/enriched in the various genelists we have created.
 
 
 ```{r}
-#| label: functional
+#| label: functional-03
 
 param$set("showCategory")
 

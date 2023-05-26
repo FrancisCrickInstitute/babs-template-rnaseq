@@ -2,7 +2,6 @@
 QUARTO=quarto
 R=R
 RVERSION=4.2.2
-GIT=git
 
 EXECUTOR = singularity
 
@@ -27,7 +26,6 @@ publish_results=results
 publish_intranet=www_internal
 publish_internet=www_external
 publish_outputs=outputs
-log_dir=logs
 location=results
 
 docs_dir=$(strip ../docs)
@@ -106,13 +104,6 @@ else ifeq (${EXECUTOR},make)
 else
   $(error "# Don't recognise '${EXECUTOR}' as an executor")
 endif
-
-
-
-# Git variables
-TAG := _$(shell $(GIT) describe --tags --dirty=_altered --always --long 2>/dev/null || echo "uncontrolled")# e.g. v1.0.2-2-ace1729a
-VERSION := $(shell $(GIT) describe --tags --abbrev=0 2>/dev/null || echo "vX.Y.Z")#e.g. v1.0.2
-git-ignore=touch .gitignore && grep -qxF '$(1)' .gitignore || echo '$(1)' >> .gitignore
 
 
 

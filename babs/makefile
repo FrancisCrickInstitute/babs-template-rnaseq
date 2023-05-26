@@ -1,6 +1,7 @@
 .DEFAULT_GOAL:=all
 all: differential
 .PHONY: all clean
+include system.mk
 include secrets
 
 stages := ingress nfcore differential biologic 

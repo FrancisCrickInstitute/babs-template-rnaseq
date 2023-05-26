@@ -26,7 +26,7 @@ We load in all the necessary additional R packages, and set up some initial para
 
 
 ```{r}
-#| label: load-01
+#| label: load-02
 #| output: false
 #| warning: false
 #| error: false
@@ -77,7 +77,7 @@ link2path <- function(lname) {  file.path(knitr::opts_knit$get("output.dir"),lna
 
 
 ```{r}
-#| label: tbl-load2
+#| label: tbl-load2-02
 #| tbl-cap: Context
 if (!isTRUE(getOption('knitr.in.progress'))) {
   my_params_yml <- "resources/01_differential.yml"
@@ -95,7 +95,7 @@ if (!isTRUE(getOption('knitr.in.progress'))) {
 ```
 
 ```{r}
-#| label: read
+#| label: read-02
 data(list=paste0("counts_", params$alignment))
 data(list=paste0("pca_", params$alignment, "_", params$spec))
 
@@ -126,7 +126,7 @@ to ensure reported fold-changes are more robust.
 
 
 ```{r}
-#| label: differential
+#| label: differential-02
 
 param$set("alpha")
 param$set("lfcThreshold")
@@ -222,7 +222,7 @@ behaviour, and so show an example of what a 'bad' pink trace might
 look like.
 
 ```{r}
-#| label: tbl-summary
+#| label: tbl-summary-02
 #| tbl-cap: Summaries
 
 summaries <- dds_model_comp %>%
@@ -277,7 +277,7 @@ for (dataset in names(summaries)) {
 
 
 ```{r}
-#| label: fig-summary
+#| label: fig-summary-02
   
 for (dataset in names(summaries)) {
   for (model in names(pval_frame[[dataset]])) {
@@ -310,7 +310,7 @@ are sub-tabs for different experimental designs, if any
 
 
 ```{r}
-#| label: fig-differential-MA
+#| label: fig-differential-MA-02
 
 for (dataset in names(dds_model_comp)) {
   cat("## ", dataset, " {.tabset} \n", sep="") 
@@ -330,7 +330,7 @@ of the experimental groups, so should be interpreted differently
 from the QC heatmaps which were blind to the experimental design.
 
 ```{r}
-#| label: fig-differential-heatmap
+#| label: fig-differential-heatmap-02
 
 param$set("clustering_distance_rows")
 param$set("clustering_distance_columns")

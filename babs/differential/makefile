@@ -149,12 +149,12 @@ R.bib: renv.lock | $(log_dir)
 	$(call git-ignore,/$@)
 
 renv.lock: | rocker.Renviron  $(log_dir)
-	( $(GIT) stash push -m "DESdemonA stashed. Use 'git stash pop' to retrieve it" -- $@ || echo "Couldn't stash changes" ) $(call log,renv)
+	$(GIT_OK) stash push -m "DESdemonA stashed. Use 'git stash pop' to retrieve it" -- $@ $(call log,renv)
 	for o in $(orgs); do grep -F -q $$o DESCRIPTION || sed -i "s/^Imports:/Imports:\n    $$o,/" DESCRIPTION; done 
 	$(R) -e 'library(renv); init(bioconductor=TRUE); options(repos=BiocManager::repositories()); install(); snapshot(type="all")' $(call log,renv,-a)
-	( $(GIT) add renv.lock $(template_scripts) || echo "Coudn't add renv.lock/scripts to version control") $(call log,renv,-a)
-	( $(GIT) rev-parse "v0.0.1" >/dev/null 2>&1 || $(GIT) tag v0.0.1 || echo "Couldn't tag" ) $(call log,renv,-a)
-	( $(GIT) commit -m 'Initialised by DESdemonA\n\n' `grep -A 4 DESdemonA renv.lock`   || echo "Couldn't commit" ) $(call log,renv,-a)
+	$(GIT_OK) add renv.lock $(template_scripts) $(call log,renv,-a)
+	$(GIT_OK) rev-parse "v0.0.1" >/dev/null 2>&1 || $(GIT) tag v0.0.1 $(call log,renv,-a)
+	$(GIT_OK) commit -m 'Initialised by DESdemonA\n\n' `grep -A 4 DESdemonA renv.lock` $(call log,renv,-a)
 
     else
 ##   being executed by container without slurm, so put what 'make' would normally execute in a temporary

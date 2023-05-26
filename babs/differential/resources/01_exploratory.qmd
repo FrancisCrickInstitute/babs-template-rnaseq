@@ -79,7 +79,7 @@ link2path <- function(lname) {  file.path(knitr::opts_knit$get("output.dir"),lna
 
 
 ```{r}
-#| label: tbl-load2
+#| label: tbl-load2-01
 #| tbl-cap: Context
 
 if (!isTRUE(getOption('knitr.in.progress'))) {
@@ -104,7 +104,7 @@ if (!isTRUE(getOption('knitr.in.progress'))) {
 ```
 
 ```{r}
-#| label: read
+#| label: read-01
 
 data(list=paste0("counts_", params$alignment))
 
@@ -171,7 +171,7 @@ The sample annotations are as follows:
 
 
 ```{r}
-#| label: tbl-inputs
+#| label: tbl-inputs-01
 #| tbl-cap: Sample Annotation
 
 table1 <- function(dds, ddsList) {
@@ -230,7 +230,7 @@ potentially several ways, as formulated here:
 
 
 ```{r}
-#| label: formulae
+#| label: formulae-01
 
 for (dataset in names(specs$sample_sets)) {
   mdls <- lapply(specs$sample_sets[[dataset]]$models, function(x) x$design)
@@ -255,7 +255,7 @@ alongside a 'wrench' icon:
 
 
 ```{r}
-#| label: tbl-settings
+#| label: tbl-settings-01
 #| tbl-cap: Analysis Settings
 
 data.frame(
@@ -339,7 +339,7 @@ play.
 
 
 ```{r}
-#| label: fig-qc-visualisation
+#| label: fig-qc-visualisation-01
 
                        
 param$set("top_n_variable")

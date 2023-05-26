@@ -17,6 +17,15 @@ NEXTFLOW = $(call ml,Nextflow/21.10.3); $(call ml,Singularity/3.4.2); $(call ml,
 R = $(call ml,pandoc/2.2.3.2-foss-2016b); $(call ml,R/4.1.2-foss-2021b); command R
 SQLITE = $(call ml,SQLite/3.36-GCCcore-11.2.0); sqlite3
 GIT=git
+
+# allow FORCE=true to override 'git' with a message
+ifeq ($(FORCE)-$(shell $(GIT) rev-parse --is-inside-work-tree > /dev/null 2>&1),true-)
+GIT_OK = echo "Skipping:"
+else
+GIT_OK = $(GIT)
+endif
+
+
 make_rwx = setfacl -m u::rwx
 
 ################################################################
