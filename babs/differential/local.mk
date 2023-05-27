@@ -67,10 +67,10 @@ CONTAINERED=false#An internal flag
 ifeq (${EXECUTOR},singularity)
 CONTAINER= $(call ml,Singularity/3.6.4); singularity
 CONTAINER_IMAGE=$(SINGULARITY_ROOT)/$(notdir $(DOCKER))_$(RVERSION).sif
-CONTAINER_BIND=--bind $(BIND_DIR),/tmp,$(RENV_PATHS_ROOT),$(PWD)/rocker.Renviron:/usr/local/lib/R/etc/Renviron.site
+CONTAINER_BIND=--bind $(BIND_DIR),/tmp,$(RENV_PATHS_ROOT),$(CURDIR)/rocker.Renviron:/usr/local/lib/R/etc/Renviron.site
 CONTAINER_ENV=--env SQLITE_TMPDIR=/tmp
-CONTAINER_FLAGS= exec $(CONTAINER_BIND) --pwd $(PWD) --containall --cleanenv $(CONTAINER_ENV)
-CONTAINER_FLAGS_INTERACTIVE= exec $(CONTAINER_BIND),$${HOME}/.emacs.d,$${HOME}/.Xauthority --pwd $(PWD) --containall --cleanenv $(CONTAINER_ENV),DISPLAY=$${DISPLAY}
+CONTAINER_FLAGS= exec $(CONTAINER_BIND) --pwd $(CURDIR) --containall --cleanenv $(CONTAINER_ENV)
+CONTAINER_FLAGS_INTERACTIVE= exec $(CONTAINER_BIND),$${HOME}/.emacs.d,$${HOME}/.Xauthority --pwd $(CURDIR) --containall --cleanenv $(CONTAINER_ENV),DISPLAY=$${DISPLAY}
 CONTAINER_SHELL = $(CONTAINER) $(patsubst exec,shell,$(CONTAINER_FLAGS_INTERACTIVE)) $(CONTAINER_IMAGE)
 $(CONTAINER_IMAGE): | rocker.Renviron
 	cd $(dir $(CONTAINER_IMAGE)) ;\
@@ -83,8 +83,8 @@ CONTAINER_IMAGE=$(DOCKER):$(RVERSION)
 CONTAINER_FLAGS=run \
 --mount type=bind,source="$(BIND_DIR)",target="$(BIND_DIR)" \
 --mount type=bind,source="/tmp",target="/tmp" \
---mount type=bind,source="$(PWD)/rocker.Renviron",target="/usr/local/lib/R/etc/Renviron.site" \
---workdir="$(PWD)" $(CONTAINER_IMAGE)
+--mount type=bind,source="$(CURDIR)/rocker.Renviron",target="/usr/local/lib/R/etc/Renviron.site" \
+--workdir="$(CURDIR)" $(CONTAINER_IMAGE)
 	mkdir -p $(dir $(CONTAINER_IMAGE))
 	touch $(CONTAINER_IMAGE)
 CONTAINER_SHELL = $(CONTAINER) $(patsubst run,exec -it,$(CONTAINER_FLAGS_INTERACTIVE)) $(CONTAINER_IMAGE) /bin/bash

@@ -217,7 +217,7 @@ endif
 	cp --no-preserve=mode -r $(RESULTS_DIR)/$(VERSION)/. $(publish_$(location))/$(VERSION)
 	ln -sfn $(VERSION) $(publish_$(location))/latest
 	cp --no-preserve=mode -r .htaccess $(publish_$(location))/latest/
-	ln -sfn $(PWD)/$(publish_$(location))/$(VERSION) $(RESULTS_DIR)/published_$(location)
+	ln -sfn $(CURDIR)/$(publish_$(location))/$(VERSION) $(RESULTS_DIR)/published_$(location)
 	cp -Lr --no-preserve=mode $(patsubst %,$(RESULTS_DIR)/multiqc-%,$(alignments)) $(publish_$(location))
 ## TODO - won't work when we do a group-as of alignments
 
