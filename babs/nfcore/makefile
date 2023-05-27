@@ -14,19 +14,36 @@ alignments = $(patsubst samplesheet_%.csv, results/%/star_rsem/rsem.merged.gene_
 
 run: $(alignments) ## Generate NF-CORE alignments, one folder for each config-specific samplesheet from the `build` process.
 
-$(alignments) : results/%/star_rsem/rsem.merged.gene_counts.tsv : samplesheet_%.csv | $(log_dir)
+$(alignments) : results/%/star_rsem/rsem.merged.gene_counts.tsv : samplesheet_%.csv | $(log_dir) nf_work
 	mkdir -p results/$*
 	export NXF_VERSION=`echo "$($*.nfcore)" | sed 's/.*-r \([0-9]\+\.[0-9]\+\).*/\1/'` ;\
 	export NXF_SINGULARITY_CACHEDIR="$(NXF_SINGULARITY_CACHEDIR)" ;\
 	export NXF_HOME=$$PWD ;\
+	refdir=$(realpath $($*.index_dir)/$(firstword $(shell md5sum $($*.genome_fasta)))/$(firstword $(shell md5sum $($*.gtf)))) ;\
+	args=();\
+	if [ -n "$($*.index_dir)" ];\
+	  then if [ -d "$$refdir" ];\
+	    then args+=(--rsem_index=$${refdir}/rsem/  --salmon_index=$${refdir}/salmon/) ;\
+	    else  args+=(--save_reference);\
+	  fi ;\
+	fi ;\
 	$(NEXTFLOW) run nf-core/rnaseq \
 	--input $< \
 	--outdir results/$*/ \
 	--aligner star_rsem \
-	--fasta `readlink -f "$($*.genome_fasta)"` \
-	--gtf `readlink -f "$($*.gtf)"` \
-	-w `readlink -f "nf_work"` \
-	$($*.nfcore) $(call log,nfcore)
+	--fasta $(realpath $($*.genome_fasta)) \
+	--gtf $(realpath $($*.gtf)) \
+	-w $(realpath nf_work) \
+	$${args[@]} \
+	$($*.nfcore) $(call log,nfcore) ;\
+	if [ -n "$($*.index_dir)" ] && [ ! -d "$$refdir" ];\
+	    then mkdir -p "$$refdir" && mv results/$*/genome/index/* "$$refdir"/;\
+	fi
+
+nf_work:
+	mkdir -p $(SCRATCH_DIR)nf_work/
+	[ -z "$(SCRATCH_DIR)" ] || ln -sfn $(SCRATCH_DIR)nf_work nf_work
+
 
 
 ################################################################
@@ -36,8 +53,6 @@ configs = $(patsubst ../ingress/%.config,%.config,$(wildcard ../ingress/*.config
 samplesheets = $(patsubst %.config,samplesheet_%.csv,$(configs))
 
 build: $(samplesheets) ## Build all necessary inputs: samplesheets for each matching alignment '.config' from 'docs'.
-	mkdir -p $(SCRATCH_DIR)nf_work/
-	[ -z "$(SCRATCH_DIR)" ] || ln -sfn $(SCRATCH_DIR)nf_work nf_work
 
 
 field=$(shell sed '/^$$/d; s/^$*./"/;s/=.*/" TEXT/' "$*.config" | paste -sd ',')
