@@ -1,8 +1,5 @@
-global.mk: $(wildcard ../system.mk)
-	[[ -f ../system.mk ]] && cp ../system.mk $@ || touch $@
-
-secrets: $(wildcard ../secrets)
-	[[ -f ../secrets ]] && cp ../secrets $@ || touch $@
+secrets global.mk: % : $(wildcard ../%)
+	cp ../$* $@ 2>/dev/null || touch $@
 
 include secrets
 include global.mk

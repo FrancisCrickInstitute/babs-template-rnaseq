@@ -1,16 +1,15 @@
-global.mk: $(wildcard ../system.mk)
-	[[ -f ../system.mk ]] && cp ../system.mk $@ || touch $@
+secrets global.mk: % : $(wildcard ../%)
+	cp ../$* $@ 2>/dev/null || touch $@
 
-secrets: $(wildcard ../secrets)
-	[[ -f ../secrets ]] && cp ../secrets $@ || touch $@
 include secrets
 include global.mk
 include local.mk
--include *.config
 
 .PHONY: run build copy publish clean
+built_samplesheets=$(patsubst samplesheet_%.csv, %,$(wildcard samplesheet_*.csv))
+include $(patsubst %,%.config,$(built_samplesheets))
 
-alignments = $(patsubst samplesheet_%.csv, results/%/star_rsem/rsem.merged.gene_counts.tsv, $(wildcard samplesheet_*.csv))
+alignments = $(patsubst %,results/%/star_rsem/rsem.merged.gene_counts.tsv,$(built_samplesheets))
 
 run: $(alignments) ## Generate NF-CORE alignments, one folder for each config-specific samplesheet from the `build` process.
 
@@ -34,7 +33,7 @@ $(alignments) : results/%/star_rsem/rsem.merged.gene_counts.tsv : samplesheet_%.
 	--fasta $(realpath $($*.genome_fasta)) \
 	--gtf $(realpath $($*.gtf)) \
 	-w $(realpath nf_work) \
-	$${args[@]} \
+	"$${args[@]}" \
 	$($*.nfcore) $(call log,nfcore) ;\
 	if [ -n "$($*.index_dir)" ] && [ ! -d "$$refdir" ];\
 	    then mkdir -p "$$refdir" && mv results/$*/genome/index/* "$$refdir"/;\

@@ -1,4 +1,9 @@
-include ../system.mk
+secrets global.mk: % : $(wildcard ../%)
+	cp ../$* $@ 2>/dev/null || touch $@
+
+include secrets
+include global.mk
+include local.mk
 .SILENT:
 
 checklist := specfiles experiment_table configs samplesheet

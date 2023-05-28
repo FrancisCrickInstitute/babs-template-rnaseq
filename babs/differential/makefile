@@ -1,15 +1,12 @@
-global.mk: $(wildcard ../system.mk)
-	[[ -f ../system.mk ]] && cp ../system.mk $@ || touch $@
-
-secrets: $(wildcard ../secrets)
-	[[ -f ../secrets ]] && cp ../secrets $@ || touch $@
-
-.PHONY: makefile project.mk local.mk 
-.PHONY: build clean geo R-local
+secrets global.mk: % : $(wildcard ../%)
+	cp ../$* $@ 2>/dev/null || touch $@
 
 include secrets
 include global.mk
 include local.mk
+.PHONY: makefile project.mk local.mk 
+.PHONY: build clean geo R-local
+
 
 include project.mk  ## Provides analysis parametrisation
 include $(patsubst %,$(staging_dir)/%.mk,$(sections))
