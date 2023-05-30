@@ -6,7 +6,7 @@ include global.mk
 
 .SILENT:
 
-checklist := specfiles experiment_table configs samplesheet
+checklist := specfiles experiment_table configs samplesheet.csv
 
 $(checklist): tmp.err tmp.log
 
@@ -31,16 +31,24 @@ endif
 $(specfiles) : 
 	[[ -s "$@" ]] || { echo "$@ is empty" | tee -a tmp.err }
 
+samplesheet.csv :
+	echo "sample,fastq_1,fastq_2" > $@
+	proj=$(dir $(call babsfield,Path));\
+	asfdir=$${proj/*\/projects\//\/nemo\/stp\/babs\/inputs\/sequencing\/released\/}$(subst asf-,,$(call babsfield,Lims));\
+	for r1 in $${asfdir}/primary_data/*/fastq/*_R1_001.fastq.gz; do \
+	  echo -n $$(basename $$r1) | sed 's/_.*/,/' >> $@ ;\
+	  echo -n "$$r1," >> $@ ;\
+	  r2=`echo $$r1 | sed 's/_R1_/_R2_/'` ;\
+	  if [ -f "$$r2" ];\
+	    then echo $$r2 >> $@ ;\
+	    else echo "" >> $@ ;\
+	  fi ;\
+	done
+	if [ "`wc -l $@`" == "1 $@" ];\
+	  then echo "Couldn't find fastq files in " $$asfdir | tee -a tmp.err;\
+	  rm -f $@;\
+	fi	
 
-samplesheet = $(wildcard samplesheet.csv)
-samplesheet: $(samplesheet)
-ifeq ($(words $(samplesheet)),0)
-	echo "No samplesheet in the docs directory"
-endif
-$(samplesheet) : 
-	[[ -s "$@" ]] || { echo "$@ is empty" | tee -a tmp.err  }
-	head -1 $@ | grep -q "sample" || { echo "$@ does not start with a 'sample'  column" | tee -a tmp.err }
-	head -1 $@ | grep -q "sample,fastq_1" || { echo "$@ does not have fastq_1 column after sample" | tee -a tmp.err }
 
 
 configs = $(wildcard *.config)
