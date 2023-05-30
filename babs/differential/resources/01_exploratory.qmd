@@ -606,8 +606,7 @@ for (dname_i in seq_along(ddsList)) {
           pl <- ggplot(pc.df, aes(x = X, y = coord, colour = col, group = col)) +
             stat_summary(fun = mean,geom = "line") +
             labs(x = inter_vars[1], y = "Residual",
-                 colour = paste(inter_vars[-1], collapse = "x"))
-          + theme_bw()
+                 colour = paste(inter_vars[-1], collapse = "x")) + theme_bw()
           if (is.numeric(pc.df$col)) {
             pal_col <- metadata(colData(this_dds))$palette$ggplot[[inter_vars[2]]]
             pl <- pl + scale_colour_gradient(low = pal_col[1], high = pal_col[2])
