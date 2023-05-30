@@ -3,7 +3,7 @@ secrets global.mk: % : $(wildcard ../%)
 
 include secrets
 include global.mk
-include local.mk
+
 .SILENT:
 
 checklist := specfiles experiment_table configs samplesheet
