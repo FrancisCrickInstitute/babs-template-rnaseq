@@ -34,7 +34,7 @@ $(specfiles) :
 samplesheet.csv :
 	echo "sample,fastq_1,fastq_2" > $@
 	proj=$(dir $(call babsfield,Path));\
-	asfdir=$${proj/*\/projects\//\/nemo\/stp\/babs\/inputs\/sequencing\/released\/}$(subst asf-,,$(call babsfield,Lims));\
+	asfdir=$${proj/*\/projects\//\/nemo\/stp\/babs\/inputs\/sequencing\/released\/}$(subst asf-,,$(subst lims-,,$(call babsfield,Lims)));\
 	for r1 in $${asfdir}/primary_data/*/fastq/*_R1_001.fastq.gz; do \
 	  echo -n $$(basename $$r1) | sed 's/_.*/,/' >> $@ ;\
 	  echo -n "$$r1," >> $@ ;\
