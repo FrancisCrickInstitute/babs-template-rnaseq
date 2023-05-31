@@ -15,8 +15,8 @@ run: $(alignments) ## Generate NF-CORE alignments, one folder for each config-sp
 
 $(alignments) : results/%/star_rsem/rsem.merged.gene_counts.tsv : samplesheet_%.csv | $(log_dir) nf_work
 	mkdir -p results/$*
-	export NXF_VERSION=`echo "$($*.nfcore)" | sed 's/.*-r \([0-9]\+\.[0-9]\+\).*/\1/'` ;\
 	export NXF_SINGULARITY_CACHEDIR="$(NXF_SINGULARITY_CACHEDIR)" ;\
+	export NXF_SINGULARITY_LIBRARYDIR="$(NXF_SINGULARITY_CACHEDIR)" ;\
 	export NXF_HOME=$$PWD ;\
 	refdir=$(realpath $($*.index_dir)/$(firstword $(shell md5sum $($*.genome_fasta)))/$(firstword $(shell md5sum $($*.gtf)))) ;\
 	args=();\
