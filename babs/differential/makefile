@@ -205,17 +205,27 @@ geo/md5.txt:
 	pushd geo; md5sum *.* > geo.md5.txt; popd
 
 location=outputs
-publish:  ## Copy results to final location. Either 'outputs' folder (default), intranet (`make publish location=intranet`) or internet
-ifdef redirect_$(location)
-	mkdir -p $(redirect_$(location))
-	ln -sfn $(redirect_$(location)) $(publish_$(location))
+shortcut=$(empty)
+ifdef babs_$(location)
+shortcut=shortcuts/
 endif
-	mkdir -p $(publish_$(location))/$(VERSION)
-	cp --no-preserve=mode -r $(RESULTS_DIR)/$(VERSION)/. $(publish_$(location))/$(VERSION)
-	ln -sfn $(VERSION) $(publish_$(location))/latest
-	cp --no-preserve=mode -r .htaccess $(publish_$(location))/latest/
-	ln -sfn $(CURDIR)/$(publish_$(location))/$(VERSION) $(RESULTS_DIR)/published_$(location)
-	cp -Lr --no-preserve=mode $(patsubst %,$(RESULTS_DIR)/multiqc-%,$(alignments)) $(publish_$(location))
+publish:  ## Copy results to final location. Either 'outputs' folder (default), intranet (`make publish location=intranet`) or internet
+ifdef babs_$(location)
+	mkdir -p $(babs_$(location))
+ifdef url_$(location)
+	mkdir -p $(shortcut)
+	echo "[InternetShortcut]" > $(shortcut)$(location).url
+	echo "URL=$(url_$(location))/latest" >> $(shortcut)$(location).url
+endif
+	ln -sfn $(babs_$(location)) $(shortcut)$(publish_$(location))
+endif
+	mkdir -p $(shortcut)$(publish_$(location))/$(VERSION)
+	cp --no-preserve=mode -r $(RESULTS_DIR)/$(VERSION)/. $(shortcut)$(publish_$(location))/$(VERSION)
+	ln -sfn $(VERSION) $(shortcut)$(publish_$(location))/latest
+	[ ! -f .htaccess ] || [ "$(location)" == "outputs" ] || cp --no-preserve=mode -r .htaccess $(shortcut)$(publish_$(location))/
+	[ -f .htaccess ] || [ "$(location)" == "outputs" ] || echo "Warning: no .htaccess files, so unauthorised people may be able to view these results"
+	ln -sfn $(realpath $(shortcut)$(publish_$(location))/$(VERSION)) $(RESULTS_DIR)/published_$(location)
+
 ## TODO - won't work when we do a group-as of alignments
 
 ################################################################
