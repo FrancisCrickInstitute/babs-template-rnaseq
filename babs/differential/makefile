@@ -100,6 +100,8 @@ $(html_reports) : $(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%$(TAG).html : $(stag
 	  --output-dir $(RESULTS_DIR)/$(VERSION)/ \
 	  --execute-dir $(CURDIR) $(call log,html-$*)
 
+html-%: $(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%$(TAG).html ## Create a single html file to be placed in the staging directory, '%' is a simplified filename e.g. `make html-01_exploratory_per-plan_GRCh38`.
+	echo "$(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%$(TAG).html"
 
 scripts: $(qmds) ## Generate all the parametrised scripts, into the staging directory. But don't render
 
@@ -140,7 +142,7 @@ $(yaml0):
 
 R.bib: orgs=$(foreach align,$(alignments),$($(align).org.db))
 R.bib: renv.lock | $(log_dir)
-	for o in $(orgs); do grep -F -q $$o resources/_dependencies.R || echo "library($$o)" >> resources/_dependences.R; done 
+	for o in $(orgs); do grep -F -q $$o resources/_dependencies.R || echo "library($$o)" >> resources/_dependencies.R; done 
 	$(R) -e 'library(renv); init(bioconductor=TRUE, bare=TRUE); options(repos=BiocManager::repositories()); restore(); hydrate()' $(call log,renv,-a)
 	$(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")' $(call log,bib)
 	$(call git-ignore,/$@)
@@ -206,25 +208,29 @@ geo/md5.txt:
 
 location=outputs
 shortcut=$(empty)
-ifdef babs_$(location)
+ifdef redirect_$(location)
 shortcut=shortcuts/
 endif
+pubdir = $(shortcut)$(publish_$(location))
+ifeq ($(pubdir),)
+pubdir = published
+endif
 publish:  ## Copy results to final location. Either 'outputs' folder (default), intranet (`make publish location=intranet`) or internet
-ifdef babs_$(location)
-	mkdir -p $(babs_$(location))
+ifdef redirect_$(location)
+	mkdir -p $(redirect_$(location))
 ifdef url_$(location)
 	mkdir -p $(shortcut)
 	echo "[InternetShortcut]" > $(shortcut)$(location).url
 	echo "URL=$(url_$(location))/latest" >> $(shortcut)$(location).url
 endif
-	ln -sfn $(babs_$(location)) $(shortcut)$(publish_$(location))
+	ln -sfn $(redirect_$(location)) $(pubdir)
 endif
-	mkdir -p $(shortcut)$(publish_$(location))/$(VERSION)
-	cp --no-preserve=mode -r $(RESULTS_DIR)/$(VERSION)/. $(shortcut)$(publish_$(location))/$(VERSION)
-	ln -sfn $(VERSION) $(shortcut)$(publish_$(location))/latest
-	[ ! -f .htaccess ] || [ "$(location)" == "outputs" ] || cp --no-preserve=mode -r .htaccess $(shortcut)$(publish_$(location))/
+	mkdir -p $(pubdir)/$(VERSION)
+	cp --no-preserve=mode -r $(RESULTS_DIR)/$(VERSION)/. $(pubdir)/$(VERSION)
+	ln -sfn $(VERSION) $(pubdir)/latest
+	[ ! -f .htaccess ] || [ "$(location)" == "outputs" ] || cp --no-preserve=mode -r .htaccess $(pubdir)/
 	[ -f .htaccess ] || [ "$(location)" == "outputs" ] || echo "Warning: no .htaccess files, so unauthorised people may be able to view these results"
-	ln -sfn $(realpath $(shortcut)$(publish_$(location))/$(VERSION)) $(RESULTS_DIR)/published_$(location)
+	ln -sfn $$(realpath $(pubdir)/$(VERSION)) $(RESULTS_DIR)/published_$(location)
 
 ## TODO - won't work when we do a group-as of alignments
 
