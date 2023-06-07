@@ -289,7 +289,7 @@ for (dataset in names(summaries)) {
       facet_wrap(~Comparison) +
       theme_bw()
     do_plot(pl,
-            label=label("fig-summary-p"),
+            label=label("summary-p"),
             caption=paste0("p-Diagnostic for", dataset, model)
             )
     cat("\n\n---\n\n")
