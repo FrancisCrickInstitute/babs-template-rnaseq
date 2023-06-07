@@ -119,7 +119,7 @@ ${staging_dir}/_quarto.yml: $(source_dir)/_quarto.yml $(qmds)
 $(source_dir)/params.yml:
 	echo "" > $@
 
-$(staging_dir)/.params.yml:
+$(staging_dir)/.params.yml:  project.mk
 	echo '{$(foreach p,$(param_names),$p: "${$p}"$(comma))}' > $@
 
 

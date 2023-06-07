@@ -35,7 +35,7 @@ for (const a in alignments) {
     for (const spec in specfiles) {
 	thisalign.contents.push({
 	    section: specfiles[spec],
-	    contents: hasspecs.map(x => x+"_"+alignments[a]+"_"+specfiles[spec]+flags.tag + ".qmd")
+	    contents: hasspecs.map(x => x + "_" + specfiles[spec] + "_"+alignments[a] + flags.tag + ".qmd")
 	})
     }
     contents.push(thisalign);
