@@ -88,3 +88,14 @@ bookdown_label <- function(data, label="") {
     
 
 }
+load_params <- function(prefix, extra=FALSE) {
+    script_params <- knitr::knit_params(readLines(paste0(prefix,".qmd"))) %>%
+      {setNames(lapply(., "[[", "value"), sapply(., "[[", "name"))}
+    if (extra) {
+      yml_params <- yaml::read_yaml(paste0(prefix, ".yml"))[[1]]$params
+      global_params <- yaml::read_yaml(file.path(dirname(prefix), "params.yml"))
+      Reduce(modifyList, list(global_params, script_params, yml_params))
+    } else {
+      script_params
+      }
+  }

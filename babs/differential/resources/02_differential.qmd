@@ -48,11 +48,11 @@ library(GO.db)
 library(IHW)
 library(equatiomatic)
 
-source("R/plot.r")
-source("R/markdown.r")
-source("R/rnaseq.r")
-source("R/output.r")
-source("R/helpers.r")
+source("R/plot.r", local = knitr::knit_global())
+source("R/markdown.r", local = knitr::knit_global())
+source("R/rnaseq.r", local = knitr::knit_global())
+source("R/output.r", local = knitr::knit_global())
+source("R/helpers.r", local = knitr::knit_global())
 
 fig_caption <- captioner()
 label <- counter()
@@ -86,16 +86,11 @@ link2path <- function(lname) {  file.path(knitr::opts_knit$get("output.dir"),lna
 #| label: tbl-load2
 #| tbl-cap: Context
 if (!isTRUE(getOption('knitr.in.progress'))) {
-  my_params_yml <- "resources/01_differential.yml"
-  if (file.exists(my_params_yml)) {
-    params <- yaml::read_yaml(my_params_yml)
-    if (is.null(names(params))) {
-      params <- params[[1]]$params
-    }
-  } else {
-    params <- list()
-  }
-} 
+  params <- load_params("resources/02_differential", extra=TRUE)
+} else {
+  gt(data.frame(Setting=names(params),
+                Value=unlist(params)))
+}
 
 
 ```

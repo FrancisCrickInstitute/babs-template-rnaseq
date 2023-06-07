@@ -9,7 +9,7 @@ include local.mk
 
 
 include project.mk  ## Provides analysis parametrisation
-include $(patsubst %,$(staging_dir)/%.mk,$(sections))
+include $(patsubst %,$(staging_dir)/.make-%,$(sections))
 
 alignments = $(patsubst ${my_counts_dir}/%,%,$(wildcard ${my_counts_dir}/*))
 samplesheets = $(patsubst %,$(my_metadata)_%.csv,$(alignments))
@@ -18,17 +18,17 @@ specfiles = $(patsubst %.spec,%,$(wildcard *.spec))
 ## Create a makefile per section. It will set up target-specific
 ## variables to inform subsequent targets of the alignment, spec-file,
 ## and section for each alignment:spec combo. It will also set up the
-## global variables 'section'_(pages|yamls|qmds|htmls|params) which
+## global variables 'section'_(pages|qmds|htmls) which
 ## enumerate the individual combos.  Because these makefiles are
 ## 'included' they will automatically get remade as necessary, and if
 ## changed will cause the whole 'make' process to be repeated.
 
-mk0 = $(patsubst %,$(staging_dir)/%.mk,$(filter 00_%,$(sections)))
-mk = $(patsubst %,$(staging_dir)/%.mk,$(filter-out 00_%,$(sections)))
+mk0 = $(patsubst %,$(staging_dir)/.make-%,$(filter 00_%,$(sections)))
+mk = $(patsubst %,$(staging_dir)/.make-%,$(filter-out 00_%,$(sections)))
 qmd_path=$(staging_dir)/$*_$(ispec)_$(ialign)$$(TAG).qmd
 qmd0_path=$(staging_dir)/$*_$(ialign)$$(TAG).qmd
 
-$(mk): $(staging_dir)/%.mk : $(patsubst %,%.spec,$(specfiles)) $(samplesheets) | $(staging_dir)
+$(mk): $(staging_dir)/.make-% : $(patsubst %,%.spec,$(specfiles)) $(samplesheets) | $(staging_dir)
 	$(foreach ispec,$(specfiles),\
 	   $(foreach ialign,$(alignments),\
 	   echo '$(qmd_path): alignment=$(ialign)' >> $@;\
@@ -40,13 +40,11 @@ $(mk): $(staging_dir)/%.mk : $(patsubst %,%.spec,$(specfiles)) $(samplesheets) |
 	   echo '' >> $@ ;\
 	))
 	echo '$*_pages=$(foreach ispec,$(specfiles),$(foreach ialign,$(alignments),$*_$(ispec)_$(ialign)))' >> $@
-	echo '$*_yamls = $$(patsubst %,$(staging_dir)/%.yml,$${$*_pages})'>> $@
 	echo '$*_qmds = $$(patsubst %,$(staging_dir)/%$$(TAG).qmd,$$($*_pages))'>> $@
-	echo '$*_params = $$(foreach p,$$($*_param_names),$$(patsubst %,-P %:$$($$(p)),$$(p)))'>> $@
 	echo '$*_htmls = $$(patsubst %,$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/%$$(TAG).html,$$($*_pages))'>> $@
 	echo '$*_htmls: $$($*_htmls)'>> $@
 
-$(mk0): $(staging_dir)/%.mk : $(samplesheets) | $(staging_dir)
+$(mk0): $(staging_dir)/.make-% : $(samplesheets) | $(staging_dir)
 	$(foreach ialign,$(alignments),\
 	 echo '$(qmd0_path): alignment=$(ialign)' >> $@;\
 	 echo '$(qmd0_path): script=$*_$(ialign)$$(TAG)' >> $@;\
@@ -56,19 +54,13 @@ $(mk0): $(staging_dir)/%.mk : $(samplesheets) | $(staging_dir)
 	 echo '' >> $@ ;\
 	)
 	echo '$*_pages=$(foreach ialign,$(alignments),$*_$(ialign))' >> $@
-	echo '$*_yamls = $$(patsubst %,$(staging_dir)/%.yml,$${$*_pages})'>> $@
 	echo '$*_qmds = $$(patsubst %,$(staging_dir)/%$$(TAG).qmd,$$($*_pages))'>> $@
-	echo '$*_params = $$(foreach p,$$($*_param_names),$$(patsubst %,-P %:$$($$(p)),$$(p)))'>> $@
 	echo '$*_htmls = $$(patsubst %,$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/%$$(TAG).html,$$($*_pages))'>> $@
 	echo '$*_htmls: $$($*_htmls)'>> $@
 
 include $(patsubst %,%.config,$(alignments))
 qmds=$(strip $(foreach section,$(sections),$($(section)_qmds)))
-all_params=$(foreach p,$(param_names),$(patsubst %,-P %:$($(p)),$(p))) -P qmd_name:$(script)
 
-yaml0 = $(filter $(staging_dir)/00_%.yml,$(foreach s,$(sections),$($(s)_yamls)))
-yaml = $(filter-out $(staging_dir)/00_%.yml,$(foreach s,$(sections),$($(s)_yamls)))
-sed-p2yml = 's/^ *-P */    /; s/: */: /g; s/ *-P */\n    /g;'
 html_reports=$(strip $(foreach section,$(sections),$($(section)_htmls)))
 
 ifeq ($(SUBMIT),false)
@@ -105,40 +97,34 @@ html-%: $(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%$(TAG).html ## Create a single
 
 scripts: $(qmds) ## Generate all the parametrised scripts, into the staging directory. But don't render
 
-$(qmds) : $(staging_dir)/%$(TAG).qmd : $(staging_dir)/%.yml
-	$(QUARTO) run $(source_dir)/typescript/merge_yml.ts --script=$(filter %.qmd,$^) --yml=$(staging_dir)/$*.yml > $@
-	sed -i -e 's#$(yaml-filename-placeholder) <- .*$$#$(yaml-filename-placeholder) <- "$(staging_dir)/$*.yml"#' $@
+$(qmds) : $(staging_dir)/%$(TAG).qmd : $(staging_dir)/.params.yml $(source_dir)/params.yml
+	$(QUARTO) run $(source_dir)/typescript/merge_yml.ts\
+	 --script=$(source_dir)/$(section).qmd\
+	 --alignment=$(alignment)\
+	 --spec=$(spec)\
+	 --fixed=$(source_dir)/params.yml\
+	 --generated=$(staging_dir)/.params.yml > $@
+	sed -i -e 's#load_params("$(source_dir)/$(section)", extra=TRUE)#load_params("$(staging_dir)/$*$(TAG)")#' $@
 
 ${staging_dir}/_quarto.yml: $(source_dir)/_quarto.yml $(qmds)
-	$(QUARTO) run $(source_dir)/typescript/sidebar.ts --template=$< --tag=$(TAG) --staging=$(staging_dir) --repo="$(repo)" > $@
+	$(QUARTO) run $(source_dir)/typescript/sidebar.ts\
+	 --sections="$(subst $(space),$(comma),$(sections))"\
+	 --alignments="$(subst $(space),$(comma),$(alignments))"\
+	 --specfiles="$(subst $(space),$(comma),$(specfiles))"\
+	 --template=$< \
+	 --tag=$(TAG)\
+	 --staging=$(staging_dir)\
+	 --repo="$(repo)" > $@
 
-${staging_dir}/index.qmd : $(source_dir)/index.qmd
-	cp $< $@
+$(source_dir)/params.yml:
+	echo "" > $@
+
+$(staging_dir)/.params.yml:
+	echo '{$(foreach p,$(param_names),$p: "${$p}"$(comma))}' > $@
 
 
-$(yaml):
-	echo "- title: $(alignment) $(spec)" >> $@ 
-	echo "  description: of $(alignment)-aligned data according to '$(spec)'" >> $@
-	echo "  categories: [$(alignment), $(spec)]" >> $@
-	echo "  params:" >> $@
-	echo "    alignment: $(alignment)" >> $@
-	echo "    spec: $(spec)" >> $@
-	echo "${all_params}" | sed $(sed-p2yml) >> $@
-	echo "$($(section)_params)" | sed $(sed-p2yml) >> $@
-	echo "" >> $@
-
-$(yaml0):
-	echo "- title: $(alignment)" >> $@ 
-	echo "  description: of $(alignment)-aligned data" >> $@
-	echo "  categories: [$(alignment)]" >> $@
-	echo "  params:" >> $@
-	echo "    alignment: $(alignment)" >> $@
-	echo "    metadata: $(my_metadata)_${alignment}.csv" >> $@ ;\
-	echo "    counts: $(my_counts_dir)/${alignment}/" >> $@ ;\
-	echo "    org_package: ${${alignment}.org.db}" >> $@ ;\
-	echo "${all_params}" | sed $(sed-p2yml) >> $@
-	echo "$($(section)_params)" | sed $(sed-p2yml) >> $@
-	echo "" >> $@
+${staging_dir}/index.qmd : $(source_dir)/index.qmd $(qmds)
+	sed  's#^  contents: .*#  contents: [$(subst $(space),$(comma),$(patsubst $(staging_dir)/%,%,$(qmds)))]#' $< > $@
 
 R.bib: orgs=$(foreach align,$(alignments),$($(align).org.db))
 R.bib: renv.lock | $(log_dir)
@@ -159,7 +145,7 @@ renv.lock: | rocker.Renviron  $(log_dir)
 ##   being executed by container without slurm, so put what 'make' would normally execute in a temporary
 ##   shell script, and get container to call that script (so it naturally inherits all the command line
 ##   arguments etc)
-run render pages $(html_reports) scripts $(qmds) ${staging_dir}/_quarto.yml ${staging_dir}/index.qmd $(yaml) $(yaml0) R.bib renv.lock: $(CONTAINER_IMAGE)
+run render pages $(html_reports) scripts $(qmds) ${staging_dir}/_quarto.yml ${staging_dir}/index.qmd  R.bib renv.lock: $(CONTAINER_IMAGE)
 	bash_script=$$(mktemp -u $(staging_dir)/bash_script_XXXXX) ;\
 	make -n -s $@ SUBMIT=false EXECUTOR=make > $${bash_script} ;\
 	$(CONTAINER) $(CONTAINER_FLAGS) $(CONTAINER_IMAGE) bash "$${bash_script}" && r=$$? || echo "Failed - tidying up temporary bash script";\
@@ -178,7 +164,7 @@ slurm-container-prefix=$(CONTAINER) $(CONTAINER_FLAGS) $(CONTAINER_IMAGE)
 slurm-container-prefix=
     endif
 #JFLAG= -j $(SLURM--cpus-per-task)# Haven't got parallel make working with quarto. race condition?
-run render pages $(html_reports) scripts $(qmds) ${staging_dir}/_quarto.yml ${staging_dir}/index.qmd $(yaml) $(yaml0) R.bib renv.lock: $(CONTAINER_IMAGE)
+run render pages $(html_reports) scripts $(qmds) ${staging_dir}/_quarto.yml ${staging_dir}/index.qmd R.bib renv.lock: $(CONTAINER_IMAGE)
 	slurm_script=$$(mktemp -u $(staging_dir)/slurm_script_XXXXX) ;\
 	echo "$$slurm" > $${slurm_script} ;\
 	make -n -s $@ SUBMIT=false EXECUTOR=make > $${slurm_script}.sh ;\

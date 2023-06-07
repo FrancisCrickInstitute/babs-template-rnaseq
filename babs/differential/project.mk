@@ -7,10 +7,13 @@
 ################################################################
 
 res_dir = $(RESULTS_DIR)/$(VERSION)
+file_col = $(metadata_id_column)
+metadata = $(my_metadata)_${alignment}.csv
+counts =  $(my_counts_dir)/${alignment}/
 
 ## Let later processes know which of those to include in every section -
 ## variable _names_ need to be stored in the `param_names` variable:
-param_names = res_dir
+param_names = res_dir VERSION TAG staging_dir file_col name_col metadata counts
 
 
 ################################################################
@@ -22,15 +25,6 @@ param_names = res_dir
 ## after one one of these.
 sections=00_init 01_exploratory 02_differential 03_enrichment
 
-
-## Section-specific variables
-## `section`_param_names will determine which parameters get included
-## in every page of that section
-## Not necessary that each section has params
-
-file_col = $(metadata_id_column)
-
-00_init_param_names = file_col name_col
 
 
 

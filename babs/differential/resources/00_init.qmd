@@ -28,6 +28,12 @@ library(tximport)
 library(DESeq2)
 library(gt)
 
+source("R/plot.r", local = knitr::knit_global())
+source("R/markdown.r", local = knitr::knit_global())
+source("R/rnaseq.r", local = knitr::knit_global())
+source("R/helpers.r", local = knitr::knit_global())
+source("R/output.r", local = knitr::knit_global())
+
 ```
 
 
@@ -35,15 +41,7 @@ library(gt)
 #| label: load2
 
 if (!isTRUE(getOption('knitr.in.progress'))) {
-  my_params_yml <- "resources/00_init.yml"
-  if (file.exists(my_params_yml)) {
-    params <- yaml::read_yaml(my_params_yml)
-    if (is.null(names(params))) {
-      params <- params[[1]]$params
-    }
-  } else {
-    params <- list()
-  }
+  params <- load_params("resources/00_init", extra=TRUE)
 } else {
   gt(data.frame(Setting=names(params),
                 Value=unlist(params)))
@@ -98,10 +96,13 @@ dds <- dds[ind,]
 
 txi[c("abundance", "counts", "length")] <- map(txi[c("abundance", "counts", "length")], ~ .[ind,])
 
+alignments <- strsplit(sub(paste0("^", params$alignment, "\\."), "", readLines(paste0(params$alignment, ".config"))), "=")
+names(alignments) <- sapply(alignments, "[", 1)
+alignments <- lapply(alignments, function(x) paste(x[-1], collapse="="))
 
-organism <- list(org=params$org_package)
+
+organism <- list(org=alignments$org.db)
 metadata(dds)$organism <- organism
-metadata(dds)$template_git <- packageDescription("DESdemonA")$git_last_commit
 metadata(dds)$count_source <- params$count_source
 metadata(mcols(dds))$init <- onames
 
