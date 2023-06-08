@@ -170,60 +170,6 @@
       "Hash": "b2866e62bab9378c3cc9476a1954226b",
       "Requirements": []
     },
-    "DESdemonA": {
-      "Package": "DESdemonA",
-      "Version": "0.23.0.9000",
-      "Source": "GitHub",
-      "RemoteType": "github",
-      "RemoteHost": "api.github.com",
-      "RemoteUsername": "macroscian",
-      "RemoteRepo": "DESdemonA",
-      "RemoteRef": "quarto",
-      "RemoteSha": "e11cd54f2a528d8e557a21f4ee1a8d294a791474",
-      "git_last_commit": "v0.23.0.9000-0-gbb6da4e_altered",
-      "Hash": "298cf57417e355ab503e2c4d59fa4355",
-      "Requirements": [
-        "BH",
-        "BiocManager",
-        "BiocParallel",
-        "ComplexHeatmap",
-        "DESeq2",
-        "IHW",
-        "MASS",
-        "PoiClaClu",
-        "R6",
-        "RColorBrewer",
-        "RSQLite",
-        "S4Vectors",
-        "ashr",
-        "bookdown",
-        "circlize",
-        "cluster",
-        "clusterProfiler",
-        "devtools",
-        "downloader",
-        "dplyr",
-        "emmeans",
-        "ggrepel",
-        "glue",
-        "gt",
-        "htmltools",
-        "htmlwidgets",
-        "knitr",
-        "lazyeval",
-        "limma",
-        "openxlsx",
-        "png",
-        "purrr",
-        "readr",
-        "renv",
-        "rlang",
-        "tibble",
-        "tidyr",
-        "usethis",
-        "viridis"
-      ]
-    },
     "DESeq2": {
       "Package": "DESeq2",
       "Version": "1.38.3",
@@ -1401,19 +1347,6 @@
         "yulab.utils"
       ]
     },
-    "equatiomatic": {
-      "Package": "equatiomatic",
-      "Version": "0.3.1",
-      "Source": "Repository",
-      "Repository": "RSPM",
-      "Hash": "85a7fdd9362e4717650de911181b4ca1",
-      "Requirements": [
-        "broom",
-        "broom.mixed",
-        "knitr",
-        "shiny"
-      ]
-    },
     "estimability": {
       "Package": "estimability",
       "Version": "1.4.1",
@@ -2508,6 +2441,24 @@
         "Rcpp",
         "stringi",
         "zip"
+      ]
+    },
+    "org.Hs.eg.db": {
+      "Package": "org.Hs.eg.db",
+      "Version": "3.16.0",
+      "Source": "Bioconductor",
+      "Hash": "e22193c47c891d1a011dade7f262cc65",
+      "Requirements": [
+        "AnnotationDbi"
+      ]
+    },
+    "org.Mm.eg.db": {
+      "Package": "org.Mm.eg.db",
+      "Version": "3.16.0",
+      "Source": "Bioconductor",
+      "Hash": "f03f94839b1db9ef14042e62135f0bb5",
+      "Requirements": [
+        "AnnotationDbi"
       ]
     },
     "parallelly": {
