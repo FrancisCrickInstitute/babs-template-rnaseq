@@ -126,30 +126,28 @@ $(staging_dir)/.params.yml:  project.mk
 ${staging_dir}/index.qmd : $(source_dir)/index.qmd $(qmds)
 	sed  's#^  contents: .*#  contents: [$(subst $(space),$(comma),$(patsubst $(staging_dir)/%,%,$(qmds)))]#' $< > $@
 
-R.bib: orgs=$(foreach align,$(alignments),$($(align).org.db))
 R.bib: renv.lock | $(log_dir)
-	for o in $(orgs); do grep -F -q $$o resources/_dependencies.R || echo "library($$o)" >> resources/_dependencies.R; done 
-	$(R) -e 'library(renv); init(bioconductor=TRUE, bare=TRUE); options(repos=BiocManager::repositories()); restore(); hydrate()' $(call log,renv,-a)
+	$(R) -e 'library(renv); init(bioconductor=TRUE, bare=TRUE); restore(); hydrate()' $(call log,renv,-a)
 	$(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")' $(call log,bib)
 	$(call git-ignore,/$@)
 
+renv.lock: orgs=$(foreach align,$(alignments),$($(align).org.db))
 renv.lock: | rocker.Renviron  $(log_dir)
-	$(GIT_OK) stash push -m "DESdemonA stashed. Use 'git stash pop' to retrieve it" -- $@ $(call log,renv)
-	for o in $(orgs); do grep -F -q $$o DESCRIPTION || sed -i "s/^Imports:/Imports:\n    $$o,/" DESCRIPTION; done 
-	$(R) -e 'library(renv); init(bioconductor=TRUE); options(repos=BiocManager::repositories()); install(); snapshot(type="all")' $(call log,renv,-a)
+	[ ! -f $@ ] || $(GIT_OK) stash push -m "Pipeline stashed. Use 'git stash pop' to retrieve it" -- $@ $(call log,renv)
+	for o in $(orgs); do grep -F -q $$o resources/_dependencies.R || echo "library($$o)" >> resources/_dependencies.R; done
+	$(R) -e 'library("BiocManager");library(renv);init(bioconductor=TRUE); install("bioc::BiocParallel"); renv::snapshot()' $(call log,renv,-a)
 	$(GIT_OK) add renv.lock $(template_scripts) $(call log,renv,-a)
 	$(GIT_OK) rev-parse "v0.0.1" >/dev/null 2>&1 || $(GIT) tag v0.0.1 $(call log,renv,-a)
-	$(GIT_OK) commit -m 'Initialised by DESdemonA\n\n' `grep -A 4 DESdemonA renv.lock` $(call log,renv,-a)
+	$(GIT_OK) commit -m 'Initialised by pipeline\n\n' $(call log,renv,-a)
 
     else
 ##   being executed by container without slurm, so put what 'make' would normally execute in a temporary
 ##   shell script, and get container to call that script (so it naturally inherits all the command line
 ##   arguments etc)
 run render pages $(html_reports) scripts $(qmds) ${staging_dir}/_quarto.yml ${staging_dir}/index.qmd  R.bib renv.lock: $(CONTAINER_IMAGE)
-	bash_script=$$(mktemp -u $(staging_dir)/bash_script_XXXXX) ;\
-	make -n -s $@ SUBMIT=false EXECUTOR=make > $${bash_script} ;\
-	$(CONTAINER) $(CONTAINER_FLAGS) $(CONTAINER_IMAGE) bash "$${bash_script}" && r=$$? || echo "Failed - tidying up temporary bash script";\
-	rm -f $${bash_script}} ;\
+	make -n -s $@ SUBMIT=false EXECUTOR=make > ${TMPSCRIPT}_bash 
+	$(CONTAINER) $(CONTAINER_FLAGS) $(CONTAINER_IMAGE) bash "${TMPSCRIPT}_bash" && r=$$? || echo "Failed - tidying up temporary bash script"
+	rm -f ${TMPSCRIPT}_bash
 	exit $$r
     endif
 else
@@ -165,15 +163,14 @@ slurm-container-prefix=
     endif
 #JFLAG= -j $(SLURM--cpus-per-task)# Haven't got parallel make working with quarto. race condition?
 run render pages $(html_reports) scripts $(qmds) ${staging_dir}/_quarto.yml ${staging_dir}/index.qmd R.bib renv.lock: $(CONTAINER_IMAGE)
-	slurm_script=$$(mktemp -u $(staging_dir)/slurm_script_XXXXX) ;\
-	echo "$$slurm" > $${slurm_script} ;\
-	make -n -s $@ SUBMIT=false EXECUTOR=make > $${slurm_script}.sh ;\
-	echo "$(slurm-container-prefix) $${slurm_script}.sh" >> $${slurm_script} ;\
-	echo 'r=$$?' >>  $${slurm_script} ;\
-	echo '$(notification)' >> $${slurm_script} ;\
-	$(make_rwx) $${slurm_script} ;\
-	$(make_rwx) $${slurm_script}.sh ;\
-	sbatch $${slurm_script} 
+	echo "$$slurm" > ${TMPSCRIPT}_slurm
+	make -n -s $@ SUBMIT=false EXECUTOR=make > ${TMPSCRIPT}_slurm.sh
+	echo "$(slurm-container-prefix) ${TMPSCRIPT}_slurm.sh" >> ${TMPSCRIPT}_slurm
+	echo 'r=$$?' >>  ${TMPSCRIPT}_slurm
+	echo '$(notification)' >> ${TMPSCRIPT}_slurm
+	$(make_rwx) ${TMPSCRIPT}_slurm
+	$(make_rwx) ${TMPSCRIPT}_slurm.sh
+	sbatch ${TMPSCRIPT}_slurm 
 
 endif
 
@@ -277,6 +274,7 @@ rocker.Renviron:
 	echo "RENV_PATHS_PREFIX=$(RENV_PATHS_PREFIX)" > $@
 	echo "RENV_PATHS_ROOT=$(RENV_PATHS_ROOT)" >> $@
 	echo "RENV_PATHS_LIBRARY=renv/library" >> $@
+	echo "RENV_CONFIG_PAK_ENABLED=TRUE" >> $@
 
 R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses)
 R-$(RVERSION): $(CONTAINER_IMAGE)

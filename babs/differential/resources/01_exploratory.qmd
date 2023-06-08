@@ -26,7 +26,7 @@ We load in all the necessary additional R packages, and set up some initial para
 
 
 ```{r}
-#| label: load-01
+#| label: load-exp1
 #| output: false
 #| warning: false
 #| error: false
@@ -46,8 +46,6 @@ library(clusterProfiler)
 library(ReactomePA)
 library(GO.db)
 library(IHW)
-library(equatiomatic)
-#library(DESdemonA)
 
 source("R/plot.r", local = knitr::knit_global())
 source("R/markdown.r", local = knitr::knit_global())
@@ -85,7 +83,7 @@ link2path <- function(lname) {  file.path(knitr::opts_knit$get("output.dir"),lna
 
 
 ```{r}
-#| label: tbl-load2
+#| label: tbl-load-exp2
 #| tbl-cap: Context
 
 if (!isTRUE(getOption('knitr.in.progress'))) {
@@ -98,14 +96,13 @@ if (!isTRUE(getOption('knitr.in.progress'))) {
 ```
 
 ```{r}
-#| label: read
+#| label: read-expl
 
 data(list=paste0("counts_", params$alignment))
 
 if (!is.null(metadata(dds)$organism$org)) {
   library(metadata(dds)$organism$org, character.only=TRUE)
 }
-metadata(dds)$template_git <- packageDescription("DESdemonA")$git_last_commit
 
 specs   <- load_specs(file=paste0(params$spec, ".spec"), context=dds)
 param <- ParamList$new(defaults=specs$settings)
@@ -229,12 +226,9 @@ for (dataset in names(specs$sample_sets)) {
   mdls <- mdls[sapply(specs$sample_sets[[dataset]]$model, function(x) "comparisons" %in% names(x))]
   for (mdl in names(mdls)) {
     cat("\n\n####", dataset, mdl, "{-}\n\n")
-    print(extract_eq(lm(
-      update(mdls[[mdl]], Expression ~ .),
-      data=cbind(data.frame(colData(ddsList[[dataset]]), check.names=FALSE), Expression=1:ncol(ddsList[[dataset]])),
-      wrap=TRUE
+    print(
+      Reduce(paste, deparse(update(mdls[[mdl]], Expression ~ .))),
     )
-    ))
   }
 }
 
@@ -586,7 +580,7 @@ for (dname_i in seq_along(ddsList)) {
       inter_vars <- inter_vars[order(many_levels[inter_vars], decreasing = TRUE)]
       pc.df$X <- colDat[, inter_vars[1]]
       for (ipc in unique(c(pc_first, pc_strong))) {
-        pc.df$coord[pc.df$PC == ipc] <- DESdemonA:::part.resid(fit_selected[[ipc]])[, covar]
+        pc.df$coord[pc.df$PC == ipc] <- part.resid(fit_selected[[ipc]])[, covar]
       }
       if (length(inter_vars) > 1) {
         pc.df$col <- colDat[, inter_vars[2]]

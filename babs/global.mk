@@ -69,6 +69,9 @@ define newline
 $(empty)
 endef
 
+## Deferred simple expansion - TMPSCRIPT won't exist when first called, then constant thereafter
+TMPSCRIPT = $(eval TMPSCRIPT := $$(shell mktemp -u $(staging_dir)/XXXXX))$(TMPSCRIPT)
+
 ifdef NTFY
 notification= [[ $$r = 0 ]] && \
 curl -H "Title: SLURM submission complete" -H "Tags: +1" -d "Finished $*" ntfy.sh/$(NTFY) || \

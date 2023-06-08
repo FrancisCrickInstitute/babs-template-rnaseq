@@ -231,7 +231,7 @@ table1 <- function(dds, ddsList) {
   ##   tab_spanner(label="Metadata",
   ##               columns=seq_along(samp)) %>%
   ##   Reduce(f=function(gti, x) tab_spanner(gti, label=x$name,columns=x$cols + ncol(samp)), x=ts_extra, init=.) %>%
-  ##   DESdemonA::tab_link_caption()
+  ##   tab_link_caption()
 }
 
 ##' Generate text files require for Biologic
@@ -239,10 +239,10 @@ table1 <- function(dds, ddsList) {
 ##' The visualisation part of 'Biologic' requires a set of text files
 ##' which represent the differential results and the models and
 ##' contrasts that were used to derive the results.  This function
-##' generates them from a previous run of DESdemonA.
+##' generates them from a previous run of the pipeline.
 ##' 
 ##' @title Export Biologic files
-##' @param result_object Path to the rds of the DESdemonA result object
+##' @param result_object Path to the rds of the  result object
 ##' @param path Where to write the files for Biologic to read
 ##' @return nothing
 ##' @author Gavin Kelly

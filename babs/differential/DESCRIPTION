@@ -10,7 +10,6 @@ Imports:
     BiocManager,
     circlize,
     ComplexHeatmap,
-    DESdemonA,
     DESeq2,
     dplyr,
     emmeans,
@@ -52,8 +51,6 @@ Suggests:
     rtracklayer,
     remotes,
     tximport
-Remotes:
-    macroscian/DESdemonA@quarto
 License: GPL-3
 LazyData: true
 git_last_commit: v0.20.10-1-g57c12bc_altered

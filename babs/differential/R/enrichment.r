@@ -23,7 +23,7 @@ enrichment <- function(dds, fun="gseGO") {
         OrgDb=get(metadata(dds)$organism$org))
     }
     if (fun=="gsePathway") {
-      reactome_org <- DESdemonA:::org2reactome(metadata(dds)$organism$org)
+      reactome_org <- org2reactome(metadata(dds)$organism$org)
       res <- gsePathway(
         genelist,
         organism = reactome_org)
@@ -63,7 +63,7 @@ over_representation <- function(ddsList, fun, showCategory, max_width=30) {
   if (fun=="enrichGO") {
     reactome <- try(eval(substitute(compareCluster(genes, fun=fun, OrgDb=metadata(ddsList[[1]])$organism$org, universe=na.omit(metadata(ddsList[[1]])$entrez)), list(fun=fun))), silent=TRUE)
   } else {
-    reactome_org <- DESdemonA:::org2reactome(metadata(ddsList[[1]])$organism$org)
+    reactome_org <- org2reactome(metadata(ddsList[[1]])$organism$org)
     reactome <- try(eval(substitute(compareCluster(genes, fun=fun, organism=reactome_org, universe=na.omit(metadata(ddsList[[1]])$entrez)), list(fun=fun))), silent=TRUE)
   }
   if (inherits(reactome,"try-error")) {

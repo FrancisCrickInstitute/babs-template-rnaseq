@@ -22,12 +22,12 @@ load_specs <- function(file="", context) {
            )
     specs <- source(file, local=e)$value
     assign("sample_set", expression, envir=e) # avoid evaluating any examples sample_sets.
-    pkg_defaults <- source(system.file("templates/example.spec", package="DESdemonA"), local=e)$value
-    new_settings <- setdiff(names(pkg_defaults$settings), names(specs$settings))
+    pkg_defaults <-default_spec_settings()
+    new_settings <- setdiff(names(pkg_defaults), names(specs$settings))
     if (length(new_settings)>0) {
-      string_rep <- lapply(pkg_defaults$settings[new_settings], deparse)
+      string_rep <- lapply(pkg_defaults[new_settings], deparse)
       warning("New settings (", paste(new_settings), ") can be set in ", file, ", so please update it. The default values that will be used are:\n", paste(names(string_rep), string_rep, sep=": ", collapse="\n"))
-      specs$settings[new_settings] <- pkg_defaults$settings[new_settings]
+      specs$settings[new_settings] <- pkg_defaults[new_settings]
     }
     rm(list=ls(envir=e), envir=e)
   } else {
@@ -640,3 +640,17 @@ rebase <- function(x, lev) {
   contrasts(x) <- contr.treatment(nlevels(x), i)
   x
  }
+
+default_spec_settings <- function() {
+   list(         ## analysis parameters
+	alpha          = 0.01,    ## p-value cutoff
+	lfcThreshold   = 0,       ## abs lfc threshold
+	baseMeanMin    = 0,       ## discard transcripts with average normalised counts lower than this
+	top_n_variable = 500,     ## For PCA
+	showCategory   = 25,      ## For enrichment analyses
+	seed           = 1,       ## random seed gets set at start of script, just in case.
+	filterFun      = IHW::ihw,                 ## NULL for standard DESeq2 results, otherwise  functions
+	clustering_distance_rows    = "euclidean", ## for all feature-distances
+	clustering_distance_columns = "euclidean"  ## for sample-distances
+   )
+}

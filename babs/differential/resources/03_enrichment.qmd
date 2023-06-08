@@ -44,7 +44,6 @@ library(DOSE)
 library(ReactomePA)
 library(GO.db)
 library(IHW)
-library(DESdemonA)
 
 source("R/plot.r", local = knitr::knit_global())
 source("R/markdown.r", local = knitr::knit_global())
@@ -91,8 +90,8 @@ if (!isTRUE(getOption('knitr.in.progress'))) {
 ```{r}
 #| label: read-enrich
 data(list=paste0("counts_", params$alignment))
-specs   <- DESdemonA::load_specs(file=paste0(params$spec, ".spec"), context=dds)
-param <- DESdemonA::ParamList$new(defaults=specs$settings)
+specs   <- load_specs(file=paste0(params$spec, ".spec"), context=dds)
+param <- ParamList$new(defaults=specs$settings)
 
 # Calling the setter without a value will pick up the default (from the spec), _and_ alert it in the markdown, and return the default
 set.seed(param$set("seed"))
@@ -135,18 +134,9 @@ if (!"functional" %in% names(specs)) {
 }
 
 
+tbl_child <- "```{r}\n#| label: tbl-{{lbl}}\nkable({{tbl}})\n```"
 
-tbl_child <- r"(```{r}
-#| label: tbl-{{lbl}}
-kable({{tbl}})
-```)"
-
-fig_child <- r"(```{r}
-#| label: fig-{{lbl}}
-#| fig-cap: {{capt}}
-print({{pl}})
-fig_caption("{{capt}}")
-```)"
+fig_child <- "```{r}\n#| label: fig-{{lbl}}\n#| fig-cap: {{capt}}\nprint({{pl}})\nfig_caption('{{capt}}')\n```"
 
 
 ```

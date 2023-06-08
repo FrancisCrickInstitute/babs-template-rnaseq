@@ -35,7 +35,7 @@ ParamList <- R6::R6Class("ParamList",
                               if (id %in% names(private$defaults)) {
                                 value <- private$defaults[[id]]
                               } else {
-                                eg <- readLines(system.file("templates/example.spec", package="DESdemonA"))
+                                eg <- default_spec_settings()
                                 eg <- eg[grep(paste0("^\\s+", id),eg)]
                                 if (length(eg)>0) {
                                   stop("Attempt to set '", id, "' but no value or default provided.\n", "You may need to update your spec file, as new settings have been introduced.  Maybe lines like:\n", paste(eg, collapse="\n"))
@@ -120,7 +120,7 @@ all_identical <- function(obj)  {all(sapply(obj, function(x) identical(x, obj[[1
 
 #' Descend a result-tree
 #'
-#' DESdemonA creates a Dataset > Model > Comparison nested list,
+#' Scripts create a Dataset > Model > Comparison nested list,
 #' with everything stored at the third level of this list. results_apply
 #' provides a way to traverse this list, applying a function to each dds object,
 #' and reporting the results of that function aggregated to a particular level.
@@ -248,10 +248,10 @@ extract_colData <- function(object, dataset) {
 
 
 
-#' Map over each component of a  DESdemonA object
+#' Map over each component of a DESeq nested  object
 #'
-#' If you want to loop through datasets that have been fitted by
-#' DESdemonA, then use this function as a wrapped so that reports
+#' If you want to loop through datasets that have been fitted,
+#' then use this function as a wrapped so that reports
 #' can generate formatted output, and transformations can be applied.
 #'
 #' This should be the first process in a pipeline, and be followed by
@@ -263,8 +263,8 @@ extract_colData <- function(object, dataset) {
 #' functions have access to a variable '.dataset' that will take the
 #' name of the current dataset
 #' 
-#' @title Wrap datasets from DESdemonA
-#' @param .dmc A three-level list in the standard DESdemonA hierarchy dataset > model > comparison
+#' @title Wrap dataset-model-comparison object
+#' @param .dmc A three-level list in the standard hierarchy dataset > model > comparison
 #' @param .f The function that will be called on the output of the per_model or per_comparison.
 #' @param before A function that will be invoked before .f
 #' @param after A function that will be invoked after .f

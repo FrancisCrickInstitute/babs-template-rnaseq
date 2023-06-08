@@ -26,7 +26,7 @@ We load in all the necessary additional R packages, and set up some initial para
 
 
 ```{r}
-#| label: load-01
+#| label: load-diff1
 #| output: false
 #| warning: false
 #| error: false
@@ -46,7 +46,6 @@ library(clusterProfiler)
 library(ReactomePA)
 library(GO.db)
 library(IHW)
-library(equatiomatic)
 
 source("R/plot.r", local = knitr::knit_global())
 source("R/markdown.r", local = knitr::knit_global())
@@ -83,7 +82,7 @@ link2path <- function(lname) {  file.path(knitr::opts_knit$get("output.dir"),lna
 
 
 ```{r}
-#| label: tbl-load2
+#| label: tbl-load-diff2
 #| tbl-cap: Context
 if (!isTRUE(getOption('knitr.in.progress'))) {
   params <- load_params("resources/02_differential", extra=TRUE)
@@ -96,14 +95,14 @@ if (!isTRUE(getOption('knitr.in.progress'))) {
 ```
 
 ```{r}
-#| label: read
+#| label: read-diff
 data(list=paste0("counts_", params$alignment))
 data(list=paste0("pca_", params$alignment, "_", params$spec))
 
 if (!is.null(metadata(dds)$organism$org)) {
   library(metadata(dds)$organism$org, character.only=TRUE)
 }
-metadata(dds)$template_git <- packageDescription("DESdemonA")$git_last_commit
+
 
 specs   <- load_specs(file=paste0(params$spec, ".spec"), context=dds)
 

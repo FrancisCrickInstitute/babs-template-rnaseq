@@ -1,5 +1,4 @@
 library(BH)
-library(BiocParallel)
 library(cluster)
 library(downloader)
 library(lazyeval)
