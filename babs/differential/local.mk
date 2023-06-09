@@ -1,10 +1,47 @@
+################################################################
+## README
+################################################################
+##
+## The further one goes through this document, the less recommended it
+## is to change parts.  Firstly we have version IDs of binaries to be
+## used, then some standard directory names that you can change if
+## you strongly object to the default choices, but it's not advised!
+## Then we have some containerisation code that is easily broken/
+##
+################################################################
+## Stand-alone usage:
+## 
+## We expect a sibling 'nfcore' directory parallel to this
+## 'differential' one, if we are to prepare things with a `make
+## build`.  However, if you have pre-aligned data from another source,
+## it is possible to omit that `build` stage, and instead arrange this
+## directory to have all the prerequisites ready for a `make run`. You
+## will need to select an (arbitrary) name to denote the set of
+## samples that have been aligned.  We recommend a short mnemonic that
+## represents this: for illustrative purposes we'll use the word 'human'.
+## Assuming that (or change _every_ instance of it uniformly),
+## here is the necessary structure:
+##
+## ./inst/extdata/metadata_human.csv - experiment table, with the ID's
+## filled in
+##
+## ./inst/extdata/genes.results/human/*.genes.results - rsem quantified
+## counts per sample (note the extra directory level 'human' when compared
+## to standard nfcore results)
+##
+## ./human.config - containing at least the line `human.org.db=org.Hs.eg.db`
+##
+## Given those three requirements, and at least one spec file, `make run` will
+## produce the reports
+
+
 ## Binaries
 QUARTO=quarto
 R=R
 RVERSION=4.2.2
 
 EXECUTOR = singularity
-
+SINGULARITY_VERSION=3.6.4
 DOCKER = gavinpaulkelly/verse-boost
 BIND_DIR = $(shell ${GIT} rev-parse --show-toplevel || echo ${CURDIR})
 
@@ -35,23 +72,6 @@ my_counts_dir=inst/extdata/genes.results
 my_metadata=inst/extdata/metadata
 samples_db = samples.db
 
-################################################################
-## Placeholders
-##
-## We need to insert lines into scripts at various places.
-## Here, we let 'make' know where we want those injections
-## to happen
-################################################################
-## If we need the filename of the yml file that contains the
-## parameters. File won't have the initial `params:`, nor will
-## the individual lines be indented
-yaml-filename-placeholder=my_params_yml
-
-
-
-## Marker in the _quarto above which the sidebar info will be placed
-sections-before-line=\#sections get inserted above
-
 ## Unlikely that anything below here needs setting by a user.
 
 ################################################################
@@ -65,7 +85,7 @@ sections-before-line=\#sections get inserted above
 CONTAINERED=false#An internal flag
 
 ifeq (${EXECUTOR},singularity)
-CONTAINER= $(call ml,Singularity/3.6.4); singularity
+CONTAINER= $(call ml,Singularity/$(SINGULARITY_VERSION)); singularity
 CONTAINER_IMAGE=$(SINGULARITY_ROOT)/$(notdir $(DOCKER))_$(RVERSION).sif
 CONTAINER_BIND=--bind $(BIND_DIR),/tmp,$(RENV_PATHS_ROOT),$(CURDIR)/rocker.Renviron:/usr/local/lib/R/etc/Renviron.site
 CONTAINER_ENV=--env SQLITE_TMPDIR=/tmp
@@ -106,40 +126,3 @@ else
 endif
 
 
-
-
-###################################################################################
-## To run just the differential module in isolation, you can uncomment
-## the lines marked CUSTOMISED below (by removing the initial '##' symbol)
-## Ideally read the MANUAL INSTRUCTIONS that precede such lines.
-## Then type `make build` and then `make run`.  This is only necessary if you've
-## run nfcore outside of the BABS RNASeq pipeline.
-##
-## If you're just making changes to, say, the spec files (or adding new ones),
-## then you should only ever need to type `make run`, without any changes to this
-## file.
-###################################################################################
-
-## MANUAL INSTRUCTIONS:
-## There must be another directory between `nfcore_dir` and star_rsem
-## so the above will work in the case of e.g.
-## ../nfcore/results/GRCh38/star_rsem/abc123.genes.results
-## which is the pipeline standard.
-## But if you've run nfcore without that intermediate directory such that
-## `/path/to/xxx/yyy/results/star_rsem/abc23.genes.results` is a file then
-## uncomment the line at the end of this, and ensure you have a file
-## called `./results.config` that contains the line
-## `results.org.db=org.Hs.eg.db` or whatever organism you have.
-##
-#nfcore_dir=/path/to/xxx/yyy#CUSTOMISED
-
-
-## I need a file in `my_metadata`_%.csv that is formatted
-## according to the 'experiment_table.csv' guidelines (ie ID and sample_label
-## as first two columns). That '%' placeholder is the 'zzz' of the
-## folder intermediate between `nfcore_dir` and `nfcoredir/zzz/star_rsem`
-## and so for the case described in the nfcore_dir instructions above, that
-## 'zzz' will be "results", so you might want to rename your experiment_table.csv to
-## be `./experiment_table_results.csv`, and uncomment the following line:
-##
-#my_metadata=experiment_table_results.csv#CUSTOMISED

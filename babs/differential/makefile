@@ -286,6 +286,10 @@ R-$(RVERSION): $(CONTAINER_IMAGE)
 	setfacl -m u::rwx $@
 	$(call git-ignore,$@)
 
+.PHONY: rstudio
+rstudio: ## Open this environment in RStudio
+	. $(source_dir)/shell/rstudio-rocker.sh
+
 clean:
 clean-geo:  ## Remove the GEO files from scratch
 	rm -rf $(geo_dir)
