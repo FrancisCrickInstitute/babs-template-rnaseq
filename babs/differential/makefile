@@ -126,16 +126,16 @@ $(staging_dir)/.params.yml:  project.mk
 ${staging_dir}/index.qmd : $(source_dir)/index.qmd $(qmds)
 	sed  's#^  contents: .*#  contents: [$(subst $(space),$(comma),$(patsubst $(staging_dir)/%,%,$(qmds)))]#' $< > $@
 
-R.bib: renv.lock | $(log_dir)
-	$(R) -e 'library(renv); init(bioconductor=TRUE, bare=TRUE); restore(); hydrate()' $(call log,renv,-a)
-	$(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")' $(call log,bib)
+R.bib: orgs=$(foreach align,$(alignments),$($(align).org.db))
+R.bib: renv.lock $(patsubst %,%.config,$(alignments)) | $(log_dir)
+	for o in $(orgs); do grep -F -q $$o resources/_dependencies.R || echo "library($$o)" >> resources/_dependencies.R; done
+	$(R) -e 'library(renv); restore(); hydrate()' $(call log,bib)
+	$(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")' $(call log,bib,-a)
 	$(call git-ignore,/$@)
 
-renv.lock: orgs=$(foreach align,$(alignments),$($(align).org.db))
 renv.lock: | rocker.Renviron  $(log_dir)
 	[ ! -f $@ ] || $(GIT_OK) stash push -m "Pipeline stashed. Use 'git stash pop' to retrieve it" -- $@ $(call log,renv)
-	for o in $(orgs); do grep -F -q $$o resources/_dependencies.R || echo "library($$o)" >> resources/_dependencies.R; done
-	$(R) -e 'library("BiocManager");library(renv);init(bioconductor=TRUE); install("bioc::BiocParallel"); renv::snapshot()' $(call log,renv,-a)
+	$(R) -e 'library(renv); options(repos = BiocManager::repositories()); init(bioconductor=TRUE);' $(call log,renv,-a)
 	$(GIT_OK) add renv.lock $(template_scripts) $(call log,renv,-a)
 	$(GIT_OK) rev-parse "v0.0.1" >/dev/null 2>&1 || $(GIT) tag v0.0.1 $(call log,renv,-a)
 	$(GIT_OK) commit -m 'Initialised by pipeline\n\n' $(call log,renv,-a)
@@ -228,7 +228,7 @@ genes_results = $(patsubst %,$(my_counts_dir)/%,$(alignments_ext))
 multiqc_results = $(patsubst %,$(RESULTS_DIR)/multiqc-%,$(alignments_ext))
 samples_db = samples.db
 
-build: $(samplesheets_ext) $(specfiles_ext) $(genes_results)  $(multiqc_results) | $(source_dir) $(staging_dir) ##  Copy the required nfcore count files into the `inst/extdata` area, and get the spec files.
+build: $(samplesheets_ext) $(specfiles_ext) $(genes_results)  $(multiqc_results) | $(source_dir) $(staging_dir) ##  Copy the required nfcore count files into the `extdata` area, and get the spec files.
 
 ifneq (,$(filter build,$(MAKECMDGOALS)))
 ## Only do build-like things if build actually called.
@@ -274,7 +274,7 @@ rocker.Renviron:
 	echo "RENV_PATHS_PREFIX=$(RENV_PATHS_PREFIX)" > $@
 	echo "RENV_PATHS_ROOT=$(RENV_PATHS_ROOT)" >> $@
 	echo "RENV_PATHS_LIBRARY=renv/library" >> $@
-	echo "RENV_CONFIG_PAK_ENABLED=TRUE" >> $@
+#	echo "RENV_CONFIG_PAK_ENABLED=TRUE" >> $@
 
 R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses)
 R-$(RVERSION): $(CONTAINER_IMAGE)

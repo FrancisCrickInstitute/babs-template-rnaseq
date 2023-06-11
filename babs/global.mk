@@ -12,9 +12,12 @@ log_dir=logs
 
 #Executibles (can be overridden in local.mk's)
 ml = module is-loaded $1 || module load $1
+SINGULARITY_VERSION=3.6.4
+NEXTFLOW_VERSION=21.10.3
+RVERSION=4.2.2
 
-NEXTFLOW = $(call ml,Nextflow/21.10.3); $(call ml,Singularity/3.4.2); $(call ml,CAMP_proxy); nextflow
-R = $(call ml,pandoc/2.2.3.2-foss-2016b); $(call ml,R/4.1.2-foss-2021b); command R
+R=R
+NEXTFLOW = $(call ml,Nextflow/$(NEXTFLOW_VERSION)); $(call ml,Singularity/$(SINGULARITY_VERSION)); $(call ml,CAMP_proxy); nextflow
 SQLITE = $(call ml,SQLite/3.36-GCCcore-11.2.0); sqlite3
 GIT=git
 

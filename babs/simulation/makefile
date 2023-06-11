@@ -66,7 +66,7 @@ R.bib: renv.lock
 #### Bootrap all relevant data from outside
 ################################################################
 
-build: specfiles samplesheets scripts ## Create experimental tables that reflect the samples actually run. Generate R scripts and environment that will analyse the data. Copy the required nfcore count files into the `inst/extdata` area.
+build: specfiles samplesheets scripts ## Create experimental tables that reflect the samples actually run. Generate R scripts and environment that will analyse the data. Copy the required nfcore count files into the `extdata` area.
 	make -n -s run > run.sh
 
 docs_specfiles = $(patsubst ../docs/%,%,$(wildcard ../docs/*.spec))

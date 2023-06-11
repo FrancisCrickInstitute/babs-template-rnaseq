@@ -34,7 +34,7 @@ $(alignments) : results/%/star_rsem/rsem.merged.gene_counts.tsv : samplesheet_%.
 	--gtf $(realpath $($*.gtf)) \
 	-w $(realpath nf_work) \
 	"$${args[@]}" \
-	$($*.nfcore) $(call log,nfcore) ;\
+	$(or $($*.nfcore),$(nf_options)) $(call log,nfcore) ;\
 	if [ -n "$($*.index_dir)" ] && [ ! -d "$$refdir" ];\
 	    then mkdir -p "$$refdir" && mv results/$*/genome/index/* "$$refdir"/;\
 	fi

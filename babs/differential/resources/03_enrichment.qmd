@@ -43,7 +43,7 @@ library(clusterProfiler)
 library(DOSE)
 library(ReactomePA)
 library(GO.db)
-library(IHW)
+
 
 source("R/plot.r", local = knitr::knit_global())
 source("R/markdown.r", local = knitr::knit_global())
@@ -122,6 +122,9 @@ en_pipe <-  . %>%
   slice_max(abs(effect), n=100)
 
 
+## 'group' will determine which comparisons (within an approach) will
+## be _plotted_ together. So ~dataset + model will show all comparisons on
+## the same plot
 if (!"functional" %in% names(specs)) {
   funcs=list(
     "GO Enrichment"=list(method="enrichment", source="GO", group= ~ dataset + model, pipe=en_pipe),
@@ -135,8 +138,6 @@ if (!"functional" %in% names(specs)) {
 
 
 tbl_child <- "```{r}\n#| label: tbl-{{lbl}}\nkable({{tbl}})\n```"
-
-fig_child <- "```{r}\n#| label: fig-{{lbl}}\n#| fig-cap: {{capt}}\nprint({{pl}})\nfig_caption('{{capt}}')\n```"
 
 
 ```
@@ -154,64 +155,30 @@ are over-represented/enriched in the various genelists we have created.
 
 param$set("showCategory")
 
-dmc2df <- function(dmc) {
-  dds <- do.call(c, lapply(dmc, function(d) {do.call(c, lapply(d, function(m) {m}))}))
-  list2DF(
-    list(dataset=sapply(dds, function(x) metadata(x)$dmc$dataset),
-    model=sapply(dds, function(x) metadata(x)$dmc$model),
-    comparison=sapply(dds, function(x) metadata(x)$dmc$comparison),
-    dds=dds
-    )
-  )
-}
 
-
+# Get a data.frame with the dds objects in a column
 dds_df <- tibble::as_tibble(dmc2df(dds_model_comp))
-
-
-functional <- function (dds, method, source,  ...) {
-  org <- metadata(dds)$organism$org
-  res <- mcols(dds)$results
-  ind <- grepl("\\*", res$class)
-  if (method!="or") ind=T
-  res <- mcols(dds)$results[ind & !is.na(res$entrez),]
-  genes <- setNames(res$shrunkLFC, res$entrez)
-  genes <- sort(genes, decreasing=TRUE)
-  if (length(genes) < 1) return(NULL)
-  reactome_species_list <- c(
-    anopheles = "org.Ag.eg.db", arabidopsis = "org.At.tair.db", 
-    bovine = "org.Bt.eg.db", canine = "org.Cf.eg.db", celegans = "org.Ce.eg.db", 
-    chicken = "org.Gg.eg.db", chimp = "org.Pt.eg.db", coelicolor = "org.Sco.eg.db", 
-    ecolik12 = "org.EcK12.eg.db", ecsakai = "org.EcSakai.eg.db", 
-    fly = "org.Dm.eg.db", gondii = "org.Tgondii.eg.db", human = "org.Hs.eg.db", 
-    malaria = "org.Pf.plasmo.db", mouse = "org.Mm.eg.db", pig = "org.Ss.eg.db", 
-    rat = "org.Rn.eg.db", rhesus = "org.Mmu.eg.db", xenopus = "org.Xl.eg.db", 
-    yeast = "org.Sc.sgd.db", zebrafish = "org.Dr.eg.db")
-  reactome_species <- names(reactome_species_list)[reactome_species_list==org]
-  yy <- switch(
-    method,
-    or=switch(
-      source,
-      GO=enrichGO(gene=names(genes), OrgDb = metadata(dds)$organism$org, ...),
-      Reactome=enrichPathway(gene=names(genes), organism=reactome_species, ...)
-    ),
-    enrichment=switch(
-      source,
-      GO=gseGO(geneList=genes, OrgDb = metadata(dds)$organism$org, ...),
-      Reactome=gsePathway(geneList=genes, organism=reactome_species, ...)
-    )
-  )
-}
   
-
+# Enumerate all functional-approach x dds combos
 func_df <- cross_join(
   tibble(func_name=names(funcs), func_params=funcs),
   dds_df)
+
+# Apply the functional approach to the dds
 func_df <- rowwise(func_df) %>%
-  mutate(func_res=list(do.call(functional, modifyList(func_params, list(dds=dds, group=NULL, pipe=NULL))))) %>%
+  mutate(func_res=list(do.call(functional_api,
+                               modifyList(
+                                 func_params,
+                                 list(dds=dds, group=NULL, pipe=NULL))
+                               )
+                       )) %>%
   filter(!is.null(func_res) && nrow(func_res)!=0) %>%
   ungroup()
 
+# Gather results into common functional approaches, a list of
+# dataframes where each element corresponds to an approach, which
+# is grouped by the grouping structure (e.g. model within dataset),
+# and the rows in a group are the comparisons.
 func_res_list <- lapply(
   unique(func_df$func_name) |> (function(x) setNames(x,x))(),
   function(f) {
@@ -225,28 +192,30 @@ func_res_list <- lapply(
       summarise(df=list(map_dfr(df, identity)))
   })
 
-sym_colour <- function(dat, lo="blue",zero="white", hi="red") {
-  mx <- quantile(abs(dat), 0.9)
-  circlize::colorRamp2(c(-mx, 0, mx), colors=c(lo, zero, hi))
-}
 
-for (i in names(func_res_list)) {
-  cat("\n\n## ", i, "\n\n")
-  grp <- unite(func_res_list[[i]], "grp", -df, sep=" ") %>% pull(grp)
-  for (j in 1:nrow(func_res_list[[i]])) {
-    df <-       func_res_list[[i]]$df[[j]] %>%
-      funcs[[i]]$pipe() %>%
-               complete(inner, ID)
-    ord <- group_by(df,ID) %>%
+## Put the results into the report
+# For each approach produce a section,
+# for each group of comparisons within an
+# approach, produce a plot.
+
+for (approach in names(func_res_list)) {
+  cat("\n\n## ", approach, "\n\n")
+  groups <- func_res_list[[approach]] %>%
+    unite("grp", -df, sep=" ") %>%
+    pull(grp)
+  for (grp in 1:nrow(func_res_list[[approach]])) {
+    df <- func_res_list[[approach]]$df[[grp]] %>%
+      funcs[[approach]]$pipe() %>%
+      complete(inner, ID)
+    ord <- df %>%
+      group_by(ID) %>%
       dplyr::select(inner, effect, ID) %>%
       mutate(na=is.na(effect) * 2^match(inner, unique(inner))) %>%
       summarise(na=sum(na), mean=mean(effect, na.rm=TRUE))
     ord <- order(ord$na, ord$mean)
     df$ID <- factor(df$ID, levels=df$ID[ord])
-    capt <- paste(i, grp[j], sep=" - ")
-    pl <- ggplot(
-      df,
-      aes(x=inner, y=ID, fill=effect)) +
+    capt <- paste(approach, groups[grp], sep=" - ")
+    pl <- ggplot(df, aes(x=inner, y=ID, fill=effect)) +
       geom_tile() +
       labs(x="Comparison", y="Annotation", title=capt) +
       scale_fill_distiller(type="div", palette="RdYlBu") +
@@ -258,7 +227,10 @@ for (i in names(func_res_list)) {
         plot.background=element_blank(),
         panel.border=element_blank()
       )
-    cat(knitr::knit_child(text=knitr::knit_expand(text=fig_child, pl="pl", lbl=gsub("[^[:alnum:]]+", "-", capt), capt=capt)))
+    do_plot(pl,
+            label=label("functional"),
+            caption=capt
+            )
   }
 }
 

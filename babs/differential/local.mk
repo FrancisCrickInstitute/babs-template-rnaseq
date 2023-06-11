@@ -22,10 +22,10 @@
 ## Assuming that (or change _every_ instance of it uniformly),
 ## here is the necessary structure:
 ##
-## ./inst/extdata/metadata_human.csv - experiment table, with the ID's
+## ./extdata/metadata_human.csv - experiment table, with the ID's
 ## filled in
 ##
-## ./inst/extdata/genes.results/human/*.genes.results - rsem quantified
+## ./extdata/genes.results/human/*.genes.results - rsem quantified
 ## counts per sample (note the extra directory level 'human' when compared
 ## to standard nfcore results)
 ##
@@ -36,12 +36,10 @@
 
 
 ## Binaries
+#R=#Set in global.mk
 QUARTO=quarto
-R=R
-RVERSION=4.2.2
-
 EXECUTOR = singularity
-SINGULARITY_VERSION=3.6.4
+
 DOCKER = gavinpaulkelly/verse-boost
 BIND_DIR = $(shell ${GIT} rev-parse --show-toplevel || echo ${CURDIR})
 
@@ -68,8 +66,8 @@ location=results
 docs_dir=$(strip ../docs)
 nfcore_dir=$(strip ../nfcore/results)
 
-my_counts_dir=inst/extdata/genes.results
-my_metadata=inst/extdata/metadata
+my_counts_dir=extdata/genes.results
+my_metadata=extdata/metadata
 samples_db = samples.db
 
 ## Unlikely that anything below here needs setting by a user.

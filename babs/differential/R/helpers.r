@@ -352,7 +352,13 @@ rbind_summary <- function(x, levels=c("Dataset", "Design", "Comparison")) {
 ##   fvars <- setdiff(all.vars(lme4::subbars(fml)), rterms)
 ##   list(fixed=fvars, groups=rterms)
 ## }
-
+##' .. content for \description{} (no empty lines) ..
+##'
+##' .. content for \details{} ..
+##' @title 
+##' @param fml 
+##' @return 
+##' @author Gavin Kelly
 classify_terms <- function(fml) {
   rhs <- as.character(fml)[length(fml)]
   spl <- strsplit(rhs, "|", fixed=TRUE)[[1]]
@@ -364,4 +370,22 @@ classify_terms <- function(fml) {
 }
 
 
+##' Convert dataset-model-comparison hierarchy into data.frame
+##'
+##' Create a data.frame with columns for dataset, model, and comparison
+##' alongside a list-column containing the dds object
+##' @title Convert DMC to dataframe
+##' @param dmc A triple-level list
+##' @return A data.frame of the expanded list
+##' @author Gavin Kelly
+dmc2df <- function(dmc) {
+  dds <- do.call(c, lapply(dmc, function(d) {do.call(c, lapply(d, function(m) {m}))}))
+  list2DF(
+    list(dataset=sapply(dds, function(x) metadata(x)$dmc$dataset),
+    model=sapply(dds, function(x) metadata(x)$dmc$model),
+    comparison=sapply(dds, function(x) metadata(x)$dmc$comparison),
+    dds=dds
+    )
+  )
+}
 
