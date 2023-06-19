@@ -28,10 +28,10 @@ build: $(configs) $(samplesheet_fname).csv ## Prepare for `run` by gathering con
 
 
 $(samplesheet_fname).csv: ../docs/$(samplesheet_fname).csv
-	cp $< $@
+	tr -d '\r' < $< > $@
 
 $(configs): %.config: ../docs/%.config
-	cp $< $@
+	tr -d '\r' < $< > $@
 	grep -q "^universal" $@ || sed -i -e '$$auniversal=yes' $@
 	grep -q "^strandedness" $@ || sed -i -e '$$astrandedness=auto' $@
 	sed -i 's/^/$*./' $@

@@ -54,13 +54,14 @@ source("R/helpers.r", local = knitr::knit_global())
 source("R/output.r", local = knitr::knit_global())
 
 fig_caption <- captioner()
-label <- counter()
+fig_label <- counter()
 set.seed(1)
 
 
 knitr::opts_chunk$set(
   warning=FALSE, error=TRUE, message=FALSE,
   dev=c("ragg_png","pdf"), out.width="100%",
+  dev.args=list(ragg_png=list(scaling=1.5)),
   fig.width=14, fig.height=10,
   results='asis', fig.cap=expression(fig_caption())
 )
@@ -109,7 +110,7 @@ param <- ParamList$new(defaults=specs$settings)
 
 # Calling the setter without a value will pick up the default (from the spec), _and_ alert it in the markdown, and return the default
 set.seed(param$set("seed"))
-param$set("title", "{{{project}}}")
+param$set("title", "Exploratory analysis")
 param$set("script", file.path(getwd(),"01_analyse.r"))
 param$set("spec",  params$spec, "Using analysis plan '{}'.")
 param$set("alignment", params$alignment, "Using alignment settings '{}'")
@@ -226,7 +227,7 @@ for (dataset in names(specs$sample_sets)) {
   mdls <- mdls[sapply(specs$sample_sets[[dataset]]$model, function(x) "comparisons" %in% names(x))]
   for (mdl in names(mdls)) {
     cat("\n\n####", dataset, mdl, "{-}\n\n")
-    print(
+    cat(
       Reduce(paste, deparse(update(mdls[[mdl]], Expression ~ .))),
     )
   }
@@ -359,7 +360,7 @@ for (dname_i in seq_along(ddsList)) {
       col = metadata(colData(this_dds))$palette$Heatmap[vars$fixed]), 
     show_row_names = FALSE, show_column_names = TRUE)
   do_plot(pl,
-          label= label("01-Heatmap"),
+          label= fig_label("01-Heatmap"),
           caption=paste("Heatmap of variable genes,", dname))
   cat("\n\n---\n\n")
 
@@ -391,7 +392,7 @@ for (dname_i in seq_along(ddsList)) {
     top_annotation = ComplexHeatmap::HeatmapAnnotation(df = colDat[vars$fixed], 
                                                        col = metadata(colData(this_dds))$palette$Heatmap[vars$fixed]))
   do_plot(pl,
-          label= label("01-sampDist"),
+          label= fig_label("01-sampDist"),
           caption=paste("Heatmap of sample distances,", dname))
   cat("\n\n---\n\n")
 
@@ -453,7 +454,7 @@ for (dname_i in seq_along(ddsList)) {
       pl <- pl + geom_text_repel(aes(label = sample))
     }
     do_plot(pl,
-            label=label("01_color"),
+            label=fig_label("01_color"),
             caption=paste("Coloured by ", covar, "in", dname)
             )
     cat("\n\n---\n\n")
@@ -479,7 +480,7 @@ for (dname_i in seq_along(ddsList)) {
         pl <- pl + geom_text_repel(aes(label = sample))
       }
       do_plot(pl,
-              label= label("02-correct"),
+              label= fig_label("02-correct"),
               caption=paste0("Coloured by ", covar, ", correcting for ", 
                              paste(batch_vars, collapse = ", "), "in", dname)
               )
@@ -505,7 +506,7 @@ for (dname_i in seq_along(ddsList)) {
         pl <- pl + geom_text_repel(aes(label = sample))
       }
       do_plot(pl,
-              label=label("01-focus"),
+              label=fig_label("01-focus"),
               caption=paste("Focussed on ", covar, "in", dname)
               )
       cat("\n\n---\n\n")
@@ -551,7 +552,7 @@ for (dname_i in seq_along(ddsList)) {
       theme_bw() + 
       theme(aspect.ratio = length(unique(plotFrame$Covariate))/min(20, npc))
     do_plot(pl,
-            label=label("01-covar"),
+            label=fig_label("01-covar"),
             caption=paste("Covariate association in", dname)
             )
     
@@ -632,7 +633,7 @@ for (dname_i in seq_along(ddsList)) {
         pl <- pl + geom_text_repel(aes(label = sample))
       }
       do_plot(pl,
-              label= label("01-covariate"),
+              label= fig_label("01-covariate"),
               caption=paste("Against ", covar, "in", dname)
               )
       cat("\n\n---\n\n")

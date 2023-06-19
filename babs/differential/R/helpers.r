@@ -58,8 +58,7 @@ ParamList <- R6::R6Class("ParamList",
                             description <- sub("\\{\\}", paste0("{", id, "}"), description)
                             private$descriptions[[id]]=description
                             if (div & isTRUE(getOption('knitr.in.progress'))) {
-                              #                          cat(knitr::knit_child(text=knitr::knit_expand(text=c("```{block, type='rparam'}", self$describe(id), "```")), quiet=TRUE))
-                              cat("\n\n<div class=\"rparam\">", self$describe(id), "</div>\n\n")
+                              cat('\n\n::: {.callout-note title="Setting analysis parameter"}\n', self$describe(id), '\n:::\n\n')
                             }
                             invisible(self$get(id))
                           },

@@ -42,6 +42,7 @@ EXECUTOR = singularity
 
 DOCKER = gavinpaulkelly/verse-boost
 BIND_DIR = $(shell ${GIT} rev-parse --show-toplevel || echo ${CURDIR})
+BIOCPARALLEL_WORKER_NUMBER=2
 
 ################################################################
 ## Directories
@@ -86,7 +87,7 @@ ifeq (${EXECUTOR},singularity)
 CONTAINER= $(call ml,Singularity/$(SINGULARITY_VERSION)); singularity
 CONTAINER_IMAGE=$(SINGULARITY_ROOT)/$(notdir $(DOCKER))_$(RVERSION).sif
 CONTAINER_BIND=--bind $(BIND_DIR),/tmp,$(RENV_PATHS_ROOT),$(CURDIR)/rocker.Renviron:/usr/local/lib/R/etc/Renviron.site
-CONTAINER_ENV=--env SQLITE_TMPDIR=/tmp
+CONTAINER_ENV=--env SQLITE_TMPDIR=/tmp,BIOCPARALLEL_WORKER_NUMBER=$(BIOCPARALLEL_WORKER_NUMBER)
 CONTAINER_FLAGS= exec $(CONTAINER_BIND) --pwd $(CURDIR) --containall --cleanenv $(CONTAINER_ENV)
 CONTAINER_FLAGS_INTERACTIVE= exec $(CONTAINER_BIND),$${HOME}/.emacs.d,$${HOME}/.Xauthority --pwd $(CURDIR) --containall --cleanenv $(CONTAINER_ENV),DISPLAY=$${DISPLAY}
 CONTAINER_SHELL = $(CONTAINER) $(patsubst exec,shell,$(CONTAINER_FLAGS_INTERACTIVE)) $(CONTAINER_IMAGE)

@@ -1,114 +1,3 @@
-##' Geneset enrichment analysis
-##'
-##' Do reactomePA-like analyses
-##' @title Geneset enrichment analysis
-##' @param ddsList 
-##' @param fun 
-##' @param showCategory 
-##' @param max_width 
-##' @return gseaResult object
-##' @author Gavin Kelly
-##' @export
-enrichment <- function(dds, fun="gseGO") {
-  if (!("entrez" %in% colnames(mcols(dds))) || is.null(metadata(dds)$organism$org)) {
-    return(NULL)
-  }
-    ord <- order(mcols(dds)$results$shrunkLFC, decreasing=TRUE)
-    ord <- ord[!is.na(mcols(dds)$entrez)]
-    genelist <- setNames(mcols(dds)$results$shrunkLFC, mcols(dds)$entrez)[ord]
-    if (fun=="gseGO") {
-      res <- gseGO(
-        genelist,
-        ont = "MF",
-        OrgDb=get(metadata(dds)$organism$org))
-    }
-    if (fun=="gsePathway") {
-      reactome_org <- org2reactome(metadata(dds)$organism$org)
-      res <- gsePathway(
-        genelist,
-        organism = reactome_org)
-    }
-    if (nrow(res)>0) {
-      res
-    } else {
-      NULL
-    }
-}
-
-
-
-
-##' .. content for \description{} (no empty lines) ..
-##'
-##' .. content for \details{} ..
-##' @title Geneset over-representation analysis
-##' @param ddsList 
-##' @param fun 
-##' @param showCategory 
-##' @param max_width 
-##' @return A list containing the plot object and table
-##' @author Gavin Kelly
-##' @export
-
-over_representation <- function(ddsList, fun, showCategory, max_width=30) {
-  ddsList <- ddsList[sapply(ddsList, function(x) "entrez" %in% colnames(x) && !is.null(metadata(x)$organism$org))]
-  genes <- lapply(ddsList, function(dds) {
-    res <- mcols(dds)$results
-    na.omit(res$entrez[grepl("\\*", res$class)])
-  })
-  genes <- genes[sapply(genes, length)!=0]
-  if (length(genes)<1) {
-    return(NULL)
-  }
-  if (fun=="enrichGO") {
-    reactome <- try(eval(substitute(compareCluster(genes, fun=fun, OrgDb=metadata(ddsList[[1]])$organism$org, universe=na.omit(metadata(ddsList[[1]])$entrez)), list(fun=fun))), silent=TRUE)
-  } else {
-    reactome_org <- org2reactome(metadata(ddsList[[1]])$organism$org)
-    reactome <- try(eval(substitute(compareCluster(genes, fun=fun, organism=reactome_org, universe=na.omit(metadata(ddsList[[1]])$entrez)), list(fun=fun))), silent=TRUE)
-  }
-  if (inherits(reactome,"try-error")) {
-    return(NULL)
-  }
-  enrich_table <- as.data.frame(reactome)[c("Cluster", "ID", "Description","GeneRatio","BgRatio")]
-  reactome@compareClusterResult$Description <- ifelse(
-    nchar(reactome@compareClusterResult$Description)>max_width,
-    reactome@compareClusterResult$ID,
-    reactome@compareClusterResult$Description)
-  is_dup <- duplicated(reactome@compareClusterResult$Description)
-  if (any(is_dup)) {
-    reactome@compareClusterResult$Description[is_dup] <- reactome@compareClusterResult$ID[is_dup]
-  }
-  pl <- dotplot(reactome, showCategory=showCategory) +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1, size=6),
-          axis.text.y = element_text(size=8)
-          )
-  if (nrow(enrich_table)>0) {
-    list(plot=pl, table=enrich_table[1:showCategory,])
-  } else {
-    NULL
-  }
-}
-
-##' .. content for \description{} (no empty lines) ..
-##'
-##' .. content for \details{} ..
-##' @title 
-##' @param org 
-##' @return 
-##' @author Gavin Kelly
-org2reactome <- function(org) {
-  orgs <- c(anopheles = "org.Ag.eg.db", arabidopsis = "org.At.tair.db", 
-           bovine = "org.Bt.eg.db", canine = "org.Cf.eg.db", celegans = "org.Ce.eg.db", 
-           chicken = "org.Gg.eg.db", chimp = "org.Pt.eg.db", coelicolor = "org.Sco.eg.db", 
-           ecolik12 = "org.EcK12.eg.db", ecsakai = "org.EcSakai.eg.db", 
-           fly = "org.Dm.eg.db", gondii = "org.Tgondii.eg.db", human = "org.Hs.eg.db", 
-           malaria = "org.Pf.plasmo.db", mouse = "org.Mm.eg.db", 
-           pig = "org.Ss.eg.db", rat = "org.Rn.eg.db", rhesus = "org.Mmu.eg.db", 
-           xenopus = "org.Xl.eg.db", yeast = "org.Sc.sgd.db", zebrafish = "org.Dr.eg.db"
-           )
-  names(orgs[orgs==org])
-}
-  
 ##' Common interface to enrichment/over-representation
 ##'
 ##' Give a unified interface to all the supported functional
@@ -124,7 +13,7 @@ functional_api <- function (dds, method, source,  ...) {
   org <- metadata(dds)$organism$org
   res <- mcols(dds)$results
   ind <- grepl("\\*", res$class)
-  if (method!="or") ind=T
+  if (method!="OR") ind=T
   res <- mcols(dds)$results[ind & !is.na(res$entrez),]
   genes <- setNames(res$shrunkLFC, res$entrez)
   genes <- sort(genes, decreasing=TRUE)
@@ -141,7 +30,7 @@ functional_api <- function (dds, method, source,  ...) {
   reactome_species <- names(reactome_species_list)[reactome_species_list==org]
   yy <- switch(
     method,
-    or=switch(
+    OR=switch(
       source,
       GO=enrichGO(gene=names(genes), OrgDb = metadata(dds)$organism$org, ...),
       Reactome=enrichPathway(gene=names(genes), organism=reactome_species, ...)
@@ -153,3 +42,62 @@ functional_api <- function (dds, method, source,  ...) {
     )
   )
 }
+
+
+default_post_process <- function(alpha=0.05, n=100, threshold=-Inf, method=NA) {
+  ret <- list(
+    OR = function(x) {
+      filter(x, p.adjust<alpha) %>%
+        mutate(effect=log(DOSE::parse_ratio(GeneRatio)/DOSE::parse_ratio(BgRatio)),
+               size=DOSE::parse_ratio(GeneRatio)) %>%
+        filter(abs(effect) > threshold) %>%
+        slice_max(abs(effect), n=n)
+    },
+    enrichment =function(x) {
+      filter(x, p.adjust<alpha) %>%
+        mutate(effect=NES) %>%
+        filter(abs(effect)>threshold) %>%
+        slice_max(abs(effect), n=n)
+    })
+  if (is.na(method)) {
+    return(ret)
+  } else {
+    return(ret[[method]])
+  }
+}
+
+#arrange GO terms so that those that appear in
+# the same comparisons are together, 
+
+order_enrichments <- function(df) {
+  ord <- df %>%
+    group_by(ID) %>%
+    dplyr::select(inner, effect, ID) %>%
+    summarise(
+      ncomp=sum(is.na(effect)),
+      comp_pattern=sum(is.na(effect) * 2^match(inner, unique(inner))),
+      mean=mean(abs(effect), na.rm=TRUE)) %>%
+    mutate(ord=order(ncomp, comp_pattern, mean)) %>%
+    pull(ord)
+  ord
+}
+
+
+## TODO - flexible recursive report writer
+## so e.g.
+## struct <- list(method=list(source=list("dataset","model")))
+## will produce sections at the 'method' level, subsections at the 'source'
+## level and then iterate through datasets and models and produce plots
+## across comparisons(omitted)
+destruct <- function(df, struct, sub_procedure, n=1) {
+  if (is.list(struct[[1]])) { # Still a hierarchy below
+    loop_vals <- df[[struct[[1]]]]
+    for (i in unique(loop_vals)) {
+      cat('\n', strrep("#", n), i, '\n\n')
+      destruct(df[loop_vals==i], struct[[1]], n=n+1)
+    }
+  } else { # At the bottom level
+  }
+}
+      
+  

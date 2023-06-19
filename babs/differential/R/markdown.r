@@ -10,7 +10,7 @@
 ##' @return
 ##' @author Gavin Kelly
 #' @export
-captioner <- function() {
+captioner <- function(ext="pdf") {
   local({
     captions <- character()
     function(caption) {
@@ -21,7 +21,7 @@ captioner <- function() {
         return(ret)
       } else {
         if (isTRUE(getOption('knitr.in.progress'))) {
-          link_caption <- paste0("[", caption, "](", knitr::fig_path("pdf", number=length(captions)+1), ")")
+          link_caption <- paste0("[", caption, "](", knitr::fig_path(ext, number=length(captions)+1), ")")
         } else {
           link_caption <- caption
         }

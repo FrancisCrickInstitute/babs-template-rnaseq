@@ -14,6 +14,7 @@ code-fold: true
 execute:
   output: asis
   echo: false
+  error: true
 code-summary: "Show the code"
 params:
 
@@ -50,26 +51,23 @@ source("R/markdown.r", local = knitr::knit_global())
 source("R/rnaseq.r", local = knitr::knit_global())
 source("R/output.r", local = knitr::knit_global())
 source("R/helpers.r", local = knitr::knit_global())
+source("R/enrichment.r", local = knitr::knit_global())
 
 fig_caption <- captioner()
+fig_label <- counter()
+tbl_label <- counter()
+
 set.seed(1)
 
 
 knitr::opts_chunk$set(
   warning=FALSE, error=TRUE, message=FALSE,
   dev=c("ragg_png","pdf"), out.width="100%",
+  dev.args=list(ragg_png=list(scaling=1.5)),
   fig.width=14, fig.height=10,
-  results='asis', fig.cap=expression(fig_caption())
+  results='asis',
+  fig.cap=expression(fig_caption())
 )
-knitr::knit_hooks$set(
-  error = function(x, options) {
-    ERROR <<- x
-    knitr::knit_exit()
-  },
-  chunk = function(x, options){
-    if(exists('ERROR')) paste0(x,'```\n',ERROR,'```\n\n**Script stopped with error**')
-    else x
-  })
 link2path <- function(lname) {  file.path(knitr::opts_knit$get("output.dir"),lname) }
 
 ```
@@ -77,7 +75,6 @@ link2path <- function(lname) {  file.path(knitr::opts_knit$get("output.dir"),lna
 
 ```{r}
 #| label: load2-enrich2
-#| tbl-cap: Context
 if (!isTRUE(getOption('knitr.in.progress'))) {
   params <- load_params("resources/03_enrichment", extra=TRUE)
 } else {
@@ -112,32 +109,31 @@ dds_model_comp <-  lapply(dds_model_comp,
                            })
                     })
 
-or_pipe <-  . %>%
-  filter(p.adjust<0.05) %>%
-  mutate(effect=log(parse_ratio(GeneRatio)/parse_ratio(BgRatio))) %>%
-  slice_max(abs(effect), n=100)
-en_pipe <-  . %>%
-  filter(p.adjust<0.05) %>%
-  mutate(effect=NES) %>%
-  slice_max(abs(effect), n=100)
 
 
-## 'group' will determine which comparisons (within an approach) will
-## be _plotted_ together. So ~dataset + model will show all comparisons on
-## the same plot
-if (!"functional" %in% names(specs)) {
-  funcs=list(
-    "GO Enrichment"=list(method="enrichment", source="GO", group= ~ dataset + model, pipe=en_pipe),
-    "GO Over-representation"=list(method="or", source="GO", group= ~ dataset + model, pipe=or_pipe),
-    "Reactome Enrichment"=list(method="enrichment", source="Reactome", group= ~ dataset + model, pipe=en_pipe),
-    "Reactome Over-representation"=list(method="or", source="Reactome", group= ~ dataset + model, pipe=or_pipe)
+if (!"functional_approaches" %in% names(specs)) {
+  approaches=list(
+    "GO Enrichment"=list(
+      method="enrichment", # that, or `OR`
+      source="GO",         # that, or `Reactome`
+      ont="BP",            # can feed other args that get used by the relevant clusterProfiler call
+      post_process=default_post_process(alpha=0.05, n=100, threshold=-Inf)), # args can be set explicitly (these are the defaults)
+    "GO Over-representation"=list(
+      method="OR",
+      source="GO",
+      ont="BP",
+      post_process=default_post_process()), # or args can be left to default
+    "Reactome Enrichment"=list(
+      method="enrichment",
+      source="Reactome"), # omitting will also use defaults. To do nothing, `post_process=identity`
+    "Reactome Over-representation"=list(
+      method="OR",
+      source="Reactome")
   )
 } else {
-  funcs <- specs$functional
+  approaches <- specs$functional_approaches
 }
 
-
-tbl_child <- "```{r}\n#| label: tbl-{{lbl}}\nkable({{tbl}})\n```"
 
 
 ```
@@ -153,44 +149,58 @@ are over-represented/enriched in the various genelists we have created.
 ```{r}
 #| label: functional
 
-param$set("showCategory")
-
+#param$set("showCategory")
 
 # Get a data.frame with the dds objects in a column
 dds_df <- tibble::as_tibble(dmc2df(dds_model_comp))
   
 # Enumerate all functional-approach x dds combos
-func_df <- cross_join(
-  tibble(func_name=names(funcs), func_params=funcs),
+approach_df <- cross_join(
+  tibble(approach_name=names(approaches), approach_params=approaches),
   dds_df)
 
 # Apply the functional approach to the dds
-func_df <- rowwise(func_df) %>%
-  mutate(func_res=list(do.call(functional_api,
-                               modifyList(
-                                 func_params,
-                                 list(dds=dds, group=NULL, pipe=NULL))
-                               )
-                       )) %>%
-  filter(!is.null(func_res) && nrow(func_res)!=0) %>%
+approach_df <- rowwise(approach_df) %>%
+  mutate(
+    approach_res=list(do.call(
+      functional_api,
+      modifyList(
+        approach_params,
+        list(dds=dds, post_process=NULL)) # don't pass post_process to the api
+    )
+    )) %>%
+  filter(!is.null(approach_res) && nrow(approach_res)!=0) %>%
   ungroup()
 
 # Gather results into common functional approaches, a list of
 # dataframes where each element corresponds to an approach, which
 # is grouped by the grouping structure (e.g. model within dataset),
 # and the rows in a group are the comparisons.
-func_res_list <- lapply(
-  unique(func_df$func_name) |> (function(x) setNames(x,x))(),
+grouper <- ~ dataset + model
+approach_res_list <- lapply(
+  unique(approach_df$approach_name) |> (function(x) setNames(x,x))(),
   function(f) {
-    grp_vars <- all.vars(funcs[[f]]$group)
+    grp_vars <- all.vars(grouper)
     within_vars <- setdiff(c("dataset","model","comparison"), grp_vars)
-    func_df %>%
-      filter(func_name==f) %>%
+    approach_df %>%
+      filter(approach_name==f) %>%
       unite("inner", all_of(within_vars)) %>%
       group_by(across(all_of(grp_vars))) %>%
-      mutate(df=map2(func_res, inner, ~data.frame(as.data.frame(.x), inner=.y))) %>%
+      mutate(df=map2(approach_res, inner, ~data.frame(as.data.frame(.x), inner=.y))) %>%
       summarise(df=list(map_dfr(df, identity)))
   })
+
+
+
+## Speculative - recursively structure the document
+if (do_approach_df_recurse <- FALSE) {
+  struct <- list(method=list(source=list("dataset","model")))
+  destruct(
+    approach_df, struct,
+    function(df, group) {
+      approach <- unique(df$approach_name)
+    })
+}
 
 
 ## Put the results into the report
@@ -198,42 +208,69 @@ func_res_list <- lapply(
 # for each group of comparisons within an
 # approach, produce a plot.
 
-for (approach in names(func_res_list)) {
+for (approach in names(approach_res_list)) {
   cat("\n\n## ", approach, "\n\n")
-  groups <- func_res_list[[approach]] %>%
+  groups <- approach_res_list[[approach]] %>%
     unite("grp", -df, sep=" ") %>%
     pull(grp)
-  for (grp in 1:nrow(func_res_list[[approach]])) {
-    df <- func_res_list[[approach]]$df[[grp]] %>%
-      funcs[[approach]]$pipe() %>%
-      complete(inner, ID)
-    ord <- df %>%
-      group_by(ID) %>%
-      dplyr::select(inner, effect, ID) %>%
-      mutate(na=is.na(effect) * 2^match(inner, unique(inner))) %>%
-      summarise(na=sum(na), mean=mean(effect, na.rm=TRUE))
-    ord <- order(ord$na, ord$mean)
-    df$ID <- factor(df$ID, levels=df$ID[ord])
+  if ("post_process" %in% names(approaches[[approach]])) { # post_process allows filtering on a case-by-case basis
+    if (is.list(approaches[[approach]]$post_process)) {# chose the method-specific post-processing
+      my_post_process <- approaches[[approach]]$post_process[[approaches[[approach]]$method]]
+    } else { # post_process can also be given as a single function
+      my_post_process <- approaches[[approach]]$post_process
+    }
+  } else { # or drop back to the default if not specified.
+    my_post_process <- default_post_process(method=approaches[[approach]]$method)
+  }
+  biggest_effect <- max(abs(sapply(
+    approach_res_list[[approach]]$df,
+    function(x) range(my_post_process(x)$effect, na.rm=TRUE))
+    ))
+  effect_label <- list(OR="Relative effect", enrichment="NES")[[approaches[[approach]]$method]]
+  for (grp in 1:nrow(approach_res_list[[approach]])) {
+    df <- approach_res_list[[approach]]$df[[grp]] %>%
+      my_post_process() %>%
+      tidyr::complete(inner, ID)
+    df$ID <- factor(df$ID, levels=df$ID[order_enrichments(df)])
     capt <- paste(approach, groups[grp], sep=" - ")
-    pl <- ggplot(df, aes(x=inner, y=ID, fill=effect)) +
-      geom_tile() +
-      labs(x="Comparison", y="Annotation", title=capt) +
-      scale_fill_distiller(type="div", palette="RdYlBu") +
-      scale_y_discrete(expand=c(0, 0))+
-      scale_x_discrete(expand=c(0, 0)) +
-      theme_grey() +
+    size <- NULL#fall-back if post-processing doesn't define a 'size'
+    pl <- ggplot(df, aes(x=inner, y=Description, colour=effect, size=size)) +
+      geom_point() +
+      labs(x="Comparison", y="Annotation", title=capt, colour=effect_label, size="Proportion of differential") +
+      scale_colour_distiller(type="div", palette="RdYlBu", limits=c(-1,1)* biggest_effect) +
+      scale_y_discrete(labels = function(x) stringr::str_wrap(x, width = 40))+
+      scale_x_discrete(labels = function(x) stringr::str_wrap(x, width = 10)) +
+      theme_bw() +
       theme(
         axis.ticks=element_line(size=0.4),
         plot.background=element_blank(),
         panel.border=element_blank()
-      )
+      ) +
+      theme(legend.position="bottom", legend.box = "horizontal")
     do_plot(pl,
-            label=label("functional"),
-            caption=capt
+            label=fig_label("functional"),
+            caption=capt,
+            height_mult=nlevels(df$ID)/30
             )
+    tbl <- df %>%
+      rename(Comparison=inner) %>%
+      filter(!is.na(Description)) %>%
+      mutate(core_enrichment=NULL) %>%
+      gt() %>%
+      data_color(
+        columns=effect,
+        reverse=TRUE,
+        palette="RdYlBu",
+        domain=c(-1,1) * biggest_effect
+      ) %>%
+    tab_header(title=capt) %>%
+    opt_interactive()
+    do_tbl(tbl,
+           label=tbl_label("functional"),
+           caption=capt,
+           path=params$staging_dir)
   }
 }
-
 
 ```
 
@@ -249,5 +286,6 @@ cite the following sources which have enabled the analysis to be
 carried out.
 
 # Bibliography
+
 
 

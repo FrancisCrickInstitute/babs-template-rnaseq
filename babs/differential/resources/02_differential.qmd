@@ -54,25 +54,18 @@ source("R/output.r", local = knitr::knit_global())
 source("R/helpers.r", local = knitr::knit_global())
 
 fig_caption <- captioner()
-label <- counter()
+fig_label <- counter()
+tbl_label <- counter()
 set.seed(1)
 
 
 knitr::opts_chunk$set(
   warning=FALSE, error=TRUE, message=FALSE,
   dev=c("ragg_png","pdf"), out.width="100%",
+  dev.args=list(ragg_png=list(scaling=1.5)),
   fig.width=14, fig.height=10,
   results='asis', fig.cap=expression(fig_caption())
 )
-knitr::knit_hooks$set(
-  error = function(x, options) {
-    ERROR <<- x
-    knitr::knit_exit()
-  },
-  chunk = function(x, options){
-    if(exists('ERROR')) paste0(x,'```\n',ERROR,'```\n\n**Script stopped with error**')
-    else x
-  })
 
 
 link2path <- function(lname) {  file.path(knitr::opts_knit$get("output.dir"),lname) }
@@ -109,7 +102,7 @@ specs   <- load_specs(file=paste0(params$spec, ".spec"), context=dds)
 param <- ParamList$new(defaults=specs$settings)
 # Calling the setter without a value will pick up the default (from the spec), _and_ alert it in the markdown, and return the default
 set.seed(param$set("seed"))
-param$set("title", "{{{project}}}")
+param$set("title", "Differential Analysis")
 param$set("script", file.path(getwd(),"01_differential.r"))
 param$set("spec",  params$spec, "Using analysis plan '{}'.")
 param$set("alignment", params$alignment, "Using alignment settings '{}'")
@@ -279,7 +272,7 @@ for (dataset in names(summaries)) {
 
 
 ```{r}
-#| label: fig-summary
+#| label: fig-summaryp
   
 for (dataset in names(summaries)) {
   for (model in names(pval_frame[[dataset]])) {
@@ -288,7 +281,7 @@ for (dataset in names(summaries)) {
       facet_wrap(~Comparison) +
       theme_bw()
     do_plot(pl,
-            label=label("summary-p"),
+            label=fig_label("summary-p"),
             caption=paste0("p-Diagnostic for", dataset, model)
             )
     cat("\n\n---\n\n")
@@ -360,7 +353,7 @@ for (dataset in names(dds_model_comp)) {
       ind <- order(res$shrunkLFC)[c(1:5, nrow(res)-(0:4))]
       pl <- pl+ggrepel::geom_text_repel(size=4, data=res[ind,])
       do_plot(pl,
-              label=label("02-MA"),
+              label=fig_label("02-MA"),
               caption=paste0("MA plot of differential genes ", sub(".*\\t", "", i))
               )
       cat("\n\n---\n\n")
@@ -371,7 +364,7 @@ for (dataset in names(dds_model_comp)) {
 ```
 
 
-# Differential Heatmaps {.tabset}
+# Differential Heatmaps
 
 Here we present heatmaps of the differential genelists.  Note
 that these will, by definition, divide the samples along lines
@@ -384,9 +377,9 @@ from the QC heatmaps which were blind to the experimental design.
 param$set("clustering_distance_rows")
 param$set("clustering_distance_columns")
 for (dataset in names(dds_model_comp)) {
-  cat("## ", dataset, " {.tabset} \n", sep="") 
+  cat("## ", dataset, '\n\n', sep="") 
   for (mdl in names(dds_model_comp[[dataset]])) {
-    cat("### ", mdl, "\n", sep="")
+    cat("### ", mdl, '\n\n', sep="")
     first_done <- FALSE
     this_mdl <- dds_model_comp[[dataset]][[mdl]]
     for (i in names(this_mdl)) {
@@ -448,8 +441,11 @@ for (dataset in names(dds_model_comp)) {
         row_names_gp = gpar(fontsize = 6),
         show_row_names = nrow(tidied_data$mat)<100)
       do_plot(pl,
-              label=label("02-Heatmap"),
-              caption=paste0("Heatmap on ", name, "-differential genes. White for ", baseline_str))
+              label=fig_label("02-Heatmap"),
+              caption=paste0("Heatmap on ", name, "-differential genes. White for ", baseline_str),
+              height_mult=nrow(tidied_data$mat)/30,
+              max_height=15, min_height=5)
+      cat('\n\n---\n\n')
       if (do_residual_transform <- FALSE) {#length(all.vars(fml))>1) {
         part_resid <- residual_heatmap_transform(tidied_data$mat, pdat, fml)
         term_names <- intersect(dimnames(part_resid$terms)[[3]], var_roles$rhs)
@@ -468,10 +464,10 @@ for (dataset in names(dds_model_comp)) {
             row_names_gp = gpar(fontsize = 6),
             show_row_names = nrow(tidied_data$mat)<100)
           do_plot(pl,
-                  label=label("02-focussed"),
+                  label=fig_label("02-focussed"),
                   caption=paste0("Heatmap on differential genes ", name, ", ", term_name, "-focussed")
                   )
-          cat("\n\n---\n\n")
+          cat('\n\n---\n\n')
         }
       }
     } # next comparison

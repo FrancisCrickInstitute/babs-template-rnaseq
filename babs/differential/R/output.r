@@ -333,3 +333,43 @@ export_biologic <- function(result_object, path) {
 
 name_sanitizer <- function(str) {  gsub("[^a-zA-Z0-9\\._]", "_", str) }
 
+
+##' Generate captioned table
+##'
+##' quarto-compatible plot wrapper
+##'
+##' Either produce a child chunk (labelled so that it can be cross-references),
+##' or print the table, depending on whether the document is being
+##' rendered or run interactively.
+##' @param tbl A gt object
+##' @param label The candidate chunk label, which will get sanitised
+##' @param caption The caption text
+##' @param cap_fn The function that will be called on the caption text
+##' @return 
+##' @author Gavin Kelly
+do_tbl <- function(tbl, label, caption, path) {
+  if (isTRUE(getOption('knitr.in.progress'))) {
+    tbl_child <- knitr::knit_expand(
+      text=r"(```{r}
+#| label: tbl-{{lbl}}
+#| tbl-cap: {{caption}}
+#| output: asis
+
+fname <-  knitr::fig_path(".csv")
+dir.create(dirname(file.path(path, fname)), showWarning=FALSE, recursive=TRUE)
+write.csv(as.data.frame(tbl), file=file.path(path,fname), col.names = NA)
+cat('\n\n::: {.column-margin}\n',fontawesome::fa('file-csv'),'[{{caption}}](', fname, ')\n:::\n\n')
+tbl
+```)",
+      lbl=gsub("[^[:alnum:]]+", "-",label)
+)
+    cat(knitr::knit_child(
+      text=tbl_child,
+      quiet=TRUE,
+      envir=environment()),
+      sep='\n'
+      )
+  } else {
+    head(as.data.frame(tbl))
+  }
+}

@@ -1,3 +1,5 @@
+library(BiocParallel)
+library(BiocManager)
 library(BH)
 library(cluster)
 library(downloader)
