@@ -13,7 +13,7 @@ log_dir=logs
 #Executibles (can be overridden in local.mk's)
 ml = module is-loaded $1 || module load $1
 SINGULARITY_VERSION=3.6.4
-NEXTFLOW_VERSION=21.10.3
+NEXTFLOW_VERSION=22.10.3
 RVERSION=4.2.2
 
 R=R
