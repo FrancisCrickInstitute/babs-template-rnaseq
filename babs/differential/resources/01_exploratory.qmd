@@ -65,17 +65,6 @@ knitr::opts_chunk$set(
   fig.width=14, fig.height=10,
   results='asis', fig.cap=expression(fig_caption())
 )
-if (do_knit_error <- FALSE) {
-knitr::knit_hooks$set(
-  error = function(x, options) {
-    ERROR <<- x
-    knitr::knit_exit()
-  },
-  chunk = function(x, options){
-    if(exists('ERROR')) paste0(x,'```\n',ERROR,'```\n\n**Script stopped with error**')
-    else x
-  })
-}
 
 link2path <- function(lname) {  file.path(knitr::opts_knit$get("output.dir"),lname) }
 

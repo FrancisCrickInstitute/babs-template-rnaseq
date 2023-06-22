@@ -8,16 +8,11 @@ include global.mk
 
 checklist := specfiles experiment_table configs samplesheet.csv
 
-$(checklist): tmp.err tmp.log
-
-tmp.log tmp.err:
-	touch $@
-
-.PHONY: build run clean $(checklist)
+.PHONY: build run clean 
 
 build: $(checklist) ## Basic check that the contents of the docs folder conforms to requirements
-	mv tmp.err report.err
-	mv tmp.log report.log
+	[ -f tmp.err ] && mv tmp.err report.err || rm -f report.err
+	[ -f tmp.log ] && mv tmp.log report.log || touch report.log
 	[ ! -s report.err ]
 
 run:  ## Empty target just to conform to general pattern
@@ -31,6 +26,11 @@ endif
 $(specfiles) : 
 	[[ -s "$@" ]] || { echo "$@ is empty" | tee -a tmp.err }
 
+
+
+
+samplesheet=$(wildcard samplesheet.csv)
+ifeq ($(samplesheet),)
 samplesheet.csv :
 	echo "sample,fastq_1,fastq_2" > $@
 	proj=$(dir $(call babsfield,Path));\
@@ -44,11 +44,15 @@ samplesheet.csv :
 	    else echo "" >> $@ ;\
 	  fi ;\
 	done
-	if [ "`wc -l $@`" == "1 $@" ];\
+	if [ "`wc -l $@`" == "2 $@" ];\
 	  then echo "Couldn't find fastq files in " $$asfdir | tee -a tmp.err;\
 	  rm -f $@;\
 	fi	
-
+else
+samplesheet.csv:
+	head -1 $@ | grep -q "^sample,fastq_1,fastq_2" || {echo "$@ has incorrect header" | tee -a tmp.err}
+	[ $(word 1,$(shell wc -l $@)) -ge 2 ] || {echo "@ has only one line" | tee -a tmp.err}
+endif
 
 
 configs = $(wildcard *.config)
@@ -67,7 +71,7 @@ ifeq ($(words $(experiment_table)),0)
 endif
 $(experiment_table) :
 	[[ -s "$@" ]] || { echo "$@ is empty" | tee -a tmp.err }
-	head -1 $@ | grep -q "ID" || { echo "experiment_table.csv does not start with an ID column" | tee -a tmp.err}
+	head -1 $@ | grep -q "^ID" || { echo "experiment_table.csv does not start with an ID column" | tee -a tmp.err}
 	head -1 $@ | grep -q "ID,sample_label" || { echo "experiment_table.csv does not have sample_label column after ID - the first unduplicated column after ID, or the ID itself will be used as a label" | tee -a tmp.log }
 
 clean:
