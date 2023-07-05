@@ -5,8 +5,11 @@
 ## Single factor pairwise analysis.
 ## Note 1. In the subset element of the list, we select all samples. A different conditional statement can be added here to select specific samples. 
 ## Note 2. In the transform element of the list we can mutate meta data columns using the tidyverse syntax.
-##         Here we relevel the treatment factor to set the appropriate control group
-## Note 3. The model. Here we modle the treatment effect. Batch effect terms can be added here e.g. ~ batch + treatment
+##         Here we relevel the treatment factor to set the appropriate control group.
+##         If it is necessary to change multiple columns, use the syntax `transform=mutate(x=..., y=...)` - it is
+##         _not_ possible to have multiple separate `transform`s.
+## Note 3. The model. Here we model the treatment effect. Batch effect terms can be added here e.g. ~ batch + treatment.
+##         The name (here 'simple') is arbitrary - you could chose 'M1', or some transliteration of the terms in the formula
 ## Note 4. Run all pairwise comparisons within the treatment factor.
 #
 
@@ -16,7 +19,7 @@ specification(
             subset = TRUE,										## Note 1.
 	    transform=mutate( treatment = relevel( treatment, ref = "control" ) ), 			## Note 2.
             models = list(
-                pairwise = model(
+                simple = model(
                     design = ~ treatment,                                                              	## Note 3.
                     comparisons = list(
                         mult_comp( revpairwise ~ treatment )                                           	## Note 4.
@@ -28,7 +31,7 @@ specification(
     settings = settings(
         alpha = 0.05,
         lfcThreshold = 0,
-        baseMeanMin = 5,
+        baseMeanMin = 0,
         top_n_variable = 500,
         showCategory = 25,
         seed = 1,
@@ -60,7 +63,7 @@ specification(
             transform=mutate( 	treatment = relevel( treatment, ref = "control" ),			## Note 1.
 				genotype = relevel(  genotype, ref = "wildtype" ) ),
             models = list(
-                pairwise = model(
+                treatXgeno = model(
                     design = ~ treatment * genotype                                                  	## Note 2.
                     comparisons = list(
                         mult_comp( revpairwise ~ treatment | genotype ),                                ## Note 3.
@@ -75,7 +78,7 @@ specification(
     settings = settings(
         alpha = 0.05,
         lfcThreshold = 0,
-        baseMeanMin = 5,
+        baseMeanMin = 0,
         top_n_variable = 500,
         showCategory = 25,
         seed = 1,
@@ -85,12 +88,14 @@ specification(
 
 ## Time-course (single factor)
 ## Here we run an LRT across the time-point groups as well as pairwise comparisons against t0
-## and each consecutive time-point pair across the time-course.
+## and each consecutive time-point pair across the time-course.  
 
 ## Note 1. We relevel the time factor to capture the temporal order of the groups.
-##         This step is not necessary if the temporal order is the same as the sort order.
+##         This step is not necessary if the temporal order is the same as the _alphabetic_ sort order, but
+##         _be careful_ if the `time` is recorded as a purely numeric in the experiment table - if you leave it
+##        as a numeric, it will only find genes that have an exponential pattern of expression across time.
 ## Note 2. The model. Batch effect terms can be added here e.g. ~ batch + time
-## Note 3. Run all pairwise comparisons against time-point group t0
+## Note 3. Run all pairwise comparisons against the first level of the `time` factor
 ## Note 4. Run all consecutive pairwise comparisons across the time-course e.g. t1 - t0, t2 - t1, t3 - t2 ect.
 ## Note 5. You could imagine comparing the model to a reduced model that includes a batch effect
 ##         (e.g. design = ~ batch + time,
@@ -102,10 +107,10 @@ specification(
             subset = TRUE,
             transform=mutate( time = factor( time, levels = c( "t0", "t1", "t2", "t3" ) ) ),  ## Note 1.  
             models = list(
-                pairwise = model(
+                timewise = model(
                     design = ~ time                                                           ## Note 2.
                     comparisons = list(
-                        mult_comp(trt.vs.ctrl ~ time, ref="t0") ,                             ## Note 3.
+                        mult_comp(trt.vs.ctrl ~ time, ref=1) ,                                ## Note 3.
 			mult_comp(consec ~ time ),                                            ## Note 4.
 			lrt = ~1                                                              ## Note 5.
 	            )
@@ -116,7 +121,7 @@ specification(
     settings = settings(
         alpha = 0.05,
         lfcThreshold = 0,
-        baseMeanMin = 5,
+        baseMeanMin = 0,
         top_n_variable = 500,
         showCategory = 25,
         seed = 1,
@@ -128,12 +133,16 @@ specification(
 ## A two-factor multi-condition analysis. This may be a time course with two or more treatment groups as an additional factor.
 
 ## Note 1. We relevel the time factor to capture the temporal order of the groups.
-##         This step is not necessary if the temporal order is the same as the sort order.
+##         This step is not necessary if the temporal order is the same as the _alphabetic_ sort order, but
+##         _be careful_ if the `time` is recorded as a purely numeric in the experiment table - if you leave it
+##        as a numeric, it will only find genes that have an exponential pattern of expression across time.
 ## Note 2. Relevel the factor to set the control group.
-## Note 3. The model.
+## Note 3. The model. We can expand the time*treatment term manually if we want, for emphasis. 
 ## Note 4. Pairwise time point comparisons against t0 within each treatment group.
 ## Note 5. Consecutive time point pairwise comparisons within each treatment group.
-## Note 6. The LRT reduced model to test the interaction between time and treatment.
+## Note 6. The LRT reduced model to test the interaction between time and treatment, so finds all genes where at
+##         least one pair of timepoints exhibits a different treatment response (or equivalently, where at least one pair
+##         of treatments exhibit a different time response)
 
 
 specification(
@@ -141,12 +150,12 @@ specification(
         treatment = sample_set(
             subset = TRUE,
             transform=mutate( time = factor( time, levels = c( "t0", "t1", "t2", "t3" ) ),    ## Note 1.
-			      treatment = relevel( treatment, ref = "none", "drug" ) ),       ## Note 2.
+			      treatment = relevel(factor(treatment), ref = "none" ) ),        ## Note 2.
             models = list(
-                pairwise = model( 
-                    design = ~ batch + time + treatment + time * treatment,                   ## Note 3.
+                batch_timeXtreatment = model( 
+                    design = ~ batch + time + treatment + time:treatment,                   ## Note 3.
                     comparisons = list(
-                        mult_comp(trt.vs.ctrl ~ time | treatment, ref="t0"),                  ## Note 4.
+                        mult_comp(trt.vs.ctrl ~ time | treatment, ref=1),                  ## Note 4.
 			mult_comp(consec ~ time | treatment ),                                ## Note 5.
 			mult_comp(revpairwise ~ treatment | time ),
 			lrt = ~batch + time + treatment                                       ## Note 6.
@@ -158,7 +167,7 @@ specification(
     settings = settings(
         alpha = 0.05,
         lfcThreshold = 0,
-        baseMeanMin = 5,
+        baseMeanMin = 0,
         top_n_variable = 500,
         showCategory = 25,
         seed = 1,
@@ -182,8 +191,17 @@ specification(
 ## We must tell DESDemonA to drop comparisons if there are groups missing in the design. If we dio not do this DESeq2 will give a "Not Full Rank Error"
 
 ## Note 1. recode treatment and patient since patient is nested by treatment in this design
-## Note 2. Set drop_unsupported_combinations = TRUE to account for the design not being full rank.
-## Note 3. Pairwise treatment comparisons.
+## Note 2. Set drop_unsupported_combinations = TRUE to account for the design not being full rank. This will be the
+##         case if there is an unequal number of units within the nesting factors.
+## Note 3. Pairwise treatment comparisons. These arguably could be done with a `~treatment + drug` model, but
+##         that would get the N (number of independent samples) incorrect.  The other approach would be to
+##         aggregate the replicates within a patient, and then use `patient` as the unit of replication - check
+##         with a statistician regarding this. It's estimating the differences between the treatment cohorts,
+##         normalising out any influence of before/after drug on the expression.
+## Note 4. This will give the genes that are having a consistent within-subject drug effect in both/all the treatment
+cohorts
+## Note 5. This will give the genes where the drug response is different in one treatment cohort when compared to the response in the other cohort.
+
 
 specification(
     sample_sets = list(
@@ -193,10 +211,11 @@ specification(
             models = list(
                 pairwise = model(
                     drop_unsupported_combinations = TRUE,                               ## Note 2.
-                    design = ~ patient_in:treatment + drug,
+                    design = ~ patient_in:treatment + treatment * drug,
                     comparisons = list(
-                        mult_comp( revpairwise ~ treatment )                             ## Note 3.
-                    )
+                        mult_comp( revpairwise ~ treatment ),                           ## Note 3.
+                        mult_comp( revpairwise ~ drug ),                                ## Note 4.
+                        mult_comp( revpairwise+revpairwise ~ drug +treatment, interaction=TRUE)  ## Note 5.                    )
                 )
             )
         )
@@ -204,7 +223,7 @@ specification(
     settings = settings(
         alpha = 0.05,
         lfcThreshold = 0,
-        baseMeanMin = 5,
+        baseMeanMin = 0,
         top_n_variable = 500,
         showCategory = 25,
         seed = 1,
