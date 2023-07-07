@@ -108,15 +108,24 @@ metadata(mcols(dds))$init <- onames
 
 library(organism$org, character.only=TRUE)
 
-mcols(dds)$symbol <- mapIds(
-  eval(parse(text = organism$org)), 
+mcols(dds)$entrez <- mapIds(
+  eval(parse(text = organism$org)),
   keys=row.names(dds),
-  column="SYMBOL",
+  column="ENTREZID",
+  keytype="ENSEMBL",
+  multiVals="first")[row.names(dds)]
+
+o <- eval(parse(text = organism$org))
+my_column <- if ("SYMBOL" ∈ columns(o)) "SYMBOL" else columns(o)[1]
+mcols(dds)$symbol <- mapIds(
+  o,
+  keys=row.names(dds),
+  column=my_column,
   keytype="ENSEMBL",
   multiVals="first")[row.names(dds)]
 
 mcols(dds)$entrez <- mapIds(
-  eval(parse(text = organism$org)),
+  o,
   keys=row.names(dds),
   column="ENTREZID",
   keytype="ENSEMBL",

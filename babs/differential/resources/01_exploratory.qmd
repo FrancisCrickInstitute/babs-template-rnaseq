@@ -218,7 +218,7 @@ for (dataset in names(specs$sample_sets)) {
   for (mdl in names(mdls)) {
     cat("\n\n####", dataset, mdl, "{-}\n\n")
     cat(
-      Reduce(paste, deparse(update(mdls[[mdl]], Expression ~ .))),
+      Reduce(paste, deparse(update(mdls[[mdl]], Expression ~ .)))
     )
   }
 }
