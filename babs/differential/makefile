@@ -4,7 +4,7 @@ secrets global.mk: % : $(wildcard ../%)
 include secrets
 include global.mk
 include local.mk
-.PHONY: makefile project.mk local.mk 
+.PHONY: makefile local.mk 
 .PHONY: build clean geo R-local
 
 

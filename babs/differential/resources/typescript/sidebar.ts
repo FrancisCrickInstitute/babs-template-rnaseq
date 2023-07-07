@@ -9,8 +9,8 @@ const quarto = parse(Deno.readTextFileSync(flags.template));
 const qmdre = new RegExp(flags.tag.concat(".qmd$"));
 const qmds = Array.from(Deno.readDirSync(flags.staging))
     .filter( f => qmdre.test(f.name))
-    .map(f => ({qmd: f.name, yml: f.name.replace(qmdre,".yml")}))
-    .sort((a,b) => a.qmd.localeCompare(b.qmd));
+    .sort((a,b) => a.name.localeCompare(b.name));
+quarto.project.render = ["index.qmd"].concat(qmds.map(q => q.qmd));
 
 const sections=flags.sections.split(",");
 const alignments=flags.alignments.split(",");
@@ -46,5 +46,4 @@ const gh=quarto.website.navbar.right.findIndex(s => s.text=="Github repository")
 if (gh != -1) {
     quarto.website.navbar.right[gh].href = flags.repo;
 }
-quarto.project.render = ["index.qmd"].concat(qmds.map(q => q.qmd));
-console.log(stringify(quarto));
+console.log(stringify(quarto, {lineWidth: -1}));
