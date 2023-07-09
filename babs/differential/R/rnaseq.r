@@ -169,7 +169,7 @@ build_dds_list <- function(dds, spec) {
 ##' @author Gavin Kelly
 ##' @export
 add_dim_reduct  <-  function(dds, n=Inf, family="norm", batch=~1) {
-  var_stab <- assay(vst(dds))
+  var_stab <- assay(vst(dds, nsub=min(1000, nrow(dds))))
   if (batch != ~1) {
     var_stab <- residuals(limma::lmFit(var_stab, model.matrix(batch, as.data.frame(colData(dds)))), var_stab)
   }
