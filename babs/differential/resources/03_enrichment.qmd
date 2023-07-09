@@ -116,12 +116,12 @@ if (!"functional_approaches" %in% names(specs)) {
     "GO Enrichment"=list(
       method="enrichment", # that, or `OR`
       source="GO",         # that, or `Reactome`
-      ont="BP",            # can feed other args that get used by the relevant clusterProfiler call
+      ont="MF",            # can feed other args that get used by the relevant clusterProfiler call
       post_process=default_post_process(alpha=0.05, n=100, threshold=-Inf)), # args can be set explicitly (these are the defaults)
     "GO Over-representation"=list(
       method="OR",
       source="GO",
-      ont="BP",
+      ont="MF",
       post_process=default_post_process()), # or args can be left to default
     "Reactome Enrichment"=list(
       method="enrichment",
