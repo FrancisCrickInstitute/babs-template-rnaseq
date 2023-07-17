@@ -116,7 +116,7 @@ mcols(dds)$entrez <- mapIds(
   multiVals="first")[row.names(dds)]
 
 o <- eval(parse(text = organism$org))
-my_column <- if ("SYMBOL" ∈ columns(o)) "SYMBOL" else columns(o)[1]
+my_column <- if ("SYMBOL" %in% columns(o)) "SYMBOL" else columns(o)[1]
 mcols(dds)$symbol <- mapIds(
   o,
   keys=row.names(dds),
