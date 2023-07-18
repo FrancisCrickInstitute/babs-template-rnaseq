@@ -60,5 +60,5 @@ meta.params=params;
 
 //And write new header followed by the script
 console.log("---");
-console.log(stringify(quarto, {lineWidth: -1}));
+console.log(stringify(meta, {lineWidth: -1}));
 console.log(script.substring(end));
