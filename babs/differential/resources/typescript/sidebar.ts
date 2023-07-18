@@ -10,7 +10,7 @@ const qmdre = new RegExp(flags.tag.concat(".qmd$"));
 const qmds = Array.from(Deno.readDirSync(flags.staging))
     .filter( f => qmdre.test(f.name))
     .sort((a,b) => a.name.localeCompare(b.name));
-quarto.project.render = ["index.qmd"].concat(qmds.map(q => q.qmd));
+quarto.project.render = ["index.qmd"].concat(qmds.map(q => q.name));
 
 const sections=flags.sections.split(",");
 const alignments=flags.alignments.split(",");
