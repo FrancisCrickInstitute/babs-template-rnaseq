@@ -10,6 +10,7 @@ built_samplesheets=$(patsubst samplesheet_%.csv, %,$(wildcard samplesheet_*.csv)
 include $(patsubst %,%.config,$(built_samplesheets))
 
 alignments = $(patsubst %,results/%/star_rsem/rsem.merged.gene_counts.tsv,$(built_samplesheets))
+refdir = $(realpath $($*.index_dir)/$($*.genome_fasta_md5)/$($*.gtf_md5))
 
 run: $(alignments) ## Generate NF-CORE alignments, one folder for each config-specific samplesheet from the `build` process.
 
@@ -18,14 +19,14 @@ $(alignments) : results/%/star_rsem/rsem.merged.gene_counts.tsv : samplesheet_%.
 	export NXF_SINGULARITY_CACHEDIR="$(NXF_SINGULARITY_CACHEDIR)" ;\
 	export NXF_SINGULARITY_LIBRARYDIR="$(NXF_SINGULARITY_CACHEDIR)" ;\
 	export NXF_HOME=$$PWD ;\
-	refdir=$(realpath $($*.index_dir)/$(firstword $(shell md5sum $($*.genome_fasta)))/$(firstword $(shell md5sum $($*.gtf)))) ;\
 	args=();\
 	if [ -n "$($*.index_dir)" ];\
-	  then if [ -d "$$refdir" ];\
-	    then args+=(--rsem_index=$${refdir}/rsem/  --salmon_index=$${refdir}/salmon/) ;\
+	  then if [ -d "$(refdir)" ];\
+	    then args+=(--rsem_index=$(refdir)/rsem/  --salmon_index=$(refdir)/salmon/) ;\
 	    else  args+=(--save_reference);\
 	  fi ;\
 	fi ;\
+	set -o pipefail ;\
 	$(NEXTFLOW) run nf-core/rnaseq \
 	--input $< \
 	--outdir results/$*/ \
@@ -34,10 +35,11 @@ $(alignments) : results/%/star_rsem/rsem.merged.gene_counts.tsv : samplesheet_%.
 	--gtf $(realpath $($*.gtf)) \
 	-w $(realpath nf_work) \
 	"$${args[@]}" \
-	$(or $($*.nfcore),$(nf_options)) $(call log,nfcore) ;\
-	if [ -n "$($*.index_dir)" ] && [ ! -d "$$refdir" ];\
-	    then mkdir -p "$$refdir" && mv results/$*/genome/index/* "$$refdir"/;\
+	$(or $($*.nfcore),$(nf_options)) $(call log,nfcore)
+	if [ -n "$($*.index_dir)" ] && [ ! -d "$(refdir)" ];\
+	    then mkdir -p "$(refdir)" && mv results/$*/genome/index/* "$(refdir)"/;\
 	fi
+	$(NEXTFLOW) clean
 
 nf_work:
 	mkdir -p $(SCRATCH_DIR)nf_work/
@@ -67,6 +69,8 @@ $(samplesheets): samplesheet_%.csv: %.config  samples.db
 
 $(configs) : %.config : ../ingress/%.config
 	cp $< $@
+	md5sum $(shell sed -n 's/^$*.genome_fasta=//p' $<) | awk '{print "$*.genome_fasta_md5=" $$1}' >> $@
+	md5sum $(shell sed -n 's/^$*.gtf=//p' $<) | awk '{print "$*.gtf_md5=" $$1}' >> $@
 
 samples.db: ../ingress/samples.db
 	cp $< $@
