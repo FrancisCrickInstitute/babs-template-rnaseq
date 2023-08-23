@@ -11,10 +11,11 @@ include $(patsubst %,%.config,$(built_samplesheets))
 
 alignments = $(patsubst %,results/%/star_rsem/rsem.merged.gene_counts.tsv,$(built_samplesheets))
 refdir = $(realpath $($*.index_dir)/$($*.genome_fasta_md5)/$($*.gtf_md5))
+workdir = $(SCRATCH_DIR)nf_work/
 
 run: $(alignments) ## Generate NF-CORE alignments, one folder for each config-specific samplesheet from the `build` process.
 
-$(alignments) : results/%/star_rsem/rsem.merged.gene_counts.tsv : samplesheet_%.csv | $(log_dir) nf_work
+$(alignments) : results/%/star_rsem/rsem.merged.gene_counts.tsv : samplesheet_%.csv | $(log_dir) $(workdir)
 	mkdir -p results/$*
 	export NXF_SINGULARITY_CACHEDIR="$(NXF_SINGULARITY_CACHEDIR)" ;\
 	export NXF_SINGULARITY_LIBRARYDIR="$(NXF_SINGULARITY_CACHEDIR)" ;\
@@ -33,17 +34,17 @@ $(alignments) : results/%/star_rsem/rsem.merged.gene_counts.tsv : samplesheet_%.
 	--aligner star_rsem \
 	--fasta $(realpath $($*.genome_fasta)) \
 	--gtf $(realpath $($*.gtf)) \
-	-w $(realpath nf_work) \
+	-w $(workdir) \
 	"$${args[@]}" \
 	$(or $($*.nfcore),$(nf_options)) $(call log,nfcore)
 	if [ -n "$($*.index_dir)" ] && [ ! -d "$(refdir)" ];\
 	    then mkdir -p "$(refdir)" && mv results/$*/genome/index/* "$(refdir)"/;\
 	fi
-	$(NEXTFLOW) clean
+	$(NEXTFLOW) clean -f
 
-nf_work:
-	mkdir -p $(SCRATCH_DIR)nf_work/
-	[ -z "$(SCRATCH_DIR)" ] || ln -sfn $(SCRATCH_DIR)nf_work nf_work
+$(workdir)
+	mkdir -p $(workdir)
+
 
 
 
