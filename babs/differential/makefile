@@ -5,7 +5,7 @@ include secrets
 include global.mk
 include local.mk
 .PHONY: makefile local.mk 
-.PHONY: build clean geo R-local
+.PHONY: build clean maintainer-clean geo R-local
 
 
 include project.mk  ## Provides analysis parametrisation
@@ -114,6 +114,7 @@ ${staging_dir}/_quarto.yml: $(source_dir)/_quarto.yml $(qmds)
 	 --template=$< \
 	 --tag=$(TAG)\
 	 --staging=$(staging_dir)\
+	 --author="$(subst .,$(space),$(.myname))"\
 	 --repo="$(repo)" > $@
 
 $(source_dir)/params.yml:
@@ -127,7 +128,7 @@ ${staging_dir}/index.qmd : $(source_dir)/index.qmd $(qmds)
 	sed  's#^  contents: .*#  contents: [$(subst $(space),$(comma),$(patsubst $(staging_dir)/%,%,$(qmds)))]#' $< > $@
 
 R.bib: orgs=$(foreach align,$(alignments),$($(align).org.db))
-R.bib: renv.lock $(patsubst %,%.config,$(alignments)) | $(log_dir)
+R.bib: renv.lock $(patsubst %,%.config,$(alignments)) | $(log_dir) rocker.Renviron
 	for o in $(orgs); do grep -F -q $$o resources/_dependencies.R || echo "library($$o)" >> resources/_dependencies.R; done
 	$(R) -e 'library(renv); restore(); hydrate()' $(call log,bib)
 	$(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")' $(call log,bib,-a)
@@ -137,8 +138,8 @@ renv.lock: | rocker.Renviron  $(log_dir)
 	[ ! -f $@ ] || $(GIT_OK) stash push -m "Pipeline stashed. Use 'git stash pop' to retrieve it" -- $@ $(call log,renv)
 	$(R) -e 'library(renv); options(repos = BiocManager::repositories()); init(bioconductor=TRUE);' $(call log,renv,-a)
 	$(GIT_OK) add renv.lock $(template_scripts) $(call log,renv,-a)
-	$(GIT_OK) rev-parse "v0.0.1" >/dev/null 2>&1 || $(GIT) tag v0.0.1 $(call log,renv,-a)
 	$(GIT_OK) commit -m 'Initialised by pipeline\n\n' $(call log,renv,-a)
+	$(GIT_OK) rev-parse "v0.0.1" >/dev/null 2>&1 || $(GIT) tag v0.0.1 $(call log,renv,-a)
 
     else
 ##   being executed by container without slurm, so put what 'make' would normally execute in a temporary
@@ -146,9 +147,8 @@ renv.lock: | rocker.Renviron  $(log_dir)
 ##   arguments etc)
 run render pages $(html_reports) scripts $(qmds) ${staging_dir}/_quarto.yml ${staging_dir}/index.qmd  R.bib renv.lock: $(CONTAINER_IMAGE)
 	make -n -s $@ SUBMIT=false EXECUTOR=make > ${TMPSCRIPT}_bash 
-	$(CONTAINER) $(CONTAINER_FLAGS) $(CONTAINER_IMAGE) bash "${TMPSCRIPT}_bash" && r=$$? || echo "Failed - tidying up temporary bash script"
+	$(CONTAINER) $(CONTAINER_FLAGS) $(CONTAINER_IMAGE) bash "${TMPSCRIPT}_bash" || { echo "${TMPSCRIPT}_bash failed." $(call log,container) ; exit 1; }
 	rm -f ${TMPSCRIPT}_bash
-	exit $$r
     endif
 else
 ## being submitted. So generate a slurm script with the usual slurm
@@ -290,7 +290,11 @@ R-$(RVERSION): $(CONTAINER_IMAGE)
 rstudio: ## Open this environment in RStudio
 	. $(source_dir)/shell/rstudio-rocker.sh
 
-clean:
+clean: ## Remove the staging folder and the log directory - these should never contain anything of lasting interest that can't be recreated
+	rm -rf $(staging_dir) $(log_dir)
+maintainer-clean: clean ## Remove the results and data directories, in addition to staging and logs. The former contain end-results, so only do this if you really want to discard them (e.g. the analysis had a bug in it, and you want to do some housekeeping)
+	rm -rf $(RESULTS_DIR) data 
+
 clean-geo:  ## Remove the GEO files from scratch
 	rm -rf $(geo_dir)
 	rm geo

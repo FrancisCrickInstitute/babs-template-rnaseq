@@ -2,7 +2,7 @@ import { parse, stringify } from "https://deno.land/std/encoding/yaml.ts";
 import { parse as flag} from "https://deno.land/std/flags/mod.ts";
 
 const flags = flag(Deno.args, {string: [
-    "script", "fixed", "generated", "alignment", "spec"
+    "script", "fixed", "generated", "alignment", "spec", "author"
 ]});
 
 //// Gather the constituent parameters
@@ -54,7 +54,7 @@ delete perPage.params;
 perPage.title = ((fromScript.title || "") +  (perPage.title || "")).replace(/\s+/g, ' ').trim() ;
 perPage.description = ((fromScript.description || "" ) +   (perPage.description || "")).replace(/\s+/g, ' ').trim();
 perPage.categories = [...new Set((perPage.categories || []).concat((fromScript.categories || [])))];
-
+perPage.author.name = flags.author.split(" ").map(x => x[0].toUpperCase() + x.substr(1)).join(" ");
 var meta = {...fromScript, ...perPage};
 meta.params=params;
 
