@@ -311,9 +311,17 @@ are sub-tabs for different experimental designs, if any
 #| label: fig-differential-MA
 
 for (dataset in names(dds_model_comp)) {
-  cat("\n## ", dataset, "\n\n", sep="") 
+  met <- metadata(dds_model_comp[[dataset]][[1]][[1]])$dmc
+  cat("\n\n## ", met$dataset_name %||% met$dataset,"\n\n")
+  if (!is.null(met$dataset_description)) {
+    cat(met$dataset_description, "\n\n")
+  }
   for (mdl in names(dds_model_comp[[dataset]])) {
-    cat("\n### ", mdl, "\n\n", sep="") 
+    met <- metadata(dds_model_comp[[dataset]][[mdl]][[1]])$dmc
+    cat("\n### ", met$model_name %||% met$model, "\n\n", sep="") 
+    if (!is.null(met$model_description)) {
+      cat(met$model_description, "\n\n")
+    }
     this_mdl <- dds_model_comp[[dataset]][[mdl]]
     for (i in names(this_mdl)) {
       res <- as.data.frame(mcols(this_mdl[[i]])$results)
@@ -377,9 +385,17 @@ from the QC heatmaps which were blind to the experimental design.
 param$set("clustering_distance_rows")
 param$set("clustering_distance_columns")
 for (dataset in names(dds_model_comp)) {
-  cat("## ", dataset, '\n\n', sep="") 
+  met <- metadata(dds_model_comp[[dataset]][[1]][[1]])$dmc
+  cat("\n\n## ", met$dataset_name %||% met$dataset,"\n\n")
+  if (!is.null(met$dataset_description)) {
+    cat(met$dataset_description, "\n\n")
+  }
   for (mdl in names(dds_model_comp[[dataset]])) {
-    cat("### ", mdl, '\n\n', sep="")
+    met <- metadata(dds_model_comp[[dataset]][[mdl]][[1]])$dmc
+    cat("\n### ", met$model_name %||% met$model, "\n\n", sep="") 
+    if (!is.null(met$model_description)) {
+      cat(met$model_description, "\n\n")
+    }
     first_done <- FALSE
     this_mdl <- dds_model_comp[[dataset]][[mdl]]
     for (i in names(this_mdl)) {

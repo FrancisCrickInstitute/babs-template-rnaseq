@@ -184,55 +184,6 @@ to_letter <- function(i, so_far="") {
 }
 
 
-##' Produce Table 1 of sample metadata
-##'
-##' Make a GT object representing all the original metadata and, for
-##' each sample subset, the sample's presence and any extra columns introduced by a
-##' transform.
-##' 
-##' @title Table One
-##' @param dds The reference dds object
-##' @param ddsList The simple list of datasets derived from the reference object
-##' @return a GT object
-##' @author Gavin Kelly
-#' @export
-table1 <- function(dds, ddsList) {
-  samp <- as.data.frame(colData(dds))
-  # Extra columns introduced by datasets
-  extra_meta <- lapply(
-    names(ddsList),
-    function(x) merge(
-      setNames(data.frame(ifelse(colnames(dds) %in% colnames(ddsList[[x]]), "✓", ""), row.names=row.names(colData(dds))), x),
-      as.data.frame(colData(ddsList[[x]])[, setdiff(names(colData(ddsList[[x]])), names(colData(dds)))]),
-      by=0, all.x=TRUE
-      )[,-1,drop=FALSE]
-  )
-  
-  extra_meta <- extra_meta[sapply(extra_meta, function(x) ncol(x)!=0 & nrow(x)!=0)]
-  # Generate tab_spanner parameters for each datasets extra columns
-  ts_extra <- lapply(names(extra_meta),
-                    function(x) list(name=x,
-                              cols=1:ncol(extra_meta[[x]]))
-                    )
-  # Cummulatively offset the columns to be spanned
-  ts_extra <- Reduce(function(ts, x) {
-    x$cols <- x$cols+max(ts$cols)
-    x},
-    ts_extra,
-    accumulate=TRUE)
-  
-  df <- cbind(samp, do.call(cbind, unname(extra_meta)))
-  clabel <- setNames(as.list(names(df)), 1:ncol(df))
-  names(df) <- names(clabel)
-  return(df)
-  ## gt(data=df,
-  ##    caption="Sample annotation") %>%
-  ##   cols_label(.list=clabel) %>%
-  ##   tab_spanner(label="Metadata",
-  ##               columns=seq_along(samp)) %>%
-  ##   Reduce(f=function(gti, x) tab_spanner(gti, label=x$name,columns=x$cols + ncol(samp)), x=ts_extra, init=.) %>%
-  ##   tab_link_caption()
-}
 
 ##' Generate text files require for Biologic
 ##'

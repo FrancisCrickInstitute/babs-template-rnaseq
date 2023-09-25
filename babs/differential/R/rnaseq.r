@@ -95,7 +95,9 @@ build_dds_list <- function(dds, spec) {
     )
   }
   metadata(colData(dds))$palette <- default_palette
-  ddsList <- lapply(spec$sample_sets, function(set) {
+  ddsList <- list()
+  for (i_set in seq_along(spec$sample_sets)) {
+    set <- spec$sample_sets[[i_set]]
     mdlList <- spec$models
     if (is.list(set)) {
       ind <- set$subset
@@ -143,17 +145,20 @@ build_dds_list <- function(dds, spec) {
     if ("collapse" %in% names(set)) {
       mf <- model.frame(set$collapse, data.frame(colData(obj)))
       ind <- match(do.call(paste, c(mf, sep="\r")),
-                  do.call(paste, c(unique(mf), sep="\r")))
+                   do.call(paste, c(unique(mf), sep="\r")))
       obj <- collapseReplicates(obj, groupby=factor(ind), renameCols=FALSE)
     }
-    obj
-  })
+    ddsList[[names(spec$sample_sets)[i_set]]] <- obj
+  }
   ddsList <- imap(ddsList,
-                   function(obj, dname) {
-                     metadata(obj)$dmc <- list(dataset=dname)
-                     obj
-                   }
-                   )
+                  function(obj, dname) {
+                    metadata(obj)$dmc <- list(
+                      dataset=dname,
+                      dataset_name=spec$sample_sets[[dname]]$name,
+                      dataset_description=spec$sample_sets[[dname]]$description)
+                    obj
+                  }
+                  )
 }
 
 ##' Calculate dimension reduction 
@@ -216,7 +221,11 @@ fit_models <- function(dds, ...) {
   )
   model_comp <- model_comp[sapply(model_comp, length)!=0]
   model_comp <- imap(model_comp, function(obj, mname) {
-    lapply(obj, function(y) {metadata(y)$dmc$model <- mname; y})
+    lapply(obj, function(y) {
+      metadata(y)$dmc$model <- mname
+      metadata(y)$dmc$model_name <- metadata(y)$model$name
+      metadata(y)$dmc$model_description <- metadata(y)$model$description
+      y})
   })
   model_comp
 }

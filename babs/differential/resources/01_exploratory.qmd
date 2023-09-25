@@ -216,32 +216,69 @@ save(ddsList,
 
 ```
 
+
 We may examine the samples in different combinations, and leave out
 certain samples.  In the above table, the columns under the 'In
 Subset' group indicate these combinations are listed, and the
-samples' inclusions are indicated.  Each of those combinations may be analysed in
+samples' inclusions are indicated.
+
+Each of those combinations may be analysed in
 potentially several ways, as formulated here:
 
+# Models
 
 ```{r}
 #| label: formulae
 
 for (dataset in names(specs$sample_sets)) {
-  mdls <- lapply(specs$sample_sets[[dataset]]$models, function(x) x$design)
-  mdls <- mdls[sapply(specs$sample_sets[[dataset]]$model, function(x) "comparisons" %in% names(x))]
-  for (mdl in names(mdls)) {
-    cat("\n\n####", dataset, mdl, "{-}\n\n")
-    cat(
-      Reduce(paste, deparse(update(mdls[[mdl]], Expression ~ .)))
-    )
+  met <- metadata(ddsList[[dataset]])
+  cat("\n\n##", met$dmc$dataset_name %||% met$dmc$dataset,"\n\n")
+  if (!is.null(met$dmc$dataset_description)) {
+    cat(met$dmc$dataset_description, "\n\n")
   }
+  mdls <- lapply(met$models, function(x) x$design)
+  mdls <- mdls[sapply(met$models, function(x) "comparisons" %in% names(x))]
+  for (mdl in names(mdls)) {
+    cat("\n\n###", met$models[[mdl]]$name %||% mdl,  "\n\n")
+    if ("description" %in% names(met$models[[mdl]])) {
+      cat(met$models[[mdl]]$description, "\n\n")
+    }
+    cat("`",
+        Reduce(paste, deparse(update(mdls[[mdl]], Expression ~ .))),
+        "`\n"
+        )
+  }
+  in_this_dataset <- unique(unlist(lapply(metadata(ddsList[[dataset]])$models, function(x) all.vars(x$design))))
+  col_legends <- lapply(
+    in_this_dataset,
+    function(md_name) {
+      md <- metadata(colData(ddsList[[dataset]]))$palette$Heatmap[[md_name]]
+      if (is.function(md)) {
+        Legend(col_fun=md, title=md_name)@grob
+      } else{
+        Legend(legend_gp=gpar(fill=md),labels=names(md),
+               title=md_name, nrow=ifelse(length(md)>8, ceiling(sqrt(length(md))), length(md)))@grob
+      }
+    }
+  )
+  nice_legends <- col_legends[]
+    do.call(gridExtra::grid.arrange, c(nice_legends, ncol=ceiling(sqrt(length(nice_legends)))))
+  fig_caption(
+    paste("Metadata colour-codings for",
+          metadata(ddsList[[dataset]])$dmc$dataset_name %||% metadata(ddsList[[dataset]])$dmc$dataset
+          ))
 }
+
+
+
+
 
 ```
 
+# Settings
 
 We also have the following defaults set.  Whenever they are used
-or changed in the, analysis that will be highlighted in the text
+or changed in the analysis, that will be highlighted in the text
 alongside a 'wrench' icon:
 
 
@@ -340,8 +377,8 @@ param$set("pc_x", 1)
 param$set("pc_y", 2)
 
 for (dname_i in seq_along(ddsList)) {
-  dname <- names(ddsList)[dname_i]
-  this_dds <- ddsList[[dname]]
+  this_dds <- ddsList[[dname_i]]
+  dname <- metadata(this_dds)$dmc$dataset_name %||% names(ddsList)[dname_i]
   cat("\n# ", dname, "\n", sep = "")
   var_stab <- assay(this_dds, "vst")
   top <- order(apply(var_stab, 1, sd), decreasing = TRUE)[1:min(nrow(var_stab),param$get("top_n_variable"))]
@@ -361,7 +398,8 @@ for (dname_i in seq_along(ddsList)) {
     heatmap_legend_param = list(direction = "horizontal"), 
     top_annotation = ComplexHeatmap::HeatmapAnnotation(
       df = colDat[vars$fixed], 
-      col = metadata(colData(this_dds))$palette$Heatmap[vars$fixed]), 
+      col = metadata(colData(this_dds))$palette$Heatmap[vars$fixed],
+      show_legend=FALSE), 
     show_row_names = FALSE, show_column_names = TRUE)
   do_plot(pl,
           label= fig_label("01-Heatmap"),
@@ -393,8 +431,10 @@ for (dname_i in seq_along(ddsList)) {
     name = "Poisson Distance", clustering_distance_rows = function(x) {poisd$dd},
     clustering_distance_columns = function(x) { poisd$dd},
     heatmap_legend_param = list(direction = "horizontal"), 
-    top_annotation = ComplexHeatmap::HeatmapAnnotation(df = colDat[vars$fixed], 
-                                                       col = metadata(colData(this_dds))$palette$Heatmap[vars$fixed]))
+    top_annotation = ComplexHeatmap::HeatmapAnnotation(
+      df = colDat[vars$fixed], 
+      col = metadata(colData(this_dds))$palette$Heatmap[vars$fixed],
+      show_legend=FALSE))
   do_plot(pl,
           label= fig_label("01-sampDist"),
           caption=paste("Heatmap of sample distances,", dname))
