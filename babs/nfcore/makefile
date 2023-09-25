@@ -42,7 +42,7 @@ $(alignments) : results/%/star_rsem/rsem.merged.gene_counts.tsv : samplesheet_%.
 	fi
 	$(NEXTFLOW) clean -f
 
-$(workdir)
+$(workdir):
 	mkdir -p $(workdir)
 
 
