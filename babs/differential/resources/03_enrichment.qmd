@@ -98,6 +98,10 @@ param$set("alignment", params$alignment, "Using alignment settings '{}'")
 data(list=paste0(params$spec, "_x_", params$alignment))
 dds_model_comp <-  decompress_dmc(dds_model_comp)
 
+if  (metadata(dds)$symbol_source== "row.names") {
+  cat('\n\n::: {.callout-warning title="No annotation"}\nSkipping enrichment analysis as we could not find an R package with the required organism transcript mappings.\n:::\n\n')
+  knitr::knit_exit()
+}
 
 
 if (!"functional_approaches" %in% names(specs)) {

@@ -106,31 +106,38 @@ metadata(dds)$organism <- organism
 metadata(dds)$count_source <- params$count_source
 metadata(mcols(dds))$init <- onames
 
-library(organism$org, character.only=TRUE)
-
-mcols(dds)$entrez <- mapIds(
-  eval(parse(text = organism$org)),
-  keys=row.names(dds),
-  column="ENTREZID",
-  keytype="ENSEMBL",
-  multiVals="first")[row.names(dds)]
-
-o <- eval(parse(text = organism$org))
-my_column <- if ("SYMBOL" %in% columns(o)) "SYMBOL" else columns(o)[1]
-mcols(dds)$symbol <- mapIds(
-  o,
-  keys=row.names(dds),
-  column=my_column,
-  keytype="ENSEMBL",
-  multiVals="first")[row.names(dds)]
-
-mcols(dds)$entrez <- mapIds(
-  o,
-  keys=row.names(dds),
-  column="ENTREZID",
-  keytype="ENSEMBL",
-  multiVals="first")[row.names(dds)]
-
+if (is.null(organism$org) || system.file(package=organism$org)=="") {
+  mcols(dds)$entrez <- row.names(dds)
+  mcols(dds)$symbol <- row.names(dds)
+  metadata(dds)$symbol_source <- "row.names"
+} else {
+  
+  library(organism$org, character.only=TRUE)
+  
+  mcols(dds)$entrez <- mapIds(
+    eval(parse(text = organism$org)),
+    keys=row.names(dds),
+    column="ENTREZID",
+    keytype="ENSEMBL",
+    multiVals="first")[row.names(dds)]
+  
+  o <- eval(parse(text = organism$org))
+  my_column <- if ("SYMBOL" %in% columns(o)) "SYMBOL" else columns(o)[1]
+  metadata(dds)$symbol_source <- my_column
+  mcols(dds)$symbol <- mapIds(
+    o,
+    keys=row.names(dds),
+    column=my_column,
+    keytype="ENSEMBL",
+    multiVals="first")[row.names(dds)]
+  
+  mcols(dds)$entrez <- mapIds(
+    o,
+    keys=row.names(dds),
+    column="ENTREZID",
+    keytype="ENSEMBL",
+    multiVals="first")[row.names(dds)]
+}
 
 trim_names <- function(names) {
   chars <- strsplit(names, "")
