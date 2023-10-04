@@ -213,9 +213,18 @@ summaries <- dds_model_comp %>%
     levels(x$Group) <- sub(".*<(.+<.+<0)$", "\\1", levels(x$Group))
     levels(x$Group) <- sub("^(0<.+?<.+?)<.*$", "\\1", levels(x$Group))
     levels(x$Group) <- sub("(.*?<)(.*0.*)(<.*)", "\\10\\3", levels(x$Group))
-    droplevels(subset(x, Group!="Zero Count" & Group!="Low Count"))
+    x
   }
   )
+
+unclassed <- lapply(summaries, 
+                    function(s) {
+                      s %>%
+                        subset(Group %in% c('Zero Count', 'Low Count', 'Outlier')) %>%
+                        group_by(Model, Group) %>% summarise(N=paste(unique(Total), collapse=";")) %>%
+                        ungroup() %>%
+                        pivot_wider(id_cols=Model, names_from=Group, values_from=N)
+                      })
 
 pval_frame <- dds_model_comp %>%
   map_dmc(~as.data.frame(mcols(.x)$results)) %>%
@@ -243,15 +252,34 @@ for (dataset in names(summaries)) {
       paste0("#| label: tbl-summary-",dataset),
       paste0("#| tbl-cap: ",dataset),
       "summaries[[dataset]] %>%",
+      "subset(!Group %in% c('Zero Count', 'Low Count', 'Outlier')) %>% ",
       "gt(groupname_col=\"Model\") %>%",
+      "tab_style(",
+      "  style = cell_fill(color = '#bee2e9'),",
+      "  locations = cells_row_groups()",
+      ") %>% ",
       "tab_header(title=\"Genelist summary\", subtitle=dataset)",
       "```",
       "",
       ""
     ), envir = environment(), quiet = TRUE)
-  cat(res, sep = '\n')
-}
+  cat(res, sep = '\n\n')
 
+  res <- knitr::knit_child(
+    text = c(
+      "```{r}",
+      "#| echo: false",
+      paste0("#| label: tbl-summaryfit-",dataset),
+      paste0("#| tbl-cap: ",dataset, " model-fit stats"),
+      "unclassed[[dataset]] %>%",
+      "gt() %>%",
+      "tab_header(title=\"Model-fit summary\", subtitle=dataset)",
+      "```",
+      "",
+      ""
+    ), envir = environment(), quiet = TRUE)
+  cat(res, sep = '\n\n')
+}
 
 ```
 
