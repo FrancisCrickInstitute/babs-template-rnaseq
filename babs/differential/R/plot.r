@@ -90,6 +90,11 @@ do_plot <- function(pl, label, caption, cap_fn=fig_caption, height_mult=NA, min_
       draw(pl, heatmap_legend_side = "top")
       cap_fn(caption)
     }
+  } else if ("gtable" %in% class(pl)){
+    fn <- function() {
+      grid.draw(pl)
+      cap_fn(caption)
+    }
   } else {
     fn <- function() {
       print(pl)
@@ -145,3 +150,18 @@ residual_heatmap_transform <- function(mat, cdata, fml) {
 }
 
 
+separate_legend <- function(dds) {
+  in_this_dataset <- unique(unlist(lapply(metadata(dds)$models, function(x) all.vars(x$design))))
+  lapply(
+    in_this_dataset,
+    function(md_name) {
+      md <- metadata(colData(dds))$palette$Heatmap[[md_name]]
+      if (is.function(md)) {
+        Legend(col_fun=md, title=md_name)@grob
+      } else{
+        Legend(legend_gp=gpar(fill=md),labels=names(md),
+               title=md_name, nrow=ifelse(length(md)>8, ceiling(sqrt(length(md))), length(md)))@grob
+      }
+    }
+  )
+}

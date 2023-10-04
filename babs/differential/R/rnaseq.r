@@ -80,9 +80,8 @@ recode_within <- function(inner, ...) {
 ##' @author Gavin Kelly
 ##' @export
 build_dds_list <- function(dds, spec) {
-  flat <- unlist(spec$sample_sets)
-  flat <- flat[sapply(flat, is_formula)]
-  modelled_terms <-  unlist(lapply(flat, all.vars))
+  modelled_terms <- lapply(spec$sample_sets, function(x) lapply(x$models, function(y) if (is_formula(y$design)) all.vars(y$design)))
+  modelled_terms <-  unique(unlist(modelled_terms))
   if (!"palette" %in% names(spec$settings)) {
     spec$settings$palette="Set1"
   }
@@ -218,10 +217,14 @@ add_dim_reduct  <-  function(dds, n=Inf, family="norm", batch=~1) {
 ##' @return
 ##' @author Gavin Kelly
 ##' @export
-fit_models <- function(dds, ...) {
+fit_models <- function(dds, param, ...) {
   model_comp <- lapply(
     metadata(dds)$models,
-    function(mdl) fit_model(mdl, dds, ...)
+    function(mdl) {
+      mdl$baseline_heuristic <- mdl$baseline_heuristic %||% param$get("baseline_heuristic")
+      mdl$LRT_effect <- mdl$LRT_effect %||% param$get("LRT_effect")
+      fit_model(mdl, dds, ...)
+    }
   )
   model_comp <- model_comp[sapply(model_comp, length)!=0]
   model_comp <- imap(model_comp, function(obj, mname) {
@@ -234,7 +237,7 @@ fit_models <- function(dds, ...) {
   model_comp
 }
 
-fit_model <- function(mdl, dds, ...) {
+old_fit_model <- function(mdl, dds, ...) {
   this_dds <- dds
   design(this_dds) <- mdl$design
   metadata(this_dds)$model <- mdl
@@ -245,6 +248,7 @@ fit_model <- function(mdl, dds, ...) {
     comps <- mdl$comparisons[!is_lrt]
     is_post_hoc <- sapply(comps, class)=="post_hoc"
     if (any(is_post_hoc)) {
+      do_lrt <- sapply(comps[is_post_hoc], function(ph) ph$LRT %||% FALSE)
       comps[is_post_hoc] <- lapply(
         comps[is_post_hoc],
         function(ph) {emcontrasts(dds=this_dds, spec=ph$spec, extra=ph[-1])}
@@ -271,6 +275,101 @@ fit_model <- function(mdl, dds, ...) {
   out <- imap(out, function(obj, cname) {metadata(obj)$dmc$comparison <- cname; obj})
   out
 }
+
+
+fit_model <- function(mdl, dds, ...) {
+  message("Processing model ", mdl$name)
+  model_dds <- dds
+  design(model_dds) <- mdl$design
+  metadata(model_dds)$model <- mdl
+  model_dds <- check_model(model_dds)
+  if (any(metadata(model_dds)$model$dropped)) {
+    design(model_dds) <- metadata(model_dds)$model$mat
+  }
+  done_wald <- FALSE# mightn't need to run Wald if everything is an LRT
+  ## Generate a nested list - single comparisons will be singletons, expanded mult_comps may not be.
+  comp_ind <- 1
+  out <- lapply(mdl$comparisons, function(comp) {
+    message("Processing comparison ", comp_ind)
+    comp_ind <<- comp_ind+1
+    comparison_dds <- model_dds
+    if (is_formula(comp)) { # Do the usual DESeq2 LRT
+      return(list(fitLRT(comparison_dds, mdl=mdl, reduced=comp, ...)))
+    }
+    if (class(comp)=="post_hoc") { #Multiple-comparisons
+      contrs <- emcontrasts(dds=comparison_dds, spec=comp$spec, extra=comp[-1])
+      if (comp$LRT %||% FALSE) { # Do LRT-equivalents of the multiple ward tests
+        mdl_mat <- metadata(comparison_dds)$model$mat %||% model.matrix(mdl$design, as.data.frame(colData(comparison_dds)))
+        return(lapply(
+          contrs,
+          function(contr) {fitContrastLRT(comparison_dds, mdl=mdl_mat, contr=contr, ...)}
+        )
+        )
+      } else {
+        if (!done_wald) {
+          model_dds <- DESeq2::DESeq(model_dds, test="Wald", ...)
+          comparison_dds <- model_dds
+          done_wald <- TRUE
+        }
+        return(lapply(
+          contrs,
+          function(contr) {
+            contr_dds <- model_dds
+            metadata(comparison_dds)$models <- NULL
+            metadata(comparison_dds)$comparisons <- NULL
+            metadata(comparison_dds)$comparison <- contr
+            comparison_dds}
+        ))
+      }
+    }
+    # Usual DESeq2 Wald
+    if (!done_wald) {
+          model_dds <- DESeq2::DESeq(model_dds, test="Wald", ...)
+          comparison_dds <- model_dds
+      done_wald <- TRUE
+    }
+    metadata(comparison_dds)$models <- NULL
+    metadata(comparison_dds)$comparisons <- NULL
+    metadata(comparison_dds)$comparison <- comp
+    return(list(comparison_dds))
+  })
+  ## Flatten the list, but preserve the original comparison name in the dmc metadata.
+  out <- unlist(out, recursive=FALSE)
+  out <- imap(out, function(obj, cname) {
+    metadata(obj)$dmc$comparison <- cname; obj
+  })
+  return(out)
+}
+
+wald2lrt <- function(contr, mdl_mat) {
+  ## Get the column vectors that span the subsspace of the space spanned
+  ## by mdl_mat that also make the contrast evaluate to zero
+  in_contr <- contr!=0
+  if (sum(in_contr)==1) {
+    ret <- mdl_mat[, !in_contr, drop=FALSE]
+  } else {
+    contr_mat <- diag(sum(in_contr))
+    contr_mat[,1] <- contr[in_contr]
+    mult_mat <- gram_schmidt(contr_mat)
+    ret <- mdl_mat
+    ret[,in_contr] <- ret[,in_contr] %*% mult_mat
+    ret <- ret[, -which(in_contr)[1], drop=FALSE]
+  }
+  return(ret)
+}
+
+gram_schmidt <- function(a) {
+  sf <- sqrt(sum(a[,1]^2))
+  e <- diag(1.0, ncol(a))
+  for (i in 1:ncol(a)) {
+    u <- a[,i]
+    for (j in seq_len(i-1)) {
+      u <- u - sum(a[,i]*e[,j]) * e[,j]
+    }
+    e[,i] <- u/sqrt(sum(u*u))
+  }
+  return(e * sf)
+  }
 
 ##' Check model
 ##'
@@ -341,6 +440,13 @@ emcontrasts <- function(dds, spec, extra=NULL) {
   } else {
     keep <- NA
   }
+  if ("LRT" %in% names(extra)) {
+    LRT <- extra$keep
+    extra$LRT <- NULL
+  } else {
+    LRT <- FALSE
+  }
+  
   mdl <- metadata(dds)$model
   emfit <- do.call(emmeans::emmeans, c(list(object=mdl$lm, specs= spec),extra))
   contr_frame <- as.data.frame(summary(emfit$contrasts))
@@ -349,6 +455,7 @@ emcontrasts <- function(dds, spec, extra=NULL) {
     ind_est  <- ind_est & contr_frame$contrast %in% keep
   }
   contr_frame <- contr_frame[ind_est,1:(which(names(contr_frame)=="estimate")-1), drop=FALSE]
+  contr_frame$contrast <- sub("|", "†", contr_frame$contrast, fixed=TRUE)
   contr_mat <- emfit$contrast@linfct[ind_est, !mdl$dropped, drop=FALSE]
   colnames(contr_mat) <- .resNames(colnames(contr_mat))
   contr <- lapply(seq_len(nrow(contr_frame)), function(i) contr_mat[i,,drop=TRUE])
@@ -387,6 +494,23 @@ fitLRT <- function(dds, mdl, reduced, ...) {
     colnames(attr(dds, "modelMatrix")),
     colnames(attr(dds, "reducedModelMatrix"))
   )
+  metadata(dds)$models <- NULL
+  metadata(dds)$comparisons <- NULL
+  dds
+}
+
+
+fitContrastLRT <- function(dds, mdl_mat, contr, ...) {
+  reduced <- wald2lrt(contr, mdl_mat)
+  metadata(dds)$comparison <- contr
+  metadata(dds)$reduced_mat <- reduced
+  design(dds) <- mdl_mat
+  dds <- DESeq2::DESeq(dds, test="LRT", full=mdl_mat, reduced=reduced, ...)
+  metadata(dds)$LRTterms <- rev(make.unique(c(
+    colnames(attr(dds, "modelMatrix")),
+    "unused")[1] # get a distinct term, to prevent any ordering
+    ))
+## TODO - make this mimic the fold-change calculated by wald.
   metadata(dds)$models <- NULL
   metadata(dds)$comparisons <- NULL
   dds
@@ -451,7 +575,7 @@ get_result <- function(dds, mcols=c("symbol", "entrez"), filterFun=IHW::ihw, lfc
     r$class[is.na(r$padj) | is.na(r$pvalue) | r$baseMean==0] <- NA
     term <-  metadata(dds)$LRTterms
     # take the biggest fold-change vs baseline, for MA and reporting?
-    if (all(term %in% names(mcols(dds)))) {
+    if (all(term %in% names(mcols(dds))) && metadata(dds)$model$LRT_effect!="none") {
       effect_matrix <- cbind(I=rep(0, nrow(dds)),as.matrix(mcols(dds)[,term,drop=FALSE]))
       split_effects <- strsplit(term, "_vs_")
       # if a main effect is dropped, then all the terms are probably named A vs (intercept)
@@ -476,7 +600,7 @@ get_result <- function(dds, mcols=c("symbol", "entrez"), filterFun=IHW::ihw, lfc
         (as.matrix(mcols(dds)[,paste0("SE_", c("Intercept", term))])[cbind(1:length(imin), imin)])^2
       )
       fit <- ashr::ash(r$maxLog2FoldChange, maxlfcSE, mixcompdist = "normal", 
-                      method = "shrink")
+                       method = "shrink")
       r$shrunkLFC <- fit$result$PosteriorMean
       r$shrunkSE <- fit$result$PosteriorSD
       r$class <- paste(colnames(effect_matrix)[imax], "V", colnames(effect_matrix)[imin])
@@ -664,6 +788,9 @@ default_spec_settings <- function() {
 	seed           = 1,       ## random seed gets set at start of script, just in case.
 	filterFun      = IHW::ihw,                 ## NULL for standard DESeq2 results, otherwise  functions
 	clustering_distance_rows    = "euclidean", ## for all feature-distances
-	clustering_distance_columns = "euclidean"  ## for sample-distances
+	clustering_distance_columns = "euclidean",  ## for sample-distances
+	baseline_heuristic = "min",  ## For the "white" colour in differential heatmaps
+	LRT_effect = "default"  ## For the "white" colour in differential heatmaps
    )
 }
+

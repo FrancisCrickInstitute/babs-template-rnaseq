@@ -124,12 +124,17 @@ to ensure reported fold-changes are more robust.
 param$set("alpha")
 param$set("lfcThreshold")
 param$set("filterFun")
+param$set("baseline_heuristic")
+param$set("LRT_effect")
 
 ## For each dataset, fit all its models
 dds_model_comp <- lapply(
   ddsList,
-  function(x) fit_models(x,
-                  minReplicatesForReplace = Inf)
+  function(dds) fit_models(
+    dds=dds,
+    param=param,
+    minReplicatesForReplace = Inf
+  )
 )
 
 
@@ -336,9 +341,9 @@ for (dataset in names(dds_model_comp)) {
       cat(met$model_description, "\n\n")
     }
     this_mdl <- dds_model_comp[[dataset]][[mdl]]
-    for (i in names(this_mdl)) {
-      res <- as.data.frame(mcols(this_mdl[[i]])$results)
-      md <- metadata(this_mdl[[i]])
+    for (comp_name in names(this_mdl)) {
+      res <- as.data.frame(mcols(this_mdl[[comp_name]])$results)
+      md <- metadata(this_mdl[[comp_name]])
       pal <- RColorBrewer::brewer.pal(12, "Set3")
       if (is_formula(md$comparison)) {
         res$class <- ifelse(grepl("\\*", res$class),res$class, "None")
@@ -375,7 +380,7 @@ for (dataset in names(dds_model_comp)) {
       pl <- pl+ggrepel::geom_text_repel(size=4, data=res[ind,])
       do_plot(pl,
               label=fig_label("02-MA"),
-              caption=paste0("MA plot of differential genes ", sub(".*\\t", "", i))
+              caption=paste0("MA plot of differential genes ", sub(".*\\t", "", comp_name))
               )
       cat("\n\n---\n\n")
     } # next comparison
@@ -403,32 +408,51 @@ for (dataset in names(dds_model_comp)) {
   if (!is.null(met$dataset_description)) {
     cat(met$dataset_description, "\n\n")
   }
-  for (mdl in names(dds_model_comp[[dataset]])) {
-    met <- metadata(dds_model_comp[[dataset]][[mdl]][[1]])$dmc
+  nice_legends <- separate_legend(ddsList[[dataset]])
+  pl <- do.call(gridExtra::grid.arrange, c(nice_legends, ncol=ceiling(sqrt(length(nice_legends)))))
+  do_plot(pl,
+          label= fig_label("02-legend-a"),
+          caption=paste("Metadata colour-codings for",
+                        metadata(ddsList[[dataset]])$dmc$dataset_name %||% metadata(ddsList[[dataset]])$dmc$dataset
+                        ))
+  for (mdl_name in names(dds_model_comp[[dataset]])) {
+    this_mdl <- dds_model_comp[[dataset]][[mdl_name]]
+    met <- metadata(this_mdl[[1]])$dmc
     cat("\n### ", met$model_name %||% met$model, "\n\n", sep="") 
     if (!is.null(met$model_description)) {
       cat(met$model_description, "\n\n")
     }
     first_done <- FALSE
-    this_mdl <- dds_model_comp[[dataset]][[mdl]]
-    for (i in names(this_mdl)) {
-      if (!any(grepl("\\*$", mcols(this_mdl[[i]])$results$class))) {
+    for (comp_name in names(this_mdl)) {
+      this_comp <- this_mdl[[comp_name]]
+      if (!any(grepl("\\*$", mcols(this_comp)$results$class))) {
         next
       }
-      comp <- metadata(this_mdl[[i]])$comparison
-      fml <- metadata(this_mdl[[i]])$model$design
-      mdl <- metadata(this_mdl[[i]])$model
+      comp <- metadata(this_comp)$comparison
+      fml <- metadata(this_comp)$model$design
+      mdl <- metadata(this_comp)$model
       if ("mat" %in% names(mdl)) {
         mmat <- mdl$mat
       } else {
-        mmat <- model.matrix(mdl$design, colData(this_mdl[[i]]))
+        mmat <- model.matrix(mdl$design, colData(this_comp))
       }
       if ("spec" %in% names(attributes(comp))) {
         var_roles <- emmeans:::.parse.by.formula(attr(comp, "spec"))
         var_roles$all <- c(var_roles$by, var_roles$rhs, setdiff(all.vars(fml), unlist(var_roles)))
-        most_decreasing <- which.min(metadata(this_mdl[[i]])$comparison %*% MASS::ginv(mmat))
-        weights <- apply(mmat, 1, function(x) all(x==mmat[most_decreasing,]))
-        weights <- weights/sum(weights)
+        most_decreasing <- which.min(metadata(this_comp)$comparison %*% MASS::ginv(mmat))
+        if (mdl$baseline_heuristic=="min") {
+          weights <- apply(mmat, 1, function(x) all(x==mmat[most_decreasing,]))
+          weights <- weights/sum(weights)
+        } else if (mdl$baseline_heuristic=="negative") {
+          weights <- metadata(this_comp)$comparison %*% MASS::ginv(mmat)
+          minw <- min(weights)
+          w_ind <- weights < -sqrt(.Machine$double.eps)
+          weights[!w_ind] <- 0
+          weights[w_ind] <- 1
+          weights <- t(weights)/sum(weights)
+        } else {
+          weights <- rep(1/nrow(mmat), times=nrow(mmat))
+            }
       } else if (is_formula(comp)) {
         most_decreasing <- which.max(MASS::ginv(mmat)[1,])
         weights <- apply(mmat, 1, function(x) all(x==mmat[most_decreasing,]))
@@ -436,18 +460,23 @@ for (dataset in names(dds_model_comp)) {
         var_roles <- list(lhs="", rhs=all.vars(fml), by=NULL, all=all.vars(fml))
       } else {
         var_roles <- list(lhs="", rhs=all.vars(fml), by=NULL, all=all.vars(fml))
-        most_decreasing <- which.min(retrieve_contrast(this_mdl[[i]]) %*% MASS::ginv(mmat))
+        most_decreasing <- which.min(retrieve_contrast(this_comp) %*% MASS::ginv(mmat))
         weights <- apply(mmat, 1, function(x) all(x==mmat[most_decreasing,]))
         weights <- weights/sum(weights)
       }
-      baseline_list <- as.data.frame(colData(this_mdl[[i]])[most_decreasing, var_roles$all])
-      baseline_str <- paste(names(baseline_list), unlist(baseline_list), sep="=", collapse=",")
-      tidied_data <- tidy_significant_dds(this_mdl[[i]], mcols(this_mdl[[i]])$results, var_roles, weights=weights)
+      baseline_list <- as.data.frame(colData(this_comp)[most_decreasing, var_roles$all])
+      baseline_str <- switch(
+        mdl$baseline_heuristic,
+        min=paste(names(baseline_list), unlist(baseline_list), sep="=", collapse=","),
+        negative="baseline condition",
+        "gene-average"
+      )
+      tidied_data <- tidy_significant_dds(this_comp, mcols(this_comp)$results, var_roles, weights=weights)
       pdat <- tidied_data$pdat
       pdat[sapply(pdat, is.character)] <- lapply(pdat[sapply(pdat, is.character)], 
                                                 as.factor)
       colnames(tidied_data$mat) <- rownames(pdat)
-      name <- sub(".*\\t", "", i)
+      name <- sub(".*\\t", "", comp_name)
       if (length(var_roles$by)==0) {
         col_split <- NULL
       } else {
@@ -456,12 +485,13 @@ for (dataset in names(dds_model_comp)) {
       
       ha <- ComplexHeatmap::HeatmapAnnotation(
         df=pdat,
-        col=metadata(colData(this_mdl[[i]]))$palette$Heatmap[names(pdat)])
+        col=metadata(colData(this_comp))$palette$Heatmap[names(pdat)],
+        show_legend=FALSE)
       pl <- ComplexHeatmap::Heatmap(
         tidied_data$mat,
         col=sym_colour(tidied_data$mat),
         heatmap_legend_param = list(direction = "horizontal" ),
-        name=sub(".*\\t", "", i),
+        name=sub(".*\\t", "", comp_name),
         cluster_columns = FALSE,
         show_column_names = TRUE,
         clustering_distance_rows=param$get("clustering_distance_rows"),
@@ -484,7 +514,7 @@ for (dataset in names(dds_model_comp)) {
             tdat,
             col=sym_colour(tdat),
             heatmap_legend_param = list(direction = "horizontal" ),
-            name=paste(sub(".*\\t", "", i),term_name),
+            name=paste(sub(".*\\t", "", comp_name),term_name),
             cluster_columns = FALSE,
             show_column_names = TRUE,
             column_split = col_split,

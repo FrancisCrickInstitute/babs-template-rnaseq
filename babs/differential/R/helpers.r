@@ -12,7 +12,9 @@ ParamList <- R6::R6Class("ParamList",
                                             showCategory= "Only show top {} enriched categories in plots",
                                             seed="A random seed of {} is used to ensure reproduciblity",
                                             filterFun="{if (is.null(filterFun)) 'Default' else deparse(filterFun)} independent filtering",
-                                            baseMeanMin="Discard transcripts with few average counts per sample than {}"
+                                            baseMeanMin="Discard transcripts with few average counts per sample than {}",
+                                            baseline_heuristic="Use the '{}' heuristic to centre the colour-scale",
+                                            LRT_effect="Use the '{}' summary of an LRT 'effect size'"
                                             ),
                           defaults=list()
                         ),
@@ -382,7 +384,7 @@ dmc2df <- function(dmc) {
   list2DF(
     list(dataset=sapply(dds, function(x) metadata(x)$dmc$dataset),
     model=sapply(dds, function(x) metadata(x)$dmc$model),
-    comparison=sapply(dds, function(x) metadata(x)$dmc$comparison),
+    comparison=make.unique(sapply(dds, function(x) metadata(x)$dmc$comparison)),
     dds=dds
     )
   )

@@ -103,17 +103,9 @@ param$set("title", "Exploratory analysis")
 param$set("script", file.path(getwd(),"01_analyse.r"))
 param$set("spec",  params$spec, "Using analysis plan '{}'.")
 param$set("alignment", params$alignment, "Using alignment settings '{}'")
+param$set("baseline_heuristic")
+param$set("LRT_effect")
 
-trim_names <- function(names) {
-  chars <- strsplit(names, "")
-  non_redundant_char <- sapply(purrr::list_transpose(chars, simplify=TRUE), function(x) length(unique(x))!=1)
-  sapply(chars,
-         function(ch) {
-           ind <- c(non_redundant_char, rep(TRUE, length(ch)-length(non_redundant_char)))
-           paste(ch[ind], collapse="")
-           })
-}
-colnames(dds) <- trim_names(colnames(dds))
 
 
 ddsList <- build_dds_list(dds, specs)
@@ -163,6 +155,7 @@ The sample annotations are as follows:
 ```{r}
 #| label: tbl-inputs
 #| tbl-cap: Sample Annotation
+#| column: page
 
 table1 <- function(dds, ddsList) {
   samp <- as.data.frame(colData(dds))
@@ -230,7 +223,7 @@ potentially several ways, as formulated here:
 ```{r}
 #| label: formulae
 
-for (dataset in names(specs$sample_sets)) {
+for (dataset in names(ddsList)) {
   met <- metadata(ddsList[[dataset]])
   cat("\n\n##", met$dmc$dataset_name %||% met$dmc$dataset,"\n\n")
   if (!is.null(met$dmc$dataset_description)) {
@@ -245,28 +238,9 @@ for (dataset in names(specs$sample_sets)) {
     }
     cat("`",
         Reduce(paste, deparse(update(mdls[[mdl]], Expression ~ .))),
-        "`\n"
+        "`\n\n"
         )
   }
-  in_this_dataset <- unique(unlist(lapply(metadata(ddsList[[dataset]])$models, function(x) all.vars(x$design))))
-  col_legends <- lapply(
-    in_this_dataset,
-    function(md_name) {
-      md <- metadata(colData(ddsList[[dataset]]))$palette$Heatmap[[md_name]]
-      if (is.function(md)) {
-        Legend(col_fun=md, title=md_name)@grob
-      } else{
-        Legend(legend_gp=gpar(fill=md),labels=names(md),
-               title=md_name, nrow=ifelse(length(md)>8, ceiling(sqrt(length(md))), length(md)))@grob
-      }
-    }
-  )
-  nice_legends <- col_legends[]
-    do.call(gridExtra::grid.arrange, c(nice_legends, ncol=ceiling(sqrt(length(nice_legends)))))
-  fig_caption(
-    paste("Metadata colour-codings for",
-          metadata(ddsList[[dataset]])$dmc$dataset_name %||% metadata(ddsList[[dataset]])$dmc$dataset
-          ))
 }
 
 
@@ -383,7 +357,15 @@ for (dname_i in seq_along(ddsList)) {
   var_stab <- assay(this_dds, "vst")
   top <- order(apply(var_stab, 1, sd), decreasing = TRUE)[1:min(nrow(var_stab),param$get("top_n_variable"))]
   models_for_qc <- metadata(this_dds)$models[sapply(metadata(this_dds)$models, 
-                                               "[[", "plot_qc")]
+                                                    "[[", "plot_qc")]
+  nice_legends <- separate_legend(ddsList[[dname_i]])
+  pl <- do.call(gridExtra::arrangeGrob, c(nice_legends, ncol=ceiling(sqrt(length(nice_legends)))))
+  do_plot(pl,
+          label= fig_label(paste0("01-legend-a-", dname_i)),
+          caption=paste("Metadata colour-codings for",
+                        metadata(ddsList[[dname_i]])$dmc$dataset_name %||% metadata(ddsList[[dname_i]])$dmc$dataset
+                        ))
+
   cat("\n## Overall Heatmap of Variable Genes in ", dname, "\n\n", sep = "")
   plotDat <- var_stab[top, ]
   plotDat <- plotDat - rowMeans(plotDat)
