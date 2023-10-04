@@ -175,7 +175,7 @@ table1 <- function(dds, ddsList) {
         as.data.frame(colData(ddsList[[x]])[, setdiff(names(colData(ddsList[[x]])), names(colData(dds)))]),
         by=0, all.x=TRUE
       )
-      transform(m, row.names=Row.names, Row.names=NULL)[row.names(samp),]
+      transform(m, row.names=Row.names, Row.names=NULL)[row.names(samp),,drop=FALSE]
     }
   )
   
