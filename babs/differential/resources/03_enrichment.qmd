@@ -220,7 +220,7 @@ for (approach in names(approach_res_list)) {
     df <- approach_res_list[[approach]]$df[[grp]] %>%
       my_post_process() %>%
       tidyr::complete(inner, ID)
-    df$ID <- factor(df$ID, levels=df$ID[order_enrichments(df)])
+    df$ID <- factor(df$ID, levels=unique(df$ID[order_enrichments(df)]))
     capt <- paste(approach, groups[grp], sep=" - ")
     size <- NULL#fall-back if post-processing doesn't define a 'size'
     pl <- ggplot(df, aes(x=inner, y=Description, colour=effect, size=size)) +
