@@ -121,6 +121,10 @@ build_dds_list <- function(dds, spec) {
       colData(obj) <- S4Vectors::DataFrame(eval(tr))
       metadata(colData(obj)) <- metadata(colData(dds))
       colnames(obj) <- cnames
+      if (".include" %in% names(colData(obj))) {
+        obj <- obj[,colData(obj)[[".include"]]]
+        colData(obj) <- droplevels(colData(obj))
+      }
       new_cols <- intersect(modelled_terms, setdiff(names(colData(obj)), names(default_palette$Heatmap)))
       old_cols <- setdiff(modelled_terms, new_cols)
       if (length(old_cols)>0) {
