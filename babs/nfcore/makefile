@@ -19,7 +19,7 @@ $(alignments) : results/%/star_rsem/rsem.merged.gene_counts.tsv : samplesheet_%.
 	mkdir -p results/$*
 	export NXF_SINGULARITY_CACHEDIR="$(NXF_SINGULARITY_CACHEDIR)" ;\
 	export NXF_SINGULARITY_LIBRARYDIR="$(NXF_SINGULARITY_CACHEDIR)" ;\
-	export NXF_HOME=$$PWD ;\
+	export NXF_HOME=$(CURDIR) ;\
 	args=();\
 	if [ -n "$($*.index_dir)" ];\
 	  then if [ -d "$(refdir)" ];\
