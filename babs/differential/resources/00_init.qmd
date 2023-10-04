@@ -131,6 +131,19 @@ mcols(dds)$entrez <- mapIds(
   keytype="ENSEMBL",
   multiVals="first")[row.names(dds)]
 
+
+trim_names <- function(names) {
+  chars <- strsplit(names, "")
+  non_redundant_char <- sapply(purrr::list_transpose(chars, simplify=TRUE), function(x) length(unique(x))!=1)
+  sapply(chars,
+         function(ch) {
+           ind <- c(non_redundant_char, rep(TRUE, length(ch)-length(non_redundant_char)))
+           paste(ch[ind], collapse="")
+           })
+}
+colnames(dds) <- trim_names(colnames(dds))
+
+
 save(dds, file=file.path("data",paste0("counts_", params$alignment, ".rda")))
 saveRDS(dds, file=file.path("data",paste0("counts_", params$alignment, ".rds")))
 ```
