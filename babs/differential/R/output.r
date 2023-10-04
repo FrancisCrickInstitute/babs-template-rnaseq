@@ -324,3 +324,36 @@ tbl
     head(as.data.frame(tbl))
   }
 }
+
+
+compress_dmc <-function(dmc) {
+  lapply(dmc,
+         function(d) {
+           lapply(d,
+                  function(m) {
+                    list(dds=m[[1]],
+                         comps=lapply(m, function(comp) {
+                           res <- mcols(comp)$results
+                           metadata(res) <- metadata(comp)
+                           res
+                         })
+                         )
+                  })
+         })
+}
+
+
+decompress_dmc <- function(dmc) {
+  lapply(dmc,
+         function(d) {
+           lapply(d,
+                  function(m) {
+                    lapply(m$comps, function(comp) {
+                      dds <- m$dds
+                      mcols(dds)$results <- comp
+                      metadata(dds) <- metadata(comp)
+                      dds
+                    })
+                  })
+         })
+}

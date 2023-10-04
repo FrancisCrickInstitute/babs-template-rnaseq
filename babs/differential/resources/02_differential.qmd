@@ -146,26 +146,11 @@ dds_model_comp <- map_depth(
 
 
 dds_name <- paste0(basename(params$spec),"_x_", params$alignment)
-pre_save <- dds_model_comp
-dds_model_comp <- lapply(dds_model_comp,
-                  function(d) {
-                    lapply(d,
-                           function(m) {
-                             list(dds=m[[1]],
-                                  comps=lapply(m, function(comp) {
-                                    res <- mcols(comp)$results
-                                    metadata(res) <- metadata(comp)
-                                    res
-                                  })
-                                  )
-                           })
-                    })
-save(dds_model_comp,
-     file=file.path("data", paste0(dds_name, ".rda")),
-     eval.promises=FALSE
-     )
-saveRDS(dds_model_comp, file=file.path("data", paste0(dds_name, ".rds")))
-dds_model_comp <- pre_save
+local({
+  dds_model_comp <- compress_dmc(dds_model_comp)
+  save(dds_model_comp, file=file.path("data", paste0(dds_name, ".rda")))
+  saveRDS(dds_model_comp, file=file.path("data", paste0(dds_name, ".rds")))
+})
 
 xl_files <- write_results(dds_model_comp, param, dir=params$res_dir)
 iwalk(xl_files,
