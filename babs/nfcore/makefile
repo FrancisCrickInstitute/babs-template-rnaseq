@@ -55,6 +55,8 @@ configs = $(patsubst ../ingress/%.config,%.config,$(wildcard ../ingress/*.config
 samplesheets = $(patsubst %.config,samplesheet_%.csv,$(configs))
 
 build: $(samplesheets) ## Build all necessary inputs: samplesheets for each matching alignment '.config' from 'docs'.
+	$(GIT) add local.mk global.mk makefile $(samplesheets) $(configs)
+	$(GIT) commit -m "Add nfcore build-files" || true
 
 
 field=$(shell sed '/^$$/d; s/^$*./"/;s/=.*/" TEXT/' "$*.config" | paste -sd ',')

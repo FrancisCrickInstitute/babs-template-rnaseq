@@ -13,7 +13,6 @@ nfcore.log: ingress.log
 ingress.log: docs.log
 biologic.log: differential.log
 
-simulate: simulation.log
 
 %.log : 
 	$(MAKE) -C $* build > $*.err 2>&1
@@ -32,3 +31,9 @@ clean: $(cleaners)
 
 $(cleaners) : clean-% :
 	cd $* && $(MAKE) clean
+
+secrets: | .not-secret
+	cp $< $@
+	echo "Created a 'secrets' file - please customise it so that the pipeline will run on your system"
+	echo "You may also want to review 'global.mk' to ensure that nextflow and singularity are set up correctly for your system"
+	exit

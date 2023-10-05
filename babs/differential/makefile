@@ -127,19 +127,19 @@ $(staging_dir)/.params.yml:  project.mk
 ${staging_dir}/index.qmd : $(source_dir)/index.qmd $(qmds)
 	sed  's#^  contents: .*#  contents: [$(subst $(space),$(comma),$(patsubst $(staging_dir)/%,%,$(qmds)))]#' $< > $@
 
-R.bib: orgs=$(foreach align,$(alignments),$($(align).org.db))
 R.bib: renv.lock $(patsubst %,%.config,$(alignments)) | $(log_dir) rocker.Renviron
-	for o in $(orgs); do grep -F -q $$o resources/_dependencies.R || echo "library($$o)" >> resources/_dependencies.R; done
 	$(R) -e 'library(renv); restore(); hydrate()' $(call log,bib)
 	$(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")' $(call log,bib,-a)
 	$(call git-ignore,/$@)
 
+renv.lock: orgs=$(foreach align,$(alignments),$($(align).org.db))
 renv.lock: | rocker.Renviron  $(log_dir)
-	[ ! -f $@ ] || $(GIT_OK) stash push -m "Pipeline stashed. Use 'git stash pop' to retrieve it" -- $@ $(call log,renv)
+	[ ! -f $@ ] || $(GIT) stash push -m "Pipeline stashed. Use 'git stash pop' to retrieve it" -- $@ $(call log,renv)
+	for o in $(orgs); do grep -F -q $$o resources/_dependencies.R || echo "library($$o)" >> resources/_dependencies.R; done
 	$(R) -e 'library(renv); options(repos = BiocManager::repositories()); init(bioconductor=TRUE);' $(call log,renv,-a)
-	$(GIT_OK) add renv.lock $(template_scripts) $(call log,renv,-a)
-	$(GIT_OK) commit -m 'Initialised by pipeline\n\n' $(call log,renv,-a)
-	$(GIT_OK) rev-parse "v0.0.1" >/dev/null 2>&1 || $(GIT) tag v0.0.1 $(call log,renv,-a)
+	$(GIT) add renv.lock resources/_dependencies.R renv/activate.R .Rprofile $(call log,renv,-a)
+	$(GIT) commit -m 'Renv initialised by pipeline\n\n' $(call log,renv,-a)
+	$(GIT) rev-parse "v0.0.1" >/dev/null 2>&1 || $(GIT) tag v0.0.1 $(call log,renv,-a)
 
     else
 ##   being executed by container without slurm, so put what 'make' would normally execute in a temporary
@@ -220,22 +220,29 @@ endif
 ################################################################
 #### Bootrap all relevant data from outside
 ################################################################
-alignments_ext = $(patsubst $(nfcore_dir)/%,%,$(wildcard $(nfcore_dir)/*))
-specfiles_ext =  $(patsubst $(docs_dir)/%,%,$(wildcard $(docs_dir)/*.spec))
+alignments_build = $(patsubst $(nfcore_dir)/%,%,$(wildcard $(nfcore_dir)/*))
+specfiles_build =  $(patsubst $(docs_dir)/%,%,$(wildcard $(docs_dir)/*.spec))
+samplesheets_build = $(patsubst %,$(my_metadata)_%.csv,$(alignments_build))
+configs_build = $(patsubst %,%.config,$(alignments_build))
 
-samplesheets_ext = $(patsubst %,$(my_metadata)_%.csv,$(alignments_ext))
-genes_results = $(patsubst %,$(my_counts_dir)/%,$(alignments_ext))
-multiqc_results = $(patsubst %,$(RESULTS_DIR)/multiqc-%,$(alignments_ext))
+genes_results = $(patsubst %,$(my_counts_dir)/%,$(alignments_build))
+multiqc_results = $(patsubst %,$(RESULTS_DIR)/multiqc-%,$(alignments_build))
 samples_db = samples.db
 
-build: $(samplesheets_ext) $(specfiles_ext) $(genes_results)  $(multiqc_results) | $(source_dir) $(staging_dir) ##  Copy the required nfcore count files into the `extdata` area, and get the spec files.
+build: $(samplesheets_build) $(specfiles_build) $(configs_build) $(genes_results)  $(multiqc_results) | $(staging_dir) ##  Copy the required nfcore count files into the `extdata` area, and get the spec files.
+	$(GIT) add makefile secrets global.mk local.mk
+	$(GIT) commit -m "Add the differential makefiles" || true
+	$(GIT) add $(source_dir) R
+	$(GIT) commit -m "Add the template scripts and R functions" || true
+	$(GIT) add $(samplesheets_build) $(specfiles_build) $(configs_build)
+	$(GIT) commit -m "Add differential build-files" || true
 
 ifneq (,$(filter build,$(MAKECMDGOALS)))
 ## Only do build-like things if build actually called.
 ## Otherwise, metadata samplesheets will trigger an
 ## attempt to rebuild the external samples.db etc.
 
-$(samplesheets_ext) : $(my_metadata)_%.csv : $(samples_db) 
+$(samplesheets_build) : $(my_metadata)_%.csv : $(samples_db) 
 	$(SQLITE) -header -csv  $(samples_db) 'SELECT metadata.* FROM metadata INNER JOIN (SELECT * FROM "fastq_$*" GROUP BY $(samplesheet_id_column)) AS nfcore on metadata.$(metadata_id_column)=nfcore.$(samplesheet_id_column);' > $@
 
 $(samples_db): $(my_metadata).csv $(nfcore_dir)/../$(samples_db)
@@ -245,13 +252,13 @@ $(samples_db): $(my_metadata).csv $(nfcore_dir)/../$(samples_db)
 $(my_metadata).csv: $(docs_dir)/$(experiment_table).csv | $(dir $(my_metadata))
 	cp $< $@
 
-$(specfiles_ext): % : $(docs_dir)/%
+$(specfiles_build): % : $(docs_dir)/%
 	cp $< $@
 
-$(patsubst %,%.config,$(alignments_ext)): %.config: ../nfcore/%.config
+$(configs_build): %.config: ../nfcore/%.config
 	cp $< $@
 
--include $(patsubst %,%.config,$(filter-out $(alignments),$(alignments_ext)))
+-include $(patsubst %,%.config,$(filter-out $(alignments),$(alignments_build)))
 
 $(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/% %.config
 	dir=$(if $($*.group-as),$($*.group-as),$*);\
@@ -267,7 +274,7 @@ endif
 ################################################################
 
 
-$(log_dir) $(source_dir) $(staging_dir) $(dir $(my_metadata)) data $(RESULTS_DIR)/$(VERSION) $(RESULTS_DIR) $(staging_dir)/$(RESULTS_DIR)/$(VERSION):
+$(log_dir) $(staging_dir) $(dir $(my_metadata)) data $(RESULTS_DIR)/$(VERSION) $(RESULTS_DIR) $(staging_dir)/$(RESULTS_DIR)/$(VERSION):
 	mkdir -p $@
 
 rocker.Renviron: 
