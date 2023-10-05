@@ -26,6 +26,8 @@ run:  ## Empty target just to conform to general pattern
 # conditional upon existence or not of a pre-written one.
 
 build: $(specfiles) samplesheet.csv $(configs) $(experiment_table) ## Basic check that the contents of the docs folder conforms to requirements
+	$(GIT) add ../.pipeline-version ../.gitignore ../makefile ../global.mk ../readme.md
+	$(GIT) commit -m "Add top-level pipeline files" || true
 	[ -n "$(specfiles)" ] || echo "No *.spec files in the docs directory" | tee -a tmp.err
 	[ -n "$(configs)" ] || echo "No *.config files in the docs directory" | tee -a tmp.err
 	[ -n "$(experiment_table)" ] || echo "No experiment_table.csv in the docs directory" | tee -a tmp.err
