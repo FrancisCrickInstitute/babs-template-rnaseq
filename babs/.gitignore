@@ -1,3 +1,5 @@
 **/secrets
 biologic/
 ingress/
+fetch_ngs/
+.not-secret
