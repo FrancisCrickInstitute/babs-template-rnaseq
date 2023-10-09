@@ -341,35 +341,6 @@ fit_model <- function(mdl, dds, ...) {
   return(out)
 }
 
-wald2lrt <- function(contr, mdl_mat) {
-  ## Get the column vectors that span the subsspace of the space spanned
-  ## by mdl_mat that also make the contrast evaluate to zero
-  in_contr <- contr!=0
-  if (sum(in_contr)==1) {
-    ret <- mdl_mat[, !in_contr, drop=FALSE]
-  } else {
-    contr_mat <- diag(sum(in_contr))
-    contr_mat[,1] <- contr[in_contr]
-    mult_mat <- gram_schmidt(contr_mat)
-    ret <- mdl_mat
-    ret[,in_contr] <- ret[,in_contr] %*% mult_mat
-    ret <- ret[, -which(in_contr)[1], drop=FALSE]
-  }
-  return(ret)
-}
-
-gram_schmidt <- function(a) {
-  sf <- sqrt(sum(a[,1]^2))
-  e <- diag(1.0, ncol(a))
-  for (i in 1:ncol(a)) {
-    u <- a[,i]
-    for (j in seq_len(i-1)) {
-      u <- u - sum(a[,i]*e[,j]) * e[,j]
-    }
-    e[,i] <- u/sqrt(sum(u*u))
-  }
-  return(e * sf)
-  }
 
 ##' Check model
 ##'
@@ -501,20 +472,25 @@ fitLRT <- function(dds, mdl, reduced, ...) {
 
 
 fitContrastLRT <- function(dds, mdl_mat, contr, ...) {
-  reduced <- wald2lrt(contr, mdl_mat)
+  ind <- contr!=0
+  # Insert a new final column that is the contrast, and remove a column that is now linearly dependent
+  # (we chose the right-most column that is involved in the contrast)
+  new_column <- apply(mdl_mat[,ind,drop=FALSE], 1, function(x) sum(x*contr))
+  old_column_ind <- which(ind)[sum(ind)] # ie last column involved in the contrast
+  mdl_mat <- cbind(mdl_mat[,-old_column_ind, drop=FALSE], contrast_column=new_column)
+  # The reduced model space is spanned by the constraint that the contrast is zero
+  # ie the final column of the new parametrisation
+  reduced <- mdl_mat[,-ncol(mdl_mat),drop=FALSE]
   metadata(dds)$comparison <- contr
   metadata(dds)$reduced_mat <- reduced
   design(dds) <- mdl_mat
   dds <- DESeq2::DESeq(dds, test="LRT", full=mdl_mat, reduced=reduced, ...)
-  metadata(dds)$LRTterms <- rev(make.unique(c(
-    colnames(attr(dds, "modelMatrix")),
-    "unused")[1] # get a distinct term, to prevent any ordering
-    ))
-## TODO - make this mimic the fold-change calculated by wald.
+  metadata(dds)$LRTterms <- "contrast_column"
   metadata(dds)$models <- NULL
   metadata(dds)$comparisons <- NULL
   dds
 }
+
 
 ## apply contrast, and transfer across interesting mcols from the dds
 ##' Generate results object
