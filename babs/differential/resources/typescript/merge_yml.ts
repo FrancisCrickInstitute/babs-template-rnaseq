@@ -54,7 +54,8 @@ delete perPage.params;
 perPage.title = ((fromScript.title || "") +  (perPage.title || "")).replace(/\s+/g, ' ').trim() ;
 perPage.description = ((fromScript.description || "" ) +   (perPage.description || "")).replace(/\s+/g, ' ').trim();
 perPage.categories = [...new Set((perPage.categories || []).concat((fromScript.categories || [])))];
-perPage.author.name = flags.author.split(" ").map(x => x[0].toUpperCase() + x.substr(1)).join(" ");
+perPage.author=fromScript.author;
+perPage.author[0].name = flags.author;
 var meta = {...fromScript, ...perPage};
 meta.params=params;
 

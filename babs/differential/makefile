@@ -103,6 +103,7 @@ $(qmds) : $(staging_dir)/%$(TAG).qmd : $(staging_dir)/.params.yml $(source_dir)/
 	 --alignment=$(alignment)\
 	 --spec=$(spec)\
 	 --fixed=$(source_dir)/params.yml\
+	 --author="$(shell git config user.name)"\
 	 --generated=$(staging_dir)/.params.yml > $@
 	sed -i -e 's#load_params("$(source_dir)/$(section)", extra=TRUE)#load_params("$(staging_dir)/$*$(TAG)")#' $@
 
@@ -114,7 +115,6 @@ ${staging_dir}/_quarto.yml: $(source_dir)/_quarto.yml $(qmds)
 	 --template=$< \
 	 --tag=$(TAG)\
 	 --staging=$(staging_dir)\
-	 --author="$(subst .,$(space),$(.myname))"\
 	 --repo="$(repo)" > $@
 
 $(source_dir)/params.yml:
