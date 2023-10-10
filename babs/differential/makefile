@@ -210,6 +210,7 @@ endif
 endif
 	mkdir -p $(pubdir)/$(VERSION)
 	cp --no-preserve=mode -r $(RESULTS_DIR)/$(VERSION)/. $(pubdir)/$(VERSION)
+	cp --no-preserve=mode --recursive --dereference --no-clobber $(RESULTS_DIR)/multiqc-* $(pubdir)/
 	ln -sfn $(VERSION) $(pubdir)/latest
 	[ ! -f .htaccess ] || [ "$(location)" == "outputs" ] || cp --no-preserve=mode -r .htaccess $(pubdir)/
 	[ -f .htaccess ] || [ "$(location)" == "outputs" ] || echo "Warning: no .htaccess files, so unauthorised people may be able to view these results"
@@ -265,9 +266,10 @@ $(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/% %.config
 	mkdir -p $(my_counts_dir)/$${dir} ;\
 	ln -fn $(nfcore_dir)/$${dir}/star_rsem/*.genes.results $(my_counts_dir)/$${dir}/
 
+endif
+
 $(multiqc_results) : $(RESULTS_DIR)/multiqc-% : $(nfcore_dir)/% | $(RESULTS_DIR)
 	ln -sfn ../$(nfcore_dir)/$*/multiqc/star_rsem $@
-endif
 
 ################################################################
 #### Helper goals
