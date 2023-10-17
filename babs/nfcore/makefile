@@ -35,6 +35,7 @@ $(alignments) : results/%/star_rsem/rsem.merged.gene_counts.tsv : samplesheet_%.
 	--fasta $(realpath $($*.genome_fasta)) \
 	--gtf $(realpath $($*.gtf)) \
 	-w $(workdir) \
+	-ansi-log false \
 	"$${args[@]}" \
 	$(or $($*.nfcore),$(nf_options)) $(call log,nfcore)
 	if [ -n "$($*.index_dir)" ] && [ ! -d "$(refdir)" ];\
