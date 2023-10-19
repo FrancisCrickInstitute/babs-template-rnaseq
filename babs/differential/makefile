@@ -231,7 +231,7 @@ multiqc_results = $(patsubst %,$(RESULTS_DIR)/multiqc-%,$(alignments_build))
 samples_db = samples.db
 
 build: $(samplesheets_build) $(specfiles_build) $(configs_build) $(genes_results)  $(multiqc_results) | $(staging_dir) ##  Copy the required nfcore count files into the `extdata` area, and get the spec files.
-	$(GIT) add makefile secrets global.mk local.mk
+	$(GIT) add makefile global.mk local.mk
 	$(GIT) commit -m "Add the differential makefiles" || true
 	$(GIT) add $(source_dir) R
 	$(GIT) commit -m "Add the template scripts and R functions" || true
