@@ -201,8 +201,8 @@ endif
 publish:  ## Copy results to final location. Either 'outputs' folder (default), intranet (`make publish location=intranet`) or internet
 ifdef redirect_$(location)
 	mkdir -p $(redirect_$(location))
-ifdef url_$(location)
 	mkdir -p $(shortcut)
+ifdef url_$(location)
 	echo "[InternetShortcut]" > $(shortcut)$(location).url
 	echo "URL=$(url_$(location))/latest" >> $(shortcut)$(location).url
 endif
