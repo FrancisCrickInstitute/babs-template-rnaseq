@@ -426,7 +426,7 @@ emcontrasts <- function(dds, spec, extra=NULL) {
     ind_est  <- ind_est & contr_frame$contrast %in% keep
   }
   contr_frame <- contr_frame[ind_est,1:(which(names(contr_frame)=="estimate")-1), drop=FALSE]
-  contr_frame$contrast <- sub("|", "†", contr_frame$contrast, fixed=TRUE)
+  contr_frame[] <- lapply(contr_frame, ℱ(x) sub("|", "†", x, fixed=TRUE))
   contr_mat <- emfit$contrast@linfct[ind_est, !mdl$dropped, drop=FALSE]
   colnames(contr_mat) <- .resNames(colnames(contr_mat))
   contr <- lapply(seq_len(nrow(contr_frame)), function(i) contr_mat[i,,drop=TRUE])
