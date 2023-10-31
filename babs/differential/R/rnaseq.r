@@ -64,7 +64,9 @@ recode_within <- function(inner, ...) {
   if (any(rowSums(tab)>1)) {
     stop("Some inner levels appear in multiple outer groups.")
   }
-  factor(apply(tab, 2, cumsum)[cbind(as.character(inner),as.character(within))]) # cumsum to get incrementing index within group.
+  f <- factor(apply(tab, 2, cumsum)[cbind(as.character(inner),as.character(within))]) # cumsum to get incrementing index within group.
+  contrasts(f) <- "contr.sum"
+  f
 }
 
 
@@ -426,7 +428,7 @@ emcontrasts <- function(dds, spec, extra=NULL) {
     ind_est  <- ind_est & contr_frame$contrast %in% keep
   }
   contr_frame <- contr_frame[ind_est,1:(which(names(contr_frame)=="estimate")-1), drop=FALSE]
-  contr_frame[] <- lapply(contr_frame, ℱ(x) sub("|", "†", x, fixed=TRUE))
+  contr_frame[] <- lapply(contr_frame, function(x) sub("|", "†", x, fixed=TRUE))
   contr_mat <- emfit$contrast@linfct[ind_est, !mdl$dropped, drop=FALSE]
   colnames(contr_mat) <- .resNames(colnames(contr_mat))
   contr <- lapply(seq_len(nrow(contr_frame)), function(i) contr_mat[i,,drop=TRUE])
