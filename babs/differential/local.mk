@@ -117,3 +117,12 @@ else
 endif
 
 
+################################################################
+## GEO settings
+################################################################
+## For submission to GEO, we need to know the version, spec and
+## aligment settings that are to be submitted.
+################################################################
+geo: version=latest
+geo: alignment=$(firstword $(alignments))
+geo: spec=$(firstword $(specfiles))

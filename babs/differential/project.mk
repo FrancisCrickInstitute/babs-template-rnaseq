@@ -41,13 +41,3 @@ sections=00_init 01_exploratory 02_differential 03_enrichment
 03_enrichment_parent = 02_differential_$(ispec)_$(ialign)
 
 
-################################################################
-## GEO settings
-################################################################
-## For submission to GEO, we need to know the version, spec and
-## aligment settings that are to be submitted.
-################################################################
-geo: version=latest
-geo: alignment=$(firstword $(alignments))
-geo: spec=$(firstword $(specfiles))
-geo_dir=scratch/geo

@@ -1,5 +1,8 @@
-secrets global.mk: % : $(wildcard ../%)
-	cp ../$* $@ 2>/dev/null || touch $@
+secrets : $(wildcard ../secrets)
+        if [ -f ../secrets ]; then cp $< $@; else touch $@; fi
+
+global.mk: $(wildcard ../global.mk)
+        if [ -f ../global.mk ]; then cp $< $@; else touch $@; fi
 
 include secrets
 include global.mk
@@ -176,18 +179,19 @@ endif
 
 
 ## Back outside the executor/submission 
-
-geo: geo/md5.txt  ## Gather everything into the 'geo' folder. Specify `geo_version=`, `geo_alignment=` and `geo_spec=` to customise. Remember to `make clean-geo` when the files have been upload.
+.PHONY: geo
+geo: geo/md5.txt  ## Gather everything into the 'geo' folder. Specify `version=`, `alignment=` and `spec=` to customise. Remember to `make clean-geo` when the files have been upload.
 geo/md5.txt:
 	mkdir -p $(SCRATCH_DIR)geo
-	[ -z "$(SCRATCH_DIR)" ] || ln -s $(SCRATCH_DIR)geo geo
-	ln -fn $(my_counts_dir)/$(alignment)/*.genes.results geo/
-	ln -fn $(results)/$(version)/$(alignment)/$(spec)/*.xlsx geo/
+	mkdir -p shortcuts
+	ln -s $(SCRATCH_DIR)geo shortcuts/geo
+	ln -fn $(my_counts_dir)/$(alignment)/*.genes.results shortcuts/geo/
+	ln -fn $(RESULTS_DIR)/$(version)/$(alignment)/$(spec)/*.xlsx shortcuts/geo/
 	$(SQLITE) $(samples_db) 'select fastq_1 from fastqs  where config_file="$(alignment)";' | \
-	while read -r fq ; do cp ${fq} geo/ ; done
+	while read -r fq ; do cp ${fq} shortcuts/geo/ ; done
 	$(SQLITE) $(samples_db) 'select fastq_2 from fastqs  where config_file="$(alignment)";' | \
-	while read -r fq ; do cp ${fq} geo/ ; done
-	pushd geo; md5sum *.* > geo.md5.txt; popd
+	while read -r fq ; do cp ${fq} shortcuts/geo/ ; done
+	pushd shortcuts/geo; md5sum *.* > geo.md5.txt; popd
 
 location=outputs
 shortcut=$(empty)
@@ -304,8 +308,8 @@ maintainer-clean: clean ## Remove the results and data directories, in addition 
 	rm -rf $(RESULTS_DIR) data 
 
 clean-geo:  ## Remove the GEO files from scratch
-	rm -rf $(geo_dir)
-	rm geo
+	rm -f shortcuts/geo
+	rm -rf $(SCRATCH_DIR)geo
 
 
 
