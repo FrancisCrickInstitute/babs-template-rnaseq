@@ -107,11 +107,10 @@ endif
 endif
         for i in $(built_samplesheets); do \
           mkdir -p "$(pubdir)/$(VERSION)/$$i" ;\
-          cp --no-preserve=mode -r "results/$$i/star_rsem/*.markdup.sorted.bam" "$(pubdir)/$(VERSION)/$$i" ;\
-          cp --no-preserve=mode -r "results/$$i/star_rsem/*.markdup.sorted.bam.bai" "$(pubdir)/$(VERSION)/$$i" ;\
+          cp --no-preserve=mode -r results/"$$i"/star_rsem/*.markdup.sorted.bam "$(pubdir)/$(VERSION)/$$i" ;\
+          cp --no-preserve=mode -r results/"$$i"/star_rsem/*.markdup.sorted.bam.bai "$(pubdir)/$(VERSION)/$$i" ;\
         done
         ln -sfn $(VERSION) $(pubdir)/latest
-        ln -sfn $$(realpath $(pubdir)/$(VERSION)) $(RESULTS_DIR)/published_$(location)
 
 clean: ## Remove working files from scratch
 	rm -rf $(SCRATCH_DIR)nf_work

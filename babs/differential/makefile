@@ -4,9 +4,9 @@ secrets global.mk: % : $(wildcard ../%)
 include secrets
 include global.mk
 include local.mk
+
 .PHONY: makefile local.mk 
 .PHONY: build clean maintainer-clean geo R-local
-
 
 include project.mk  ## Provides analysis parametrisation
 include $(patsubst %,$(staging_dir)/.make-%,$(sections))
@@ -214,7 +214,6 @@ endif
 	ln -sfn $(VERSION) $(pubdir)/latest
 	[ ! -f .htaccess ] || [ "$(location)" == "outputs" ] || cp --no-preserve=mode -r .htaccess $(pubdir)/
 	[ -f .htaccess ] || [ "$(location)" == "outputs" ] || echo "Warning: no .htaccess files, so unauthorised people may be able to view these results"
-	ln -sfn $$(realpath $(pubdir)/$(VERSION)) $(RESULTS_DIR)/published_$(location)
 
 ## TODO - won't work when we do a group-as of alignments
 
