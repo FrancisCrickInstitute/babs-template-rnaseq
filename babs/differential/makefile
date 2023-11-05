@@ -250,7 +250,7 @@ $(samples_db): $(my_metadata).csv $(nfcore_dir)/../$(samples_db)
 	cp $(nfcore_dir)/../$(samples_db) $@ || echo "No samples database in nfcore directory"
 	$(SQLITE) $@ -csv "DROP TABLE IF EXISTS metadata;"  ".import $< metadata"
 
-$(my_metadata).csv: $(docs_dir)/$(experiment_table).csv | $(dir $(my_metadata))
+$(my_metadata).csv: $(ingress_dir)/$(experiment_table).csv | $(dir $(my_metadata))
 	cp $< $@
 
 $(specfiles_build): % : $(docs_dir)/%

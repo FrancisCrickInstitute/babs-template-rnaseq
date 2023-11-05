@@ -58,14 +58,6 @@ RENV_PATHS_ROOT ?= ~/.local/share/renv
 RENV_PATHS_PREFIX=rocker
 #Another 'secret', but in case not:
 SINGULARITY_ROOT ?= ./
-publish_results=results
-publish_intranet=www_internal
-publish_internet=www_external
-publish_outputs=outputs
-location=results
-
-docs_dir=$(strip ../docs)
-nfcore_dir=$(strip ../nfcore/results)
 
 my_counts_dir=extdata/genes.results
 my_metadata=extdata/metadata

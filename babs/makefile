@@ -32,8 +32,16 @@ clean: $(cleaners)
 $(cleaners) : clean-% :
 	cd $* && $(MAKE) clean
 
-secrets: | .not-secret
-	cp $< $@
-	echo "Created a 'secrets' file - please customise it so that the pipeline will run on your system"
-	echo "You may also want to review 'global.mk' to ensure that nextflow and singularity are set up correctly for your system"
-	exit
+
+secrets: $(wildcard ../.babs)
+	if [ -f secrets ]; then \
+	  if [ -f ../.babs ]; then \
+            sed -n -i '/^setting_/!p' $@ ;\
+            sed -r -n 's/^(\s*)(.*)\s*:\s*(.*$$)/setting_\2=\3/p' ../.babs >> $@ ;\
+	  fi ;\
+	else \
+	  cp .not-secret $@ ;\
+	  echo "Created a 'secrets' file - please customise it so that the pipeline will run on your system" ;\
+	  echo "You may also want to review 'global.mk' to ensure that nextflow and singularity are set up correctly for your system" ;\
+	 exit ;\
+	fi

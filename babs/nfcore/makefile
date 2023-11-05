@@ -1,5 +1,8 @@
-secrets global.mk: % : $(wildcard ../%)
-	cp ../$* $@ 2>/dev/null || touch $@
+secrets : $(wildcard ../secrets)
+        if [ -f ../secrets ]; then cp $< $@; else touch $@; fi
+
+global.mk: $(wildcard ../global.mk)
+        if [ -f ../global.mk ]; then cp $< $@; else touch $@; fi
 
 include secrets
 include global.mk
@@ -52,7 +55,7 @@ $(workdir):
 ################################################################
 #### Bootrap all relevant data from outside
 ################################################################
-configs = $(patsubst ../ingress/%.config,%.config,$(wildcard ../ingress/*.config))
+configs = $(patsubst $(ingress_dir)/%.config,%.config,$(wildcard $(ingress_dir)/*.config))
 samplesheets = $(patsubst %.config,samplesheet_%.csv,$(configs))
 
 build: $(samplesheets) ## Build all necessary inputs: samplesheets for each matching alignment '.config' from 'docs'.
@@ -71,16 +74,45 @@ $(samplesheets): samplesheet_%.csv: %.config  samples.db
 	'CREATE TABLE "fastq_$*" AS SELECT * FROM fastqs NATURAL JOIN "config_$*" ;'; \
 	$(SQLITE) -header -csv  samples.db 'SELECT $(samplesheet_id_column) AS sample, fastq_1, fastq_2, strandedness FROM "fastq_$*";' > $@
 
-$(configs) : %.config : ../ingress/%.config
+$(configs) : %.config : $(ingress_dir)/%.config
 	cp $< $@
 	md5sum $(shell sed -n 's/^$*.genome_fasta=//p' $<) | awk '{print "$*.genome_fasta_md5=" $$1}' >> $@
 	md5sum $(shell sed -n 's/^$*.gtf=//p' $<) | awk '{print "$*.gtf_md5=" $$1}' >> $@
 
-samples.db: ../ingress/samples.db
+samples.db: $(ingress_dir)/samples.db
 	cp $< $@
 
 $(log_dir):
 	mkdir -p $@
+
+location=outputs
+shortcut=$(empty)
+ifdef redirect_$(location)
+shortcut=shortcuts/
+endif
+pubdir = $(shortcut)$(publish_$(location))
+ifeq ($(pubdir),)
+pubdir = published
+endif
+publish:  ## Copy results to final location. Either 'outputs' folder (default), intranet (`make publish location=intranet`) or inte\
+rnet
+ifdef redirect_$(location)
+        mkdir -p $(redirect_$(location))
+        mkdir -p $(shortcut)
+ifdef url_$(location)
+        echo "[InternetShortcut]" > $(shortcut)$(location).url
+        echo "URL=$(url_$(location))/latest" >> $(shortcut)$(location).url
+endif
+        ln -sfn $(redirect_$(location)) $(pubdir)
+endif
+        for i in $(built_samplesheets); do \
+          mkdir -p "$(pubdir)/$(VERSION)/$$i" ;\
+          cp --no-preserve=mode -r "results/$$i/star_rsem/*.markdup.sorted.bam" "$(pubdir)/$(VERSION)/$$i" ;\
+          cp --no-preserve=mode -r "results/$$i/star_rsem/*.markdup.sorted.bam.bai" "$(pubdir)/$(VERSION)/$$i" ;\
+        done
+        ln -sfn $(VERSION) $(pubdir)/latest
+        ln -sfn $$(realpath $(pubdir)/$(VERSION)) $(RESULTS_DIR)/published_$(location)
+
 clean: ## Remove working files from scratch
 	rm -rf $(SCRATCH_DIR)nf_work
 	rm -f nf_work

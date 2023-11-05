@@ -24,6 +24,16 @@ GIT=git
 
 make_rwx = setfacl -m u::rwx
 
+# Standard folder and shortcut names
+publish_results=results
+publish_intranet=www_internal
+publish_internet=www_external
+publish_outputs=outputs
+location=results
+docs_dir=$(strip ../docs)
+nfcore_dir=$(strip ../nfcore/results)
+ingress_dir=$(strip ../ingress)
+
 ################################################################
 ## SLURM
 ## 

@@ -1,5 +1,8 @@
-secrets global.mk: % : $(wildcard ../%)
-	cp ../$* $@ 2>/dev/null || touch $@
+secrets : $(wildcard ../secrets)
+        if [ -f ../secrets ]; then cp $< $@; else touch $@; fi
+
+global.mk: $(wildcard ../global.mk)
+        if [ -f ../global.mk ]; then cp $< $@; else touch $@; fi
 
 include secrets
 include global.mk
