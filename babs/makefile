@@ -32,12 +32,12 @@ clean: $(cleaners)
 $(cleaners) : clean-% :
 	cd $* && $(MAKE) clean
 
-
+.PHONY: secrets
 secrets: $(wildcard ../.babs)
 	if [ -f secrets ]; then \
 	  if [ -f ../.babs ]; then \
-            sed -n -i '/^setting_/!p' $@ ;\
-            sed -r -n 's/^(\s*)(.*)\s*:\s*(.*$$)/setting_\2=\3/p' ../.babs >> $@ ;\
+	    sed -n -i '/^setting_/!p' $@ ;\
+	    sed -r -n 's/^(\s*)(.*)\s*:\s*(.*$$)/setting_\2=\3/p' ../.babs >> $@ ;\
 	  fi ;\
 	else \
 	  cp .not-secret $@ ;\

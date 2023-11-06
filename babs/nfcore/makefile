@@ -1,8 +1,8 @@
 secrets : $(wildcard ../secrets)
-        if [ -f ../secrets ]; then cp $< $@; else touch $@; fi
+	if [ -f ../secrets ]; then cp $< $@; else touch $@; fi
 
 global.mk: $(wildcard ../global.mk)
-        if [ -f ../global.mk ]; then cp $< $@; else touch $@; fi
+	if [ -f ../global.mk ]; then cp $< $@; else touch $@; fi
 
 include secrets
 include global.mk
@@ -97,20 +97,20 @@ endif
 publish:  ## Copy results to final location. Either 'outputs' folder (default), intranet (`make publish location=intranet`) or inte\
 rnet
 ifdef redirect_$(location)
-        mkdir -p $(redirect_$(location))
-        mkdir -p $(shortcut)
+	mkdir -p $(redirect_$(location))
+	mkdir -p $(shortcut)
 ifdef url_$(location)
-        echo "[InternetShortcut]" > $(shortcut)$(location).url
-        echo "URL=$(url_$(location))/latest" >> $(shortcut)$(location).url
+	echo "[InternetShortcut]" > $(shortcut)$(location).url
+	echo "URL=$(url_$(location))/latest" >> $(shortcut)$(location).url
 endif
-        ln -sfn $(redirect_$(location)) $(pubdir)
+	ln -sfn $(redirect_$(location)) $(pubdir)
 endif
-        for i in $(built_samplesheets); do \
-          mkdir -p "$(pubdir)/$(VERSION)/$$i" ;\
-          cp --no-preserve=mode -r results/"$$i"/star_rsem/*.markdup.sorted.bam "$(pubdir)/$(VERSION)/$$i" ;\
-          cp --no-preserve=mode -r results/"$$i"/star_rsem/*.markdup.sorted.bam.bai "$(pubdir)/$(VERSION)/$$i" ;\
-        done
-        ln -sfn $(VERSION) $(pubdir)/latest
+	for i in $(built_samplesheets); do \
+	  mkdir -p "$(pubdir)/$(VERSION)/$$i" ;\
+	  cp --no-preserve=mode -r results/"$$i"/star_rsem/*.markdup.sorted.bam "$(pubdir)/$(VERSION)/$$i" ;\
+	  cp --no-preserve=mode -r results/"$$i"/star_rsem/*.markdup.sorted.bam.bai "$(pubdir)/$(VERSION)/$$i" ;\
+	done
+	ln -sfn $(VERSION) $(pubdir)/latest
 
 clean: ## Remove working files from scratch
 	rm -rf $(SCRATCH_DIR)nf_work
