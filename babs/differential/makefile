@@ -213,11 +213,11 @@ endif
 	ln -sfn $(redirect_$(location)) $(pubdir)
 endif
 	mkdir -p $(pubdir)/$(VERSION)
-	cp --no-preserve=mode -r $(RESULTS_DIR)/$(VERSION)/. $(pubdir)/$(VERSION)
+	cp --no-preserve=mode -r $(RESULTS_DIR)/$(VERSION)/. $(extra_files) $(pubdir)/$(VERSION)
 	cp --no-preserve=mode --recursive --dereference --no-clobber $(RESULTS_DIR)/multiqc-* $(pubdir)/
 	ln -sfn $(VERSION) $(pubdir)/latest
-	[ ! -f .htaccess ] || [ "$(location)" == "outputs" ] || cp --no-preserve=mode -r .htaccess $(pubdir)/
-	[ -f .htaccess ] || [ "$(location)" == "outputs" ] || echo "Warning: no .htaccess files, so unauthorised people may be able to view these results"
+	[ "$(location)" == "outputs" ] || cp --no-preserve=mode -r .htaccess $(pubdir)/ || echo "Warning: no .htaccess files, so unauthorised people may be able to view these results"
+	ln -sfn $$(realpath $(pubdir)/$(VERSION)) $(RESULTS_DIR)/published_$(location)
 
 ## TODO - won't work when we do a group-as of alignments
 

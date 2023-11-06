@@ -284,13 +284,34 @@ and even if the clustering is not perfect, there will still be genes
 that are consistent with the expected expression profiles, and they
 will be revealed in the differential analysis.
 
-The second heatmap @fig-01-sampDist-1 focuses on the pairwise
+In case that heatmap doesn't cluster exactly according to the
+experimental design, in @fit-01-SuperV-Heatmap-1 we provide the
+samples ordered according to one particular interpretation of the
+experimental design.  In simple (one-way) designs where there is only
+one covariate, this is a fairly straightforward way of gathering
+samples in a set of columns, but in more complex designs it isn't
+obvious whether to sort first by genotype and then treatment, say, or
+perhaps the reverse, so for this 'supervised' clustering we chose the
+(arbitrary) order the 'model' was specified, above.
+
+The third heatmap @fig-01-sampDist-1 focuses on the pairwise
 similarity of samples, using a slightly different metric than the
 first, to emphasise that there's not one way of calculating how
-similar two samples are, transcriptome-wide.  The colours in the first
-heatmap are a gene's expression in a sample, relative to its average
-expression.  The second heatmap represents the similarity of each pair
-of samples.
+similar two samples are, transcriptome-wide.  The colours in the
+previous heatmaps are a gene's expression in a sample, relative to its
+average expression. In this heatmap, colour represents the similarity
+of each pair of samples.
+
+### Focussed Heatmaps
+
+Heatmap @fig-01-Heatmap-correct-1 is the first in a series of
+'focussed' plots. By focussed, we mean that in turn we remove the main
+effect of all but one covariates in turn, and then force the order of
+the samples to respect the one remaining covariate.  Sometimes this
+allows structures that are masked by one 'dominant' effect to emerge,
+or to remove annoyance effects such as that due to batch which might
+be preventing the real structure from being apparent. The
+interpretation of these is very specific to the experimental design.
 
 ## Principal Component Scatterplots
 
@@ -353,7 +374,7 @@ param$set("pc_y", 2)
 for (dname_i in seq_along(ddsList)) {
   this_dds <- ddsList[[dname_i]]
   dname <- metadata(this_dds)$dmc$dataset_name %||% names(ddsList)[dname_i]
-  cat("\n# ", dname, "\n", sep = "")
+  cat("\n\n# ", dname, "\n\n", sep = "")
   var_stab <- assay(this_dds, "vst")
   top <- order(apply(var_stab, 1, sd), decreasing = TRUE)[1:min(nrow(var_stab),param$get("top_n_variable"))]
   models_for_qc <- metadata(this_dds)$models[sapply(metadata(this_dds)$models, 
@@ -388,6 +409,24 @@ for (dname_i in seq_along(ddsList)) {
           caption=paste("Heatmap of variable genes,", dname))
   cat("\n\n---\n\n")
 
+
+  ord <- do.call(order, colDat[vars$fixed])
+  pl <- ComplexHeatmap::Heatmap(
+    plotDat[,ord], name = "Mean Centred",
+    column_title = "Samples", row_title = "Genes", col = sym_colour(plotDat), 
+    cluster_columns = FALSE,
+    clustering_distance_rows = param$get("clustering_distance_rows"),
+    heatmap_legend_param = list(direction = "horizontal"),
+    top_annotation = ComplexHeatmap::HeatmapAnnotation(
+      df = colDat[ord,vars$fixed],
+      col = metadata(colData(this_dds))$palette$Heatmap[vars$fixed],
+      show_legend=FALSE),
+    show_row_names = FALSE, show_column_names = TRUE)
+  do_plot(pl,
+          label= fig_label("01-SuperV-Heatmap"),
+          caption=paste("Supervised Heatmap of variable genes,", dname))
+  cat("\n\n---\n\n")
+  
   poisd <- PoiClaClu::PoissonDistance(t(counts(this_dds, normalized = TRUE)))
   samplePoisDistMatrix <- as.matrix(poisd$dd)
   if (length(vars$fixed) > 1) {
@@ -455,6 +494,35 @@ for (dname_i in seq_along(ddsList)) {
       names(pc_resid) <- dimnames(sample_gene_factor$terms)[[3]]
     }
   }
+
+  if (do_focus) {
+    cat("\n## Focussed Heatmaps\n\n")
+    for (covar in dimnames(sample_gene_factor$terms)[[3]]) {
+      part_res <- t(sample_gene_factor$terms[, , covar, drop = TRUE] + sample_gene_factor$resid)
+      top <- order(apply(part_res, 1, sd), decreasing = TRUE)[1:min(nrow(part_res),param$get("top_n_variable"))]
+      plotDat <- part_res[top, ]
+      vars <- get_terms(this_dds)
+      colDat <- as.data.frame(colData(this_dds))
+      colnames(plotDat) <- rownames(colDat)
+      pl <- ComplexHeatmap::Heatmap(
+        plotDat, name = "Residual", 
+        column_title = "Samples", row_title = "Genes", col = sym_colour(plotDat),
+        column_split = colDat[[covar]],
+        clustering_distance_columns = param$get("clustering_distance_columns"), 
+        clustering_distance_rows = param$get("clustering_distance_rows"), 
+        heatmap_legend_param = list(direction = "horizontal"), 
+        top_annotation = ComplexHeatmap::HeatmapAnnotation(
+          df = colDat[vars$fixed], 
+          col = metadata(colData(this_dds))$palette$Heatmap[vars$fixed],
+          show_legend=FALSE), 
+        show_row_names = FALSE, show_column_names = TRUE)
+      do_plot(pl,
+              label= fig_label("01-Heatmap-correct"),
+              caption=paste("Heatmap of variable genes,", dname, " focussed on ", covar ))
+      cat("\n\n---\n\n")
+    }
+  }
+  
   cat("\n## Principal Component Scatterplots of PCs ", param$get("pc_x"), " and ", param$get("pc_y"), 
       " coloured by covariate", "\n\n", sep = "")
   do_labels <- nrow(colDat) < 10
