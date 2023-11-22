@@ -82,7 +82,7 @@ recode_within <- function(inner, ...) {
 ##' @author Gavin Kelly
 ##' @export
 build_dds_list <- function(dds, spec) {
-  modelled_terms <- lapply(spec$sample_sets, function(x) lapply(x$models, function(y) if (is_formula(y$design)) all.vars(y$design)))
+  modelled_terms <- lapply(spec$sample_sets, function(x) lapply(x$models, function(y) if (is_formula(y$design)) all.vars(update(y$design, NULL ~ .))))
   modelled_terms <-  unique(unlist(modelled_terms))
   if (!"palette" %in% names(spec$settings)) {
     spec$settings$palette="Set1"
@@ -114,6 +114,15 @@ build_dds_list <- function(dds, spec) {
       mdlList[[1]]$plot_qc <- TRUE
     }
     metadata(obj)$models <- mdlList
+    if ("sample_swap" %in% names(set)) {
+      for (x1 in names(set$sample_swap)) {
+        i1 <- match(x1, colData(obj)$ID)
+        i2 <- match(set$sample_swap[[x1]], colData(obj)$ID)
+        tmp <- colData(obj)[i1, -1, drop=FALSE]
+        colData(obj)[i1, -1] <- colData(obj)[i2, -1, drop=FALSE]
+        colData(obj)[i2, -1] <- tmp
+      }
+    }
     if ("transform" %in% names(set)) {
       .mu <- purrr::partial(mutate, .data=as.data.frame(colData(obj)))
       tr <- set$transform
