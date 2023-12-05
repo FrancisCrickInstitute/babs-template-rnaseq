@@ -433,9 +433,7 @@ emcontrasts <- function(dds, spec, extra=NULL) {
   emfit <- do.call(emmeans::emmeans, c(list(object=mdl$lm, specs= spec),extra))
   contr_frame <- as.data.frame(summary(emfit$contrasts))
   ind_est <- !is.na(contr_frame$estimate)
-  if (!is.na(keep[1])) {
-    ind_est  <- ind_est & contr_frame$contrast %in% keep
-  }
+
   contr_frame <- contr_frame[ind_est,1:(which(names(contr_frame)=="estimate")-1), drop=FALSE]
   contr_frame[] <- lapply(contr_frame, function(x) sub("|", "†", x, fixed=TRUE))
   contr_mat <- emfit$contrast@linfct[ind_est, !mdl$dropped, drop=FALSE]
@@ -443,6 +441,9 @@ emcontrasts <- function(dds, spec, extra=NULL) {
   contr <- lapply(seq_len(nrow(contr_frame)), function(i) contr_mat[i,,drop=TRUE])
   contr <- lapply(contr, function(vect) {attr(vect, "spec") <- spec; vect})
   names(contr) <- do.call(paste, c(contr_frame,sep= "|"))
+  if (!is.na(keep[1])) {
+    contr  <- contr[keep]
+  }
   contr
 }
 
