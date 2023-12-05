@@ -27,8 +27,10 @@ samples.db: $(samplesheet_fname).csv
 
 configs:= $(patsubst ../docs/%.config,%.config,$(wildcard ../docs/*.config))
 
-build: $(configs) $(samplesheet_fname).csv ## Prepare for `run` by gathering configs and samplesheet into current directory
+build: $(configs) $(samplesheet_fname).csv $(experiment_table).csv ## Prepare for `run` by gathering configs and samplesheet into current directory
 
+$(experiment_table).csv: ../docs/$(experiment_table).csv
+	tr -d '\r' < $< > $@
 
 $(samplesheet_fname).csv: ../docs/$(samplesheet_fname).csv
 	tr -d '\r' < $< > $@
