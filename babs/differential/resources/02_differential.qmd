@@ -270,20 +270,22 @@ for (dataset in names(summaries)) {
     ), envir = environment(), quiet = TRUE)
   cat(res, sep = '\n\n')
 
-  res <- knitr::knit_child(
-    text = c(
-      "```{r}",
-      "#| echo: false",
-      paste0("#| label: tbl-summaryfit-",dataset),
-      paste0("#| tbl-cap: ",dataset, " model-fit stats"),
-      "unclassed[[dataset]] %>%",
-      "gt() %>%",
-      "tab_header(title=\"Model-fit summary\", subtitle=dataset)",
-      "```",
-      "",
-      ""
-    ), envir = environment(), quiet = TRUE)
-  cat(res, sep = '\n\n')
+  if (nrow(unclassified[[dataset]])>0) {
+    res <- knitr::knit_child(
+      text = c(
+        "```{r}",
+        "#| echo: false",
+        paste0("#| label: tbl-summaryfit-",dataset),
+        paste0("#| tbl-cap: ",dataset, " model-fit stats"),
+        "unclassed[[dataset]] %>%",
+        "gt() %>%",
+        "tab_header(title=\"Model-fit summary\", subtitle=dataset)",
+        "```",
+        "",
+        ""
+      ), envir = environment(), quiet = TRUE)
+    cat(res, sep = '\n\n')
+  }
 }
 
 ```

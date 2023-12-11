@@ -297,7 +297,7 @@ fit_model <- function(mdl, dds, ...) {
   if (any(metadata(model_dds)$model$dropped)) {
     design(model_dds) <- metadata(model_dds)$model$mat
   }
-  done_wald <- FALSE# mightn't need to run Wald if everything is an LRT
+  done_fit <- FALSE# mightn't need to run Wald if everything is an LRT
   ## Generate a nested list - single comparisons will be singletons, expanded mult_comps may not be.
   comp_ind <- 1
   out <- lapply(mdl$comparisons, function(comp) {
@@ -317,15 +317,39 @@ fit_model <- function(mdl, dds, ...) {
         )
         )
       } else {
-        if (!done_wald) {
-          model_dds <- DESeq2::DESeq(model_dds, test="Wald", ...)
+        if (!done_fit) {
+          if ((mdl$approach %||% "DESeq2")=="DESeq2") {
+            model_dds <- DESeq2::DESeq(model_dds, test="Wald", ...)
+          } else {
+            tmp <- rowData(model_dds)
+            tmp$PCA <- NULL
+            dge <- edgeR::DGEList(
+              counts=assay(model_dds, "counts"),
+              samples=as.data.frame(colData(model_dds)),
+              genes=as.data.frame(tmp)
+            )
+            dge <- edgeR::calcNormFactors(dge)
+            mm <- model.matrix(design(model_dds), dge$samples)
+            y <- limma::voom(dge, mm, plot=FALSE)
+            if ("block" %in% names(mdl)) {
+              block <- dge$samples[[mdl$block]]
+              corfit <- duplicateCorrelation(y, mm, block=block)
+              y <- limma::voom(dge, mm,  block=block, correlation=corfit)
+              fit <- limma::lmFit(y, mm, block=block, correlation=corfit )
+            } else {
+              fit <- limma::lmFit(y, mm)
+            }
+            fit <- limma::contrasts.fit(fit, do.call(cbind, contrs))
+            fit <- limma::eBayes(fit)
+            metadata(model_dds)$voom <- fit
+            contrs[] <- seq_along(contrs)
+          }
           comparison_dds <- model_dds
-          done_wald <- TRUE
+          done_fit <- TRUE
         }
         return(lapply(
           contrs,
           function(contr) {
-            contr_dds <- model_dds
             metadata(comparison_dds)$models <- NULL
             metadata(comparison_dds)$comparisons <- NULL
             metadata(comparison_dds)$comparison <- contr
@@ -334,10 +358,10 @@ fit_model <- function(mdl, dds, ...) {
       }
     }
     # Usual DESeq2 Wald
-    if (!done_wald) {
+    if (!done_fit) {
           model_dds <- DESeq2::DESeq(model_dds, test="Wald", ...)
           comparison_dds <- model_dds
-      done_wald <- TRUE
+      done_fit <- TRUE
     }
     metadata(comparison_dds)$models <- NULL
     metadata(comparison_dds)$comparisons <- NULL
@@ -533,7 +557,21 @@ get_result <- function(dds, mcols=c("symbol", "entrez"), filterFun=IHW::ihw, lfc
       if (is.list(comp) && "listValues" %in% names(comp)) {
         r <- DESeq2::results(dds, filterFun=filterFun, lfcThreshold=lfcThreshold, contrast=metadata(dds)$comparison[names(comp) != "listValues"], listValues=comp$listValues, alpha=alpha1, ...)
       } else {
-        r <- DESeq2::results(dds, filterFun=filterFun, lfcThreshold=lfcThreshold, contrast=metadata(dds)$comparison, alpha=alpha1, ...)
+        if ("voom" %in% names(metadata(dds))) {
+          vm <- metadata(dds)$voom
+          r <- limma::topTable(vm, coef=comp,
+                        genelist=row.names(vm$genes),
+                        number=Inf, sort.by="none")
+          r <- with(r, DataFrame(baseMean=2^AveExpr,
+                                 log2FoldChange=logFC,
+                                 pvalue=P.Value,
+                                 padj=adj.P.Val,
+                                 lfcSE=vm$stdev.unscaled[,comp] * vm$sigma,
+                                 row.names=row.names(dds)))
+          metadata(r)$alpha <- alpha1
+        } else {
+          r <- DESeq2::results(dds, filterFun=filterFun, lfcThreshold=lfcThreshold, contrast=metadata(dds)$comparison, alpha=alpha1, ...)
+        }
       }
     }
   } else { # it's LRT
@@ -598,7 +636,15 @@ get_result <- function(dds, mcols=c("symbol", "entrez"), filterFun=IHW::ihw, lfc
       r$class <- ""
     }
   }  else {
-    r$shrunkLFC <- lfcShrink(dds, res=r, type="ashr", quiet=TRUE)$log2FoldChange
+    if ("voom" %in% names(metadata(dds))) {
+      fit_sh <- ashr::ash(
+        r$log2FoldChange,
+        r$lfcSE, mixcompdist = "normal", 
+        method = "shrink")
+      r$shrunkLFC <- fit_sh$result$PosteriorMean
+    } else {
+      r$shrunkLFC <- lfcShrink(dds, res=r, type="ashr", quiet=TRUE)$log2FoldChange
+    }
     r$class <- ifelse(r$log2FoldChange >0, "Up", "Down")
   }
   ind <- which(r$padj<metadata(r)$alpha)
@@ -781,4 +827,3 @@ default_spec_settings <- function() {
 	LRT_effect = "default"  ## For the "white" colour in differential heatmaps
    )
 }
-
