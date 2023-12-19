@@ -1,13 +1,43 @@
 ## *** Useful Functions
 
+# e.g. set grp=whole_cell, denominator=fraction=="cyt", to implement nuc/cyt
+#     or grp=whole_cell, numerator=fraction!="cyt", to implement nuc/(nuc+cyt)
+norm_within <- function(df, grp, denominator, numerator, adj=0.01) {
+  ret <- NA
+  if (!missing(denominator)) {
+    ret <- list(
+      adj=adj,
+      ind=df |>
+        mutate(.ind=1:n()) |>
+        group_by({{grp}}) |>
+        mutate(.ind=ifelse({{denominator}}, NA, .ind[{{denominator}}])) |>
+        pull(.ind)
+    )
+  } else if (!missing(numerator)) {
+    ret <- list(
+      adj=adj,
+      ind=df |>
+        mutate(.ind=1:n()) |>
+        group_by({{grp}}) |>
+        mutate(.ind= ifelse({{numerator}}, NA, list(unique(.ind)))) |>
+        pull(.ind)
+    )
+  }
+  ret
+}
+
 
 load_specs <- function(file="", context) {
   if (file.exists(file)) {
     e <- as.environment(as.data.frame(colData(context)))
+    list_ok <- function(...) rlang::dots_list(..., .ignore_empty="all")
     parent.env(e) <- environment()
-    assign("sample_set", list, envir=e)
-    assign("model", list, envir=e)
-    assign("specification", list, envir=e)
+    assign("list", list_ok, envir=e)
+    assign("sample_set", list_ok, envir=e)
+    assign("model", list_ok, envir=e)
+    assign("specification", list_ok, envir=e)
+    normalise_within <- function(...) {
+      norm_within(as.data.frame(colData(context)), ...)}    
     assign("settings",
            function(...) {
              as.list( substitute(alist(...)))[-1]
@@ -100,13 +130,25 @@ build_dds_list <- function(dds, spec) {
   for (i_set in seq_along(spec$sample_sets)) {
     set <- spec$sample_sets[[i_set]]
     mdlList <- spec$models
+    obj <- dds
+    if ("baseline" %in% names(set)) {
+      if (!is.list(set$baseline$ind)) {
+        is_numerator <- !is.na(set$baseline$ind)
+        norm <- counts(obj[,set$baseline$ind[is_numerator]]) + set$baseline$adj
+      } else {
+        is_numerator <- sapply(set$baseline$ind, function(x) !all(is.na(x)))!=0
+        norm <- sapply(set$baseline$ind[is_numerator], function(x) rowSums(counts(obj[,x]))) + set$baseline$adj
+      }
+      obj <- obj[,is_numerator]
+      normalizationFactors(obj) <- norm
+    }
     if (is.list(set)) {
       ind <- set$subset
       mdlList <- c(mdlList, set$models)
     } else {
       ind <- set
     }
-    obj <- dds[,ind]
+    obj <- obj[,ind]
     metadata(obj)$full_model <- spec$full_model
     colData(obj) <- droplevels(colData(obj))
     mdlList <- lapply(mdlList, function(x) modifyList(list(plot_qc=FALSE), x))
@@ -250,7 +292,7 @@ fit_models <- function(dds, param, ...) {
 
 old_fit_model <- function(mdl, dds, ...) {
   this_dds <- dds
-  design(this_dds) <- mdl$design
+  DESeq2::design(this_dds) <- mdl$design
   metadata(this_dds)$model <- mdl
   this_dds <- check_model(this_dds) 
   out <- list()
@@ -268,7 +310,7 @@ old_fit_model <- function(mdl, dds, ...) {
       comps <- unlist(comps, recursive=FALSE)
     }
     if (any(metadata(this_dds)$model$dropped)) {
-      design(this_dds) <- metadata(this_dds)$model$mat
+      DESeq2::design(this_dds) <- metadata(this_dds)$model$mat
     }
     this_dds <- DESeq2::DESeq(this_dds, test="Wald", ...)
     metadata(this_dds)$models <- NULL
@@ -291,13 +333,13 @@ old_fit_model <- function(mdl, dds, ...) {
 fit_model <- function(mdl, dds, ...) {
   message("Processing model ", mdl$name)
   model_dds <- dds
-  design(model_dds) <- mdl$design
+  DESeq2::design(model_dds) <- mdl$design
   metadata(model_dds)$model <- mdl
   model_dds <- check_model(model_dds)
   if (any(metadata(model_dds)$model$dropped)) {
-    design(model_dds) <- metadata(model_dds)$model$mat
+    DESeq2::design(model_dds) <- metadata(model_dds)$model$mat
   }
-  done_fit <- FALSE# mightn't need to run Wald if everything is an LRT
+  done_wald <- FALSE# mightn't need to run Wald if everything is an LRT
   ## Generate a nested list - single comparisons will be singletons, expanded mult_comps may not be.
   comp_ind <- 1
   out <- lapply(mdl$comparisons, function(comp) {
@@ -393,7 +435,7 @@ check_model <- function(dds) {
   if (is_formula(mdl$design) ) {
     df <- as.data.frame(colData(dds))
     df$.x <- counts(dds, norm=TRUE)[1,]
-    fml <- as.formula(paste0(".x ~ ", as.character(design(dds)[2])))
+    fml <- as.formula(paste0(".x ~ ", as.character(DESeq2::design(dds)[2])))
     fit <- lm(fml, data=df)
     mdl$lm <- fit
     if ("drop_unsupported_combinations" %in% names(mdl) && mdl$drop_unsupported_combinations==TRUE) {
@@ -495,7 +537,7 @@ fitLRT <- function(dds, mdl, reduced, ...) {
   } else {
     full <- mdl$design
   }
-  design(dds) <- full
+  DESeq2::design(dds) <- full
   dds <- DESeq2::DESeq(dds, test="LRT", full=full, reduced=reduced, ...)
   metadata(dds)$LRTterms=setdiff(
     colnames(attr(dds, "modelMatrix")),
@@ -519,7 +561,7 @@ fitContrastLRT <- function(dds, mdl_mat, contr, ...) {
   reduced <- mdl_mat[,-ncol(mdl_mat),drop=FALSE]
   metadata(dds)$comparison <- contr
   metadata(dds)$reduced_mat <- reduced
-  design(dds) <- mdl_mat
+  DESeq2::design(dds) <- mdl_mat
   dds <- DESeq2::DESeq(dds, test="LRT", full=mdl_mat, reduced=reduced, ...)
   metadata(dds)$LRTterms <- "contrast_column"
   metadata(dds)$models <- NULL
@@ -737,8 +779,8 @@ retrieve_contrast <- function (object, expanded = FALSE, listValues=c(1,-1)) {
       contrastNumLevel <- comparison[2]
       contrastDenomLevel <- comparison[3]
       contrastBaseLevel <- levels(colData(object)[, contrastFactor])[1]
-      hasIntercept <- attr(terms(design(object)), "intercept") == 1
-      firstVar <- contrastFactor == all.vars(design(object))[1]
+      hasIntercept <- attr(terms(DESeq2::design(object)), "intercept") == 1
+      firstVar <- contrastFactor == all.vars(DESeq2::design(object))[1]
       noInterceptPullCoef <- !hasIntercept & !firstVar & (contrastBaseLevel %in% 
                                                            c(contrastNumLevel, contrastDenomLevel))
       if (!expanded & (hasIntercept | noInterceptPullCoef)) {
