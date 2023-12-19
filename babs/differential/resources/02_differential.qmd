@@ -142,10 +142,12 @@ dds_model_comp <- lapply(
 dds_model_comp <- map_depth(
   dds_model_comp,
   .depth=3,
-  get_result,
-  filterFun=param$get("filterFun"),
-  alpha=param$get("alpha"),
-  lfcThreshold=param$get("lfcThreshold")
+  function(dds) get_result(dds,
+                         filterFun=param$get("filterFun"),
+                         alpha=param$get("alpha"),
+                         lfcThreshold=param$get("lfcThreshold"),
+                         LRT_effect=param$get("LRT_effect", metadata(dds)$models)
+                         )
 )
 
 
@@ -442,10 +444,10 @@ for (dataset in names(dds_model_comp)) {
         var_roles <- emmeans:::.parse.by.formula(attr(comp, "spec"))
         var_roles$all <- c(var_roles$by, var_roles$rhs, setdiff(all.vars(fml), unlist(var_roles)))
         most_decreasing <- which.min(metadata(this_comp)$comparison %*% MASS::ginv(mmat))
-        if (mdl$baseline_heuristic=="min") {
+        if (param$get("baseline_heuristic", mdl)=="min") {
           weights <- apply(mmat, 1, function(x) all(x==mmat[most_decreasing,]))
           weights <- weights/sum(weights)
-        } else if (mdl$baseline_heuristic=="negative") {
+        } else if (param$get("baseline_heuristic", mdl)=="negative") {
           weights <- metadata(this_comp)$comparison %*% MASS::ginv(mmat)
           minw <- min(weights)
           w_ind <- weights < -sqrt(.Machine$double.eps)

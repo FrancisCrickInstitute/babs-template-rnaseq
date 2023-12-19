@@ -274,8 +274,6 @@ fit_models <- function(dds, param, ...) {
   model_comp <- lapply(
     metadata(dds)$models,
     function(mdl) {
-      mdl$baseline_heuristic <- mdl$baseline_heuristic %||% param$get("baseline_heuristic")
-      mdl$LRT_effect <- mdl$LRT_effect %||% param$get("LRT_effect")
       fit_model(mdl, dds, ...)
     }
   )
@@ -583,7 +581,7 @@ fitContrastLRT <- function(dds, mdl_mat, contr, ...) {
 ##' @return 
 ##' @author Gavin Kelly
 ##' @export
-get_result <- function(dds, mcols=c("symbol", "entrez"), filterFun=IHW::ihw, lfcThreshold=0, alpha=0.1, ...) {
+get_result <- function(dds, mcols=c("symbol", "entrez"), filterFun=IHW::ihw, lfcThreshold=0, alpha=0.1, LRT_effect="default", ...) {
   if (is.null(filterFun)) filterFun <- rlang::missing_arg()
   comp <- metadata(dds)$comparison
   if (length(alpha)>1) {
@@ -643,7 +641,7 @@ get_result <- function(dds, mcols=c("symbol", "entrez"), filterFun=IHW::ihw, lfc
     r$class[is.na(r$padj) | is.na(r$pvalue) | r$baseMean==0] <- NA
     term <-  metadata(dds)$LRTterms
     # take the biggest fold-change vs baseline, for MA and reporting?
-    if (all(term %in% names(mcols(dds))) && metadata(dds)$model$LRT_effect!="none") {
+    if (all(term %in% names(mcols(dds))) && LRT_effect!="none") {
       effect_matrix <- cbind(I=rep(0, nrow(dds)),as.matrix(mcols(dds)[,term,drop=FALSE]))
       split_effects <- strsplit(term, "_vs_")
       # if a main effect is dropped, then all the terms are probably named A vs (intercept)

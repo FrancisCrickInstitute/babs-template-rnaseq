@@ -67,7 +67,10 @@ ParamList <- R6::R6Class("ParamList",
                           #' @description
                           #' Get the value that the parameter is currently set to.
                           #' @param id Name of the value you want to access.
-                          get = function(id) {
+                          get = function(id, override) {
+                            if (!missing(override) && (id %in% names(override))) {
+                              return(override$id)
+                            }
                             if (!id %in% names(private$params)) {
                               stop(id, " has not yet been initialized")
                             }
