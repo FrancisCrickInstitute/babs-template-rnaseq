@@ -337,7 +337,7 @@ fit_model <- function(mdl, dds, ...) {
   if (any(metadata(model_dds)$model$dropped)) {
     DESeq2::design(model_dds) <- metadata(model_dds)$model$mat
   }
-  done_wald <- FALSE# mightn't need to run Wald if everything is an LRT
+  done_fit <- FALSE# mightn't need to run Wald if everything is an LRT
   ## Generate a nested list - single comparisons will be singletons, expanded mult_comps may not be.
   comp_ind <- 1
   out <- lapply(mdl$comparisons, function(comp) {
