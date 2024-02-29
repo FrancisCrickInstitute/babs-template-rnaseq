@@ -470,7 +470,7 @@ for (dataset in names(dds_model_comp)) {
       }
       baseline_list <- as.data.frame(colData(this_comp)[most_decreasing, var_roles$all])
       baseline_str <- switch(
-        mdl$baseline_heuristic,
+        param$get("baseline_heuristic"),
         min=paste(names(baseline_list), unlist(baseline_list), sep="=", collapse=","),
         negative="baseline condition",
         "gene-average"
