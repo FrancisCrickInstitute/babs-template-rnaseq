@@ -130,19 +130,27 @@ $(staging_dir)/.params.yml:  project.mk
 ${staging_dir}/index.qmd : $(source_dir)/index.qmd $(qmds)
 	sed  's#^  contents: .*#  contents: [$(subst $(space),$(comma),$(patsubst $(staging_dir)/%,%,$(qmds)))]#' $< > $@
 
-R.bib: renv.lock $(patsubst %,%.config,$(alignments)) | $(log_dir) rocker.Renviron
-	$(R) -e 'library(renv); restore(); hydrate()' $(call log,bib)
-	$(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")' $(call log,bib,-a)
+R.bib: renv.lock  | $(log_dir) rocker.Renviron
+	$(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")' $(call log,bib)
 	$(call git-ignore,/$@)
 
-renv.lock: orgs=$(foreach align,$(alignments),$($(align).org.db))
-renv.lock: | rocker.Renviron  $(log_dir)
-	[ ! -f $@ ] || $(GIT) stash push -m "Pipeline stashed. Use 'git stash pop' to retrieve it" -- $@ $(call log,renv)
-	for o in $(orgs); do grep -F -q $$o resources/_dependencies.R || echo "library($$o)" >> resources/_dependencies.R; done
-	$(R) -e 'library(renv); options(repos = BiocManager::repositories()); init(bioconductor=TRUE);' $(call log,renv,-a)
-	$(GIT) add renv.lock resources/_dependencies.R renv/activate.R .Rprofile $(call log,renv,-a)
-	$(GIT) commit -m 'Renv initialised by pipeline\n\n' $(call log,renv,-a)
-	$(GIT) rev-parse "v0.0.1" >/dev/null 2>&1 || $(GIT) tag v0.0.1 $(call log,renv,-a)
+renv.lock: resources/_dependencies.R $(wildcard .renv.lock)
+	if [ -f .renv.lock ] ; then \
+	  $(GIT) mv .renv.lock renv.lock;\
+	  $(R) -e 'library(renv); activate(); restore()' ;\
+	  $(R) -e 'library(renv); install(); snapshot()' ;\
+	  $(GIT) add renv.lock resources/_dependencies.R renv/activate.R .Rprofile $(call log,renv,-a) ;\
+	  $(GIT) commit -m 'Renv initialised by pipeline\n\n' $(call log,renv,-a) ;\
+	  $(GIT) rev-parse "v0.0.1" >/dev/null 2>&1 || $(GIT) tag v0.0.1 $(call log,renv,-a); \
+	else \
+	  $(GIT) stash push -m "Pipeline stashed. Use 'git stash pop' to retrieve it" -- $@ $(call log,renv)
+	  $(R) -e 'library(renv); install(); snapshot()' ;\
+	fi
+
+resources/_dependencies.R: orgs=$(foreach align,$(alignments),$($(align).org.db))
+resources/_dependencies.R: $(patsubst %,%.config,$(alignments))
+	for o in $(orgs); do grep -F -q $$o $@ || echo "library($$o)" >> $@; done
+	touch $@
 
     else
 ##   being executed by container without slurm, so put what 'make' would normally execute in a temporary
@@ -310,7 +318,6 @@ maintainer-clean: clean ## Remove the results and data directories, in addition 
 clean-geo:  ## Remove the GEO files from scratch
 	rm -f shortcuts/geo
 	rm -rf $(SCRATCH_DIR)geo
-
 
 
 

@@ -143,7 +143,7 @@ trim_names <- function(names) {
   chars <- strsplit(names, "")
   non_redundant_char <- sapply(purrr::list_transpose(chars, simplify=FALSE), function(x) length(unique(x))!=1)
   substr(names,
-         min(nchar(names), which(non_redundant_char)[1], na.rm=TRUE),
+         min(nchar(names), which(non_redundant_char)[1]-1, na.rm=TRUE),
          nchar(names))
 }
 

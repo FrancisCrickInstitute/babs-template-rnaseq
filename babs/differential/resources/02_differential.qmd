@@ -272,7 +272,7 @@ for (dataset in names(summaries)) {
     ), envir = environment(), quiet = TRUE)
   cat(res, sep = '\n\n')
 
-  if (nrow(unclassified[[dataset]])>0) {
+  if (nrow(unclassed[[dataset]])>0) {
     res <- knitr::knit_child(
       text = c(
         "```{r}",
