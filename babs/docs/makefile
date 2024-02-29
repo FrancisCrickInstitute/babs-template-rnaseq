@@ -48,8 +48,8 @@ samplesheet.csv:
 	head -1 $@ | grep -q "^sample,fastq_1,fastq_2" || { echo "$@ has incorrect header" | tee -a tmp.err }
 	[ $(word 1,$(shell wc -l $@)) -ge 2 ] || { echo "@ has only one line" | tee -a tmp.err }
 else
-limsid=$(subst asf-,,$(subst lims-,,$(call babsfield,Lims)))
-lab-sci=$(word 2,$(subst /projects/, ,$(dir $(call babsfield,Path))))
+limsid=$(subst asf-,,$(subst lims-,,$(setting_Lims)))
+lab-sci=$(word 2,$(subst /projects/, ,$(dir $(setting_Path))))
 fqfiles=/nemo/stp/babs/inputs/sequencing/released/$(lab-sci)$(limsid)/primary_data/*/fastq/*_R1_001.fastq.gz
 samplesheet.csv : $(wildcard ${fqfiles})
 	if [ "$(words $(wildcard ${fqfiles}))" == "0" ] ;\
