@@ -41,7 +41,7 @@ QUARTO=quarto
 EXECUTOR = singularity
 
 DOCKER = gavinpaulkelly/verse-boost
-BIND_DIR = $(shell ${GIT} rev-parse --show-toplevel || echo ${CURDIR})
+BIND_DIR = $(shell ${GIT} rev-parse --show-toplevel || echo ${CURDIR}),$(shell $(GIT) worktree list | awk -e '$$3=="[main]"{print $$1}')
 BIOCPARALLEL_WORKER_NUMBER=2
 
 ################################################################

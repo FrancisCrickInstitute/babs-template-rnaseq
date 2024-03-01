@@ -299,87 +299,18 @@ fit_model <- function(mdl, dds, ...) {
   if (any(metadata(model_dds)$model$dropped)) {
     DESeq2::design(model_dds) <- metadata(model_dds)$model$mat
   }
-  done_fit <- FALSE# mightn't need to run Wald if everything is an LRT
   ## Generate a nested list - single comparisons will be singletons, expanded mult_comps may not be.
-  if (PUT_COMPARISON_IN_FUNCTION <- FALSE) {
-    # TODO Need some way of handling the cached fit flagged by done_fit if we go this route!
-    out <- list()
-    this_dds <- model_dds
-    for (comp_ind in seq(along=mdl$comparisons)) {
-      message("Processing comparison ", comp_ind)
-      out[[comp_ind]] <- fit_comparison(comp=mdl$comparisons[[comp_ind]], dds = this_dds)
-    }
-    names(out) <- names(mdl$comparisons)
-  }
-  comp_ind <- 1
-  out <- lapply(mdl$comparisons, function(comp) {
+  out <- list()
+  metadata(model_dds)$model_fit_done <- FALSE
+  for (comp_ind in seq(along=mdl$comparisons)) {
     message("Processing comparison ", comp_ind)
-    comp_ind <<- comp_ind+1
-    comparison_dds <- model_dds
-    if (is_formula(comp)) { # Do the usual DESeq2 LRT
-      return(list(fitLRT(comparison_dds, mdl=mdl, reduced=comp, ...)))
+    fit <- fit_comparison(comp=mdl$comparisons[[comp_ind]], model_dds=model_dds, mdl=mdl, ...)
+    out[[comp_ind]] <- fit
+    if (metadata(fit[[1]])$model_fit_done && !metadata(model_dds)$model_fit_done) {
+      model_dds <- fit[[1]]
     }
-    if (class(comp)=="post_hoc") { #Multiple-comparisons
-      contrs <- emcontrasts(dds=comparison_dds, spec=comp$spec, extra=comp[-1])
-      if (comp$LRT %||% FALSE) { # Do LRT-equivalents of the multiple ward tests
-        mdl_mat <- metadata(comparison_dds)$model$mat %||% model.matrix(mdl$design, as.data.frame(colData(comparison_dds)))
-        return(lapply(
-          contrs,
-          function(contr) {fitContrastLRT(comparison_dds, mdl=mdl_mat, contr=contr, ...)}
-        )
-        )
-      } else {
-        if (!done_fit) {
-          if ((mdl$approach %||% "DESeq2")=="DESeq2") {
-            model_dds <- DESeq2::DESeq(model_dds, test="Wald", ...)
-          } else {
-            tmp <- rowData(model_dds)
-            tmp$PCA <- NULL
-            dge <- edgeR::DGEList(
-              counts=assay(model_dds, "counts"),
-              samples=as.data.frame(colData(model_dds)),
-              genes=as.data.frame(tmp)
-            )
-            dge <- edgeR::calcNormFactors(dge)
-            mm <- model.matrix(design(model_dds), dge$samples)
-            y <- limma::voom(dge, mm, plot=FALSE)
-            if ("block" %in% names(mdl)) {
-              block <- dge$samples[[mdl$block]]
-              corfit <- duplicateCorrelation(y, mm, block=block)
-              y <- limma::voom(dge, mm,  block=block, correlation=corfit)
-              fit <- limma::lmFit(y, mm, block=block, correlation=corfit )
-            } else {
-              fit <- limma::lmFit(y, mm)
-            }
-            fit <- limma::contrasts.fit(fit, do.call(cbind, contrs))
-            fit <- limma::eBayes(fit)
-            metadata(model_dds)$voom <- fit
-            contrs[] <- seq_along(contrs)
-          }
-          comparison_dds <- model_dds
-          done_fit <- TRUE
-        }
-        return(lapply(
-          contrs,
-          function(contr) {
-            metadata(comparison_dds)$models <- NULL
-            metadata(comparison_dds)$comparisons <- NULL
-            metadata(comparison_dds)$comparison <- contr
-            comparison_dds}
-        ))
-      }
-    }
-    # Usual DESeq2 Wald
-    if (!done_fit) {
-          model_dds <- DESeq2::DESeq(model_dds, test="Wald", ...)
-          comparison_dds <- model_dds
-      done_fit <- TRUE
-    }
-    metadata(comparison_dds)$models <- NULL
-    metadata(comparison_dds)$comparisons <- NULL
-    metadata(comparison_dds)$comparison <- comp
-    return(list(comparison_dds))
-  })
+  }
+  names(out) <- names(mdl$comparisons)
   ## Flatten the list, but preserve the original comparison name in the dmc metadata.
   out <- unlist(out, recursive=FALSE)
   out <- imap(out, function(obj, cname) {
@@ -388,71 +319,51 @@ fit_model <- function(mdl, dds, ...) {
   return(out)
 }
 
-#TODO Doesn't work, as we need the caching mechanism!
-fit_comparison <- function(comp, model_dds, mdl) {
-    if (is_formula(comp)) { # Do the usual DESeq2 LRT
-      return(list(fitLRT(model_dds, mdl=mdl, reduced=comp, ...)))
+fit_comparison <- function(comp, model_dds, mdl, ...) {
+  if (is_formula(comp)) { # Do the usual DESeq2 LRT
+    return(list(fitLRT(model_dds, mdl=mdl, reduced=comp, ...)))
+  } else if (class(comp)=="post_hoc") { #Multiple-comparisons
+    contrs <- emcontrasts(dds=model_dds, spec=comp$spec, extra=comp[-1])
+    if (comp$LRT %||% FALSE) { # Do LRT-equivalents of the multiple ward tests
+      mdl_mat <- metadata(model_dds)$model$mat %||% model.matrix(mdl$design, as.data.frame(colData(model_dds)))
+      return(lapply(
+        contrs,
+        function(contr) {fitContrastLRT(model_dds, mdl=mdl_mat, contr=contr, ...)}
+      )
+      )
+    } else if ((mdl$approach %||% "DESeq2")=="voom"){
+      ## TODO: possibly optimise/cache repeated calls to fitVoom, like 'model_fit_done'
+      fit <- fitVoom(model_dds, mdl)
+      fit <- limma::contrasts.fit(fit, do.call(cbind, contrs))
+      fit <- limma::eBayes(fit)
+      metadata(model_dds)$voom <- fit
+      contrs[] <- seq_along(contrs)
+    } else {
+      if (!metadata(model_dds)$model_fit_done) {
+        model_dds <- DESeq2::DESeq(model_dds, test="Wald", ...)
+        metadata(model_dds)$model_fit_done <- TRUE
+      } # no need for an 'else': the model fit has already been done
     }
-    if (class(comp)=="post_hoc") { #Multiple-comparisons
-      contrs <- emcontrasts(dds=model_dds, spec=comp$spec, extra=comp[-1])
-      if (comp$LRT %||% FALSE) { # Do LRT-equivalents of the multiple ward tests
-        mdl_mat <- metadata(model_dds)$model$mat %||% model.matrix(mdl$design, as.data.frame(colData(comparison_dds)))
-        return(lapply(
-          contrs,
-          function(contr) {fitContrastLRT(model_dds, mdl=mdl_mat, contr=contr, ...)}
-        )
-        )
-      } else {
-        if (!done_fit) {
-          if ((mdl$approach %||% "DESeq2")=="DESeq2") {
-            model_dds <- DESeq2::DESeq(model_dds, test="Wald", ...)
-          } else {
-            tmp <- rowData(model_dds)
-            tmp$PCA <- NULL
-            dge <- edgeR::DGEList(
-              counts=assay(model_dds, "counts"),
-              samples=as.data.frame(colData(model_dds)),
-              genes=as.data.frame(tmp)
-            )
-            dge <- edgeR::calcNormFactors(dge)
-            mm <- model.matrix(design(model_dds), dge$samples)
-            y <- limma::voom(dge, mm, plot=FALSE)
-            if ("block" %in% names(mdl)) {
-              block <- dge$samples[[mdl$block]]
-              corfit <- duplicateCorrelation(y, mm, block=block)
-              y <- limma::voom(dge, mm,  block=block, correlation=corfit)
-              fit <- limma::lmFit(y, mm, block=block, correlation=corfit )
-            } else {
-              fit <- limma::lmFit(y, mm)
-            }
-            fit <- limma::contrasts.fit(fit, do.call(cbind, contrs))
-            fit <- limma::eBayes(fit)
-            metadata(model_dds)$voom <- fit
-            contrs[] <- seq_along(contrs)
-          }
-          comparison_dds <- model_dds
-          done_fit <- TRUE
-        }
-        return(lapply(
-          contrs,
-          function(contr) {
-            metadata(comparison_dds)$models <- NULL
-            metadata(comparison_dds)$comparisons <- NULL
-            metadata(comparison_dds)$comparison <- contr
-            comparison_dds}
-        ))
-      }
+    # Return a list of DESeq2 objects, with the comparison metadata set.
+    return(lapply(
+      contrs,
+      function(contr) {
+        metadata(model_dds)$models <- NULL
+        metadata(model_dds)$comparisons <- NULL
+        metadata(model_dds)$comparison <- contr
+        model_dds}
+    ))
+  } else {
+    # Just a single DESeq2 Wald
+    if (!metadata(model_dds)$model_fit_done) {
+      model_dds <- DESeq2::DESeq(model_dds, test="Wald", ...)
+      metadata(model_dds)$model_fit_done <- TRUE
     }
-    # Usual DESeq2 Wald
-    if (!done_fit) {
-          model_dds <- DESeq2::DESeq(model_dds, test="Wald", ...)
-          comparison_dds <- model_dds
-      done_fit <- TRUE
-    }
-    metadata(comparison_dds)$models <- NULL
-    metadata(comparison_dds)$comparisons <- NULL
-    metadata(comparison_dds)$comparison <- comp
-    return(list(comparison_dds))
+    metadata(model_dds)$models <- NULL
+    metadata(model_dds)$comparisons <- NULL
+    metadata(model_dds)$comparison <- comp
+    return(list(model_dds))
+  }
 }
 
 ##' Check model
@@ -549,6 +460,27 @@ emcontrasts <- function(dds, spec, extra=NULL) {
   contr
 }
 
+fitVoom <- function(model_dds, mdl) {
+  tmp <- rowData(model_dds)
+  tmp$PCA <- NULL
+  dge <- edgeR::DGEList(
+    counts=assay(model_dds, "counts"),
+    samples=as.data.frame(colData(model_dds)),
+    genes=as.data.frame(tmp)
+  )
+  dge <- edgeR::calcNormFactors(dge)
+  mm <- model.matrix(design(model_dds), dge$samples)
+  y <- limma::voom(dge, mm, plot=FALSE)
+  if ("block" %in% names(mdl)) {
+    block <- dge$samples[[mdl$block]]
+    corfit <- duplicateCorrelation(y, mm, block=block)
+    y <- limma::voom(dge, mm,  block=block, correlation=corfit)
+    fit <- limma::lmFit(y, mm, block=block, correlation=corfit )
+  } else {
+    fit <- limma::lmFit(y, mm)
+  }
+  fit
+}
 
 ##' Fit an LRT model
 ##'

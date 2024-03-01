@@ -216,7 +216,7 @@ ifdef redirect_$(location)
 	mkdir -p $(shortcut)
 ifdef url_$(location)
 	echo "[InternetShortcut]" > $(shortcut)$(location).url
-	echo "URL=$(url_$(location))/latest" >> $(shortcut)$(location).url
+	echo "URL=$(url_$(location))/$(VERSION)" >> $(shortcut)$(location).url
 endif
 	ln -sfn $(redirect_$(location)) $(pubdir)
 endif
@@ -249,6 +249,9 @@ build: $(samplesheets_build) $(specfiles_build) $(configs_build) $(genes_results
 	$(GIT) add $(samplesheets_build) $(specfiles_build) $(configs_build)
 	$(GIT) commit -m "Add differential build-files" || true
 
+$(specfiles_build): % : $(docs_dir)/%
+	cp $< $@
+
 ifneq (,$(filter build,$(MAKECMDGOALS)))
 ## Only do build-like things if build actually called.
 ## Otherwise, metadata samplesheets will trigger an
@@ -264,8 +267,6 @@ $(samples_db): $(my_metadata).csv $(nfcore_dir)/../$(samples_db)
 $(my_metadata).csv: $(ingress_dir)/$(experiment_table).csv | $(dir $(my_metadata))
 	cp $< $@
 
-$(specfiles_build): % : $(docs_dir)/%
-	cp $< $@
 
 $(configs_build): %.config: ../nfcore/%.config
 	cp $< $@

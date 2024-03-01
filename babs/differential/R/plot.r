@@ -25,7 +25,7 @@ df2colorspace <- function(df, palette) {
                                      levels(column))
                 } else {
                   my_cols <- RColorBrewer::brewer.pal(3, seq_cols[start_level])[-2]
-                  circlize::colorRamp2(range(column), my_cols)
+                  circlize::colorRamp2(range(column, na.rm=TRUE), my_cols)
                 }
               }
               )
