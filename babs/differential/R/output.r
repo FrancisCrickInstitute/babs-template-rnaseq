@@ -62,8 +62,8 @@ write_results <- function(ddsList, param, dir=".", assays=NULL) {
   summaries <- map_depth(ddsList, 3, summarise_results)
   out <- lapply(ddsList, function(x) "")
   for (dataset in names(ddsList)) {
-    wb <- openxlsx::createWorkbook(title=param$get("title"),
-                                  creator="Gavin Kelly")
+    wb <- openxlsx::createWorkbook(title="Differential Analysis",
+                                  creator="BABS")
     tmp <- param$describe()
     dframe <- data.frame(id=names(tmp), description=unlist(tmp))
     sn <- "Parameters"

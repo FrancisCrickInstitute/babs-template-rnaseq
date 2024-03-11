@@ -16,6 +16,7 @@ execute:
   echo: false
 code-summary: "Show the code"
 params:
+  section: Differential analysis
 
 ---
 
@@ -101,10 +102,8 @@ specs   <- load_specs(file=paste0(params$spec, ".spec"), context=dds)
 
 param <- ParamList$new(defaults=specs$settings)
 # Calling the setter without a value will pick up the default (from the spec), _and_ alert it in the markdown, and return the default
-set.seed(param$set("seed"))
-param$set("title", "Differential Analysis")
-param$set("script", file.path(getwd(),"01_differential.r"))
-param$set("spec",  params$spec, "Using analysis plan '{}'.")
+set.seed(param$set("seed", postpone=TRUE))
+param$set("spec",  params$spec, "Using analysis plan '{}'.", postpone=TRUE)
 param$set("alignment", params$alignment, "Using alignment settings '{}'")
   
 ```
@@ -112,7 +111,7 @@ param$set("alignment", params$alignment, "Using alignment settings '{}'")
 # Find differential genes
 
  We use DESeq2 [@pkg_DESeq2] to find differential genes using the
-negative binomial distribution to model counts, with IHW [@pkg_IHW]
+negative binomial distribution to model counts, with IHW [@IHW2016]
 for multiple-testing correction with greater power than
 Benjamini-Hochberg, and ashr [@pkg_ashr] for effect-size shrinkage
 to ensure reported fold-changes are more robust.
@@ -121,10 +120,10 @@ to ensure reported fold-changes are more robust.
 ```{r}
 #| label: differential
 
-param$set("alpha")
-param$set("lfcThreshold")
-param$set("filterFun")
-param$set("baseline_heuristic")
+param$set("alpha", postpone=TRUE)
+param$set("lfcThreshold", postpone=TRUE)
+param$set("filterFun", postpone=TRUE)
+param$set("baseline_heuristic", postpone=TRUE)
 param$set("LRT_effect")
 
 ## For each dataset, fit all its models
@@ -331,7 +330,7 @@ are sub-tabs for different experimental designs, if any
 
 ```{r}
 #| label: fig-differential-MA
-
+first <- TRUE
 for (dataset in names(dds_model_comp)) {
   met <- metadata(dds_model_comp[[dataset]][[1]][[1]])$dmc
   cat("\n\n## ", met$dataset_name %||% met$dataset,"\n\n")
@@ -340,7 +339,7 @@ for (dataset in names(dds_model_comp)) {
   }
   for (mdl in names(dds_model_comp[[dataset]])) {
     met <- metadata(dds_model_comp[[dataset]][[mdl]][[1]])$dmc
-    cat("\n### ", met$model_name %||% met$model, "\n\n", sep="") 
+    cat("\n\n### ", met$model_name %||% met$model, "\n\n", sep="") 
     if (!is.null(met$model_description)) {
       cat(met$model_description, "\n\n")
     }
@@ -384,8 +383,10 @@ for (dataset in names(dds_model_comp)) {
       pl <- pl+ggrepel::geom_text_repel(size=4, data=res[ind,])
       do_plot(pl,
               label=fig_label("02-MA"),
-              caption=paste0("MA plot of differential genes ", sub(".*\\t", "", comp_name))
+              caption=paste0("MA plot of differential genes ", sub(".*\\t", "", comp_name)),
+              preview=first
               )
+      first <- FALSE
       cat("\n\n---\n\n")
     } # next comparison
   }   # next model
@@ -404,7 +405,7 @@ from the QC heatmaps which were blind to the experimental design.
 ```{r}
 #| label: fig-differential-heatmap
 
-param$set("clustering_distance_rows")
+param$set("clustering_distance_rows", postpone=TRUE)
 param$set("clustering_distance_columns")
 for (dataset in names(dds_model_comp)) {
   met <- metadata(dds_model_comp[[dataset]][[1]][[1]])$dmc
@@ -422,7 +423,7 @@ for (dataset in names(dds_model_comp)) {
   for (mdl_name in names(dds_model_comp[[dataset]])) {
     this_mdl <- dds_model_comp[[dataset]][[mdl_name]]
     met <- metadata(this_mdl[[1]])$dmc
-    cat("\n### ", met$model_name %||% met$model, "\n\n", sep="") 
+    cat("\n\n### ", met$model_name %||% met$model, "\n\n", sep="") 
     if (!is.null(met$model_description)) {
       cat(met$model_description, "\n\n")
     }
@@ -551,6 +552,8 @@ the BABS analyst must receive a named acknowledgement. Please also
 cite the following sources which have enabled the analysis to be
 carried out.
 
-# Bibliography
+# References
 
+::: {#refs}
+:::
 

@@ -1,7 +1,12 @@
 ---
 title: "Index of analysis pages"
+number-sections: false
 listing:
+  id: generated-pages
   contents: []
   categories: true
   sort: filename
 ---
+
+::: {#generated-pages}
+:::

@@ -84,7 +84,7 @@ part.resid <- function(fit) {
 ##' @param cap_fn The function that will be called on the caption text
 ##' @return 
 ##' @author Gavin Kelly
-do_plot <- function(pl, label, caption, cap_fn=fig_caption, height_mult=NA, min_height=0, max_height=Inf) {
+do_plot <- function(pl, label, caption, cap_fn=fig_caption, height_mult=NA, min_height=0, max_height=Inf, preview=FALSE) {
   if ("Heatmap" %in% class(pl)) {
     fn <- function() {
       draw(pl, heatmap_legend_side = "top")
@@ -115,11 +115,16 @@ fn()
 lbl=gsub("[^[:alnum:]]+", "-",label),
 height=height_opt
 )
-    cat(knitr::knit_child(
+    out <- knitr::knit_child(
       text=fig_child,
       quiet=TRUE,
       envir=environment())
-      )
+    if (preview) {
+      cat(sub("(.*)(}.*)", "\\1 .preview-image\\2", out))
+    } else {
+      cat(out)
+    }
+    
   } else {
     fn()
   }

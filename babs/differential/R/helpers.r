@@ -16,7 +16,8 @@ ParamList <- R6::R6Class("ParamList",
                                             baseline_heuristic="Use the '{}' heuristic to centre the colour-scale",
                                             LRT_effect="Use the '{}' summary of an LRT 'effect size'"
                                             ),
-                          defaults=list()
+                          defaults=list(),
+                          div_contents=""
                         ),
                         public = list(
                           #' @description
@@ -32,7 +33,7 @@ ParamList <- R6::R6Class("ParamList",
                           #' @param value The value the parameter should taken henceforth; if missing, it will take the default value.
                           #' @param description A string describing what the purpose of the parameter is.
                           #' @param div Logical, whether to mention in the markdown report what the value has been set to.
-                          set = function(id, value, description="", div=TRUE) {
+                          set = function(id, value, description="", postpone=FALSE) {
                             if (missing(value)) {
                               if (id %in% names(private$defaults)) {
                                 value <- private$defaults[[id]]
@@ -59,8 +60,13 @@ ParamList <- R6::R6Class("ParamList",
                             } 
                             description <- sub("\\{\\}", paste0("{", id, "}"), description)
                             private$descriptions[[id]]=description
-                            if (div & isTRUE(getOption('knitr.in.progress'))) {
-                              cat('\n\n::: {.callout-note title="Setting analysis parameter"}\n', self$describe(id), '\n:::\n\n')
+                            private$div_contents <- paste(private$div_contents, " - ", self$describe(id), '\n')
+                            if ((!postpone) && isTRUE(getOption('knitr.in.progress'))) {
+                              cat('\n\n::: {.callout-note title="Setting analysis parameter"}\n', private$div_contents, '\n:::\n\n')
+                              private$div_contents <- ""
+                            }
+                            if (is.na(postpone)) {
+                              private$div_contents <- ""
                             }
                             invisible(self$get(id))
                           },

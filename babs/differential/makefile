@@ -74,7 +74,7 @@ ifeq ($(SUBMIT),false)
 run: render  ## Create objects in `data` that store the results of applying each spec file, along with a versioned html report in `results`.  Requires 'make build' be done first.
 
 ## Render the qmds to html in one quarto call
-render: $(qmds)  $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(samplesheets)| $(log_dir) data $(RESULTS_DIR)/$(VERSION) R.bib## Render the whole directory of generated qmds
+render: $(qmds)  $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(samplesheets)| $(log_dir) data $(RESULTS_DIR)/$(VERSION) $(staging_dir)/R.bib## Render the whole directory of generated qmds
 	sed  -i 's#^  contents: .*#  contents: [$(subst $(space),$(comma),$(patsubst $(staging_dir)/%,%,$(qmds)))]#' $(staging_dir)/index.qmd
 	$(QUARTO) render '$(staging_dir)' --output-dir $(RESULTS_DIR)/$(VERSION) --execute-dir $(CURDIR) $(call log,render)
 	cp -rT $(staging_dir)/$(RESULTS_DIR)/$(VERSION) $(RESULTS_DIR)/$(VERSION)
@@ -90,7 +90,7 @@ pages: $(html_reports) ## Generate the renders individually
 	ln -sfn  $(VERSION) $(RESULTS_DIR)/latest
 
 ## Render an individual page
-$(html_reports) : $(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%$(TAG).html : $(staging_dir)/%$(TAG).qmd $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(samplesheets)| $(log_dir) $(RESULTS_DIR)/$(VERSION) $(staging_dir)/$(RESULTS_DIR)/$(VERSION) R.bib
+$(html_reports) : $(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%$(TAG).html : $(staging_dir)/%$(TAG).qmd $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(samplesheets)| $(log_dir) $(RESULTS_DIR)/$(VERSION) $(staging_dir)/$(RESULTS_DIR)/$(VERSION) $(staging_dir)/R.bib
 	$(QUARTO) render '$<' \
 	  --output-dir $(RESULTS_DIR)/$(VERSION)/ \
 	  --execute-dir $(CURDIR) $(call log,html-$*)
@@ -130,21 +130,23 @@ $(staging_dir)/.params.yml:  project.mk
 ${staging_dir}/index.qmd : $(source_dir)/index.qmd $(qmds)
 	sed  's#^  contents: .*#  contents: [$(subst $(space),$(comma),$(patsubst $(staging_dir)/%,%,$(qmds)))]#' $< > $@
 
+$(staging_dir)/R.bib: R.bib
+	cp $< $@
 R.bib: renv.lock  | $(log_dir) rocker.Renviron
 	$(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")' $(call log,bib)
 	$(call git-ignore,/$@)
 
-renv.lock: resources/_dependencies.R $(wildcard .renv.lock)
-	if [ -f .renv.lock ] ; then \
-	  $(GIT) mv .renv.lock renv.lock;\
-	  $(R) -e 'library(renv); activate(); restore()' ;\
+renv.lock: resources/_dependencies.R $(wildcard pre.renv.lock)
+	if [ -f pre.renv.lock ] ; then \
+	  $(GIT) mv pre.renv.lock renv.lock;\
+	  $(R) -e 'library(renv); restore()' ;\
 	  $(R) -e 'library(renv); install(); snapshot()' ;\
 	  $(GIT) add renv.lock resources/_dependencies.R renv/activate.R .Rprofile $(call log,renv,-a) ;\
 	  $(GIT) commit -m 'Renv initialised by pipeline\n\n' $(call log,renv,-a) ;\
 	  $(GIT) rev-parse "v0.0.1" >/dev/null 2>&1 || $(GIT) tag v0.0.1 $(call log,renv,-a); \
 	else \
 	  $(GIT) stash push -m "Pipeline stashed. Use 'git stash pop' to retrieve it" -- $@ $(call log,renv)
-	  $(R) -e 'library(renv); install(); snapshot()' ;\
+	  $(R) -e 'library(renv); init(bioconductor=TRUE); snapshot()' ;\
 	fi
 
 resources/_dependencies.R: orgs=$(foreach align,$(alignments),$($(align).org.db))
@@ -215,8 +217,10 @@ ifdef redirect_$(location)
 	mkdir -p $(redirect_$(location))
 	mkdir -p $(shortcut)
 ifdef url_$(location)
-	echo "[InternetShortcut]" > $(shortcut)$(location).url
-	echo "URL=$(url_$(location))/$(VERSION)" >> $(shortcut)$(location).url
+	echo "<!doctype html>" > $(shortcut)$(location).html
+	echo "<script>" >> $(shortcut)$(location).html
+	echo "window.location.replace('$(url_$(location))/$(VERSION)')" >> $(shortcut)$(location).html
+	echo "</script>"  >> $(shortcut)$(location).html
 endif
 	ln -sfn $(redirect_$(location)) $(pubdir)
 endif

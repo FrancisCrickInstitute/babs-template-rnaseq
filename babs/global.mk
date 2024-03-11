@@ -14,7 +14,8 @@ log_dir=logs
 ml = module is-loaded $1 || module load $1
 SINGULARITY_VERSION=3.6.4
 NEXTFLOW_VERSION=22.10.3
-RVERSION=4.2.2
+RVERSION=4.3.2
+BIOCONDUCTOR_VERSION=3.18
 
 R=R
 NEXTFLOW = $(call ml,Nextflow/$(NEXTFLOW_VERSION)); $(call ml,Singularity/$(SINGULARITY_VERSION)); $(call ml,CAMP_proxy); nextflow

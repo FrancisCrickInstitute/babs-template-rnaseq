@@ -21,7 +21,7 @@ if ((flags.spec)=="") {
 } else {
     perPage = {
 	title: " " + flags.alignment + " " + flags.spec,
-	description: " of " + flags.alignment + "-aligned data according to " + flags.spec,
+	description: " of " + flags.alignment + "-aligned data according to plan '" + flags.spec + "'",
 	categories: [flags.alignment, flags.spec],
 	params: {
 	    alignment: flags.alignment,

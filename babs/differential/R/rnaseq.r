@@ -306,7 +306,7 @@ fit_model <- function(mdl, dds, ...) {
     message("Processing comparison ", comp_ind)
     fit <- fit_comparison(comp=mdl$comparisons[[comp_ind]], model_dds=model_dds, mdl=mdl, ...)
     out[[comp_ind]] <- fit
-    if (metadata(fit[[1]])$model_fit_done && !metadata(model_dds)$model_fit_done) {
+    if (length(fit)!=0 && metadata(fit[[1]])$model_fit_done && !metadata(model_dds)$model_fit_done) {
       model_dds <- fit[[1]]
     }
   }
@@ -324,6 +324,7 @@ fit_comparison <- function(comp, model_dds, mdl, ...) {
     return(list(fitLRT(model_dds, mdl=mdl, reduced=comp, ...)))
   } else if (class(comp)=="post_hoc") { #Multiple-comparisons
     contrs <- emcontrasts(dds=model_dds, spec=comp$spec, extra=comp[-1])
+    if (length(contrs)==0) return(list())
     if (comp$LRT %||% FALSE) { # Do LRT-equivalents of the multiple ward tests
       mdl_mat <- metadata(model_dds)$model$mat %||% model.matrix(mdl$design, as.data.frame(colData(model_dds)))
       return(lapply(

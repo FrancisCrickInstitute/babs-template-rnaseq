@@ -17,6 +17,7 @@ execute:
   error: true
 code-summary: "Show the code"
 params:
+  section: Enrichment analysis
 
 ---
 
@@ -91,9 +92,8 @@ specs   <- load_specs(file=paste0(params$spec, ".spec"), context=dds)
 param <- ParamList$new(defaults=specs$settings)
 
 # Calling the setter without a value will pick up the default (from the spec), _and_ alert it in the markdown, and return the default
-set.seed(param$set("seed"))
-param$set("script", params$script)
-param$set("spec",  params$spec, "Using analysis plan '{}'.")
+set.seed(param$set("seed", postpone=TRUE))
+param$set("spec",  params$spec, "Using analysis plan '{}'.", postpone=TRUE)
 param$set("alignment", params$alignment, "Using alignment settings '{}'")
 data(list=paste0(params$spec, "_x_", params$alignment))
 dds_model_comp <-  decompress_dmc(dds_model_comp)
@@ -348,8 +348,10 @@ for (approach in names(approach_res_list)) {
     do_plot(pl,
             label=fig_label("functional"),
             caption=capt,
-            height_mult=nlevels(df$ID)/30
+            height_mult=nlevels(df$ID)/30,
+            min_height=9
             )
+    cat("\n\n")
     tbl <- df %>%
       rename(Comparison=inner) %>%
       filter(!is.na(Description)) %>%
@@ -383,8 +385,4 @@ discussed with BABS regarding authorship. If not authorship then
 the BABS analyst must receive a named acknowledgement. Please also
 cite the following sources which have enabled the analysis to be
 carried out.
-
-# Bibliography
-
-
 
