@@ -1,5 +1,8 @@
 library(BiocParallel)
 library(BiocManager)
+library(treeio)
+library(tidydr)
+library(irlba)
 library(BH)
 library(cluster)
 library(downloader)

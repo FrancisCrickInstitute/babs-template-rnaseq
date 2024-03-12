@@ -39,7 +39,8 @@
 #R=#Set in global.mk
 QUARTO=quarto
 EXECUTOR = singularity
-IMAGE = bioconductor/bioconductor_docker\:$(BIOCONDUCTOR_VERSION)-R-$(RVERSION)
+IMAGE=bioconductor/bioconductor_docker
+IMAGE_TAG=$(BIOCONDUCTOR_VERSION)-R-$(RVERSION)
 BIND_DIR = $(shell ${GIT} rev-parse --show-toplevel || echo ${CURDIR}),$(shell $(GIT) worktree list | awk -e '$$3=="[main]"{print $$1}')
 BIOCPARALLEL_WORKER_NUMBER=2
 
@@ -76,7 +77,7 @@ CONTAINERED=false#An internal flag
 
 ifeq (${EXECUTOR},singularity)
 CONTAINER= $(call ml,Singularity/$(SINGULARITY_VERSION)); singularity
-CONTAINER_IMAGE=$(SINGULARITY_ROOT)/$(IMAGE).sif
+CONTAINER_IMAGE=$(SINGULARITY_ROOT)/$(IMAGE)_$(IMAGE_TAG).sif
 CONTAINER_BIND=--bind $(BIND_DIR),/tmp,$(RENV_PATHS_ROOT),$(CURDIR)/rocker.Renviron:/usr/local/lib/R/etc/Renviron.site
 CONTAINER_ENV=--env SQLITE_TMPDIR=/tmp,BIOCPARALLEL_WORKER_NUMBER=$(BIOCPARALLEL_WORKER_NUMBER),GITHUB_PAT=${GITHUB_PAT}
 CONTAINER_FLAGS= exec $(CONTAINER_BIND) --pwd $(CURDIR) --containall --cleanenv $(CONTAINER_ENV)
@@ -84,24 +85,24 @@ CONTAINER_FLAGS_INTERACTIVE= exec $(CONTAINER_BIND),$${HOME} --pwd $(CURDIR) --c
 CONTAINER_SHELL = $(CONTAINER) $(patsubst exec,shell,$(CONTAINER_FLAGS_INTERACTIVE)) $(CONTAINER_IMAGE)
 $(CONTAINER_IMAGE): | rocker.Renviron
 	cd $(dir $(CONTAINER_IMAGE)) ;\
-	$(CONTAINER) pull docker://$(subst @,:,$(IMAGE))
+	$(CONTAINER) pull docker://$(IMAGE):$(IMAGE_TAG)
 CONTAINERED=true
 
 else ifeq (${EXECUTOR},docker)
 CONTAINER=docker
-CONTAINER_IMAGE=$(IMAGE)
+CONTAINER_IMAGE=$(IMAGE)_$(IMAGE_TAG)
 CONTAINER_FLAGS=run \
 --mount type=bind,source="$(BIND_DIR)",target="$(BIND_DIR)" \
 --mount type=bind,source="/tmp",target="/tmp" \
 --mount type=bind,source="$(CURDIR)/rocker.Renviron",target="/usr/local/lib/R/etc/Renviron.site" \
---workdir="$(CURDIR)" $(CONTAINER_IMAGE)
+--workdir="$(CURDIR)" $(IMAGE):$(IMAGE_TAG)
 	mkdir -p $(dir $(CONTAINER_IMAGE))
 	touch $(CONTAINER_IMAGE)
 CONTAINER_SHELL = $(CONTAINER) $(patsubst run,exec -it,$(CONTAINER_FLAGS_INTERACTIVE)) $(CONTAINER_IMAGE) /bin/bash
 CONTAINERED=true
 $(CONTAINER_IMAGE): | rocker.Renviron
-	$(CONTAINER) pull docker://$(IMAGE)
-	echo "Proxy for docker image" > $(IMAGE)
+	$(CONTAINER) pull docker://$(IMAGE):$(IMAGE_TAG)
+	echo "Proxy for docker image" > $@
 
 else ifeq (${EXECUTOR},shell)
   $(info " Not using containerisation so results are not necessarily reproducible")

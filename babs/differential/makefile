@@ -132,6 +132,7 @@ ${staging_dir}/index.qmd : $(source_dir)/index.qmd $(qmds)
 
 $(staging_dir)/R.bib: R.bib
 	cp $< $@
+
 R.bib: renv.lock  | $(log_dir) rocker.Renviron
 	$(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")' $(call log,bib)
 	$(call git-ignore,/$@)
@@ -141,13 +142,13 @@ renv.lock: resources/_dependencies.R $(wildcard pre.renv.lock)
 	  $(GIT) mv pre.renv.lock renv.lock;\
 	  $(R) -e 'library(renv); restore()' ;\
 	  $(R) -e 'library(renv); install(); snapshot()' ;\
-	  $(GIT) add renv.lock resources/_dependencies.R renv/activate.R .Rprofile $(call log,renv,-a) ;\
+	  $(GIT) add renv.lock resources/_dependencies.R renv/activate.R .Rprofile renv/settings.json $(call log,renv,-a) ;\
 	  $(GIT) commit -m 'Renv initialised by pipeline\n\n' $(call log,renv,-a) ;\
 	  $(GIT) rev-parse "v0.0.1" >/dev/null 2>&1 || $(GIT) tag v0.0.1 $(call log,renv,-a); \
 	else \
 	  $(GIT) stash push -m "Pipeline stashed. Use 'git stash pop' to retrieve it" -- $@ $(call log,renv)
 	  $(R) -e 'library(renv); init(bioconductor=TRUE); snapshot()' ;\
-	fi
+	fi	
 
 resources/_dependencies.R: orgs=$(foreach align,$(alignments),$($(align).org.db))
 resources/_dependencies.R: $(patsubst %,%.config,$(alignments))
@@ -158,7 +159,7 @@ resources/_dependencies.R: $(patsubst %,%.config,$(alignments))
 ##   being executed by container without slurm, so put what 'make' would normally execute in a temporary
 ##   shell script, and get container to call that script (so it naturally inherits all the command line
 ##   arguments etc)
-run render pages $(html_reports) scripts $(qmds) ${staging_dir}/_quarto.yml ${staging_dir}/index.qmd  R.bib renv.lock: $(CONTAINER_IMAGE)
+run render pages $(html_reports) scripts $(qmds) ${staging_dir}/_quarto.yml ${staging_dir}/index.qmd  ${staging_dir}/R.bib renv.lock: $(CONTAINER_IMAGE)
 	make -n -s $@ SUBMIT=false EXECUTOR=make > ${TMPSCRIPT}_bash 
 	$(CONTAINER) $(CONTAINER_FLAGS) $(CONTAINER_IMAGE) bash "${TMPSCRIPT}_bash" || { echo "${TMPSCRIPT}_bash failed." $(call log,container) ; exit 1; }
 	rm -f ${TMPSCRIPT}_bash
@@ -175,7 +176,7 @@ slurm-container-prefix=$(CONTAINER) $(CONTAINER_FLAGS) $(CONTAINER_IMAGE)
 slurm-container-prefix=
     endif
 #JFLAG= -j $(SLURM--cpus-per-task)# Haven't got parallel make working with quarto. race condition?
-run render pages $(html_reports) scripts $(qmds) ${staging_dir}/_quarto.yml ${staging_dir}/index.qmd R.bib renv.lock: $(CONTAINER_IMAGE)
+run render pages $(html_reports) scripts $(qmds) ${staging_dir}/_quarto.yml ${staging_dir}/index.qmd ${staging_dir}/R.bib renv.lock: $(CONTAINER_IMAGE)
 	echo "$$slurm" > ${TMPSCRIPT}_slurm
 	make -n -s $@ SUBMIT=false EXECUTOR=make > ${TMPSCRIPT}_slurm.sh
 	echo "$(slurm-container-prefix) ${TMPSCRIPT}_slurm.sh" >> ${TMPSCRIPT}_slurm
@@ -248,6 +249,8 @@ samples_db = samples.db
 build: $(samplesheets_build) $(specfiles_build) $(configs_build) $(genes_results)  $(multiqc_results) | $(staging_dir) ##  Copy the required nfcore count files into the `extdata` area, and get the spec files.
 	$(GIT) add makefile global.mk local.mk
 	$(GIT) commit -m "Add the differential makefiles" || true
+	$(GIT) add pre.renv.lock renv/activate.R .Rprofile
+	$(GIT) commit -m "Adding the vanilla renv setup" || true
 	$(GIT) add $(source_dir) R
 	$(GIT) commit -m "Add the template scripts and R functions" || true
 	$(GIT) add $(samplesheets_build) $(specfiles_build) $(configs_build)
