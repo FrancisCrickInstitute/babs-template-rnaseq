@@ -1,8 +1,7 @@
 .DEFAULT_GOAL:=help
 all: differential
 .PHONY: all clean
-include global.mk
-include secrets
+include shared.mk
 
 stages := ingress nfcore differential biologic 
 .PHONY: $(stages)
@@ -32,16 +31,3 @@ clean: $(cleaners)
 $(cleaners) : clean-% :
 	cd $* && $(MAKE) clean
 
-.PHONY: secrets
-secrets: $(wildcard ../.babs)
-	if [ -f secrets ]; then \
-	  if [ -f ../.babs ]; then \
-	    sed -n -i '/^setting_/!p' $@ ;\
-	    sed -r -n 's/^(\s*)(.*)\s*:\s*(.*$$)/setting_\2=\3/p' ../.babs >> $@ ;\
-	  fi ;\
-	else \
-	  cp .not-secret $@ ;\
-	  echo "Created a 'secrets' file - please customise it so that the pipeline will run on your system" ;\
-	  echo "You may also want to review 'global.mk' to ensure that nextflow and singularity are set up correctly for your system" ;\
-	 exit ;\
-	fi

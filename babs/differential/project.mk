@@ -1,5 +1,5 @@
 ################################################################
-## GLOBAL PARAMETERS
+## PROJECT PARAMETERS
 ################################################################
 ##
 ## Overall project parameters (shared, or section-specific).  The
@@ -19,13 +19,11 @@ param_names = res_dir VERSION TAG staging_dir file_col name_col metadata counts
 ################################################################
 ## SECTIONS AND THEIR PARAMETERS
 ################################################################
-## List of sections
-## These will get used to pick up script names, and  yml metadata,
-## so name everything in the 'source-dir' (`./building-blocks` by default)
+## List of sections These will get used to pick up script names, so
+## name everything in the source dirrectory (`./resources` by default)
 ## after one one of these.
+
 sections=00_init 01_exploratory 02_differential 03_enrichment
-
-
 
 
 ################################################################
@@ -39,5 +37,3 @@ sections=00_init 01_exploratory 02_differential 03_enrichment
 01_exploratory_parent = 00_init_$(ialign)
 02_differential_parent = 01_exploratory_$(ispec)_$(ialign)
 03_enrichment_parent = 02_differential_$(ispec)_$(ialign)
-
-

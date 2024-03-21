@@ -36,7 +36,7 @@ more elegant static reports.
 So far [differential](babs/differential) is the most feature-rich
 module, so I'll focus on using that as an illustrative example.  The
 resting state of the module contains: an empty skeleton of an R
-project and environment; a settings file `local.mk` that contains
+project and environment; a settings file `module.mk` that contains
 e.g. what the R executible is; and a `makefile` which serves two
 purposes.
 
@@ -80,3 +80,14 @@ at this top level will store the commentary of what happened - and on
 successful completion of a module it will get turned into a
 corresponding `module.log` file.  Within each module, there is likely
 to be a `logs` subdirectory which contains individual log files.
+
+Also in this top-level are two makefiles that will be loaded into
+every module automatically. `shared.mk` will be under version control,
+and includes generic recipes and variables that are likely to be used
+by more than one module. It also loads `secret.mk` which contains
+site-specific settings that you don't want to put in a public
+repository as it may contain file-paths etc.  Both of these files get
+automatically duplicated into each module that uses them, if you start
+the `makefile` in each directory with an `include shared.mk` at the
+start, and have a copy of the recipe for `shared.mk` that is at the
+end of, for example, [the `docs` makefile](babs/docs/makefile)

@@ -1,5 +1,4 @@
-**/secrets
+**/secret.mk
 biologic/
 ingress/
 fetch_ngs/
-.not-secret

@@ -60,7 +60,7 @@ update-module: ## Update the specific module you're currently using.
 	  if [ -f "$(targz)" ]; then \
 	    $(GIT) stash -m "Stashing state prior to pipeline update" &&\
 	    tar -xzf $(targz) babs/$(module) --strip-components=2  && \
-	    tar -xzf $(targz) babs/global.mk babs/secrets babs/.pipeline-version --strip-components=1 && \
+	    tar -xzf $(targz) babs/shared.mk babs/secret.mk babs/.pipeline-version --strip-components=1 && \
 	    cat .pipeline-version;\
 	  else \
 	    if [ -d "$(subst .tar.gz,,$(targz))" ]; then \
@@ -82,3 +82,21 @@ update-pm: ## Update the project management scripts
 	  rsync -avzp $(TEMPLATE_DIR)/generic/.github/ `echo $(CURDIR) | sed 's|\(.*\)/babs/.*|\1/|'` ;\
 	fi
 
+babsfile=.babs
+
+ifneq ($(wildcard $(babsfile)),)
+.PHONY: secret.mk
+secret.mk: 
+	if [ -f $(babsfile) ]; then \
+	  sed  -i '/^setting_/d' $@ ;\
+	  sed -r -n 's/^(\s*)(.*)\s*:\s*(.*$$)/setting_\2=\3/p' $(babsfile) >> $@ ;\
+	fi
+endif
+
+
+# The following settings come from the .babs file. If that file still
+# exists, change the values there and they will propagate here
+# automatically.  If there is no longer a .babs file then make the
+# changes to the 'secret.mk' file (ideally the top-level one as changes
+# to module-level secret.mk may get overwritten by subsequent changes to
+# the top-level one)

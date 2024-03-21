@@ -1,12 +1,5 @@
-secrets : $(wildcard ../secrets)
-	if [ -f ../secrets ]; then cp $< $@; else touch $@; fi
-
-global.mk: $(wildcard ../global.mk)
-	if [ -f ../global.mk ]; then cp $< $@; else touch $@; fi
-
-include secrets
-include global.mk
-include local.mk
+include shared.mk
+include module.mk
 
 .PHONY: run build copy publish clean
 built_samplesheets=$(patsubst samplesheet_%.csv, %,$(wildcard samplesheet_*.csv))
@@ -59,7 +52,7 @@ configs = $(patsubst $(ingress_dir)/%.config,%.config,$(wildcard $(ingress_dir)/
 samplesheets = $(patsubst %.config,samplesheet_%.csv,$(configs))
 
 build: $(samplesheets) ## Build all necessary inputs: samplesheets for each matching alignment '.config' from 'docs'.
-	$(GIT) add local.mk global.mk makefile .gitignore $(samplesheets) $(configs)
+	$(GIT) add module.mk shared.mk makefile .gitignore $(samplesheets) $(configs)
 	$(GIT) commit -m "Add nfcore build-files" || true
 
 
@@ -125,3 +118,10 @@ build-clean:  ## Remove files only needed for re-`run`ning. Downstream steps wil
 
 clean-complete: clean-build ## Complete reset. Donwstream steps will no `build` (and perhaps might not even run even if they've already been built.)
 	rm -rf results/$(alignments)
+
+# Originally, shared.mk comes from the parent directory. Copy it here
+# if necessary and applicable:
+ifneq ($(wildcard ../shared.mk),)
+shared.mk: ../shared.mk
+	cp $< $@
+endif

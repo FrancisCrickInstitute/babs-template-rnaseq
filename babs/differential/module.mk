@@ -35,13 +35,14 @@
 ## produce the reports
 
 
+################################################################
 ## Binaries
-#R=#Set in global.mk
+################################################################
+#R=#Set in shared.mk
 QUARTO=quarto
 EXECUTOR = singularity
 IMAGE=bioconductor/bioconductor_docker
 IMAGE_TAG=$(BIOCONDUCTOR_VERSION)-R-$(RVERSION)
-BIND_DIR = $(shell ${GIT} rev-parse --show-toplevel || echo ${CURDIR}),$(shell $(GIT) worktree list | awk -e '$$3=="[main]"{print $$1}')
 BIOCPARALLEL_WORKER_NUMBER=2
 
 ################################################################
@@ -53,7 +54,7 @@ source_dir=resources
 staging_dir=staging
 ## place within the staging directory where renders will be placed
 RESULTS_DIR = results
-#Probably set in 'secrets' file, but if not then:
+#Probably set in 'secret.mk' file, but if not then:
 RENV_PATHS_ROOT ?= ~/.local/share/renv
 RENV_PATHS_PREFIX=rocker
 #Another 'secret', but in case not:
@@ -74,6 +75,7 @@ samples_db = samples.db
 ## 'shell' will run using the prevailing system executibles.
 ################################################################
 CONTAINERED=false#An internal flag
+BIND_DIR = $(shell ${GIT} rev-parse --show-toplevel || echo ${CURDIR}),$(shell $(GIT) worktree list | awk -e '$$3=="[main]"{print $$1}')
 
 ifeq (${EXECUTOR},singularity)
 CONTAINER= $(call ml,Singularity/$(SINGULARITY_VERSION)); singularity

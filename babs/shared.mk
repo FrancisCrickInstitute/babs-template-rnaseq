@@ -13,7 +13,7 @@ name_col = sample_name
 log_dir=logs
 
 ################################################################
-# Executibles (can be overridden in local.mk's)
+# Executibles (can be overridden in module.mk's)
 ################################################################
 ## Versions
 SINGULARITY_VERSION=3.6.4
@@ -113,3 +113,29 @@ $(V).SILENT:
 help: ## Show help message
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage: `make command` where command is one of: \n"} /^[$$()% 0-9a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
+################################################################
+# Load secrets
+################################################################
+
+# Originally, secret.mk should come from the parent directory.  If
+# it's still there, make sure it's up-to-date and then copy it
+# here. If a secret.mk file can't be found anywhere, create a dummy
+# one out of a template.
+
+secret.mk: $(wildcard ../secret.mk) .not-secret
+	if [ -f ../secret.mk ]; then \
+	  $(MAKE) -C .. secret.mk ;\
+	  cp $< $@ ;\
+	else \
+	  if [ ! -f secret.mk ] ; then \
+	    cp .not-secret secret.mk ;\
+	    echo "Created a 'secret.mk' file - please customise it so that the pipeline will run on your system" ;\
+	    exit ;\
+	 fi ;\
+	fi
+include secret.mk
+
+ifneq ($(wildcard ../.not-secret),)
+.not-secret: ../.not-secret
+	cp $< $@
+endif

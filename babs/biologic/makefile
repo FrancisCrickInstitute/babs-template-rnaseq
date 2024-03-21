@@ -1,4 +1,4 @@
-include ../global.mk
+include shared.mk
 -include ../ingress/*.config
 
 .PHONY: run build
@@ -40,3 +40,11 @@ inputs/%.transcript_tpm.tsv:../nfcore/results/%/star_rsem/rsem.merged.transcript
 	cp $< $@
 
 print-%: ; @echo $*=$($*)
+
+
+# Originally, shared.mk comes from the parent directory. Copy it here
+# if necessary and applicable:
+ifneq ($(wildcard ../shared.mk),)
+shared.mk: ../shared.mk
+	cp $< $@
+endif

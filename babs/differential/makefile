@@ -1,14 +1,7 @@
-secrets : $(wildcard ../secrets)
-	if [ -f ../secrets ]; then cp $< $@; else touch $@; fi
+include shared.mk
+include module.mk
 
-global.mk: $(wildcard ../global.mk)
-	if [ -f ../global.mk ]; then cp $< $@; else touch $@; fi
-
-include secrets
-include global.mk
-include local.mk
-
-.PHONY: makefile local.mk 
+.PHONY: makefile module.mk 
 .PHONY: build clean maintainer-clean geo R-local
 
 include project.mk  ## Provides analysis parametrisation
@@ -247,7 +240,7 @@ multiqc_results = $(patsubst %,$(RESULTS_DIR)/multiqc-%,$(alignments_build))
 samples_db = samples.db
 
 build: $(samplesheets_build) $(specfiles_build) $(configs_build) $(genes_results)  $(multiqc_results) | $(staging_dir) ##  Copy the required nfcore count files into the `extdata` area, and get the spec files.
-	$(GIT) add makefile global.mk local.mk
+	$(GIT) add makefile module.mk shared.mk
 	$(GIT) commit -m "Add the differential makefiles" || true
 	$(GIT) add pre.renv.lock renv/activate.R .Rprofile
 	$(GIT) commit -m "Adding the vanilla renv setup" || true
@@ -330,3 +323,10 @@ clean-geo:  ## Remove the GEO files from scratch
 
 
 MAKEFLAGS += --no-builtin-rules
+
+# Originally, shared.mk comes from the parent directory. Copy it here
+# if necessary and applicable:
+ifneq ($(wildcard ../shared.mk),)
+shared.mk: ../shared.mk
+	cp $< $@
+endif

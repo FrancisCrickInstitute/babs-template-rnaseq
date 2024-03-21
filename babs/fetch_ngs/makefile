@@ -1,5 +1,5 @@
-include ../global.mk
-include local.mk
+include shared.mk
+include module.mk
 -include *.config
 
 .PHONY: run build copy publish clean
@@ -65,3 +65,10 @@ $(inputs) : %.txt : ../docs/%.public
 samples.db: 
 	rm -f $@
 	sqlite3 $@ "VACUUM;"
+
+# Originally, shared.mk comes from the parent directory. Copy it here
+# if necessary and applicable:
+ifneq ($(wildcard ../shared.mk),)
+shared.mk: ../shared.mk
+	cp $< $@
+endif

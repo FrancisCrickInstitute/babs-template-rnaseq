@@ -1,11 +1,4 @@
-secrets : $(wildcard ../secrets)
-	if [ -f ../secrets ]; then cp $< $@; else touch $@; fi
-
-global.mk: $(wildcard ../global.mk)
-	if [ -f ../global.mk ]; then cp $< $@; else touch $@; fi
-
-include secrets
-include global.mk
+include shared.mk
 
 .SILENT:
 
@@ -29,7 +22,7 @@ run:  ## Empty target just to conform to general pattern
 # conditional upon existence or not of a pre-written one.
 
 build: $(specfiles) samplesheet.csv $(configs) $(experiment_table) ## Basic check that the contents of the docs folder conforms to requirements
-	$(GIT) add ../.pipeline-version ../.gitignore ../makefile ../global.mk ../readme.md global.mk
+	$(GIT) add ../.pipeline-version ../.gitignore ../makefile ../shared.mk ../readme.md shared.mk
 	$(GIT) commit -m "Add top-level pipeline files" || true
 	[ -n "$(specfiles)" ] || echo "No *.spec files in the docs directory" | tee -a tmp.err
 	[ -n "$(configs)" ] || echo "No *.config files in the docs directory" | tee -a tmp.err
@@ -84,3 +77,10 @@ endif
 
 clean:
 	rm -f report.err report.log
+
+# Originally, shared.mk comes from the parent directory. Copy it here
+# if necessary and applicable:
+ifneq ($(wildcard ../shared.mk),)
+shared.mk: ../shared.mk
+	cp $< $@
+endif

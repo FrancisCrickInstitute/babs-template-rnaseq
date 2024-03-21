@@ -1,7 +1,7 @@
 data
 logs
 results
-secrets
+secret.mk
 shortcuts
 staging
 extdata/genes.results/

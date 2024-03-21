@@ -1,12 +1,4 @@
-secrets : $(wildcard ../secrets)
-	if [ -f ../secrets ]; then cp $< $@; else touch $@; fi
-
-global.mk: $(wildcard ../global.mk)
-	if [ -f ../global.mk ]; then cp $< $@; else touch $@; fi
-
-include secrets
-include global.mk
-include local.mk
+include shared.mk
 
 .PHONY: run build copy publish clean run-clean build-clean
 
@@ -53,3 +45,10 @@ run-clean:
 build-clean:
 	rm -f $(patsubst ../docs/%.config, %.config, $(wildcard ../docs/*.config))
 	rm -f $(patsubst ../docs/$(samplesheet_fname).csv, $(samplesheet_fname).csv, $(wildcard ../docs/$(samplesheet_fname).csv))
+
+# Originally, shared.mk comes from the parent directory. Copy it here
+# if necessary and applicable:
+ifneq ($(wildcard ../shared.mk),)
+shared.mk: ../shared.mk
+	cp $< $@
+endif
