@@ -1,5 +1,8 @@
 .DEFAULT_GOAL=help
 
+################################################################
+# Conventional file- and field- names
+################################################################
 # csv file names (excluding ext)
 samplesheet_fname=samplesheet
 experiment_table = experiment_table
@@ -7,25 +10,28 @@ experiment_table = experiment_table
 samplesheet_id_column := sample
 metadata_id_column := ID
 name_col = sample_name
-V:=1#switches _off_ SILENT mode - delete for SILENT to be default
 log_dir=logs
 
-#Executibles (can be overridden in local.mk's)
-ml = module is-loaded $1 || module load $1
+################################################################
+# Executibles (can be overridden in local.mk's)
+################################################################
+## Versions
 SINGULARITY_VERSION=3.6.4
 NEXTFLOW_VERSION=22.10.3
 RVERSION=4.3.2
 BIOCONDUCTOR_VERSION=3.18
-
+## Module loader
+ml = module is-loaded $1 || module load $1 || true # ie fall back to true (ie rely on system version if can't load a module)
+## Define commands invoked by make
 R=R
 NEXTFLOW = $(call ml,Nextflow/$(NEXTFLOW_VERSION)); $(call ml,Singularity/$(SINGULARITY_VERSION)); $(call ml,CAMP_proxy); nextflow
 SQLITE = $(call ml,SQLite/3.36-GCCcore-11.2.0); sqlite3
 GIT=git
-
-
 make_rwx = setfacl -m u::rwx
 
+################################################################
 # Standard folder and shortcut names
+################################################################
 publish_results=results
 publish_intranet=www_internal
 publish_internet=www_external
@@ -60,14 +66,17 @@ endef
 
 export slurm
 
-# Git variables
+################################################################
+# Git-derived variables
+################################################################
 PROJECT_HOME:=$(shell $(GIT) rev-parse --show-toplevel 2>/dev/null || echo $(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 TAG := _$(shell $(GIT) describe --tags --dirty=_altered --always --long 2>/dev/null || echo "uncontrolled")# e.g. v1.0.2-2-ace1729a
 VERSION := $(shell $(GIT) describe --tags --abbrev=0 2>/dev/null || echo "vX.Y.Z")#e.g. v1.0.2
 git-ignore=touch .gitignore && grep -qxF '$(1)' .gitignore || echo '$(1)' >> .gitignore
 
-
+################################################################
 #Standard makefile hacks
+################################################################
 comma:= ,
 space:= $() $()
 empty:= $()
@@ -97,6 +106,7 @@ log=2>&1 | tee $2 $(log_dir)/$1.log
 print-%: ## `make print-varname` will show varname's value
 	@echo "$*"="$($*)"
 
+V:=1#switches _off_ SILENT mode - delete for SILENT to be default
 $(V).SILENT: 
 
 .PHONY: help
