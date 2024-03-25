@@ -247,9 +247,6 @@ endif
 #### Bootstrap all relevant data from outside
 ################################################################
 
-
-samples_db = samples.db
-
 build: $(_samplesheets) $(patsubst %,%.spec,$(_specfiles)) $(_configs) $(_genes_results)  $(_multiqc_results) | $(staging_dir) ##  Copy the required nfcore count files into the `extdata` area, and get the spec files.
 	$(GIT) add makefile module.mk shared.mk
 	$(GIT) commit -m "Add the differential makefiles" || true

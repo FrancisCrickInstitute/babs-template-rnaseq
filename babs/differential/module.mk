@@ -62,7 +62,6 @@ SINGULARITY_ROOT ?= ./
 
 my_counts_dir=extdata/genes.results
 my_metadata=extdata/metadata
-samples_db = samples.db
 
 ## Unlikely that anything below here needs setting by a user.
 

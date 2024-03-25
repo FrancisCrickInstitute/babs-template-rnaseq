@@ -60,19 +60,19 @@ field=$(shell sed '/^$$/d; s/^$*./"/;s/=.*/" TEXT/' "$*.config" | paste -sd ',')
 insfield=$(shell sed '/^$$/d; s/^$*./"/;s/=.*/"/' "$*.config" | paste -sd ',')
 vals=$(shell sed -r '/^$$/d; s/.*=(.*)/"\1"/' "$*.config" | paste -sd ',')
 
-$(samplesheets): samplesheet_%.csv: %.config  samples.db
-	$(SQLITE) samples.db 'DROP TABLE IF EXISTS "config_$*";' \
+$(samplesheets): samplesheet_%.csv: %.config  ${samples_db}
+	$(SQLITE) ${samples_db} 'DROP TABLE IF EXISTS "config_$*";' \
 	'CREATE TABLE "config_$*" ($(field));' \
 	'INSERT INTO "config_$*" ($(insfield)) VALUES ($(vals));' \
 	'CREATE TABLE "fastq_$*" AS SELECT * FROM fastqs NATURAL JOIN "config_$*" ;'; \
-	$(SQLITE) -header -csv  samples.db 'SELECT $(samplesheet_id_column) AS sample, fastq_1, fastq_2, strandedness FROM "fastq_$*";' > $@
+	$(SQLITE) -header -csv  ${samples_db} 'SELECT $(samplesheet_id_column) AS sample, fastq_1, fastq_2, strandedness FROM "fastq_$*";' > $@
 
 $(configs) : %.config : $(ingress_dir)/%.config
 	cp $< $@
 	md5sum $(shell sed -n 's/^$*.genome_fasta=//p' $<) | awk '{print "$*.genome_fasta_md5=" $$1}' >> $@
 	md5sum $(shell sed -n 's/^$*.gtf=//p' $<) | awk '{print "$*.gtf_md5=" $$1}' >> $@
 
-samples.db: $(ingress_dir)/samples.db
+${samples_db}: $(ingress_dir)/${samples_db}
 	cp $< $@
 
 $(log_dir):
@@ -113,7 +113,7 @@ run-clean:
 
 build-clean:  ## Remove files only needed for re-`run`ning. Downstream steps will still work if `run` has already completed.
 	rm -f $(samplesheets)
-	rm -f samples.db
+	rm -f ${samples_db}
 
 
 clean-complete: clean-build ## Complete reset. Donwstream steps will no `build` (and perhaps might not even run even if they've already been built.)

@@ -2,9 +2,9 @@ include shared.mk
 
 .PHONY: run build copy publish clean run-clean build-clean
 
-run: samples.db ## Generate a database of samples for downstream convenience
+run: ${samples_db} ## Generate a database of samples for downstream convenience
 
-samples.db: $(samplesheet_fname).csv
+${samples_db{: $(samplesheet_fname).csv
 	rm -f $@
 	$(SQLITE) $@ -csv ".import $< fastqs" \
 	"ALTER TABLE fastqs ADD COLUMN config_file text;" \
@@ -40,7 +40,7 @@ publish:
 clean:
 
 run-clean:
-	rm -f samples.db
+	rm -f ${samples_db}
 
 build-clean:
 	rm -f $(patsubst ../docs/%.config, %.config, $(wildcard ../docs/*.config))

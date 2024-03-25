@@ -11,6 +11,7 @@ samplesheet_id_column := sample
 metadata_id_column := ID
 name_col = sample_name
 log_dir=logs
+samples_db = samples.db
 
 ################################################################
 # Executibles (can be overridden in module.mk's)
