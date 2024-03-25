@@ -4,7 +4,7 @@ include shared.mk
 
 run: ${samples_db} ## Generate a database of samples for downstream convenience
 
-${samples_db{: $(samplesheet_fname).csv
+${samples_db}: $(samplesheet_fname).csv
 	rm -f $@
 	$(SQLITE) $@ -csv ".import $< fastqs" \
 	"ALTER TABLE fastqs ADD COLUMN config_file text;" \
@@ -17,21 +17,29 @@ ${samples_db{: $(samplesheet_fname).csv
 #### Bootrap all relevant data from outside
 ################################################################
 
-configs:= $(patsubst ../docs/%.config,%.config,$(wildcard ../docs/*.config))
+_configs = $(patsubst ../docs/%.config,%.config,$(wildcard ../docs/*.config))
+_etable=$(wildcard ../docs/$(experiment_table).csv)
+_samplesheet = $(wildcard  ../docs/$(samplesheet_fname).csv)
 
-build: $(configs) $(samplesheet_fname).csv $(experiment_table).csv ## Prepare for `run` by gathering configs and samplesheet into current directory
+build: $(_configs) $(samplesheet_fname).csv $(experiment_table).csv ## Prepare for `run` by gathering configs and samplesheet into current directory
 
-$(experiment_table).csv: ../docs/$(experiment_table).csv
+ifneq (${_etable},)
+$(experiment_table).csv: ${_etable}
 	tr -d '\r' < $< > $@
+endif
 
-$(samplesheet_fname).csv: ../docs/$(samplesheet_fname).csv
+ifneq (${_samplesheet},)
+$(samplesheet_fname).csv: ${_samplesheet}
 	tr -d '\r' < $< > $@
+endif
 
-$(configs): %.config: ../docs/%.config
+ifneq (${_configs},)
+$(_configs): %.config: ../docs/%.config
 	tr -d '\r' < $< > $@
 	grep -q "^universal" $@ || sed -i -e '$$auniversal=yes' $@
 	grep -q "^strandedness" $@ || sed -i -e '$$astrandedness=auto' $@
 	sed -i 's/^/$*./' $@
+endif
 
 copy:
 
