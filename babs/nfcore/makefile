@@ -2,10 +2,16 @@ include shared.mk
 include module.mk
 
 .PHONY: run build copy publish clean
-built_samplesheets=$(patsubst samplesheet_%.csv, %,$(wildcard samplesheet_*.csv))
-include $(patsubst %,%.config,$(built_samplesheets))
 
-alignments = $(patsubst %,results/%/star_rsem/rsem.merged.gene_counts.tsv,$(built_samplesheets))
+_db = ${wildcard $(ingress_dir)/${samples_db})
+_configs = $(patsubst $(ingress_dir)/%.config,%.config,$(wildcard $(ingress_dir)/*.config))
+configs = $(sort $(wildcard *.config) ${_configs})
+_samplesheets = $(patsubst %.config,samplesheet_%.csv,$(_configs))
+samplesheets = $(patsubst %.config,samplesheet_%.csv,$(configs))
+
+include $(configs)
+
+alignments = $(patsubst %,results/%/star_rsem/rsem.merged.gene_counts.tsv,$(samplesheets))
 refdir = $(realpath $($*.index_dir)/$($*.genome_fasta_md5)/$($*.gtf_md5))
 workdir = $(SCRATCH_DIR)nf_work/
 
@@ -42,17 +48,12 @@ $(alignments) : results/%/star_rsem/rsem.merged.gene_counts.tsv : samplesheet_%.
 $(workdir):
 	mkdir -p $(workdir)
 
-
-
-
 ################################################################
 #### Bootrap all relevant data from outside
 ################################################################
-configs = $(patsubst $(ingress_dir)/%.config,%.config,$(wildcard $(ingress_dir)/*.config))
-samplesheets = $(patsubst %.config,samplesheet_%.csv,$(configs))
 
-build: $(samplesheets) ## Build all necessary inputs: samplesheets for each matching alignment '.config' from 'docs'.
-	$(GIT) add module.mk shared.mk makefile .gitignore $(samplesheets) $(configs)
+build: $(_samplesheets) ## Build all necessary inputs: samplesheets for each matching alignment '.config' from 'docs'.
+	$(GIT) add module.mk shared.mk makefile .gitignore $(_samplesheets) $(_configs)
 	$(GIT) commit -m "Add nfcore build-files" || true
 
 
@@ -60,44 +61,31 @@ field=$(shell sed '/^$$/d; s/^$*./"/;s/=.*/" TEXT/' "$*.config" | paste -sd ',')
 insfield=$(shell sed '/^$$/d; s/^$*./"/;s/=.*/"/' "$*.config" | paste -sd ',')
 vals=$(shell sed -r '/^$$/d; s/.*=(.*)/"\1"/' "$*.config" | paste -sd ',')
 
-$(samplesheets): samplesheet_%.csv: %.config  ${samples_db}
+ifneq ($(_samplesheets),)
+$(_samplesheets): samplesheet_%.csv: %.config  ${samples_db}
 	$(SQLITE) ${samples_db} 'DROP TABLE IF EXISTS "config_$*";' \
 	'CREATE TABLE "config_$*" ($(field));' \
 	'INSERT INTO "config_$*" ($(insfield)) VALUES ($(vals));' \
 	'CREATE TABLE "fastq_$*" AS SELECT * FROM fastqs NATURAL JOIN "config_$*" ;'; \
 	$(SQLITE) -header -csv  ${samples_db} 'SELECT $(samplesheet_id_column) AS sample, fastq_1, fastq_2, strandedness FROM "fastq_$*";' > $@
+endif
 
-$(configs) : %.config : $(ingress_dir)/%.config
+ifneq ($(_configs),)
+$(_configs) : %.config : $(ingress_dir)/%.config
 	cp $< $@
 	md5sum $(shell sed -n 's/^$*.genome_fasta=//p' $<) | awk '{print "$*.genome_fasta_md5=" $$1}' >> $@
 	md5sum $(shell sed -n 's/^$*.gtf=//p' $<) | awk '{print "$*.gtf_md5=" $$1}' >> $@
+endif
 
-${samples_db}: $(ingress_dir)/${samples_db}
+ifneq ($(_db),)
+${samples_db}: $(_db)
 	cp $< $@
+endif
 
 $(log_dir):
 	mkdir -p $@
 
-location=outputs
-shortcut=$(empty)
-ifdef redirect_$(location)
-shortcut=shortcuts/
-endif
-pubdir = $(shortcut)$(publish_$(location))
-ifeq ($(pubdir),)
-pubdir = published
-endif
-publish:  ## Copy results to final location. Either 'outputs' folder (default), intranet (`make publish location=intranet`) or inte\
-rnet
-ifdef redirect_$(location)
-	mkdir -p $(redirect_$(location))
-	mkdir -p $(shortcut)
-ifdef url_$(location)
-	echo "[InternetShortcut]" > $(shortcut)$(location).url
-	echo "URL=$(url_$(location))/latest" >> $(shortcut)$(location).url
-endif
-	ln -sfn $(redirect_$(location)) $(pubdir)
-endif
+publish: $(pubdir) ## Copy results to final location. Either 'outputs' folder (default), intranet (`make publish location=intranet`) or internet
 	for i in $(built_samplesheets); do \
 	  mkdir -p "$(pubdir)/$(VERSION)/$$i" ;\
 	  cp --no-preserve=mode -r results/"$$i"/star_rsem/*.markdup.sorted.bam "$(pubdir)/$(VERSION)/$$i" ;\

@@ -222,18 +222,7 @@ pubdir = $(shortcut)$(publish_$(location))
 ifeq ($(pubdir),)
 pubdir = published
 endif
-publish:  ## Copy results to final location. Either 'outputs' folder (default), intranet (`make publish location=intranet`) or internet
-ifdef redirect_$(location)
-	mkdir -p $(redirect_$(location))
-	mkdir -p $(shortcut)
-ifdef url_$(location)
-	echo "<!doctype html>" > $(shortcut)$(location).html
-	echo "<script>" >> $(shortcut)$(location).html
-	echo "window.location.replace('$(url_$(location))/$(VERSION)')" >> $(shortcut)$(location).html
-	echo "</script>"  >> $(shortcut)$(location).html
-endif
-	ln -sfn $(redirect_$(location)) $(pubdir)
-endif
+publish: $(pubdir) ## Copy results to final location. Either 'outputs' folder (default), intranet (`make publish location=intranet`) or internet
 	mkdir -p $(pubdir)/$(VERSION)
 	cp --no-preserve=mode -r $(RESULTS_DIR)/$(VERSION)/. $(extra_files) $(pubdir)/$(VERSION)
 	cp --no-preserve=mode --recursive --dereference --no-clobber $(RESULTS_DIR)/multiqc-* $(pubdir)/

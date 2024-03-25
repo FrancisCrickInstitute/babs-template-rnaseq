@@ -76,6 +76,32 @@ VERSION := $(shell $(GIT) describe --tags --abbrev=0 2>/dev/null || echo "vX.Y.Z
 git-ignore=touch .gitignore && grep -qxF '$(1)' .gitignore || echo '$(1)' >> .gitignore
 
 ################################################################
+#### Publication 
+################################################################
+location=outputs
+shortcut=$(empty)
+ifdef redirect_$(location)
+shortcut=shortcuts/
+endif
+pubdir = $(shortcut)$(publish_$(location))
+ifeq ($(pubdir),)
+pubdir = published
+endif
+$(pubdir):
+ifdef redirect_$(location)
+	mkdir -p $(redirect_$(location))
+	mkdir -p $(shortcut)
+ifdef url_$(location)
+	echo "<!doctype html>" > $(shortcut)$(location).html
+	echo "<script>" >> $(shortcut)$(location).html
+	echo "window.location.replace('$(url_$(location))/$(VERSION)')" >> $(shortcut)$(location).html
+	echo "</script>"  >> $(shortcut)$(location).html
+endif
+	ln -sfn $(redirect_$(location)) $(pubdir)
+endif
+	mkdir -p $(pubdir)/$(VERSION)
+
+################################################################
 #Standard makefile hacks
 ################################################################
 comma:= ,
