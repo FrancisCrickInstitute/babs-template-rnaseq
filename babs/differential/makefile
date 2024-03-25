@@ -7,9 +7,25 @@ include module.mk
 include project.mk  ## Provides analysis parametrisation
 include $(patsubst %,$(staging_dir)/.make-%,$(sections))
 
-alignments = $(patsubst ${my_counts_dir}/%,%,$(wildcard ${my_counts_dir}/*))
+
+_alignments = $(patsubst $(nfcore_dir)/%,%,$(wildcard $(nfcore_dir)/*))
+alignments = $(sort $(patsubst ${my_counts_dir}/%,%,$(wildcard ${my_counts_dir}/*)) ${_alignments})
+
+_samplesheets = $(patsubst %,$(my_metadata)_%.csv,$(_alignments))
 samplesheets = $(patsubst %,$(my_metadata)_%.csv,$(alignments))
-specfiles = $(patsubst %.spec,%,$(wildcard *.spec))
+
+_configs = $(patsubst %,%.config,$(_alignments))
+configs = $(patsubst %,%.config,$(alignments))
+
+_genes_results = $(patsubst %,$(my_counts_dir)/%,$(_alignments))
+genes_results = $(patsubst %,$(my_counts_dir)/%,$(alignments))
+
+_metadata = $(patsubst %,$(my_metadata).csv,$(wildcard $(ingress_dir)/$(experiment_table).csv))
+
+_specfiles =  $(patsubst $(docs_dir)/%.spec,%,$(wildcard $(docs_dir)/*.spec))
+specfiles = $(sort $(patsubst %.spec,%,$(wildcard *.spec)) ${_specfiles})
+
+_multiqc_results = $(patsubst %,$(RESULTS_DIR)/multiqc-%,$(_alignments))
 
 ## Create a makefile per section. It will set up target-specific
 ## variables to inform subsequent targets of the alignment, spec-file,
@@ -32,7 +48,7 @@ $(mk): $(staging_dir)/.make-% : $(patsubst %,%.spec,$(specfiles)) $(samplesheets
 	   echo '$(qmd_path): script=$*_$(ispec)_$(ialign)$$(TAG)' >> $@;\
 	   echo '$(qmd_path): section=$*' >> $@;\
 	   echo '$(qmd_path): $(source_dir)/$*.qmd' >> $@;\
-	   echo '$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$*_$(ispec)_$(ialign)$$(TAG).html: $(ispec).spec $(my_metadata)_$(ialign).csv $(qmd_path) $(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$($*_parent)$$(TAG).html' >> $@ ;\
+	   echo '$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$*_$(ispec)_$(ialign)$$(TAG).html: $(my_counts_dir)/$(ialign) $(ispec).spec $(my_metadata)_$(ialign).csv $(qmd_path) $(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$($*_parent)$$(TAG).html' >> $@ ;\
 	   echo '' >> $@ ;\
 	))
 	echo '$*_pages=$(foreach ispec,$(specfiles),$(foreach ialign,$(alignments),$*_$(ispec)_$(ialign)))' >> $@
@@ -54,7 +70,7 @@ $(mk0): $(staging_dir)/.make-% : $(samplesheets) | $(staging_dir)
 	echo '$*_htmls = $$(patsubst %,$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/%$$(TAG).html,$$($*_pages))'>> $@
 	echo '$*_htmls: $$($*_htmls)'>> $@
 
-include $(patsubst %,%.config,$(alignments))
+include ${configs}
 qmds=$(strip $(foreach section,$(sections),$($(section)_qmds)))
 
 html_reports=$(strip $(foreach section,$(sections),$($(section)_htmls)))
@@ -228,60 +244,54 @@ endif
 ## TODO - won't work when we do a group-as of alignments
 
 ################################################################
-#### Bootrap all relevant data from outside
+#### Bootstrap all relevant data from outside
 ################################################################
-alignments_build = $(patsubst $(nfcore_dir)/%,%,$(wildcard $(nfcore_dir)/*))
-specfiles_build =  $(patsubst $(docs_dir)/%,%,$(wildcard $(docs_dir)/*.spec))
-samplesheets_build = $(patsubst %,$(my_metadata)_%.csv,$(alignments_build))
-configs_build = $(patsubst %,%.config,$(alignments_build))
 
-genes_results = $(patsubst %,$(my_counts_dir)/%,$(alignments_build))
-multiqc_results = $(patsubst %,$(RESULTS_DIR)/multiqc-%,$(alignments_build))
+
 samples_db = samples.db
 
-build: $(samplesheets_build) $(specfiles_build) $(configs_build) $(genes_results)  $(multiqc_results) | $(staging_dir) ##  Copy the required nfcore count files into the `extdata` area, and get the spec files.
+build: $(_samplesheets) $(patsubst %,%.spec,$(_specfiles)) $(_configs) $(_genes_results)  $(_multiqc_results) | $(staging_dir) ##  Copy the required nfcore count files into the `extdata` area, and get the spec files.
 	$(GIT) add makefile module.mk shared.mk
 	$(GIT) commit -m "Add the differential makefiles" || true
 	$(GIT) add pre.renv.lock renv/activate.R .Rprofile
 	$(GIT) commit -m "Adding the vanilla renv setup" || true
 	$(GIT) add $(source_dir) R
 	$(GIT) commit -m "Add the template scripts and R functions" || true
-	$(GIT) add $(samplesheets_build) $(specfiles_build) $(configs_build)
+	$(GIT) add $(_samplesheets) $(patsubst %,%.spec,$(_specfiles)) $(_configs)
 	$(GIT) commit -m "Add differential build-files" || true
 
-$(specfiles_build): % : $(docs_dir)/%
+ifneq (${_specfiles},)
+$(patsubst %,%.spec,$(_specfiles)): % : $(docs_dir)/%
 	cp $< $@
+endif
 
-ifneq (,$(filter build,$(MAKECMDGOALS)))
-## Only do build-like things if build actually called.
-## Otherwise, metadata samplesheets will trigger an
-## attempt to rebuild the external samples.db etc.
+ifneq (${_metadata},)
+$(_metadata): $(ingress_dir)/$(experiment_table).csv | $(dir $(my_metadata))
+	cp $< $@
+endif
 
-$(samplesheets_build) : $(my_metadata)_%.csv : $(samples_db) 
+ifneq (${_alignments},)
+$(_samplesheets) : $(my_metadata)_%.csv : $(samples_db) $(my_metadata).csv
+	$(SQLITE) $(samples_db) -csv "DROP TABLE IF EXISTS metadata;"  ".import $(my_metadata).csv metadata"
 	$(SQLITE) -header -csv  $(samples_db) 'SELECT metadata.* FROM metadata INNER JOIN (SELECT * FROM "fastq_$*" GROUP BY $(samplesheet_id_column)) AS nfcore on metadata.$(metadata_id_column)=nfcore.$(samplesheet_id_column);' > $@
 
-$(samples_db): $(my_metadata).csv $(nfcore_dir)/../$(samples_db)
-	cp $(nfcore_dir)/../$(samples_db) $@ || echo "No samples database in nfcore directory"
-	$(SQLITE) $@ -csv "DROP TABLE IF EXISTS metadata;"  ".import $< metadata"
+$(samples_db): $(nfcore_dir)/../$(samples_db)
+	cp $< $@ || echo "No samples database in nfcore directory"
 
-$(my_metadata).csv: $(ingress_dir)/$(experiment_table).csv | $(dir $(my_metadata))
+$(_configs): %.config: $(nfcore_dir)/../%.config
 	cp $< $@
 
-
-$(configs_build): %.config: ../nfcore/%.config
-	cp $< $@
-
--include $(patsubst %,%.config,$(filter-out $(alignments),$(alignments_build)))
-
-$(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/% %.config
+$(_genes_results): $(my_counts_dir)/%: $(nfcore_dir)/% %.config
 	dir=$(if $($*.group-as),$($*.group-as),$*);\
 	mkdir -p $(my_counts_dir)/$${dir} ;\
 	ln -fn $(nfcore_dir)/$${dir}/star_rsem/*.genes.results $(my_counts_dir)/$${dir}/
 
+$(_multiqc_results) : $(RESULTS_DIR)/multiqc-% : $(nfcore_dir)/% | $(RESULTS_DIR)
+	ln -sfn ../$(nfcore_dir)/$*/multiqc/star_rsem $@
+
 endif
 
-$(multiqc_results) : $(RESULTS_DIR)/multiqc-% : $(nfcore_dir)/% | $(RESULTS_DIR)
-	ln -sfn ../$(nfcore_dir)/$*/multiqc/star_rsem $@
+
 
 ################################################################
 #### Helper goals
