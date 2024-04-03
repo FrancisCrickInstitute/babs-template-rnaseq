@@ -26,7 +26,7 @@ ml = module is-loaded $1 || module load $1 || true # ie fall back to true (ie re
 ## Define commands invoked by make
 R=R
 NEXTFLOW = $(call ml,Nextflow/$(NEXTFLOW_VERSION)); $(call ml,Singularity/$(SINGULARITY_VERSION)); $(call ml,CAMP_proxy); nextflow
-SQLITE = $(call ml,SQLite/3.36-GCCcore-11.2.0); sqlite3
+SQLITE = $(call ml,SQLite/3.42.0-GCCcore-12.3.0); sqlite3
 GIT=git
 make_rwx = setfacl -m u::rwx
 
@@ -38,9 +38,31 @@ publish_intranet=www_internal
 publish_internet=www_external
 publish_outputs=outputs
 location=results
-docs_dir=$(strip ../docs)
-nfcore_dir=$(strip ../nfcore/results)
-ingress_dir=$(strip ../ingress)
+docs_dir=../docs
+ingress_dir=../ingress
+nfcore_dir=../nfcore
+diff_dir=../differential
+
+
+################################################################
+## Propagation of docs files
+## 'Earliest' presence of a propagated file is taken as definitive.
+################################################################
+ifneq (${diff_dir},)
+alignments=$(patsubst ${diff_dir}/${my_counts_dir}/%,%,$(wildcard ${diff_dir}/${my_counts_dir}/*))
+specfiles=$(patsubst $(diff_dir)/%.spec,%,$(wildcard $(diff_dir)/*.spec))
+endif
+ifneq (${nfcore_dir},)
+alignments=$(patsubst $(nfcore_dir)/results/%,%,$(wildcard $(nfcore_dir)/results/*))
+endif
+ifneq ($(ingress_dir),)
+alignments=$(patsubst $(ingress_dir)/%.config,%,$(wildcard $(ingress_dir)/*.config))
+specfiles=$(patsubst $(ingress_dir)/%.spec,%,$(wildcard $(ingress_dir)/*.spec))
+endif
+ifneq (${docs_dir},)
+alignments=$(patsubst $(docs_dir)/%.config,%,$(wildcard $(docs_dir)/*.config))
+specfiles=$(patsubst $(docs_dir)/%.spec,%,$(wildcard $(docs_dir)/*.spec))
+endif
 
 ################################################################
 ## SLURM
@@ -87,19 +109,6 @@ pubdir = $(shortcut)$(publish_$(location))
 ifeq ($(pubdir),)
 pubdir = published
 endif
-$(pubdir):
-ifdef redirect_$(location)
-	mkdir -p $(redirect_$(location))
-	mkdir -p $(shortcut)
-ifdef url_$(location)
-	echo "<!doctype html>" > $(shortcut)$(location).html
-	echo "<script>" >> $(shortcut)$(location).html
-	echo "window.location.replace('$(url_$(location))/$(VERSION)')" >> $(shortcut)$(location).html
-	echo "</script>"  >> $(shortcut)$(location).html
-endif
-	ln -sfn $(redirect_$(location)) $(pubdir)
-endif
-	mkdir -p $(pubdir)/$(VERSION)
 
 ################################################################
 #Standard makefile hacks
@@ -111,6 +120,9 @@ define newline
 
 $(empty)
 endef
+
+# These targets will skip any computationally intensive 'include's
+excluded-targets=help clean maintainer-clean R-local
 
 ## Deferred simple expansion - TMPSCRIPT won't exist when first called, then constant thereafter
 TMPSCRIPT = $(eval TMPSCRIPT := $$(shell mktemp -u $(staging_dir)/XXXXX))$(TMPSCRIPT)
@@ -126,9 +138,26 @@ log=2>&1 | tee $2 $(log_dir)/$1.log
 #log=>$(subst -a,>)$(log_dir)/$1.log 2>&1
 # as above, but suppress stdout
 
+ifndef have-run-shared
+
 ################################################################
 ## Standard Goals
 ################################################################
+
+$(pubdir):
+ifdef redirect_$(location)
+	mkdir -p $(redirect_$(location))
+	mkdir -p $(shortcut)
+ifdef url_$(location)
+	echo "<!doctype html>" > $(shortcut)$(location).html
+	echo "<script>" >> $(shortcut)$(location).html
+	echo "window.location.replace('$(url_$(location))/$(VERSION)')" >> $(shortcut)$(location).html
+	echo "</script>"  >> $(shortcut)$(location).html
+endif
+	ln -sfn $(redirect_$(location)) $(pubdir)
+endif
+	mkdir -p $(pubdir)/$(VERSION)
+
 .PHONY: print-%
 print-%: ## `make print-varname` will show varname's value
 	@echo "$*"="$($*)"
@@ -150,8 +179,8 @@ help: ## Show help message
 # one out of a template.
 
 secret.mk: $(wildcard ../secret.mk) .not-secret
-	if [ -f ../secret.mk ]; then \
-	  $(MAKE) -C .. secret.mk ;\
+	@if [ -f ../secret.mk ]; then \
+	  $(MAKE) --no-print-directory -C .. secret.mk >/dev/null ;\
 	  cp $< $@ ;\
 	else \
 	  if [ ! -f secret.mk ] ; then \
@@ -164,5 +193,8 @@ include secret.mk
 
 ifneq ($(wildcard ../.not-secret),)
 .not-secret: ../.not-secret
-	cp $< $@
+	@cp $< $@
+endif
+
+have-run-shared=true
 endif

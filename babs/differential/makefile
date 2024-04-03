@@ -1,31 +1,23 @@
-include shared.mk
-include module.mk
-
 .PHONY: makefile module.mk 
 .PHONY: build clean maintainer-clean geo R-local
 
+include shared.mk
+include module.mk
 include project.mk  ## Provides analysis parametrisation
+
+ifeq (,$(filter $(excluded-targets),$(MAKECMDGOALS)))
+ifneq (,$(excluded-targets))
 include $(patsubst %,$(staging_dir)/.make-%,$(sections))
+endif
+endif
 
 
-_alignments = $(patsubst $(nfcore_dir)/%,%,$(wildcard $(nfcore_dir)/*))
-alignments = $(sort $(patsubst ${my_counts_dir}/%,%,$(wildcard ${my_counts_dir}/*)) ${_alignments})
-
-_samplesheets = $(patsubst %,$(my_metadata)_%.csv,$(_alignments))
 samplesheets = $(patsubst %,$(my_metadata)_%.csv,$(alignments))
-
-_configs = $(patsubst %,%.config,$(_alignments))
 configs = $(patsubst %,%.config,$(alignments))
-
-_genes_results = $(patsubst %,$(my_counts_dir)/%,$(_alignments))
 genes_results = $(patsubst %,$(my_counts_dir)/%,$(alignments))
+multiqc_results = $(patsubst %,$(RESULTS_DIR)/multiqc-%,$(alignments))
 
-_metadata = $(patsubst %,$(my_metadata).csv,$(wildcard $(ingress_dir)/$(experiment_table).csv))
-
-_specfiles =  $(patsubst $(docs_dir)/%.spec,%,$(wildcard $(docs_dir)/*.spec))
-specfiles = $(sort $(patsubst %.spec,%,$(wildcard *.spec)) ${_specfiles})
-
-_multiqc_results = $(patsubst %,$(RESULTS_DIR)/multiqc-%,$(_alignments))
+file.spec = $(patsubst %,%.spec,$(specfiles))
 
 ## Create a makefile per section. It will set up target-specific
 ## variables to inform subsequent targets of the alignment, spec-file,
@@ -40,7 +32,7 @@ mk = $(patsubst %,$(staging_dir)/.make-%,$(filter-out 00_%,$(sections)))
 qmd_path=$(staging_dir)/$*_$(ispec)_$(ialign)$$(TAG).qmd
 qmd0_path=$(staging_dir)/$*_$(ialign)$$(TAG).qmd
 
-$(mk): $(staging_dir)/.make-% : $(patsubst %,%.spec,$(specfiles)) $(samplesheets) | $(staging_dir)
+$(mk): $(staging_dir)/.make-% : $(file.spec) $(samplesheets) | $(staging_dir)
 	$(foreach ispec,$(specfiles),\
 	   $(foreach ialign,$(alignments),\
 	   echo '$(qmd_path): alignment=$(ialign)' >> $@;\
@@ -70,7 +62,12 @@ $(mk0): $(staging_dir)/.make-% : $(samplesheets) | $(staging_dir)
 	echo '$*_htmls = $$(patsubst %,$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/%$$(TAG).html,$$($*_pages))'>> $@
 	echo '$*_htmls: $$($*_htmls)'>> $@
 
+ifeq (,$(filter $(excluded-targets),$(MAKECMDGOALS)))
+ifneq (,$(excluded-targets))
 include ${configs}
+endif
+endif
+
 qmds=$(strip $(foreach section,$(sections),$($(section)_qmds)))
 
 html_reports=$(strip $(foreach section,$(sections),$($(section)_htmls)))
@@ -83,7 +80,7 @@ ifeq ($(SUBMIT),false)
 run: render  ## Create objects in `data` that store the results of applying each spec file, along with a versioned html report in `results`.  Requires 'make build' be done first.
 
 ## Render the qmds to html in one quarto call
-render: $(qmds)  $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(samplesheets)| $(log_dir) data $(RESULTS_DIR)/$(VERSION) $(staging_dir)/R.bib## Render the whole directory of generated qmds
+render: $(qmds)  $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(samplesheets)| $(log_dir) data $(RESULTS_DIR)/$(VERSION) $(staging_dir)/R.bib $(genes_results)  ## Render the whole directory of generated qmds
 	sed  -i 's#^  contents: .*#  contents: [$(subst $(space),$(comma),$(patsubst $(staging_dir)/%,%,$(qmds)))]#' $(staging_dir)/index.qmd
 	$(QUARTO) render '$(staging_dir)' --output-dir $(RESULTS_DIR)/$(VERSION) --execute-dir $(CURDIR) $(call log,render)
 	cp -rT $(staging_dir)/$(RESULTS_DIR)/$(VERSION) $(RESULTS_DIR)/$(VERSION)
@@ -148,7 +145,7 @@ R.bib: renv.lock  | $(log_dir) rocker.Renviron
 
 renv.lock: resources/_dependencies.R $(wildcard pre.renv.lock)
 	if [ -f pre.renv.lock ] ; then \
-	  $(GIT) mv pre.renv.lock renv.lock;\
+	  $(GIT) mv pre.renv.lock renv.lock || mv pre.renv.lock renv.lock;\
 	  $(R) -e 'library(renv); restore()' ;\
 	  $(R) -e 'library(renv); install(); snapshot()' ;\
 	  $(GIT) add renv.lock resources/_dependencies.R renv/activate.R .Rprofile renv/settings.json $(call log,renv,-a) ;\
@@ -213,15 +210,6 @@ geo/md5.txt:
 	while read -r fq ; do cp ${fq} shortcuts/geo/ ; done
 	pushd shortcuts/geo; md5sum *.* > geo.md5.txt; popd
 
-location=outputs
-shortcut=$(empty)
-ifdef redirect_$(location)
-shortcut=shortcuts/
-endif
-pubdir = $(shortcut)$(publish_$(location))
-ifeq ($(pubdir),)
-pubdir = published
-endif
 publish: $(pubdir) ## Copy results to final location. Either 'outputs' folder (default), intranet (`make publish location=intranet`) or internet
 	mkdir -p $(pubdir)/$(VERSION)
 	cp --no-preserve=mode -r $(RESULTS_DIR)/$(VERSION)/. $(extra_files) $(pubdir)/$(VERSION)
@@ -236,46 +224,62 @@ publish: $(pubdir) ## Copy results to final location. Either 'outputs' folder (d
 #### Bootstrap all relevant data from outside
 ################################################################
 
-build: $(_samplesheets) $(patsubst %,%.spec,$(_specfiles)) $(_configs) $(_genes_results)  $(_multiqc_results) | $(staging_dir) ##  Copy the required nfcore count files into the `extdata` area, and get the spec files.
-	$(GIT) add makefile module.mk shared.mk
+build: $(configs)  ##  Copy the required nfcore count files into the `extdata` area, and get the spec files.
+
+ifneq (${docs_dir},)
+$(docs_dir)/%:
+	$(MAKE) --no-print-directory -C ${docs_dir} $*
+
+$(file.spec): % : $(docs_dir)/%
+	$(MAKE) --no-print-directory -C ${docs_dir} $*
+	cp $< $@
+	$(GIT) add $@
+endif
+
+ifneq (${ingress_dir},)
+$(ingress_dir)/%:
+	$(MAKE) --no-print-directory -C ${ingress_dir} $*
+
+$(my_metadata).csv: $(ingress_dir)/$(experiment_table).csv | $(dir $(my_metadata))
+	$(MAKE) --no-print-directory -C ${ingress_dir} $(experiment_table).csv
+	cp $< $@
+	$(GIT) add $@
+endif
+
+
+ifneq (${nfcore_dir},)
+$(nfcore_dir)/%:
+	$(MAKE)  --no-print-directory -C ${nfcore_dir} $*
+
+$(samplesheets) : $(my_metadata)_%.csv : $(nfcore_dir)/samplesheet_%.csv ${samples_db} $(my_metadata).csv
+	$(SQLITE) -header -csv  $(samples_db) --cmd '.import --csv --schema temp $(my_metadata).csv metadata' 'SELECT metadata.* FROM metadata INNER JOIN (SELECT * FROM "fastq_$*" GROUP BY $(samplesheet_id_column)) AS nfcore on metadata.$(metadata_id_column)=nfcore.$(samplesheet_id_column);' > $@
+	$(GIT) add $@
+	$(GIT) commit -m "Add the dependencies for $*" || true
+
+$(samples_db): $(nfcore_dir)/$(samples_db) | $(file.spec) $(staging_dir)
+	cp $< $@ || echo "No samples database in nfcore directory"
+	$(GIT) add makefile module.mk shared.mk project.mk
 	$(GIT) commit -m "Add the differential makefiles" || true
 	$(GIT) add pre.renv.lock renv/activate.R .Rprofile
-	$(GIT) commit -m "Adding the vanilla renv setup" || true
+	$(GIT) commit -m "Add the vanilla renv setup" || true
 	$(GIT) add $(source_dir) R
 	$(GIT) commit -m "Add the template scripts and R functions" || true
-	$(GIT) add $(_samplesheets) $(patsubst %,%.spec,$(_specfiles)) $(_configs)
-	$(GIT) commit -m "Add differential build-files" || true
 
-ifneq (${_specfiles},)
-$(patsubst %,%.spec,$(_specfiles)): % : $(docs_dir)/%
+
+$(configs): %.config: $(nfcore_dir)/%.config $(my_metadata)_%.csv  $(my_counts_dir)/%
 	cp $< $@
-endif
+	$(GIT) add $@
 
-ifneq (${_metadata},)
-$(_metadata): $(ingress_dir)/$(experiment_table).csv | $(dir $(my_metadata))
-	cp $< $@
-endif
 
-ifneq (${_alignments},)
-$(_samplesheets) : $(my_metadata)_%.csv : $(samples_db) $(my_metadata).csv
-	$(SQLITE) $(samples_db) -csv "DROP TABLE IF EXISTS metadata;"  ".import $(my_metadata).csv metadata"
-	$(SQLITE) -header -csv  $(samples_db) 'SELECT metadata.* FROM metadata INNER JOIN (SELECT * FROM "fastq_$*" GROUP BY $(samplesheet_id_column)) AS nfcore on metadata.$(metadata_id_column)=nfcore.$(samplesheet_id_column);' > $@
-
-$(samples_db): $(nfcore_dir)/../$(samples_db)
-	cp $< $@ || echo "No samples database in nfcore directory"
-
-$(_configs): %.config: $(nfcore_dir)/../%.config
-	cp $< $@
-
-$(_genes_results): $(my_counts_dir)/%: $(nfcore_dir)/% %.config
+$(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/results/%/star_rsem/rsem.merged.gene_counts.tsv %.config $(RESULTS_DIR)/multiqc-%
 	dir=$(if $($*.group-as),$($*.group-as),$*);\
 	mkdir -p $(my_counts_dir)/$${dir} ;\
-	ln -fn $(nfcore_dir)/$${dir}/star_rsem/*.genes.results $(my_counts_dir)/$${dir}/
+	ln -fn $(nfcore_dir)/results/$${dir}/star_rsem/*.genes.results $(my_counts_dir)/$${dir}/
 
-$(_multiqc_results) : $(RESULTS_DIR)/multiqc-% : $(nfcore_dir)/% | $(RESULTS_DIR)
-	ln -sfn ../$(nfcore_dir)/$*/multiqc/star_rsem $@
-
+$(multiqc_results) : $(RESULTS_DIR)/multiqc-% : $(nfcore_dir)/results/%/star_rsem/rsem.merged.gene_counts.tsv | $(RESULTS_DIR)
+	ln -sfn ../$(nfcore_dir)/results/$*/multiqc/star_rsem $@
 endif
+
 
 
 
@@ -284,8 +288,9 @@ endif
 ################################################################
 
 
-$(log_dir) $(staging_dir) $(dir $(my_metadata)) data $(RESULTS_DIR)/$(VERSION) $(RESULTS_DIR) $(staging_dir)/$(RESULTS_DIR)/$(VERSION):
+$(log_dir) $(dir $(my_metadata)) data $(RESULTS_DIR)/$(VERSION) $(RESULTS_DIR) $(staging_dir)/$(RESULTS_DIR)/$(VERSION) $(staging_dir):
 	mkdir -p $@
+
 
 rocker.Renviron: 
 	echo "RENV_PATHS_PREFIX=$(RENV_PATHS_PREFIX)" > $@
@@ -324,5 +329,6 @@ MAKEFLAGS += --no-builtin-rules
 # if necessary and applicable:
 ifneq ($(wildcard ../shared.mk),)
 shared.mk: ../shared.mk
-	cp $< $@
+	@cp $< $@
 endif
+

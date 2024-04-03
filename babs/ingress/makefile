@@ -17,28 +17,26 @@ ${samples_db}: $(samplesheet_fname).csv
 #### Bootrap all relevant data from outside
 ################################################################
 
-_configs = $(patsubst ../docs/%.config,%.config,$(wildcard ../docs/*.config))
-_etable=$(wildcard ../docs/$(experiment_table).csv)
-_samplesheet = $(wildcard  ../docs/$(samplesheet_fname).csv)
+configs = $(patsubst %,%.config,$(alignments))
 
-build: $(_configs) $(samplesheet_fname).csv $(experiment_table).csv ## Prepare for `run` by gathering configs and samplesheet into current directory
+build: $(configs) $(samplesheet_fname).csv $(experiment_table).csv ## Prepare for `run` by gathering configs and samplesheet into current directory
 
-ifneq (${_etable},)
-$(experiment_table).csv: ${_etable}
-	tr -d '\r' < $< > $@
-endif
+ifneq (${docs_dir},)
+$(docs_dir)/%:
+	$(MAKE)  --no-print-directory -C ${docs_dir} $*
 
-ifneq (${_samplesheet},)
-$(samplesheet_fname).csv: ${_samplesheet}
-	tr -d '\r' < $< > $@
-endif
-
-ifneq (${_configs},)
-$(_configs): %.config: ../docs/%.config
+$(configs): %.config: $(docs_dir)/%.config
+	cp $< $@
 	tr -d '\r' < $< > $@
 	grep -q "^universal" $@ || sed -i -e '$$auniversal=yes' $@
 	grep -q "^strandedness" $@ || sed -i -e '$$astrandedness=auto' $@
 	sed -i 's/^/$*./' $@
+$(samplesheet_fname).csv: ${docs_dir}/$(samplesheet_fname).csv
+	cp $< $@
+	tr -d '\r' < $< > $@
+$(experiment_table).csv:  $(docs_dir)/$(experiment_table).csv
+	cp $< $@
+	tr -d '\r' < $< > $@
 endif
 
 copy:

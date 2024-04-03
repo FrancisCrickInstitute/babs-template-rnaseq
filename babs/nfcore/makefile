@@ -1,23 +1,27 @@
+.PHONY: run build copy publish clean
 include shared.mk
 include module.mk
 
-.PHONY: run build copy publish clean
+configs = $(patsubst %,%.config,$(alignments))
+samplesheets = $(patsubst %,samplesheet_%.csv,$(alignments))
+gene_counts = $(patsubst %,results/%/star_rsem/rsem.merged.gene_counts.tsv,$(alignments))
 
-_db = ${wildcard $(ingress_dir)/${samples_db})
-_configs = $(patsubst $(ingress_dir)/%.config,%.config,$(wildcard $(ingress_dir)/*.config))
-configs = $(sort $(wildcard *.config) ${_configs})
-_samplesheets = $(patsubst %.config,samplesheet_%.csv,$(_configs))
-samplesheets = $(patsubst %.config,samplesheet_%.csv,$(configs))
+ifeq (,$(filter $(excluded-targets),$(MAKECMDGOALS)))
+ifneq (,$(excluded-targets))
+include ${configs}
+endif
+endif
 
-include $(configs)
 
-alignments = $(patsubst %,results/%/star_rsem/rsem.merged.gene_counts.tsv,$(samplesheets))
 refdir = $(realpath $($*.index_dir)/$($*.genome_fasta_md5)/$($*.gtf_md5))
 workdir = $(SCRATCH_DIR)nf_work/
 
-run: $(alignments) ## Generate NF-CORE alignments, one folder for each config-specific samplesheet from the `build` process.
+run: $(gene_counts) ## Generate NF-CORE alignments, one folder for each config-specific samplesheet from the `build` process.
 
-$(alignments) : results/%/star_rsem/rsem.merged.gene_counts.tsv : samplesheet_%.csv | $(log_dir) $(workdir)
+$(patsubst %,results/%,$(alignments)):
+	mkdir -p $@
+
+$(gene_counts) : results/%/star_rsem/rsem.merged.gene_counts.tsv : samplesheet_%.csv results/% | $(log_dir) $(workdir)
 	mkdir -p results/$*
 	export NXF_SINGULARITY_CACHEDIR="$(NXF_SINGULARITY_CACHEDIR)" ;\
 	export NXF_SINGULARITY_LIBRARYDIR="$(NXF_SINGULARITY_CACHEDIR)" ;\
@@ -52,7 +56,7 @@ $(workdir):
 #### Bootrap all relevant data from outside
 ################################################################
 
-build: $(_samplesheets) ## Build all necessary inputs: samplesheets for each matching alignment '.config' from 'docs'.
+build: $(samplesheets) ## Build all necessary inputs: samplesheets for each matching alignment '.config' from 'docs'.
 	$(GIT) add module.mk shared.mk makefile .gitignore $(_samplesheets) $(_configs)
 	$(GIT) commit -m "Add nfcore build-files" || true
 
@@ -61,26 +65,26 @@ field=$(shell sed '/^$$/d; s/^$*./"/;s/=.*/" TEXT/' "$*.config" | paste -sd ',')
 insfield=$(shell sed '/^$$/d; s/^$*./"/;s/=.*/"/' "$*.config" | paste -sd ',')
 vals=$(shell sed -r '/^$$/d; s/.*=(.*)/"\1"/' "$*.config" | paste -sd ',')
 
-ifneq ($(_samplesheets),)
-$(_samplesheets): samplesheet_%.csv: %.config  ${samples_db}
+
+$(samplesheets): samplesheet_%.csv: %.config ${samples_db}
 	$(SQLITE) ${samples_db} 'DROP TABLE IF EXISTS "config_$*";' \
 	'CREATE TABLE "config_$*" ($(field));' \
 	'INSERT INTO "config_$*" ($(insfield)) VALUES ($(vals));' \
 	'CREATE TABLE "fastq_$*" AS SELECT * FROM fastqs NATURAL JOIN "config_$*" ;'; \
 	$(SQLITE) -header -csv  ${samples_db} 'SELECT $(samplesheet_id_column) AS sample, fastq_1, fastq_2, strandedness FROM "fastq_$*";' > $@
-endif
 
-ifneq ($(_configs),)
-$(_configs) : %.config : $(ingress_dir)/%.config
+
+ifneq ($(ingress_dir),)
+$(ingress_dir)/%:
+	$(MAKE) --no-print-directory -C ${ingress_dir} $*
+$(configs) : %.config : $(ingress_dir)/%.config
 	cp $< $@
 	md5sum $(shell sed -n 's/^$*.genome_fasta=//p' $<) | awk '{print "$*.genome_fasta_md5=" $$1}' >> $@
 	md5sum $(shell sed -n 's/^$*.gtf=//p' $<) | awk '{print "$*.gtf_md5=" $$1}' >> $@
-endif
-
-ifneq ($(_db),)
-${samples_db}: $(_db)
+${samples_db}: $(ingress_dir)/${samples_db}
 	cp $< $@
 endif
+
 
 $(log_dir):
 	mkdir -p $@
@@ -113,3 +117,5 @@ ifneq ($(wildcard ../shared.mk),)
 shared.mk: ../shared.mk
 	cp $< $@
 endif
+
+
