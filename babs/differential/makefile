@@ -271,7 +271,7 @@ $(configs): %.config: $(nfcore_dir)/%.config $(my_metadata)_%.csv  $(my_counts_d
 	$(GIT) add $@
 
 
-$(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/results/%/star_rsem/rsem.merged.gene_counts.tsv %.config $(RESULTS_DIR)/multiqc-%
+$(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/results/%/star_rsem/rsem.merged.gene_counts.tsv  $(RESULTS_DIR)/multiqc-%
 	dir=$(if $($*.group-as),$($*.group-as),$*);\
 	mkdir -p $(my_counts_dir)/$${dir} ;\
 	ln -fn $(nfcore_dir)/results/$${dir}/star_rsem/*.genes.results $(my_counts_dir)/$${dir}/

@@ -100,7 +100,10 @@ recode_within <- function(inner, ...) {
 }
 
 
-
+default_names <- function(obj, prefix="", offset=0) {
+  ifelse(names(obj)=="", paste0(prefix, seq_along(obj)+offset), names(obj))
+  }
+  
 ##' Expand an analysis specification into its corresponding subset list
 ##'
 ##' Generate a list of DESeq2 objects corresponding to the different
@@ -127,7 +130,18 @@ build_dds_list <- function(dds, spec) {
   }
   metadata(colData(dds))$palette <- default_palette
   ddsList <- list()
+  names(spec$sample_sets) <- default_names(spec$sample_sets, prefix="D")
+  offset_c <- 0
+  offset_m <- 0
   for (i_set in seq_along(spec$sample_sets)) {
+    names(spec$sample_sets[[i_set]]$models) <- default_names(spec$sample_sets[[i_set]]$models, prefix="M", offset=offset_m)
+    offset_m <- offset_m + length(spec$sample_sets[[i_set]]$models)
+    for (i_mdl in seq_along(spec$sample_sets[[i_set]]$models)) {
+      if ("comparisons" %in% names(spec$sample_sets[[i_set]]$models[[i_mdl]])) {
+        names(spec$sample_sets[[i_set]]$models[[i_mdl]]$comparisons) <- default_names(spec$sample_sets[[i_set]]$models[[i_mdl]]$comparisons, prefix="C", offset=offset_c)
+        offset_c <- offset_c + length(spec$sample_sets[[i_set]]$models[[i_mdl]]$comparisons)
+      }
+    }
     set <- spec$sample_sets[[i_set]]
     mdlList <- spec$models
     obj <- dds
