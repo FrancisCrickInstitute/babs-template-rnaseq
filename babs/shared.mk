@@ -17,8 +17,8 @@ samples_db = samples.db
 # Executibles (can be overridden in module.mk's)
 ################################################################
 ## Versions
-SINGULARITY_VERSION=3.6.4
-NEXTFLOW_VERSION=22.10.3
+SINGULARITY_VERSION=3.11.3
+NEXTFLOW_VERSION=23.10.0
 RVERSION=4.3.2
 BIOCONDUCTOR_VERSION=3.18
 ## Module loader

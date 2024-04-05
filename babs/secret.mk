@@ -82,7 +82,7 @@ update-pm: ## Update the project management scripts
 	  rsync -avzp $(TEMPLATE_DIR)/generic/.github/ `echo $(CURDIR) | sed 's|\(.*\)/babs/.*|\1/|'` ;\
 	fi
 
-babsfile=.babs
+babsfile=../.babs
 
 ifneq ($(wildcard $(babsfile)),)
 .PHONY: secret.mk

@@ -18,6 +18,12 @@ ${samples_db}: $(samplesheet_fname).csv
 ################################################################
 
 configs = $(patsubst %,%.config,$(alignments))
+ifeq (,$(filter $(excluded-targets),$(MAKECMDGOALS)))
+ifneq (,$(excluded-targets))
+include ${configs}
+endif
+endif
+
 
 build: $(configs) $(samplesheet_fname).csv $(experiment_table).csv ## Prepare for `run` by gathering configs and samplesheet into current directory
 

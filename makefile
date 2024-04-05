@@ -31,16 +31,19 @@ ena=005/SRR1039515/SRR1039515_1 006/SRR1039516/SRR1039516_1 004/SRR1039514/SRR10
 
 
 
-airway-fastq:
+airway/fastq:
 	mkdir -p $@
 	cd @$; for i in ${ena}; do wget -nc ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR103/$$i.fastq.gz ; done
 
+test: test.
+	mv $< $@
 
-test%: airway-fastq
+test%: airway/fastq
 	mkdir -p $@
-	rsync -av  babs/. $@/. --exclude '.~'
+	rsync -av  babs/. $@/. --exclude '.~' --exclude 'docs'
 	cd $@ && \
-	ln -s ../airway-fastq fastq && \
+	ln -s ../airway/fastq fastq && \
+	cp -r ../airway/docs . && \
 	git init && \
 	git add makefile && \
 	git commit -m "Restart git repo for testing" && \
@@ -51,3 +54,4 @@ test%: airway-fastq
 
 help: ## show help message
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m\033[0m\n"} /^[$$()% 0-9a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+MAKEFLAGS += --no-builtin-rules
