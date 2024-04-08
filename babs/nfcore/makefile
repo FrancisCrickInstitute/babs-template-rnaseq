@@ -72,7 +72,7 @@ $(samplesheets): samplesheet_%.csv: %.config ${samples_db}
 	'INSERT INTO "config_$*" ($(insfield)) VALUES ($(vals));' \
 	'CREATE TABLE "fastq_$*" AS SELECT * FROM fastqs NATURAL JOIN "config_$*" ;'; \
 	$(SQLITE) -header -csv  ${samples_db} 'SELECT $(samplesheet_id_column) AS sample, fastq_1, fastq_2, strandedness FROM "fastq_$*";' > $@
-
+	if [ ! -z "$($*.grep)" ]; then grep $($*.grep) $@ > $@.tmp; mv $@.tmp $@; fi
 
 ifneq ($(ingress_dir),)
 $(ingress_dir)/%:
