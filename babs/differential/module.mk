@@ -74,7 +74,7 @@ my_metadata=extdata/metadata
 ## 'shell' will run using the prevailing system executibles.
 ################################################################
 CONTAINERED=false#An internal flag
-BIND_DIR = $(shell ${GIT} rev-parse --show-toplevel || echo ${CURDIR}),$(shell $(GIT) worktree list | awk -e '$$3=="[main]"{print $$1}')
+BIND_DIR = $(shell ${GIT} rev-parse --show-toplevel || echo ${CURDIR})
 
 ifeq (${EXECUTOR},singularity)
 CONTAINER= $(call ml,Singularity/$(SINGULARITY_VERSION)); singularity
