@@ -210,6 +210,7 @@ geo/md5.txt:
 	while read -r fq ; do cp ${fq} shortcuts/geo/ ; done
 	pushd shortcuts/geo; md5sum *.* > geo.md5.txt; popd
 
+.PHONY: publish
 publish: $(pubdir) ## Copy results to final location. Either 'outputs' folder (default), intranet (`make publish location=intranet`) or internet
 	mkdir -p $(pubdir)/$(VERSION)
 	cp --no-preserve=mode -r $(RESULTS_DIR)/$(VERSION)/. $(extra_files) $(pubdir)/$(VERSION)

@@ -101,14 +101,6 @@ git-ignore=touch .gitignore && grep -qxF '$(1)' .gitignore || echo '$(1)' >> .gi
 #### Publication 
 ################################################################
 location=outputs
-shortcut=$(empty)
-ifdef redirect_$(location)
-shortcut=shortcuts/
-endif
-pubdir = $(shortcut)$(publish_$(location))
-ifeq ($(pubdir),)
-pubdir = published
-endif
 
 ################################################################
 #Standard makefile hacks
@@ -144,35 +136,8 @@ ifndef have-run-shared
 ## Standard Goals
 ################################################################
 
-$(pubdir):
-ifdef redirect_$(location)
-	mkdir -p $(redirect_$(location))
-	mkdir -p $(shortcut)
-ifdef url_$(location)
-	echo "<!doctype html>" > $(shortcut)$(location).html
-	echo "<script>" >> $(shortcut)$(location).html
-	echo "window.location.replace('$(url_$(location))/$(VERSION)')" >> $(shortcut)$(location).html
-	echo "</script>"  >> $(shortcut)$(location).html
-endif
-	ln -sfn $(redirect_$(location)) $(pubdir)
-endif
-	mkdir -p $(pubdir)/$(VERSION)
-
-.PHONY: print-%
-print-%: ## `make print-varname` will show varname's value
-	@echo "$*"="$($*)"
-
-V:=1#switches _off_ SILENT mode - delete for SILENT to be default
-$(V).SILENT: 
-
-.PHONY: help
-help: ## Show help message
-	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage: `make command` where command is one of: \n"} /^[$$()% 0-9a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
-
-################################################################
 # Load secrets
-################################################################
-
+##############
 # Originally, secret.mk should come from the parent directory.  If
 # it's still there, make sure it's up-to-date and then copy it
 # here. If a secret.mk file can't be found anywhere, create a dummy
@@ -189,7 +154,19 @@ secret.mk: $(wildcard ../secret.mk) .not-secret
 	    exit ;\
 	 fi ;\
 	fi
-include secret.mk
+
+
+.PHONY: print-%
+print-%: ## `make print-varname` will show varname's value
+	@echo "$*"="$($*)"
+
+V:=1#switches _off_ SILENT mode - delete for SILENT to be default
+$(V).SILENT: 
+
+.PHONY: help
+help: ## Show help message
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage: `make command` where command is one of: \n"} /^[$$()% 0-9a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+
 
 ifneq ($(wildcard ../.not-secret),)
 .not-secret: ../.not-secret
@@ -198,3 +175,29 @@ endif
 
 have-run-shared=true
 endif
+
+include secret.mk
+
+shortcut=$(empty)
+ifdef redirect_$(location)
+shortcut=shortcuts/
+endif
+pubdir = $(shortcut)$(publish_$(location))
+ifeq ($(pubdir),)
+pubdir = published
+endif
+
+$(pubdir):
+ifdef redirect_$(location)
+	mkdir -p $(redirect_$(location))
+	mkdir -p $(shortcut)
+ifdef url_$(location)
+	echo "<!doctype html>" > $(shortcut)$(location).html
+	echo "<script>" >> $(shortcut)$(location).html
+	echo "window.location.replace('$(url_$(location))/$(VERSION)')" >> $(shortcut)$(location).html
+	echo "</script>"  >> $(shortcut)$(location).html
+endif
+	ln -sfn $(redirect_$(location)) $(pubdir)
+endif
+	mkdir -p $(pubdir)/$(VERSION)
+
