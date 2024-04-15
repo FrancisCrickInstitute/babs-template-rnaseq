@@ -38,10 +38,10 @@ publish_intranet=www_internal
 publish_internet=www_external
 publish_outputs=outputs
 location=results
-docs_dir=../docs
-ingress_dir=../ingress
-nfcore_dir=../nfcore
-diff_dir=../differential
+docs_dir=$(wildcard ../docs)
+ingress_dir=$(wildcard ../ingress)
+nfcore_dir=$(wildcard ../nfcore)
+diff_dir=$(wildcard ../differential)
 
 
 ################################################################
