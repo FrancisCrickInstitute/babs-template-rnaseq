@@ -55,7 +55,7 @@ load_specs <- function(file="", context) {
     pkg_defaults <-default_spec_settings()
     new_settings <- setdiff(names(pkg_defaults), names(specs$settings))
     if (length(new_settings)>0) {
-      string_rep <- lapply(pkg_defaults[new_settings], deparse)
+      string_rep <- lapply(pkg_defaults[new_settings], deparse1)
       warning("New settings (", paste(new_settings), ") can be set in ", file, ", so please update it. The default values that will be used are:\n", paste(names(string_rep), string_rep, sep=": ", collapse="\n"))
       specs$settings[new_settings] <- pkg_defaults[new_settings]
     }
@@ -328,7 +328,9 @@ fit_model <- function(mdl, dds, ...) {
   ## Flatten the list, but preserve the original comparison name in the dmc metadata.
   out <- unlist(out, recursive=FALSE)
   out <- imap(out, function(obj, cname) {
-    metadata(obj)$dmc$comparison <- cname; obj
+    metadata(obj)$comparison_code <- paste0("res <- results(dds, contrast=",deparse1(metadata(obj)$comparison),")")
+    metadata(obj)$dmc$comparison <- cname
+    obj
   })
   return(out)
 }
@@ -412,6 +414,21 @@ check_model <- function(dds) {
     mm <- model.matrix(mdl$design, as.data.frame(colData(dds)))[,!mdl$dropped]
     colnames(mm) <- .resNames(colnames(mm))
     mdl$mat <- mm
+    metadata(dds)$model_code <-c(
+      "# Warning - creates long lines.  May be necessary to chunk it into smaller continuation lines in R console",
+      paste0("df <- eval(parse(text='", deparse1(as.data.frame(colData(dds)), collapse="\n"),"'))"),
+      paste0("mm <- model.matrix(",deparse1(mdl$design),",df)[,-c(",paste(which(mdl$dropped), collapse=", "),")]"),
+      "colnames(mm)[colnames(mm)==\"(Intercept)\"] <- \"Intercept\"",
+      "colnames(mm) <- make.names(colnames(mm)",
+      "colData(dds) <- df",
+      "design(dds) <- mm"
+    ) 
+  } else {
+    metadata(dds)$model_code <- c(
+      paste0("df <- eval(parse(text='", deparse1(as.data.frame(colData(dds))),"'))"),
+      "colData(dds) <- df",
+      paste0("design(dds) <- ", deparse1(mdl$design))
+    )
   }
   metadata(dds)$model <- mdl
   dds
@@ -744,7 +761,7 @@ tidy_per_gene <- function(mat, pdat,  tidy_fn) {
 }
 
 full_model <- function(mdlList) {
-  rhs <- lapply(mdlList, function(mdl) deparse(mdl$design[[2]]))
+  rhs <- lapply(mdlList, function(mdl) deparse1(mdl$design[[2]]))
   fml <- stats::update(as.formula(paste("~", paste(rhs, collapse=" + "))), ~ . )
 }
 
@@ -831,7 +848,7 @@ retrieve_contrast <- function (object, expanded = FALSE, listValues=c(1,-1)) {
 rebase <- function(x, lev) {
   i <- which(levels(x)==lev)
   if (length(i)==0) {
-    stop(lev, " is not a level of your factor ", deparse(substitute(x)))
+    stop(lev, " is not a level of your factor ", deparse1(substitute(x)))
   }
   contrasts(x) <- contr.treatment(nlevels(x), i)
   x
@@ -852,3 +869,4 @@ default_spec_settings <- function() {
 	LRT_effect = "default"  ## For the "white" colour in differential heatmaps
    )
 }
+

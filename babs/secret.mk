@@ -28,23 +28,15 @@ targz=$(TEMPLATE_DIR)/archive/$(setting_Type)-$(version).tar.gz
 genericgz=$(TEMPLATE_DIR)/archive/generic-$(version).tar.gz
 endif
 
-ifeq ($(version),)
-targz=$(TEMPLATE_DIR)/$(setting_Type).tar.gz
-genericgz = $(TEMPLATE_DIR)/generic.tar.gz
-else
-targz=$(TEMPLATE_DIR)/archive/$(setting_Type)-$(version).tar.gz
-genericgz=$(TEMPLATE_DIR)/archive/generic-$(version).tar.gz
-endif
-
 get-pipeline: update-pipeline
 	true
 
 update-pipeline: ## Update the pipeline
 	if [ -f "$(targz)" ]; then \
 	  $(GIT) stash -m "Stashing state prior to pipeline update" &&\
-	  tar -xzf $(targz) -C `echo $(CURDIR) | sed 's,\(.*\)/babs.*,\1/,'` && \
-	  cat `echo $(CURDIR) | sed 's,\(.*\)/babs.*,\1/babs/.pipeline-version,'` && \
-	  rm -f `echo $(CURDIR) | sed 's,\(.*\)/babs.*,\1/babs/*/.pipeline-version,'`;\
+	  tar -xzf $(targz) -C ${PROJECT_HOME} && \
+	  cat ${PROJECT_HOME}/babs/.pipeline-version && \
+	  rm -f ${PROJECT_HOME}/babs/*/.pipeline-version;\
 	else \
 	  if [ -d "$(subst .tar.gz,,$(targz))" ]; then \
 	    $(GIT) stash -m "Stashing state prior to pipeline update" &&\
@@ -60,8 +52,8 @@ update-module: ## Update the specific module you're currently using.
 	  if [ -f "$(targz)" ]; then \
 	    $(GIT) stash -m "Stashing state prior to pipeline update" &&\
 	    tar -xzf $(targz) babs/$(module) --strip-components=2  && \
-	    tar -xzf $(targz) babs/shared.mk babs/secret.mk babs/.pipeline-version --strip-components=1 && \
-	    cat .pipeline-version;\
+	    tar -xzf $(targz) babs/shared.mk babs/secret.mk babs/.pipeline-version -C .. --strip-components=1 && \
+	    cat .pipeline-version; \
 	  else \
 	    if [ -d "$(subst .tar.gz,,$(targz))" ]; then \
 	      $(GIT) stash -m "Stashing state prior to pipeline update" &&\

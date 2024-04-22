@@ -279,6 +279,7 @@ $(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/results/%/star_rsem/rsem.mer
 
 $(multiqc_results) : $(RESULTS_DIR)/multiqc-% : $(nfcore_dir)/results/%/star_rsem/rsem.merged.gene_counts.tsv | $(RESULTS_DIR)
 	ln -sfn ../$(nfcore_dir)/results/$*/multiqc/star_rsem $@
+	touch `realpath $@`
 endif
 
 
