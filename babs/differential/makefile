@@ -15,7 +15,6 @@ endif
 samplesheets = $(patsubst %,$(my_metadata)_%.csv,$(alignments))
 configs = $(patsubst %,%.config,$(alignments))
 genes_results = $(patsubst %,$(my_counts_dir)/%,$(alignments))
-multiqc_results = $(patsubst %,$(RESULTS_DIR)/multiqc-%,$(alignments))
 
 file.spec = $(patsubst %,%.spec,$(specfiles))
 
@@ -271,15 +270,21 @@ $(configs): %.config: $(nfcore_dir)/%.config $(my_metadata)_%.csv  $(my_counts_d
 	cp $< $@
 	$(GIT) add $@
 
+multiqc_results = $(patsubst $(nfcore_dir)/results/%/multiqc/star_rsem/multiqc_report.html,$\
+  $(RESULTS_DIR)/multiqc-%,$\
+  $(wildcard $(nfcore_dir)/results/*/multiqc/star_rsem/multiqc_report.html))
+# multiqc_report.html has no recipe, but OK to include it as a prereq as it has to exist by definition of multiqc_results
+$(multiqc_results) : $(RESULTS_DIR)/multiqc-% : $(nfcore_dir)/results/%/multiqc/star_rsem/multiqc_report.html
+	mkdir -p $@
+	cp -lr $(nfcore_dir)/results/$*/multiqc/star_rsem $@ || cp -r $(nfcore_dir)/results/$*/multiqc/star_rsem $@
 
-$(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/results/%/star_rsem/rsem.merged.gene_counts.tsv  $(RESULTS_DIR)/multiqc-%
+
+$(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/results/%/star_rsem/rsem.merged.gene_counts.tsv  $(multiqc_results)
 	dir=$(if $($*.group-as),$($*.group-as),$*);\
 	mkdir -p $(my_counts_dir)/$${dir} ;\
-	ln -fn $(nfcore_dir)/results/$${dir}/star_rsem/*.genes.results $(my_counts_dir)/$${dir}/
+	cp -l $(nfcore_dir)/results/$${dir}/star_rsem/*.genes.results $(my_counts_dir)/$${dir}/ || cp  $(nfcore_dir)/results/$${dir}/star_rsem/*.genes.results $(my_counts_dir)/$${dir}/
 
-$(multiqc_results) : $(RESULTS_DIR)/multiqc-% : $(nfcore_dir)/results/%/star_rsem/rsem.merged.gene_counts.tsv | $(RESULTS_DIR)
-	ln -sfn ../$(nfcore_dir)/results/$*/multiqc/star_rsem $@
-	touch `realpath $@`
+
 endif
 
 

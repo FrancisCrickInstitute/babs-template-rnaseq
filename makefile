@@ -35,10 +35,13 @@ airway/fastq:
 	mkdir -p $@
 	cd @$; for i in ${ena}; do wget -nc ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR103/$$i.fastq.gz ; done
 
-test: test.
-	mv $< $@
+airway/nfcore.tar.gz: test ## Cache the nfcore results for future speed
+	cd test/nfcore &&\
+	make run &&\
+	tar -czf ../../$@ samplesheet_GRCh38.csv samples.db GRCh38.config results/GRCh38/multiqc results/GRCh38/star_rsem/*.genes.results results/GRCh38/star_rsem/rsem.merged.gene_counts.tsv
 
-test%: airway/fastq
+
+test: airway/fastq ## Generate a test folder setup for the airway data
 	mkdir -p $@
 	rsync -av  babs/. $@/. --exclude '.~' --exclude 'docs'
 	cd $@ && \
@@ -49,7 +52,11 @@ test%: airway/fastq
 	git commit -m "Restart git repo for testing" && \
 	git tag v9.9.9
 
+.PHONY: test-nfcore
+test-nfcore: test/nfcore/results ## Fast-forward to before the differential analysis, by using a cached run of nfcore
 
+test/nfcore/results: airway/nfcore.tar.gz test
+	cd test/nfcore && tar -xzf ../../airway/nfcore.tar.gz
 
 
 help: ## show help message

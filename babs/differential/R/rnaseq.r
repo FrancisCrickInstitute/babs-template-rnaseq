@@ -419,7 +419,7 @@ check_model <- function(dds) {
       paste0("df <- eval(parse(text='", deparse1(as.data.frame(colData(dds)), collapse="\n"),"'))"),
       paste0("mm <- model.matrix(",deparse1(mdl$design),",df)[,-c(",paste(which(mdl$dropped), collapse=", "),")]"),
       "colnames(mm)[colnames(mm)==\"(Intercept)\"] <- \"Intercept\"",
-      "colnames(mm) <- make.names(colnames(mm)",
+      "colnames(mm) <- make.names(colnames(mm))",
       "colData(dds) <- df",
       "design(dds) <- mm"
     ) 
