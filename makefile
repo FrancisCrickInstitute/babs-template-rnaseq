@@ -42,22 +42,22 @@ airway/nfcore.tar.gz: | test ## Cache the nfcore results for future speed
 
 
 test: airway/fastq ## Generate a test folder setup for the airway data
-	mkdir -p $@
-	rsync -av  babs/. $@/. --exclude '.~' --exclude 'docs'
-	cd $@ && \
-	ln -s ../airway/fastq fastq && \
-	cp -r ../airway/docs . && \
-	git init && \
+	mkdir -p $@/babs
+	rsync -av  babs/. $@/babs/. --exclude '.~' --exclude 'docs'
+	cd $@ && git init
+	cd $@/babs && \
+	ln -s ../../airway/fastq fastq && \
+	cp -r ../../airway/docs . 
 	git add makefile && \
 	git commit -m "Restart git repo for testing" && \
 	git tag v9.9.9
 
 .PHONY: test-nfcore
-test-nfcore: test/nfcore/results ## Fast-forward to before the differential analysis, by using a cached run of nfcore
+test-nfcore: test/babs/nfcore/results ## Fast-forward to before the differential analysis, by using a cached run of nfcore
 
-test/nfcore/results:  test | airway/nfcore.tar.gz
-	cd test/ingress && make run
-	cd test/nfcore && tar -xzf ../../airway/nfcore.tar.gz
+test/babs/nfcore/results:  test | airway/nfcore.tar.gz
+	cd test/babs/ingress && make run
+	cd test/babs/nfcore && tar -xzf ..././../airway/nfcore.tar.gz
 
 
 help: ## show help message
