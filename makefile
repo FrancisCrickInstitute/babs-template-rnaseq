@@ -47,8 +47,8 @@ test: airway/fastq ## Generate a test folder setup for the airway data
 	cd $@ && git init
 	cd $@/babs && \
 	ln -s ../../airway/fastq fastq && \
-	cp -r ../../airway/docs . 
-	git add makefile && \
+	cp -r ../../airway/docs . && \
+	git add makefile &&  \
 	git commit -m "Restart git repo for testing" && \
 	git tag v9.9.9
 
@@ -57,7 +57,7 @@ test-nfcore: test/babs/nfcore/results ## Fast-forward to before the differential
 
 test/babs/nfcore/results:  test | airway/nfcore.tar.gz
 	cd test/babs/ingress && make run
-	cd test/babs/nfcore && tar -xzf ..././../airway/nfcore.tar.gz
+	cd test/babs/nfcore && tar -xzf ../../../airway/nfcore.tar.gz
 
 
 help: ## show help message

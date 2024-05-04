@@ -92,3 +92,4 @@ endif
 # changes to the 'secret.mk' file (ideally the top-level one as changes
 # to module-level secret.mk may get overwritten by subsequent changes to
 # the top-level one)
+setting_Type=rnaseq
