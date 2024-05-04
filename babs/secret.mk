@@ -2,7 +2,7 @@ SINGULARITY_ROOT = /flask/apps/containers/all-singularity-images/
 RENV_PATHS_ROOT = /nemo/stp/babs/working/software/renv
 RENV_PATHS_PREFIX=rocker
 TEMPLATE_DIR = /nemo/stp/babs/working/bioinformatics/templates
-SCRATCH_DIR = /flask/scratch/babs/bioinformatics/projects/$(or ${setting_Hash},$(USER))/
+SCRATCH_DIR = /flask/scratch/babs/bioinformatics/projects/$(or $(setting_Hash),$(USER))/
 NXF_SINGULARITY_CACHEDIR = /flask/apps/containers/all-singularity-images/
 
 ## BABS-specific stuff
@@ -34,9 +34,9 @@ get-pipeline: update-pipeline
 update-pipeline: ## Update the pipeline
 	if [ -f "$(targz)" ]; then \
 	  $(GIT) stash -m "Stashing state prior to pipeline update" &&\
-	  tar -xzf $(targz) -C ${PROJECT_HOME} && \
-	  cat ${PROJECT_HOME}/babs/.pipeline-version && \
-	  rm -f ${PROJECT_HOME}/babs/*/.pipeline-version;\
+	  tar -xzf $(targz) -C $(PROJECT_HOME) && \
+	  cat $(PROJECT_HOME)/babs/.pipeline-version && \
+	  rm -f $(PROJECT_HOME)/babs/*/.pipeline-version;\
 	else \
 	  if [ -d "$(subst .tar.gz,,$(targz))" ]; then \
 	    $(GIT) stash -m "Stashing state prior to pipeline update" &&\

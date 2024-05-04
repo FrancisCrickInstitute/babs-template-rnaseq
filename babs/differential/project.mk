@@ -8,8 +8,8 @@
 
 res_dir = $(RESULTS_DIR)/$(VERSION)
 file_col = $(metadata_id_column)
-metadata = $(my_metadata)_${alignment}.csv
-counts =  $(my_counts_dir)/${alignment}/
+metadata = $(my_metadata)_$(alignment).csv
+counts =  $(my_counts_dir)/$(alignment)/
 
 ## Let later processes know which of those to include in every section -
 ## variable _names_ need to be stored in the `param_names` variable:

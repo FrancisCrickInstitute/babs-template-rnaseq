@@ -35,7 +35,7 @@ airway/fastq:
 	mkdir -p $@
 	cd @$; for i in ${ena}; do wget -nc ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR103/$$i.fastq.gz ; done
 
-airway/nfcore.tar.gz: test ## Cache the nfcore results for future speed
+airway/nfcore.tar.gz: | test ## Cache the nfcore results for future speed
 	cd test/nfcore &&\
 	make run &&\
 	tar -czf ../../$@ samplesheet_GRCh38.csv samples.db GRCh38.config results/GRCh38/multiqc results/GRCh38/star_rsem/*.genes.results results/GRCh38/star_rsem/rsem.merged.gene_counts.tsv
@@ -55,7 +55,8 @@ test: airway/fastq ## Generate a test folder setup for the airway data
 .PHONY: test-nfcore
 test-nfcore: test/nfcore/results ## Fast-forward to before the differential analysis, by using a cached run of nfcore
 
-test/nfcore/results: airway/nfcore.tar.gz test
+test/nfcore/results:  test | airway/nfcore.tar.gz
+	cd test/ingress && make run
 	cd test/nfcore && tar -xzf ../../airway/nfcore.tar.gz
 
 

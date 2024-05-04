@@ -48,18 +48,18 @@ diff_dir=$(wildcard ../differential)
 ## Propagation of docs files
 ## 'Earliest' presence of a propagated file is taken as definitive.
 ################################################################
-ifneq (${diff_dir},)
-alignments=$(patsubst ${diff_dir}/${my_counts_dir}/%,%,$(wildcard ${diff_dir}/${my_counts_dir}/*))
+ifneq ($(diff_dir),)
+alignments=$(patsubst $(diff_dir)/$(my_counts_dir)/%,%,$(wildcard $(diff_dir)/$(my_counts_dir)/*))
 specfiles=$(patsubst $(diff_dir)/%.spec,%,$(wildcard $(diff_dir)/*.spec))
 endif
-ifneq (${nfcore_dir},)
+ifneq ($(nfcore_dir),)
 alignments=$(patsubst $(nfcore_dir)/results/%,%,$(wildcard $(nfcore_dir)/results/*))
 endif
 ifneq ($(ingress_dir),)
 alignments=$(patsubst $(ingress_dir)/%.config,%,$(wildcard $(ingress_dir)/*.config))
 specfiles=$(patsubst $(ingress_dir)/%.spec,%,$(wildcard $(ingress_dir)/*.spec))
 endif
-ifneq (${docs_dir},)
+ifneq ($(docs_dir),)
 alignments=$(patsubst $(docs_dir)/%.config,%,$(wildcard $(docs_dir)/*.config))
 specfiles=$(patsubst $(docs_dir)/%.spec,%,$(wildcard $(docs_dir)/*.spec))
 endif

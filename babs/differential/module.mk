@@ -74,13 +74,13 @@ my_metadata=extdata/metadata
 ## 'shell' will run using the prevailing system executibles.
 ################################################################
 CONTAINERED=false#An internal flag
-BIND_DIR = $(shell ${GIT} rev-parse --show-toplevel || echo ${CURDIR})
+BIND_DIR = $(shell $(GIT) rev-parse --show-toplevel || echo $(CURDIR))
 
-ifeq (${EXECUTOR},singularity)
+ifeq ($(EXECUTOR),singularity)
 CONTAINER= $(call ml,Singularity/$(SINGULARITY_VERSION)); singularity
 CONTAINER_IMAGE=$(SINGULARITY_ROOT)/$(IMAGE)_$(IMAGE_TAG).sif
 CONTAINER_BIND=--bind $(BIND_DIR),/tmp,$(RENV_PATHS_ROOT),$(CURDIR)/rocker.Renviron:/usr/local/lib/R/etc/Renviron.site
-CONTAINER_ENV=--env SQLITE_TMPDIR=/tmp,BIOCPARALLEL_WORKER_NUMBER=$(BIOCPARALLEL_WORKER_NUMBER),GITHUB_PAT=${GITHUB_PAT}
+CONTAINER_ENV=--env SQLITE_TMPDIR=/tmp,BIOCPARALLEL_WORKER_NUMBER=$(BIOCPARALLEL_WORKER_NUMBER),GITHUB_PAT=$${GITHUB_PAT}
 CONTAINER_FLAGS= exec $(CONTAINER_BIND) --pwd $(CURDIR) --containall --cleanenv $(CONTAINER_ENV)
 CONTAINER_FLAGS_INTERACTIVE= exec $(CONTAINER_BIND),$${HOME} --pwd $(CURDIR) --containall --cleanenv $(CONTAINER_ENV),DISPLAY=$${DISPLAY}
 CONTAINER_SHELL = $(CONTAINER) $(patsubst exec,shell,$(CONTAINER_FLAGS_INTERACTIVE)) $(CONTAINER_IMAGE)
@@ -89,7 +89,7 @@ $(CONTAINER_IMAGE): | rocker.Renviron
 	$(CONTAINER) pull docker://$(IMAGE):$(IMAGE_TAG)
 CONTAINERED=true
 
-else ifeq (${EXECUTOR},docker)
+else ifeq ($(EXECUTOR),docker)
 CONTAINER=docker
 CONTAINER_IMAGE=$(IMAGE)_$(IMAGE_TAG)
 CONTAINER_FLAGS=run \
@@ -105,16 +105,16 @@ $(CONTAINER_IMAGE): | rocker.Renviron
 	$(CONTAINER) pull docker://$(IMAGE):$(IMAGE_TAG)
 	echo "Proxy for docker image" > $@
 
-else ifeq (${EXECUTOR},shell)
+else ifeq ($(EXECUTOR),shell)
   $(info " Not using containerisation so results are not necessarily reproducible")
 ## Maybe setup different values for R, QUARTO, eg
 # R=module load R
 
-else ifeq (${EXECUTOR},make)
+else ifeq ($(EXECUTOR),make)
 # This is what we use as internal option - effectively means we're already in the container,
 # so no need for any action here.
 else
-  $(error "# Don't recognise '${EXECUTOR}' as an executor")
+  $(error "# Don't recognise '$(EXECUTOR)' as an executor")
 endif
 
 
