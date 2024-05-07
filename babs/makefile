@@ -9,8 +9,8 @@ $(stages): % : %.log
 
 
 %.log : 
-	$(MAKE) -C $* run  >> $*.err 2>&1
-	mv $*.err $@
+	cd $*; $(MAKE) --no-print-directory run  >> $*.err 2>&1
+	mv $*/$*.err $@
 
 all: ## Attempt to run the full pipeline (to differential). Produces a `.err` file if a module doesn't complete (look at this and perhaps at `./module-name/logs/*.err` to help debugging.) It's no longer necessary to run modules in succession, as things have been refactored to recursively calculate any necessary prerequisites. An explicit 'make build' is no longer necessary, as 'make run' will carry that out as and when necessary.
 docs: ## Basic check that the prerequisite files (spec, configs, samplesheet and experiment table) are in place in this folder
