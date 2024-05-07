@@ -139,7 +139,7 @@ $(staging_dir)/R.bib: R.bib
 
 R.bib: renv.lock  | $(log_dir) rocker.Renviron
 	$(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")' $(call log,bib)
-	$(call git-ignore,/$@)
+	$(GIT) add $@
 
 renv.lock: resources/_dependencies.R $(wildcard pre.renv.lock)
 	if [ -f pre.renv.lock ] ; then \
@@ -150,7 +150,7 @@ renv.lock: resources/_dependencies.R $(wildcard pre.renv.lock)
 	  $(GIT) stash push -m "Pipeline stashed. Use 'git stash pop' to retrieve it" -- $@ $(call log,renv)
 	  $(R) -e 'library(renv); init(bioconductor=TRUE); snapshot()' ;\
 	fi
-	$(GIT) add renv.lock $(call log,renv,-a) 
+	$(GIT) add renv.lock renv/.gitignore $(call log,renv,-a)
 	$(GIT) commit -m 'Renv initialised by pipeline\n\n' || echo "No initialisation files need commiting" $(call log,renv,-a) 
 	$(GIT) rev-parse "v0.0.1" >/dev/null 2>&1 || $(GIT) tag v0.0.1 $(call log,renv,-a)
 
@@ -298,6 +298,7 @@ rocker.Renviron:
 	echo "RENV_PATHS_ROOT=$(RENV_PATHS_ROOT)" >> $@
 	echo "RENV_PATHS_LIBRARY=renv/library" >> $@
 #	echo "RENV_CONFIG_PAK_ENABLED=TRUE" >> $@
+	$(GIT) add $@
 
 R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses)
 R-$(RVERSION): $(CONTAINER_IMAGE)

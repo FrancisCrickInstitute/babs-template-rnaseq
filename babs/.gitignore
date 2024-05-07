@@ -1,3 +1,5 @@
 **/secret.mk
-biologic/
-fetch_ngs/
+/biologic/
+/fetch_ngs/
+/*.log
+.not-secret

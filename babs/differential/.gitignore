@@ -1,7 +1,8 @@
-data
-logs
-results
-secret.mk
-shortcuts
-staging
-extdata/genes.results/
+/data
+/logs
+/results
+/secret.mk
+/shortcuts
+/staging
+/extdata/genes.results/
+/samples.db
