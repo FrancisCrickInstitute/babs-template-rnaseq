@@ -48,6 +48,7 @@ test: airway/fastq ## Generate a test folder setup for the airway data
 	cd $@/babs && \
 	ln -s ../../airway/fastq fastq && \
 	cp -r ../../airway/docs . && \
+	cp    ../../babs/docs/makefile ../../babs/docs/readme.md ../../babs/docs/.gitignore docs/ && \
 	git add makefile &&  \
 	git commit -m "Restart git repo for testing" && \
 	git tag v9.9.9

@@ -154,6 +154,8 @@ secret.mk: $(wildcard ../secret.mk) .not-secret
 	    exit ;\
 	 fi ;\
 	fi
+	$(GIT) add $(wildcard ../shared.mk) $(wildcard ../makefile) $(wildcard ../.gitignore) $(wildcard ../readme.md) $(wildcard ../.gitignore) $(wildcard ../.pipeline-version) 
+	$(GIT) add $(wildcard shared.mk) $(wildcard makefile) $(wildcard .gitignore) $(wildcard module.mk)
 
 
 .PHONY: print-%

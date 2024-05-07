@@ -150,9 +150,7 @@ renv.lock: resources/_dependencies.R $(wildcard pre.renv.lock)
 	  $(GIT) stash push -m "Pipeline stashed. Use 'git stash pop' to retrieve it" -- $@ $(call log,renv)
 	  $(R) -e 'library(renv); init(bioconductor=TRUE); snapshot()' ;\
 	fi
-	$(GIT) add $(source_dir) $(call log,renv,-a) 
-	$(GIT) add makefile shared.mk .Rprofile project.mk module.mk .gitignore .Rbuildignore $(call log,renv,-a) 
-	$(GIT) add renv.lock renv/settings.json renv/activate.R $(call log,renv,-a) 
+	$(GIT) add renv.lock $(call log,renv,-a) 
 	$(GIT) commit -m 'Renv initialised by pipeline\n\n' || echo "No initialisation files need commiting" $(call log,renv,-a) 
 	$(GIT) rev-parse "v0.0.1" >/dev/null 2>&1 || $(GIT) tag v0.0.1 $(call log,renv,-a)
 
@@ -235,7 +233,7 @@ $(docs_dir)/%:
 $(file.spec): % : $(docs_dir)/%
 	$(MAKE) --no-print-directory -C $(docs_dir) $*
 	cp $< $@
-	$(GIT) add $@
+	$(GIT) add $@ $<
 endif
 
 ifneq ($(ingress_dir),)
@@ -245,7 +243,7 @@ $(ingress_dir)/%:
 $(my_metadata).csv: $(ingress_dir)/$(experiment_table).csv | $(dir $(my_metadata))
 	$(MAKE) --no-print-directory -C $(ingress_dir) $(experiment_table).csv
 	cp $< $@
-	$(GIT) add $@
+	$(GIT) add $@ $<
 endif
 
 
@@ -255,21 +253,16 @@ $(nfcore_dir)/%:
 
 $(samplesheets) : $(my_metadata)_%.csv : $(nfcore_dir)/samplesheet_%.csv $(samples_db) $(my_metadata).csv
 	$(SQLITE) -header -csv  $(samples_db) --cmd '.import --csv --schema temp $(my_metadata).csv metadata' 'SELECT metadata.* FROM metadata INNER JOIN (SELECT * FROM "fastq_$*" GROUP BY $(samplesheet_id_column)) AS nfcore on metadata.$(metadata_id_column)=nfcore.$(samplesheet_id_column);' > $@
-	$(GIT) add $@
+	$(GIT) add $@ $<
 
 $(samples_db): $(nfcore_dir)/$(samples_db) | $(file.spec) $(staging_dir)
 	cp $< $@ || echo "No samples database in nfcore directory"
-	$(GIT) add makefile module.mk shared.mk project.mk
-	$(GIT) commit -m "Add the differential makefiles" || true
-	$(GIT) add pre.renv.lock renv/activate.R .Rprofile
-	$(GIT) commit -m "Add the vanilla renv setup" || true
-	$(GIT) add $(source_dir) R
-	$(GIT) commit -m "Add the template scripts and R functions" || true
+	$(GIT) commit -m "Add template scripts, R functions, makefiles" || true
 
 
 $(configs): %.config: $(nfcore_dir)/%.config $(my_metadata)_%.csv  $(my_counts_dir)/%
 	cp $< $@
-	$(GIT) add $@
+	$(GIT) add $@ $<
 
 multiqc_results = $(patsubst $(nfcore_dir)/results/%/multiqc/star_rsem/multiqc_report.html,$\
   $(RESULTS_DIR)/multiqc-%,$\
@@ -338,5 +331,6 @@ MAKEFLAGS += --no-builtin-rules
 ifneq ($(wildcard ../shared.mk),)
 shared.mk: ../shared.mk
 	@cp $< $@
+	$(or $(GIT),git) add pre.renv.lock project.mk R renv $(source_dir) .Rprofile .Rbuildignore
 endif
 
