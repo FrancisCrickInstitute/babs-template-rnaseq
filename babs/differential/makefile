@@ -270,7 +270,7 @@ multiqc_results = $(patsubst $(nfcore_dir)/results/%/multiqc/star_rsem/multiqc_r
 # multiqc_report.html has no recipe, but OK to include it as a prereq as it has to exist by definition of multiqc_results
 $(multiqc_results) : $(RESULTS_DIR)/multiqc-% : $(nfcore_dir)/results/%/multiqc/star_rsem/multiqc_report.html
 	mkdir -p $@
-	cp -lr $(nfcore_dir)/results/$*/multiqc/star_rsem $@ || cp -r $(nfcore_dir)/results/$*/multiqc/star_rsem $@
+	cp -lr $(nfcore_dir)/results/$*/multiqc/star_rsem/. $@ || cp -r $(nfcore_dir)/results/$*/multiqc/star_rsem/. $@
 
 
 $(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/results/%/star_rsem/rsem.merged.gene_counts.tsv  $(multiqc_results)
