@@ -165,6 +165,8 @@ if (param$get("baseMeanMin")>0) {
                    function(x) x[rowMeans(counts(x, normalized=TRUE)) >= param$get("baseMeanMin"),]
                    )
 }
+ddsList <- lapply(ddsList, function(x) add_dim_reduct(x))
+
 
 ```
 
@@ -186,7 +188,7 @@ table1 <- function(dds, ddsList) {
     function(x) {
       m <- merge(
         setNames(data.frame(ifelse(colnames(dds) %in% colnames(ddsList[[x]]), "✓", ""), row.names=row.names(colData(dds))), x),
-        as.data.frame(colData(ddsList[[x]])[, setdiff(names(colData(ddsList[[x]])), names(colData(dds)))]),
+        as.data.frame(colData(ddsList[[x]])[, setdiff(names(colData(ddsList[[x]])), c(".PCA", names(colData(dds))))]),
         by=0, all.x=TRUE
       )
       transform(m, row.names=Row.names, Row.names=NULL)[row.names(samp),,drop=FALSE]
@@ -219,7 +221,6 @@ table1 <- function(dds, ddsList) {
 table1(dds, ddsList) %>%
   as_raw_html()
 
-ddsList <- lapply(ddsList, function(x) add_dim_reduct(x))
 
 for (assay in c("counts", "norm", "vst")) {
   write_assay(ddsList, assay=assay, path=params$res_dir)
@@ -307,29 +308,46 @@ of each pair of samples.
 
 Heatmap @fig-01-Heatmap-correct-1 is the first in a series of
 'focussed' plots. By focussed, we mean that in turn we remove the main
-effect of all but one covariates, and then force the order of
-the samples to respect the one remaining covariate.  Sometimes this
-allows structures that are masked by one 'dominant' effect to emerge,
-or to remove annoyance effects such as that due to batch which might
-be preventing the real structure from being apparent. The
-interpretation of these is very specific to the experimental design.
+effect of some of the covariates, and then also optionally force the
+tree-structure to respect one of the remaining covariate (samples
+within the given enforced covariate group are allowed to cluster
+empirically, and the covariate groups themselves are also clustered at
+the aggregate level.)  Sometimes this allows structures that are
+masked by one 'dominant' effect to emerge, or to remove annoyance
+effects such as that due to batch which might be preventing the real
+structure from being apparent. The interpretation of these is very
+specific to the experimental design. We can alter which covariates
+split the heatmap, and also which covariates are regressed out before
+the heatmap is calculated, so please consult with the analyst if you
+want to change this: the default is that we remove the effect of
+_everything_ other than the factor being used to colour a specific
+plot, but this can be changed (e.g. if you just want to see what the
+result of removing a batch effect looks like, but want to preserve a
+genotype x treatment composite)
 
 ## Principal Component Scatterplots
 
-The come a series of (pairs of) scatter plots of the first two
+The come a series of scatter plots of the first two
 Principal Components - a way of summarising all the genes down to just
 two 'metagenes' that attempt to encapsulate the variability across the
-samples in as faithful way as possible. The first of each pair
+samples in as faithful way as possible. Each plot
 (e.g. @fig-01-color-1) takes the PCs from the unadjusted data,
-and colours them by each of your covariates/treatments in turn. They
-alternate with 'focussed' PC adjustments, such as
-@fig-01-focus-1 which regress out ('normalise away') the
-effect of all experimental factors except the one being focussed
-on. This 'realigns' the principal components, and may be useful if
-there's one experimental factor (e.g. strong batch effect) that
-dominates the transcriptional profile and masking a less dominant
-factor: we then colour by the one experimental factor that hasn't been
-regressed out, hopefully allowing its effect to emerge.
+and colours them by each of your covariates/treatments in turn. 
+
+## Focussed Principal Component Scatterplots
+
+Principal components, just like clusters in the heatmaps, can be
+driven by a dominant effect that might mask other important
+effects. So again we have the flexibility to remove systematic effects
+before recalculating the PCs such as in @fig-01-focus-1 . which
+regress out ('normalise away') the effect of a set of covariates. This
+'realigns' the principal components. We then colour by one of the
+experimental factors that hasn't been regressed out, hopefully
+allowing its effect to emerge, or to diagnose which is causing the
+clustering. Again, the default is to regress out everything other than
+the effect being used to colour the plot, but that can (or maybe has
+been - read the legends to double check!) be customised.
+
 
 ## PC-Covariate assocation
 
@@ -379,8 +397,7 @@ for (dname_i in seq_along(ddsList)) {
   cat("\n\n# ", dname, "\n\n", sep = "")
   var_stab <- assay(this_dds, "vst")
   top <- order(apply(var_stab, 1, sd), decreasing = TRUE)[1:min(nrow(var_stab),param$get("top_n_variable"))]
-  models_for_qc <- metadata(this_dds)$models[sapply(metadata(this_dds)$models, 
-                                                    "[[", "plot_qc")]
+  models_for_qc <- metadata(this_dds)$models[sapply(metadata(this_dds)$models, function(x) "qc_formulae" %in% names(x))]
   nice_legends <- separate_legend(ddsList[[dname_i]])
   pl <- do.call(gridExtra::arrangeGrob, c(nice_legends, ncol=ceiling(sqrt(length(nice_legends)))))
   do_plot(pl,
@@ -470,146 +487,163 @@ for (dname_i in seq_along(ddsList)) {
   do_focus <- length(vars$fixed) > 1
   do_batch <- FALSE
   if (do_focus) {
-    sample_gene_factor <- residual_heatmap_transform(
-      assay(this_dds, 
-            "vst"), colData(this_dds), models_for_qc[[1]]$design)
-    if ("batch" %in% names(models_for_qc[[1]])) {
-      batch_vars <- all.vars(models_for_qc[[1]]$batch)
-      pc_batch <- prcomp(
-        t(assay(this_dds, "vst")) -
-          apply(sample_gene_factor$terms[, , batch_vars, drop = FALSE], 1:2, sum),
-        scale = FALSE)
-      pc_resid <- list(
-        pc = pc_batch$x,
-        percent = round(100 * pc_batch$sdev^2/sum(pc_batch$sdev^2)))
-      do_focus <- FALSE
-      do_batch <- TRUE
+    qc_formulae <- if (is_formula(models_for_qc[[1]]$qc_formulae)) {
+      list(I(models_for_qc[[1]]$qc_formulae))
+    } else {
+      models_for_qc[[1]]$qc_formulae
     }
-    else {
-      pc_resid <- lapply(
-        dimnames(sample_gene_factor$terms)[[3]], 
-        function(fac) {
-          pc <- prcomp(
-            sample_gene_factor$terms[, , fac, drop = TRUE] + sample_gene_factor$resid, 
-            scale = FALSE)
-          list(pc = pc$x, percent = round(100 * pc$sdev^2/sum(pc$sdev^2)))
-        })
-      names(pc_resid) <- dimnames(sample_gene_factor$terms)[[3]]
-    }
-  }
-
-  if (do_focus) {
+    sample_gene_factor <-
+      lapply(qc_formulae, function(fml) {
+        residual_heatmap_transform(
+          assay(this_dds,  "vst"),
+          colData(this_dds),
+          fml)
+      })
+    rhs_terms <- lapply(
+      qc_formulae,
+      function(fml) labels(terms(fml))
+    )
+    lhs_terms <- mapply(
+      function(fml,rhs) {
+        if (length(fml)==2) {
+          lhs <- rhs
+        } else {
+          lhs <- labels(terms(fml[1:2]))
+        }
+        names(lhs) <- lhs
+        lhs
+      },
+      qc_formulae,
+      rhs_terms,
+      SIMPLIFY=FALSE
+    )
+    
+    contributing_terms <- mapply(
+      function(lhs, sgf, rhs) {
+        lapply(lhs, 
+               function(colour_by) {
+                 !( dimnames(sgf$terms)[[3]] %in% setdiff(rhs, colour_by) )
+               })},
+        lhs_terms,
+        sample_gene_factor,
+        rhs_terms,
+        SIMPLIFY=FALSE
+    )
     cat("\n\n## Focussed Heatmaps\n\n")
-    for (covar in dimnames(sample_gene_factor$terms)[[3]]) {
-      part_res <- t(sample_gene_factor$terms[, , covar, drop = TRUE] + sample_gene_factor$resid)
-      top <- order(apply(part_res, 1, sd), decreasing = TRUE)[1:min(nrow(part_res),param$get("top_n_variable"))]
-      plotDat <- part_res[top, ]
-      vars <- get_terms(this_dds)
-      colDat <- as.data.frame(colData(this_dds))
-      colnames(plotDat) <- rownames(colDat)
-      pl <- ComplexHeatmap::Heatmap(
-        plotDat, name = "Residual", 
-        column_title = "Samples", row_title = "Genes", col = sym_colour(plotDat),
-        column_split = colDat[[covar]],
-        clustering_distance_columns = param$get("clustering_distance_columns"), 
-        clustering_distance_rows = param$get("clustering_distance_rows"), 
-        heatmap_legend_param = list(direction = "horizontal"), 
-        top_annotation = ComplexHeatmap::HeatmapAnnotation(
-          df = colDat[vars$fixed], 
-          col = metadata(colData(this_dds))$palette$Heatmap[vars$fixed],
-          show_legend=FALSE), 
-        show_row_names = FALSE, show_column_names = TRUE)
-      do_plot(pl,
-              label= fig_label("01-Heatmap-correct"),
-              caption=paste("Heatmap of variable genes,", dname, " focussed on ", covar ))
-      cat("\n\n---\n\n")
-    }
+    for (qc_ind in seq_along(lhs_terms)) {
+      for (colour_by in names(lhs_terms[[qc_ind]])) {
+        part_res <- t(
+          rowSums(sample_gene_factor[[qc_ind]]$terms[, , contributing_terms[[qc_ind]][[colour_by]], drop=FALSE], na.rm=TRUE, dims=2) +
+            sample_gene_factor[[qc_ind]]$resid)
+        top <- order(apply(part_res, 1, sd), decreasing = TRUE)[1:min(nrow(part_res),param$get("top_n_variable"))]
+        plotDat <- part_res[top, ]
+        vars <- get_terms(this_dds)
+        vars <- c(colour_by,
+                 setdiff(lhs_terms[[qc_ind]], colour_by),
+                 setdiff(get_terms(this_dds)$fixed, lhs_terms[[qc_ind]])
+                 )
+        colDat <- as.data.frame(colData(this_dds))
+        colnames(plotDat) <- rownames(colDat)
+        pl <- ComplexHeatmap::Heatmap(
+          plotDat, name = "Residual", 
+          column_title = "Samples", row_title = "Genes", col = sym_colour(plotDat),
+          column_split = colDat[[colour_by]],
+          clustering_distance_columns = param$get("clustering_distance_columns"), 
+          clustering_distance_rows = param$get("clustering_distance_rows"), 
+          heatmap_legend_param = list(direction = "horizontal"), 
+          top_annotation = ComplexHeatmap::HeatmapAnnotation(
+            df = colDat[vars], 
+            col = metadata(colData(this_dds))$palette$Heatmap[vars],
+            show_legend=FALSE), 
+          show_row_names = FALSE, show_column_names = TRUE)
+        removed <- paste(setdiff(rhs_terms[[qc_ind]], colour_by), collapse=", ")
+        if (removed=="") removed <- "nothing"
+        do_plot(pl,
+                label= fig_label("01-Heatmap-correct"),
+                caption=paste("Focussed on", colour_by, "in",  dname, " having removed", removed)
+                )
+        cat("\n\n---\n\n")
+      } # next covariate
+    }   # next qc_formula
   }
   
   cat("\n\n## Principal Component Scatterplots of PCs ", param$get("pc_x"), " and ", param$get("pc_y"), 
       " coloured by covariate", "\n\n", sep = "")
   do_labels <- nrow(colDat) < 10
-  for (covar in vars$fixed[is_vary]) {
-    covar_i <- match(covar, vars$fixed[is_vary])
+  for (colour_by in names(lhs_terms[[qc_ind]])) {
     pc.df <- data.frame(
       PC1 = pc[, param$get("pc_x")],
       PC2 = pc[, param$get("pc_y")], 
-      col = colDat[[covar]], sample = rownames(colDat))
+      col = colDat[[colour_by]], sample = rownames(colDat))
     pl <- ggplot(pc.df, aes(x = PC1, y = PC2, colour = col)) + 
       geom_point(size = 5) +
       xlab(paste0("PC ", param$get("pc_x"), ": ",  percentVar[param$get("pc_x")], "% variance")) +
       ylab(paste0("PC ",param$get("pc_y"), ": ", percentVar[param$get("pc_y")], "% variance")) +
-      labs(colour = covar) + 
+      labs(colour = colour_by) + 
       theme_bw()
-    if (is.numeric(colDat[[covar]])) {
-      pal_col <- metadata(colData(this_dds))$palette$ggplot[[covar]]
+    if (is.numeric(colDat[[colour_by]])) {
+      pal_col <- metadata(colData(this_dds))$palette$ggplot[[colour_by]]
       pl <- pl + scale_colour_gradient(low = pal_col[1], high = pal_col[2])
     }  else {
-      pl <- pl + scale_colour_manual(values = metadata(colData(this_dds))$palette$ggplot[[covar]])
+      pl <- pl + scale_colour_manual(values = metadata(colData(this_dds))$palette$ggplot[[colour_by]])
     }
     if (do_labels) {
       pl <- pl + geom_text_repel(aes(label = sample))
     }
     do_plot(pl,
             label=fig_label("01_color"),
-            caption=paste("Coloured by ", covar, "in", dname)
+            caption=paste("Coloured by ", colour_by, "in", dname)
             )
     cat("\n\n---\n\n")
-    if (do_batch) {
-      pc.df <- data.frame(
-        PC1 = pc_resid$pc[, param$get("pc_x")],
-        PC2 = pc_resid$pc[, param$get("pc_y")],
-        col = colDat[[covar]],
-        sample = rownames(colDat))
-      pl <- ggplot(pc.df, aes(x = PC1, y = PC2, colour = col)) + 
-        geom_point(size = 5) +
-        xlab(paste0("PC ", param$get("pc_x"), ": ", pc_resid$percent[param$get("pc_x")], "% variance")) + 
-        ylab(paste0("PC ", param$get("pc_y"), ": ", pc_resid$percent[param$get("pc_y")],  "% variance")) +
-        labs(colour = covar) +
-        theme_bw()
-      if (is.numeric(colDat[[covar]])) {
-        pal_col <- metadata(colData(this_dds))$palette$ggplot[[covar]]
-        pl <- pl + scale_colour_gradient(low = pal_col[1], high = pal_col[2])
-      }  else {
-        pl <- pl + scale_colour_manual(values = metadata(colData(this_dds))$palette$ggplot[[covar]])
-      }
-      if (do_labels) {
-        pl <- pl + geom_text_repel(aes(label = sample))
-      }
-      do_plot(pl,
-              label= fig_label("02-correct"),
-              caption=paste0("Coloured by ", covar, ", correcting for ", 
-                             paste(batch_vars, collapse = ", "), "in", dname)
-              )
-      cat("\n\n---\n\n")
-    }
-    if (do_focus && covar %in% names(pc_resid)) {
-      pc.df$PC1 <- pc_resid[[covar]]$pc[, param$get("pc_x")]
-      pc.df$PC2 <- pc_resid[[covar]]$pc[, param$get("pc_y")]
-      pl <- ggplot(pc.df, aes(x = PC1, y = PC2, colour = col)) + 
-        annotate("text", x = Inf, y = -Inf, label = "PROOF ONLY", 
-                 hjust = 1.1, vjust = -1.1, col = "white", cex = 6, 
-                 fontface = "bold", alpha = 0.8) + geom_point(size = 5) + 
-        xlab(paste0("PC ", param$get("pc_x"), ": ", pc_resid[[covar]]$percent[param$get("pc_x")], "% variance")) +
-        ylab(paste0("PC ", param$get("pc_y"), ": ", pc_resid[[covar]]$percent[param$get("pc_y")], "% variance")) + 
-        labs(colour = covar) + theme_bw()
-      if (is.numeric(colDat[[covar]])) {
-        pal_col <- metadata(colData(this_dds))$palette$ggplot[[covar]]
-        pl <- pl + scale_colour_gradient(low = pal_col[1], high = pal_col[2])
-      } else {
-        pl <- pl + scale_colour_manual(values = metadata(colData(this_dds))$palette$ggplot[[covar]])
-      }
-      if (do_labels) {
-        pl <- pl + geom_text_repel(aes(label = sample))
-      }
-      do_plot(pl,
-              label=fig_label("01-focus"),
-              caption=paste("Focussed on ", covar, "in", dname)
-              )
-      cat("\n\n---\n\n")
-    }
   } # next covariate
-
+  
+  
+  if (do_focus) {
+    cat("\n\n## Focussed Principal Component Scatterplots of PCs ", param$get("pc_x"), " and ", param$get("pc_y"), 
+        " coloured by covariate", "\n\n", sep = "")
+    do_labels <- nrow(colDat) < 10
+    for (qc_ind in seq_along(lhs_terms)) {
+      for (colour_by in names(lhs_terms[[qc_ind]])) {
+        if (all(contributing_terms[[qc_ind]][[colour_by]])) next
+        pc_resid <- lapply(lhs_terms[[qc_ind]], function(colour_by) {
+          mat <- rowSums(sample_gene_factor[[qc_ind]]$terms[, , contributing_terms[[qc_ind]][[colour_by]], drop=FALSE], na.rm=TRUE, dims=2) +
+            sample_gene_factor[[qc_ind]]$resid +
+            sample_gene_factor[[qc_ind]]$const
+          pc <- prcomp(
+            mat, 
+            scale = FALSE)
+          list(pc = pc$x, percent = round(100 * pc$sdev^2/sum(pc$sdev^2)))
+        }
+        )
+        pc.df <- data.frame(
+          PC1 = pc_resid[[colour_by]]$pc[, param$get("pc_x")],
+          PC2 = pc_resid[[colour_by]]$pc[, param$get("pc_y")],
+          col = colDat[[colour_by]], sample = rownames(colDat))
+        pl <- ggplot(pc.df, aes(x = PC1, y = PC2, colour = col)) + 
+          annotate("text", x = Inf, y = -Inf, label = "PROOF ONLY", 
+                   hjust = 1.1, vjust = -1.1, col = "white", cex = 6, 
+                   fontface = "bold", alpha = 0.8) + geom_point(size = 5) + 
+          xlab(paste0("PC ", param$get("pc_x"), ": ", pc_resid[[colour_by]]$percent[param$get("pc_x")], "% variance")) +
+          ylab(paste0("PC ", param$get("pc_y"), ": ", pc_resid[[colour_by]]$percent[param$get("pc_y")], "% variance")) + 
+          labs(colour = colour_by) + theme_bw()
+        if (is.numeric(colDat[[colour_by]])) {
+          pal_col <- metadata(colData(this_dds))$palette$ggplot[[colour_by]]
+          pl <- pl + scale_colour_gradient(low = pal_col[1], high = pal_col[2])
+        } else {
+          pl <- pl + scale_colour_manual(values = metadata(colData(this_dds))$palette$ggplot[[colour_by]])
+        }
+        if (do_labels) {
+          pl <- pl + geom_text_repel(aes(label = sample))
+        }
+        do_plot(pl,
+                label=fig_label("01-focus"),
+                caption=paste("Colour by", colour_by, "in", dname, "having removed", paste(setdiff(rhs_terms[[qc_ind]], colour_by), collapse=", ") )
+                )
+        cat("\n\n---\n\n")
+      } # next covariate
+    } # Next QC formula
+  }
+    
   cat("\n\n## PC-Covariate Associations\n\n")
   pc_frame <- expand.grid(sample = rownames(colDat), PC = 1:ncol(pc))
   pc_frame$coord <- as.vector(pc)
@@ -657,7 +691,6 @@ for (dname_i in seq_along(ddsList)) {
     factors_1 <- attr(terms(fit1), "factors")
     many_levels <- sapply(colDat, function(x) length(unique(x)))
     for (covar in unique(plotFrame$Covariate)) {
-      covar_i <- match(covar, unique(plotFrame$Covariate))
       this_covar <- subset(plotFrame, Covariate == covar & 
                                         !is.na(Assoc) & PC != PC[nrow(plotFrame)])
       if (nrow(this_covar) == 0) 

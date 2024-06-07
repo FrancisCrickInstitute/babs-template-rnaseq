@@ -165,9 +165,8 @@ build_dds_list <- function(dds, spec) {
     obj <- obj[,ind]
     metadata(obj)$full_model <- spec$full_model
     colData(obj) <- droplevels(colData(obj))
-    mdlList <- lapply(mdlList, function(x) modifyList(list(plot_qc=FALSE), x))
-    if (!any(sapply(mdlList, "[[", "plot_qc"))) {
-      mdlList[[1]]$plot_qc <- TRUE
+    if (!any(sapply(mdlList, function(x) "qc_formulae" %in% names(x)))) {
+      mdlList[[1]]$qc_formulae <- mdlList[[1]]$design
     }
     metadata(obj)$models <- mdlList
     if ("sample_swap" %in% names(set)) {
