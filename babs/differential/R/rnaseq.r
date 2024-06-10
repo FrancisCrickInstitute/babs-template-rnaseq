@@ -165,10 +165,22 @@ build_dds_list <- function(dds, spec) {
     obj <- obj[,ind]
     metadata(obj)$full_model <- spec$full_model
     colData(obj) <- droplevels(colData(obj))
-    if (!any(sapply(mdlList, function(x) "qc_formulae" %in% names(x)))) {
-      mdlList[[1]]$qc_formulae <- mdlList[[1]]$design
-    }
     metadata(obj)$models <- mdlList
+    if ("qc_formulae" %in% names(set)) {
+      metadata(obj)$qc_formulae <- set$qc_formulae
+    } else {
+      metadata(obj)$qc_formulae <- update(
+        mdlList[[1]]$design,
+        as.formula(
+          paste0(
+            paste(all.vars(qc_formulae[[1]]), collapse="+"),
+            " ~ . ")
+        )
+      )
+    }
+    if (is_formula(metadata(obj)$qc_formulae)) {
+      metadata(obj)$qc_formulae <- list(I(metadata(obj)$qc_formulae))
+    } 
     if ("sample_swap" %in% names(set)) {
       for (x1 in names(set$sample_swap)) {
         i1 <- match(x1, colData(obj)$ID)
@@ -868,4 +880,3 @@ default_spec_settings <- function() {
 	LRT_effect = "default"  ## For the "white" colour in differential heatmaps
    )
 }
-
