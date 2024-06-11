@@ -75,7 +75,7 @@ SUBMIT=false
 SLURM--time=0-02:00:00
 SLURM--mem=64G
 SLURM--cpus-per-task=8
-SLURM--partition=cpu
+SLURM--partition=ncpu
 
 define slurm
 #! /usr/bin/bash
