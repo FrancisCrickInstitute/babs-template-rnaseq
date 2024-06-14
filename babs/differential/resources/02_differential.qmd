@@ -79,7 +79,7 @@ link2path <- function(lname) {  file.path(knitr::opts_knit$get("output.dir"),lna
 #| label: tbl-load-diff2
 #| tbl-cap: Context
 if (!isTRUE(getOption('knitr.in.progress'))) {
-  params <- load_params("resources/02_differential", extra=TRUE)
+  params <- load_params(choose_staging("02_differential"))
 } else {
   gt(data.frame(Setting=names(params),
                 Value=unlist(params)))

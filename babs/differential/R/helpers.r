@@ -399,3 +399,7 @@ dmc2df <- function(dmc) {
   )
 }
 
+choose_staging <- function(resource, staging="staging") {
+  files <- dir(staging, pattern=paste0("^", resource, ".*"))
+  file.path(staging, sub(".qmd$", "", files[menu(files, title="Select which staging file to use for parameters")]))
+  }

@@ -114,6 +114,7 @@ $(qmds) : $(staging_dir)/%$(TAG).qmd : $(staging_dir)/.params.yml $(source_dir)/
 	 --author="$(shell git config user.name)"\
 	 --generated=$(staging_dir)/.params.yml > $@
 	sed -i -e 's#load_params("$(source_dir)/$(section)", extra=TRUE)#load_params("$(staging_dir)/$*$(TAG)")#' $@
+	sed -i -e 's#choose_staging("$(section)")#"$(staging_dir)/$*$(TAG)"#' $@
 
 $(staging_dir)/_quarto.yml: $(source_dir)/_quarto.yml $(qmds)
 	$(QUARTO) run $(source_dir)/typescript/sidebar.ts\

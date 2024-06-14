@@ -78,7 +78,7 @@ link2path <- function(lname) {  file.path(knitr::opts_knit$get("output.dir"),lna
 #| tbl-cap: Context
 
 if (!isTRUE(getOption('knitr.in.progress'))) {
-  params <- load_params("resources/01_exploratory", extra=TRUE)
+  params <- load_params(choose_staging("01_exploratory"))
 } else {
   gt(data.frame(Setting=names(params),
                 Value=unlist(params)))
@@ -259,7 +259,7 @@ for (dataset in names(ddsList)) {
       cat(met$models[[mdl]]$description, "\n\n")
     }
     cat("`",
-        Reduce(paste, deparse(update(mdls[[mdl]], Expression ~ .))),
+        Reduce(paste, sub("~", "Expression ~ ", deparse(mdls[[mdl]]))),
         "`\n\n"
         )
   }
@@ -394,374 +394,417 @@ first <- TRUE
 for (dname_i in seq_along(ddsList)) {
   this_dds <- ddsList[[dname_i]]
   dname <- metadata(this_dds)$dmc$dataset_name %||% names(ddsList)[dname_i]
-  cat("\n\n# ", dname, "\n\n", sep = "")
-  var_stab <- assay(this_dds, "vst")
-  top <- order(apply(var_stab, 1, sd), decreasing = TRUE)[1:min(nrow(var_stab),param$get("top_n_variable"))]
-  qc_formulae <- metadata(this_dds)$qc_formulae
-  nice_legends <- separate_legend(ddsList[[dname_i]])
-  pl <- do.call(gridExtra::arrangeGrob, c(nice_legends, ncol=ceiling(sqrt(length(nice_legends)))))
-  do_plot(pl,
-          label= fig_label(paste0("01-legend-a-", dname_i)),
-          caption=paste("Metadata colour-codings for",
-                        metadata(ddsList[[dname_i]])$dmc$dataset_name %||% metadata(ddsList[[dname_i]])$dmc$dataset
-                        ))
-  cat("\n\n## Overall Heatmap of Variable Genes in ", dname, "\n\n", sep = "")
-  plotDat <- var_stab[top, ]
-  plotDat <- plotDat - rowMeans(plotDat)
-  vars <- get_terms(this_dds)
-  colDat <- as.data.frame(colData(this_dds))
-  colnames(plotDat) <- rownames(colDat)
-  pl <- ComplexHeatmap::Heatmap(
-    plotDat, name = "Mean Centred", 
-    column_title = "Samples", row_title = "Genes", col = sym_colour(plotDat), 
-    clustering_distance_columns = param$get("clustering_distance_columns"), 
-    clustering_distance_rows = param$get("clustering_distance_rows"), 
-    heatmap_legend_param = list(direction = "horizontal"), 
-    top_annotation = ComplexHeatmap::HeatmapAnnotation(
-      df = colDat[vars$fixed], 
-      col = metadata(colData(this_dds))$palette$Heatmap[vars$fixed],
-      show_legend=FALSE), 
-    show_row_names = FALSE, show_column_names = TRUE)
-  do_plot(pl,
-          label= fig_label("01-Heatmap"),
-          caption=paste("Heatmap of variable genes,", dname),
-          preview=first)
-  first <- FALSE
-  cat("\n\n---\n\n")
-
-
-  ord <- do.call(order, colDat[vars$fixed])
-  pl <- ComplexHeatmap::Heatmap(
-    plotDat[,ord], name = "Mean Centred",
-    column_title = "Samples", row_title = "Genes", col = sym_colour(plotDat), 
-    cluster_columns = FALSE,
-    clustering_distance_rows = param$get("clustering_distance_rows"),
-    heatmap_legend_param = list(direction = "horizontal"),
-    top_annotation = ComplexHeatmap::HeatmapAnnotation(
-      df = colDat[ord,vars$fixed],
-      col = metadata(colData(this_dds))$palette$Heatmap[vars$fixed],
-      show_legend=FALSE),
-    show_row_names = FALSE, show_column_names = TRUE)
-  do_plot(pl,
-          label= fig_label("01-SuperV-Heatmap"),
-          caption=paste("Supervised Heatmap of variable genes,", dname))
-  cat("\n\n---\n\n")
-  
-  poisd <- PoiClaClu::PoissonDistance(t(counts(this_dds, normalized = TRUE)))
-  samplePoisDistMatrix <- as.matrix(poisd$dd)
-  if (length(vars$fixed) > 1) {
-    rownames(samplePoisDistMatrix) <- Reduce(
-      function(...) paste(..., sep = "_"), colDat[vars$fixed])
-  } else {
-    rownames(samplePoisDistMatrix) <- colDat[[vars$fixed]]
-  }
-  if (is.null(vars$groups)) {
-    colnames(samplePoisDistMatrix) <- row.names(colDat)
-  } else {
-    if (length(vars$groups) > 1) {
-      rownames(samplePoisDistMatrix) <- Reduce(function(...) paste(..., sep = "_"), colDat[vars$groups])
+  mdls <- sapply(metadata(this_dds)$models, function(mdl) "qc_formulae" %in% names(mdl))
+  for (mname in names(metadata(ddsList[[1]])$models)[mdls]) {
+    qc_formulae <- metadata(this_dds)$models[[mname]]$qc_formulae
+    design <- metadata(this_dds)$models[[mname]]$design
+    if (sum(mdls)==1) {
+      cat("\n\n# ", dname, "\n\n", sep = "")
     } else {
-      rownames(samplePoisDistMatrix) <- colDat[[vars$groups]]
+      cat("\n\n# ", dname, " - ", mname, "\n\n", sep = "")
     }
-  }
-  pl <- ComplexHeatmap::Heatmap(
-    samplePoisDistMatrix,
-    col = circlize::colorRamp2(
-      c(0,  max(samplePoisDistMatrix)),
-      colors = c("white", "red")), 
-    name = "Poisson Distance", clustering_distance_rows = function(x) {poisd$dd},
-    clustering_distance_columns = function(x) { poisd$dd},
-    heatmap_legend_param = list(direction = "horizontal"), 
-    top_annotation = ComplexHeatmap::HeatmapAnnotation(
-      df = colDat[vars$fixed], 
-      col = metadata(colData(this_dds))$palette$Heatmap[vars$fixed],
-      show_legend=FALSE))
-  do_plot(pl,
-          label= fig_label("01-sampDist"),
-          caption=paste("Heatmap of sample distances,", dname))
-  cat("\n\n---\n\n")
-
-  pc <- as.matrix(colData(this_dds)$.PCA)
-  percentVar <- metadata(colData(this_dds)$.PCA)$percentVar
-  is_vary <- sapply(colDat[vars$fixed], function(v) length(unique(v)) != 1)
-  do_focus <- length(vars$fixed) > 1
-  do_batch <- FALSE
-  if (do_focus) {
-    sample_gene_factor <-
-      lapply(qc_formulae, function(fml) {
-        residual_heatmap_transform(
-          assay(this_dds,  "vst"),
-          colData(this_dds),
-          fml)
-      })
-    rhs_terms <- lapply(
-      qc_formulae,
-      function(fml) labels(terms(fml))
-    )
-    lhs_terms <- mapply(
-      function(fml,rhs) {
-        if (length(fml)==2) {
-          lhs <- rhs
-        } else {
-          lhs <- labels(terms(fml[1:2]))
-        }
-        names(lhs) <- lhs
-        lhs
-      },
-      qc_formulae,
-      rhs_terms,
-      SIMPLIFY=FALSE
-    )
-    
-    contributing_terms <- mapply(
-      function(lhs, sgf, rhs) {
-        lapply(lhs, 
-               function(colour_by) {
-                 !( dimnames(sgf$terms)[[3]] %in% setdiff(rhs, colour_by) )
-               })},
-        lhs_terms,
-        sample_gene_factor,
-        rhs_terms,
-        SIMPLIFY=FALSE
-    )
-    cat("\n\n## Focussed Heatmaps\n\n")
-    for (qc_ind in seq_along(lhs_terms)) {
-      for (colour_by in names(lhs_terms[[qc_ind]])) {
-        part_res <- t(
-          rowSums(sample_gene_factor[[qc_ind]]$terms[, , contributing_terms[[qc_ind]][[colour_by]], drop=FALSE], na.rm=TRUE, dims=2) +
-            sample_gene_factor[[qc_ind]]$resid)
-        top <- order(apply(part_res, 1, sd), decreasing = TRUE)[1:min(nrow(part_res),param$get("top_n_variable"))]
-        plotDat <- part_res[top, ]
-        vars <- get_terms(this_dds)
-        vars <- c(colour_by,
-                 setdiff(lhs_terms[[qc_ind]], colour_by),
-                 setdiff(get_terms(this_dds)$fixed, lhs_terms[[qc_ind]])
-                 )
-        colDat <- as.data.frame(colData(this_dds))
-        colnames(plotDat) <- rownames(colDat)
-        pl <- ComplexHeatmap::Heatmap(
-          plotDat, name = "Residual", 
-          column_title = "Samples", row_title = "Genes", col = sym_colour(plotDat),
-          column_split = colDat[[colour_by]],
-          clustering_distance_columns = param$get("clustering_distance_columns"), 
-          clustering_distance_rows = param$get("clustering_distance_rows"), 
-          heatmap_legend_param = list(direction = "horizontal"), 
-          top_annotation = ComplexHeatmap::HeatmapAnnotation(
-            df = colDat[vars], 
-            col = metadata(colData(this_dds))$palette$Heatmap[vars],
-            show_legend=FALSE), 
-          show_row_names = FALSE, show_column_names = TRUE)
-        removed <- paste(setdiff(rhs_terms[[qc_ind]], colour_by), collapse=", ")
-        if (removed=="") removed <- "nothing"
-        do_plot(pl,
-                label= fig_label("01-Heatmap-correct"),
-                caption=paste("Focussed on", colour_by, "in",  dname, " having removed", removed)
-                )
-        cat("\n\n---\n\n")
-      } # next covariate
-    }   # next qc_formula
-  }
-  
-  cat("\n\n## Principal Component Scatterplots of PCs ", param$get("pc_x"), " and ", param$get("pc_y"), 
-      " coloured by covariate", "\n\n", sep = "")
-  do_labels <- nrow(colDat) < 10
-  for (colour_by in names(lhs_terms[[qc_ind]])) {
-    pc.df <- data.frame(
-      PC1 = pc[, param$get("pc_x")],
-      PC2 = pc[, param$get("pc_y")], 
-      col = colDat[[colour_by]], sample = rownames(colDat))
-    pl <- ggplot(pc.df, aes(x = PC1, y = PC2, colour = col)) + 
-      geom_point(size = 5) +
-      xlab(paste0("PC ", param$get("pc_x"), ": ",  percentVar[param$get("pc_x")], "% variance")) +
-      ylab(paste0("PC ",param$get("pc_y"), ": ", percentVar[param$get("pc_y")], "% variance")) +
-      labs(colour = colour_by) + 
-      theme_bw()
-    if (is.numeric(colDat[[colour_by]])) {
-      pal_col <- metadata(colData(this_dds))$palette$ggplot[[colour_by]]
-      pl <- pl + scale_colour_gradient(low = pal_col[1], high = pal_col[2])
-    }  else {
-      pl <- pl + scale_colour_manual(values = metadata(colData(this_dds))$palette$ggplot[[colour_by]])
-    }
-    if (do_labels) {
-      pl <- pl + geom_text_repel(aes(label = sample))
-    }
+    var_stab <- assay(this_dds, "vst")
+    top <- order(apply(var_stab, 1, sd), decreasing = TRUE)[1:min(nrow(var_stab),param$get("top_n_variable"))]
+    nice_legends <- separate_legend(ddsList[[dname_i]])
+    pl <- do.call(gridExtra::arrangeGrob, c(nice_legends, ncol=ceiling(sqrt(length(nice_legends)))))
     do_plot(pl,
-            label=fig_label("01_color"),
-            caption=paste("Coloured by ", colour_by, "in", dname)
-            )
+            label= fig_label(paste0("01-legend-a-", dname_i)),
+            caption=paste("Metadata colour-codings for",
+                          metadata(ddsList[[dname_i]])$dmc$dataset_name %||% metadata(ddsList[[dname_i]])$dmc$dataset
+                          ))
+    cat("\n\n## Overall Heatmap of Variable Genes in ", dname, "\n\n", sep = "")
+    plotDat <- var_stab[top, ]
+    plotDat <- plotDat - rowMeans(plotDat)
+    vars <- get_terms(this_dds)
+    colDat <- as.data.frame(colData(this_dds))
+    colnames(plotDat) <- rownames(colDat)
+    pl <- ComplexHeatmap::Heatmap(
+      plotDat, name = "Mean Centred", 
+      column_title = "Samples", row_title = "Genes", col = sym_colour(plotDat), 
+      clustering_distance_columns = param$get("clustering_distance_columns"), 
+      clustering_distance_rows = param$get("clustering_distance_rows"), 
+      heatmap_legend_param = list(direction = "horizontal"), 
+      top_annotation = ComplexHeatmap::HeatmapAnnotation(
+        df = colDat[vars$fixed], 
+        col = metadata(colData(this_dds))$palette$Heatmap[vars$fixed],
+        show_legend=FALSE), 
+      show_row_names = FALSE, show_column_names = TRUE)
+    do_plot(pl,
+            label= fig_label("01-Heatmap"),
+            caption=paste("Heatmap of variable genes,", dname),
+            preview=first)
+    first <- FALSE
     cat("\n\n---\n\n")
-  } # next covariate
-  
-  
-  if (do_focus) {
-    cat("\n\n## Focussed Principal Component Scatterplots of PCs ", param$get("pc_x"), " and ", param$get("pc_y"), 
+
+
+    ord <- do.call(order, colDat[vars$fixed])
+    pl <- ComplexHeatmap::Heatmap(
+      plotDat[,ord], name = "Mean Centred",
+      column_title = "Samples", row_title = "Genes", col = sym_colour(plotDat), 
+      cluster_columns = FALSE,
+      clustering_distance_rows = param$get("clustering_distance_rows"),
+      heatmap_legend_param = list(direction = "horizontal"),
+      top_annotation = ComplexHeatmap::HeatmapAnnotation(
+        df = colDat[ord,vars$fixed],
+        col = metadata(colData(this_dds))$palette$Heatmap[vars$fixed],
+        show_legend=FALSE),
+      show_row_names = FALSE, show_column_names = TRUE)
+    do_plot(pl,
+            label= fig_label("01-SuperV-Heatmap"),
+            caption=paste("Supervised Heatmap of variable genes,", dname))
+    cat("\n\n---\n\n")
+    
+    poisd <- PoiClaClu::PoissonDistance(t(counts(this_dds, normalized = TRUE)))
+    samplePoisDistMatrix <- as.matrix(poisd$dd)
+    if (length(vars$fixed) > 1) {
+      rownames(samplePoisDistMatrix) <- Reduce(
+        function(...) paste(..., sep = "_"), colDat[vars$fixed])
+    } else {
+      rownames(samplePoisDistMatrix) <- colDat[[vars$fixed]]
+    }
+    if (is.null(vars$groups)) {
+      colnames(samplePoisDistMatrix) <- row.names(colDat)
+    } else {
+      if (length(vars$groups) > 1) {
+        rownames(samplePoisDistMatrix) <- Reduce(function(...) paste(..., sep = "_"), colDat[vars$groups])
+      } else {
+        rownames(samplePoisDistMatrix) <- colDat[[vars$groups]]
+      }
+    }
+    pl <- ComplexHeatmap::Heatmap(
+      samplePoisDistMatrix,
+      col = circlize::colorRamp2(
+        c(0,  max(samplePoisDistMatrix)),
+        colors = c("white", "red")), 
+      name = "Poisson Distance", clustering_distance_rows = function(x) {poisd$dd},
+      clustering_distance_columns = function(x) { poisd$dd},
+      heatmap_legend_param = list(direction = "horizontal"), 
+      top_annotation = ComplexHeatmap::HeatmapAnnotation(
+        df = colDat[vars$fixed], 
+        col = metadata(colData(this_dds))$palette$Heatmap[vars$fixed],
+        show_legend=FALSE))
+    do_plot(pl,
+            label= fig_label("01-sampDist"),
+            caption=paste("Heatmap of sample distances,", dname))
+    cat("\n\n---\n\n")
+
+    pc <- as.matrix(colData(this_dds)$.PCA)
+    percentVar <- metadata(colData(this_dds)$.PCA)$percentVar
+    is_vary <- sapply(colDat[vars$fixed], function(v) length(unique(v)) != 1)
+    do_focus <- length(vars$fixed) > 1
+    do_batch <- FALSE
+    if (do_focus) {
+      sample_gene_factor <-
+        lapply(design, function(fml) {
+          residual_heatmap_transform(
+            assay(this_dds,  "vst"),
+            colData(this_dds),
+            design)
+        })
+      rhs_terms <- lapply(
+        qc_formulae,
+        function(fml) labels(terms(fml))
+      )
+      ## lhs terms are those separated by a `+`.  Each lhs terms is plotted
+      ## consecutively, and composite ones `a:b` are used to apply multiple
+      ## aesthetics within a plot. The first (`a`) part is used for colour,
+      ## and the optional second is used for shape
+      lhs_terms <- lapply(
+        qc_formulae,
+        function(fml) {
+          lhs <- strsplit(as.character(fml)[[2]], " *\\+ *")[[1]]
+          names(lhs) <- lhs
+          if (fml[[2]]==0) {
+            attr(lhs, "strategy") <- "retain"
+          } else {
+            attr(lhs, "strategy") <- "regress"
+          }
+          lhs
+        }
+      )
+      
+      cat("\n\n## Focussed Heatmaps\n\n")
+      for (qc_ind in seq_along(lhs_terms)) {
+        for (aes_by in c("", names(lhs_terms[[qc_ind]]))) {
+          split_by <- strsplit(aes_by, ":")[[1]][1]
+          null_or_splitter <- if (aes_by=="") NULL else split_by
+          contrib <- rhs_terms[[qc_ind]]
+          removed <- paste(
+            setdiff(dimnames(sample_gene_factor[[qc_ind]]$terms)[[3]],
+                    contrib),
+            sep=", ", collapse=", ")
+          if (length(removed)==0 || removed=="") removed <- "nothing"
+          part_res <- t(
+            rowSums(sample_gene_factor[[qc_ind]]$terms[, , contrib, drop=FALSE], na.rm=TRUE, dims=2) +
+              sample_gene_factor[[qc_ind]]$resid)
+          if (aes_by=="") {
+            ## To generate an unsplit (but regressed) heatmap we denote
+            ## that by having aes as an empty string.
+            my_caption <- paste("In",  dname, "having removed", removed)
+          } else {
+            my_caption <- paste("Split on", split_by, "in",  dname, "having removed", removed)
+          }
+          top <- order(apply(part_res, 1, sd), decreasing = TRUE)[1:min(nrow(part_res),param$get("top_n_variable"))]
+          plotDat <- part_res[top, ]
+          vars <- get_terms(this_dds)
+          vars <- c(null_or_splitter,
+                   unique(unlist(strsplit(lhs_terms[[qc_ind]], ":"))),
+                   get_terms(this_dds)$fixed
+                   )
+          vars <- vars[!duplicated(vars)]
+          colDat <- as.data.frame(colData(this_dds))
+          colnames(plotDat) <- rownames(colDat)
+          pl <- ComplexHeatmap::Heatmap(
+            plotDat, name = "Residual", 
+            column_title = "Samples", row_title = "Genes", col = sym_colour(plotDat),
+            column_split = if (aes_by=="") NULL else colDat[[split_by]],
+            clustering_distance_columns = param$get("clustering_distance_columns"), 
+            clustering_distance_rows = param$get("clustering_distance_rows"), 
+            heatmap_legend_param = list(direction = "horizontal"), 
+            top_annotation = ComplexHeatmap::HeatmapAnnotation(
+              df = colDat[vars], 
+              col = metadata(colData(this_dds))$palette$Heatmap[vars],
+              show_legend=FALSE), 
+            show_row_names = FALSE, show_column_names = TRUE)
+          do_plot(pl,
+                  label= fig_label("01-Heatmap-correct"),
+                  caption=my_caption
+                  )
+          cat("\n\n---\n\n")
+        } # next covariate
+      }   # next qc_formula
+    }
+    
+    cat("\n\n## Principal Component Scatterplots of PCs ", param$get("pc_x"), " and ", param$get("pc_y"), 
         " coloured by covariate", "\n\n", sep = "")
     do_labels <- nrow(colDat) < 10
+    aes_done <- list()
     for (qc_ind in seq_along(lhs_terms)) {
-      for (colour_by in names(lhs_terms[[qc_ind]])) {
-        if (all(contributing_terms[[qc_ind]][[colour_by]])) next
-        pc_resid <- lapply(lhs_terms[[qc_ind]], function(colour_by) {
-          mat <- rowSums(sample_gene_factor[[qc_ind]]$terms[, , contributing_terms[[qc_ind]][[colour_by]], drop=FALSE], na.rm=TRUE, dims=2) +
-            sample_gene_factor[[qc_ind]]$resid +
-            sample_gene_factor[[qc_ind]]$const
-          pc <- prcomp(
-            mat, 
-            scale = FALSE)
-          list(pc = pc$x, percent = round(100 * pc$sdev^2/sum(pc$sdev^2)))
-        }
-        )
+      for (aes_by in names(lhs_terms[[qc_ind]])) {
+        if (aes_by %in% names(aes_done)) next
+        aes_done[[aes_by]] <- TRUE
+        ## For PCA plots, we do an unregressed PCA coloured by the first
+        ## part of each aes, and optionally shaped by the second part.
+        colour_by <- strsplit(aes_by, ":")[[1]][1]
+        shape_by <- strsplit(aes_by, ":")[[1]][2]
         pc.df <- data.frame(
-          PC1 = pc_resid[[colour_by]]$pc[, param$get("pc_x")],
-          PC2 = pc_resid[[colour_by]]$pc[, param$get("pc_y")],
-          col = colDat[[colour_by]], sample = rownames(colDat))
-        pl <- ggplot(pc.df, aes(x = PC1, y = PC2, colour = col)) + 
-          annotate("text", x = Inf, y = -Inf, label = "PROOF ONLY", 
-                   hjust = 1.1, vjust = -1.1, col = "white", cex = 6, 
-                   fontface = "bold", alpha = 0.8) + geom_point(size = 5) + 
-          xlab(paste0("PC ", param$get("pc_x"), ": ", pc_resid[[colour_by]]$percent[param$get("pc_x")], "% variance")) +
-          ylab(paste0("PC ", param$get("pc_y"), ": ", pc_resid[[colour_by]]$percent[param$get("pc_y")], "% variance")) + 
-          labs(colour = colour_by) + theme_bw()
+          PC1 = pc[, param$get("pc_x")],
+          PC2 = pc[, param$get("pc_y")], 
+          col = colDat[[colour_by]],
+          shape = if (is.na(shape_by)) NA else colDat[[shape_by]],
+          sample = rownames(colDat))
+        pl <- ggplot(
+          pc.df,
+          if (is.na(shape_by)) aes(x = PC1, y = PC2, colour = col) else aes(x = PC1, y = PC2, colour = col, shape=shape)) + 
+          geom_point(size = 5) +
+          xlab(paste0("PC ", param$get("pc_x"), ": ",  percentVar[param$get("pc_x")], "% variance")) +
+          ylab(paste0("PC ",param$get("pc_y"), ": ", percentVar[param$get("pc_y")], "% variance")) +
+          labs(colour = colour_by, shape=if (is.na(shape_by)) waiver() else shape_by) + 
+          theme_bw()
         if (is.numeric(colDat[[colour_by]])) {
           pal_col <- metadata(colData(this_dds))$palette$ggplot[[colour_by]]
           pl <- pl + scale_colour_gradient(low = pal_col[1], high = pal_col[2])
-        } else {
+        }  else {
           pl <- pl + scale_colour_manual(values = metadata(colData(this_dds))$palette$ggplot[[colour_by]])
         }
         if (do_labels) {
           pl <- pl + geom_text_repel(aes(label = sample))
         }
         do_plot(pl,
-                label=fig_label("01-focus"),
-                caption=paste("Colour by", colour_by, "in", dname, "having removed", paste(setdiff(rhs_terms[[qc_ind]], colour_by), collapse=", ") )
+                label=fig_label("01_color"),
+                caption=paste("Annotated by ", aes_by, "in", dname)
                 )
         cat("\n\n---\n\n")
       } # next covariate
-    } # Next QC formula
-  }
+    } # next formula
     
-  cat("\n\n## PC-Covariate Associations\n\n")
-  pc_frame <- expand.grid(sample = rownames(colDat), PC = 1:ncol(pc))
-  pc_frame$coord <- as.vector(pc)
-  pc_frame <- cbind(pc_frame, colDat)
-  fitFrame <- colDat
-  yvar <- make.unique(c(colnames(fitFrame), "y", sep = ""))[ncol(fitFrame) + 1]
-  for (formula_ind in seq_along(qc_formulae)) {
-    fml <- update(qc_formulae[[formula_ind]], 
-                  paste(yvar, "~ ."))
-    plotFrame <- expand.grid(
-      Covariate = attr(terms(fml), "term.labels"),
-      PC = 1:ncol(pc))
-    plotFrame$Assoc <- NA
-    npc <- ncol(pc)
-    fit_selected <- list()
-    for (ipc in 1:npc) {
-      fitFrame[[yvar]] <- pc[, ipc]
-      fit1 <- lm(fml, data = fitFrame)
-      fit_selected[[ipc]] <- MASS::stepAIC(fit1, trace = 0)
-      ind <- attr(terms(fit_selected[[ipc]]), "term.labels")
-      if (length(ind)) {
-        fit0 <- as.data.frame(anova(fit_selected[[ipc]]))
-        rss <- fit0[ind, "Sum Sq"]/sum(fit0[, "Sum Sq"])
-        ind_pc <- plotFrame$PC == ipc
-        ind_fit <- match(ind, plotFrame$Covariate[ind_pc])
-        plotFrame$Assoc[ind_pc][ind_fit] <- rss
-      }
-    }
-    plotFrame$wrap <- (plotFrame$PC - 1)%/%20
-    plotFrame$wrap <- paste0("PCs ", plotFrame$wrap * 20 + 
-                                       1, "-", min((plotFrame$wrap + 1) * 20, npc))
-    plotFrame$PC <- sprintf("%02d", plotFrame$PC)
-    pl <- ggplot(plotFrame, aes(x = PC, y = Covariate, fill = Assoc)) + 
-      geom_raster() +
-      facet_wrap(~wrap, scales = "free_x",ncol = 1) +
-      scale_fill_gradient2(low = "#4575b4",mid = "grey90", high = "#d73027") +
-      theme_bw() + 
-      theme(aspect.ratio = length(unique(plotFrame$Covariate))/min(20, npc))
-    do_plot(pl,
-            label=fig_label("01-covar"),
-            caption=paste("Covariate association in", dname)
-            )
     
-    cat("\n\n## Partial Residuals of Associated PCs ", formula_ind, "\n\n", sep = "")
-    factors_1 <- attr(terms(fit1), "factors")
-    many_levels <- sapply(colDat, function(x) length(unique(x)))
-    for (covar in unique(plotFrame$Covariate)) {
-      this_covar <- subset(plotFrame, Covariate == covar & 
-                                        !is.na(Assoc) & PC != PC[nrow(plotFrame)])
-      if (nrow(this_covar) == 0) 
-        next
-      pc_first <- as.integer(as.character(this_covar$PC[1]))
-      this_covar <- this_covar[order(this_covar$Assoc, 
-                                     decreasing = TRUE), ]
-      pc_strong <- as.integer(as.character(this_covar$PC[1]))
-      pc.df <- subset(pc_frame, PC %in% c(pc_first, pc_strong))
-      pc.df$label <- as.character(pc.df$PC)
-      pc.df$label[pc.df$PC == pc_first] <- paste0(pc.df$label[pc.df$PC == 
-                                                                pc_first], "+First")
-      pc.df$label[pc.df$PC == pc_strong] <- paste0(pc.df$label[pc.df$PC == 
-                                                                 pc_strong], "+Best")
-      pc.df$label <- paste0(pc.df$label, " (", percentVar[pc.df$PC], 
-                            "%)")
-      inter_vars <- rownames(factors_1)[factors_1[, covar] !=  0]
-      inter_vars <- inter_vars[order(many_levels[inter_vars], decreasing = TRUE)]
-      pc.df$X <- colDat[, inter_vars[1]]
-      for (ipc in unique(c(pc_first, pc_strong))) {
-        pc.df$coord[pc.df$PC == ipc] <- part.resid(fit_selected[[ipc]])[, covar]
-      }
-      if (length(inter_vars) > 1) {
-        pc.df$col <- colDat[, inter_vars[2]]
-        if (length(inter_vars) == 2) {
-          pl <- ggplot(pc.df, aes(x = X, y = coord, colour = col, group = col)) +
-            stat_summary(fun = mean,geom = "line") +
-            labs(x = inter_vars[1], y = "Residual",
-                 colour = paste(inter_vars[-1], collapse = "x")) + theme_bw()
-          if (is.numeric(pc.df$col)) {
-            pal_col <- metadata(colData(this_dds))$palette$ggplot[[inter_vars[2]]]
-            pl <- pl + scale_colour_gradient(low = pal_col[1], high = pal_col[2])
+    if (do_focus) {
+      cat("\n\n## Focussed Principal Component Scatterplots of PCs ", param$get("pc_x"), " and ", param$get("pc_y"), 
+          " coloured by covariate", "\n\n", sep = "")
+      do_labels <- nrow(colDat) < 10
+      for (qc_ind in seq_along(lhs_terms)) {
+        for (aes_by in names(lhs_terms[[qc_ind]])) {
+          colour_by <- strsplit(aes_by, ":")[[1]][1]
+          shape_by <- strsplit(aes_by, ":")[[1]][2]
+          ## Here, we want to add back the coefficients we're
+          ## colouring/shaping by, so that their effect will be allowed
+          ## to drive the rotation of the PCs.
+          if (attr(lhs_terms[[qc_ind]], "strategy") == "retain") {
+            contrib <- colour_by
+          } else {
+            contrib <- rhs_terms[[qc_ind]]
           }
-          else {
-            pl <- pl + scale_colour_manual(values = metadata(colData(this_dds))$palette$ggplot[[inter_vars[2]]])
-          }
-        }
-        else {
-          pc.df$grp <- Reduce(interaction, colDat[, inter_vars[-1]])
-          pl <- ggplot(pc.df, aes(x = X, y = coord, colour = col,  group = grp)) +
-            stat_summary(fun = mean, geom = "line") +
-            labs(x = inter_vars[1], y="Residual",
-                 colour = paste(inter_vars[-1], collapse = "x")) +
+          removed <- paste(
+            setdiff(dimnames(sample_gene_factor[[qc_ind]]$terms)[[3]],
+                    contrib),
+            sep=", ", collapse=", ")
+          if (length(removed)==0 || removed=="") removed <- "nothing"
+          my_mat <- rowSums(sample_gene_factor[[qc_ind]]$terms[, , contrib, drop=FALSE], na.rm=TRUE, dims=2) +
+            sample_gene_factor[[qc_ind]]$resid +
+            sample_gene_factor[[qc_ind]]$const
+          my_pc <- prcomp(
+            my_mat, 
+            scale = FALSE)
+          my_percent <- round(100 * my_pc$sdev^2/sum(my_pc$sdev^2))
+          pc.df <- data.frame(
+            PC1 = my_pc$x[, param$get("pc_x")],
+            PC2 = my_pc$x[, param$get("pc_y")],
+            col = colDat[[colour_by]],
+            shape = if (is.na(shape_by)) NA else colDat[[shape_by]],
+            sample = rownames(colDat))
+          pl <- ggplot(pc.df,
+                      if (is.na(shape_by)) aes(x = PC1, y = PC2, colour = col) else aes(x = PC1, y = PC2, colour = col, shape=shape)) + 
+            annotate("text", x = Inf, y = -Inf, label = "PROOF ONLY", 
+                     hjust = 1.1, vjust = -1.1, col = "white", cex = 6, 
+                     fontface = "bold", alpha = 0.8) +
+            geom_point(size = 5) + 
+            xlab(paste0("PC ", param$get("pc_x"), ": ", my_percent[param$get("pc_x")], "% variance")) +
+            ylab(paste0("PC ", param$get("pc_y"), ": ", my_percent[param$get("pc_y")], "% variance")) + 
+            labs(colour = colour_by, shape=if (is.na(shape_by)) waiver() else shape_by) +
             theme_bw()
-          if (is.numeric(pc.df$col)) {
-            pal_col <- metadata(colData(this_dds))$palette$ggplot[[inter_vars[2]]]
+          if (is.numeric(colDat[[colour_by]])) {
+            pal_col <- metadata(colData(this_dds))$palette$ggplot[[colour_by]]
+            pl <- pl + scale_colour_gradient(low = pal_col[1], high = pal_col[2])
+          } else {
+            pl <- pl + scale_colour_manual(values = metadata(colData(this_dds))$palette$ggplot[[colour_by]])
+          }
+          if (do_labels) {
+            pl <- pl + geom_text_repel(aes(label = sample))
+          }
+          do_plot(pl,
+                  label=fig_label("01-focus"),
+                  caption=paste("Annotated by", aes_by, "in", dname, "having removed", removed)
+                  )
+          cat("\n\n---\n\n")
+        } # next covariate
+      } # Next QC formula
+    }
+    
+    cat("\n\n## PC-Covariate Associations\n\n")
+    pc_frame <- expand.grid(sample = rownames(colDat), PC = 1:ncol(pc))
+    pc_frame$coord <- as.vector(pc)
+    pc_frame <- cbind(pc_frame, colDat)
+    fitFrame <- colDat
+    yvar <- make.unique(c(colnames(fitFrame), "y", sep = ""))[ncol(fitFrame) + 1]
+    for (formula_ind in seq_along(qc_formulae)) {
+      fml <- update(qc_formulae[[formula_ind]], 
+                   paste(yvar, "~ ."))
+      plotFrame <- expand.grid(
+        Covariate = attr(terms(fml), "term.labels"),
+        PC = 1:ncol(pc))
+      plotFrame$Assoc <- NA
+      npc <- ncol(pc)
+      fit_selected <- list()
+      for (ipc in 1:npc) {
+        fitFrame[[yvar]] <- pc[, ipc]
+        fit1 <- lm(fml, data = fitFrame)
+        fit_selected[[ipc]] <- MASS::stepAIC(fit1, trace = 0)
+        ind <- attr(terms(fit_selected[[ipc]]), "term.labels")
+        if (length(ind)) {
+          fit0 <- as.data.frame(anova(fit_selected[[ipc]]))
+          rss <- fit0[ind, "Sum Sq"]/sum(fit0[, "Sum Sq"])
+          ind_pc <- plotFrame$PC == ipc
+          ind_fit <- match(ind, plotFrame$Covariate[ind_pc])
+          plotFrame$Assoc[ind_pc][ind_fit] <- rss
+        }
+      }
+      plotFrame$wrap <- (plotFrame$PC - 1)%/%20
+      plotFrame$wrap <- paste0("PCs ", plotFrame$wrap * 20 + 
+                                        1, "-", min((plotFrame$wrap + 1) * 20, npc))
+      plotFrame$PC <- sprintf("%02d", plotFrame$PC)
+      pl <- ggplot(plotFrame, aes(x = PC, y = Covariate, fill = Assoc)) + 
+        geom_raster() +
+        facet_wrap(~wrap, scales = "free_x",ncol = 1) +
+        scale_fill_gradient2(low = "#4575b4",mid = "grey90", high = "#d73027") +
+        theme_bw() + 
+        theme(aspect.ratio = length(unique(plotFrame$Covariate))/min(20, npc))
+      do_plot(pl,
+              label=fig_label("01-covar"),
+              caption=paste("Covariate association in", dname)
+              )
+      
+      cat("\n\n## Partial Residuals of Associated PCs ", formula_ind, "\n\n", sep = "")
+      factors_1 <- attr(terms(fit1), "factors")
+      many_levels <- sapply(colDat, function(x) length(unique(x)))
+      for (covar in unique(plotFrame$Covariate)) {
+        this_covar <- subset(plotFrame, Covariate == covar & 
+                                         !is.na(Assoc) & PC != PC[nrow(plotFrame)])
+        if (nrow(this_covar) == 0) 
+          next
+        pc_first <- as.integer(as.character(this_covar$PC[1]))
+        this_covar <- this_covar[order(this_covar$Assoc, 
+                                      decreasing = TRUE), ]
+        pc_strong <- as.integer(as.character(this_covar$PC[1]))
+        pc.df <- subset(pc_frame, PC %in% c(pc_first, pc_strong))
+        pc.df$label <- as.character(pc.df$PC)
+        pc.df$label[pc.df$PC == pc_first] <- paste0(pc.df$label[pc.df$PC == 
+                                                                pc_first], "+First")
+        pc.df$label[pc.df$PC == pc_strong] <- paste0(pc.df$label[pc.df$PC == 
+                                                                 pc_strong], "+Best")
+        pc.df$label <- paste0(pc.df$label, " (", percentVar[pc.df$PC], 
+                             "%)")
+        inter_vars <- rownames(factors_1)[factors_1[, covar] !=  0]
+        inter_vars <- inter_vars[order(many_levels[inter_vars], decreasing = TRUE)]
+        pc.df$X <- colDat[, inter_vars[1]]
+        for (ipc in unique(c(pc_first, pc_strong))) {
+          pc.df$coord[pc.df$PC == ipc] <- part.resid(fit_selected[[ipc]])[, covar]
+        }
+        if (length(inter_vars) > 1) {
+          pc.df$col <- colDat[, inter_vars[2]]
+          if (length(inter_vars) == 2) {
+            pl <- ggplot(pc.df, aes(x = X, y = coord, colour = col, group = col)) +
+              stat_summary(fun = mean,geom = "line") +
+              labs(x = inter_vars[1], y = "Residual",
+                   colour = paste(inter_vars[-1], collapse = "x")) + theme_bw()
+            if (is.numeric(pc.df$col)) {
+              pal_col <- metadata(colData(this_dds))$palette$ggplot[[inter_vars[2]]]
+              pl <- pl + scale_colour_gradient(low = pal_col[1], high = pal_col[2])
+            }
+            else {
+              pl <- pl + scale_colour_manual(values = metadata(colData(this_dds))$palette$ggplot[[inter_vars[2]]])
+            }
+          }
+          else {
+            pc.df$grp <- Reduce(interaction, colDat[, inter_vars[-1]])
+            pl <- ggplot(pc.df, aes(x = X, y = coord, colour = col,  group = grp)) +
+              stat_summary(fun = mean, geom = "line") +
+              labs(x = inter_vars[1], y="Residual",
+                   colour = paste(inter_vars[-1], collapse = "x")) +
+              theme_bw()
+            if (is.numeric(pc.df$col)) {
+              pal_col <- metadata(colData(this_dds))$palette$ggplot[[inter_vars[2]]]
+              pl <- pl + scale_colour_gradient(low = pal_col[1], high = pal_col[2])
+            }
+            else {
+              pl <- pl + scale_colour_manual(values = metadata(colData(this_dds))$palette$ggplot[[inter_vars[2]]])
+            }
+          }
+        }
+        else {
+          pl <- ggplot(pc.df, aes(x = X, y = coord, colour = X, group = 1)) +
+            stat_summary(fun = mean, geom = "line", colour = "black") +
+            labs( x = inter_vars[1], y="Residual", colour = covar) +
+            theme_bw()
+          if (is.numeric(pc.df$X)) {
+            pal_col <- metadata(colData(this_dds))$palette$ggplot[[inter_vars[1]]]
             pl <- pl + scale_colour_gradient(low = pal_col[1], high = pal_col[2])
           }
           else {
-            pl <- pl + scale_colour_manual(values = metadata(colData(this_dds))$palette$ggplot[[inter_vars[2]]])
+            pl <- pl + scale_colour_manual(values = metadata(colData(this_dds))$palette$ggplot[[inter_vars[1]]])
           }
         }
-      }
-      else {
-        pl <- ggplot(pc.df, aes(x = X, y = coord, colour = X, group = 1)) +
-          stat_summary(fun = mean, geom = "line", colour = "black") +
-          labs( x = inter_vars[1], y="Residual", colour = covar) +
-          theme_bw()
-        if (is.numeric(pc.df$X)) {
-          pal_col <- metadata(colData(this_dds))$palette$ggplot[[inter_vars[1]]]
-          pl <- pl + scale_colour_gradient(low = pal_col[1], high = pal_col[2])
+        pl <- pl + geom_point(size = 2) +
+          facet_wrap(~label, scales = "free_y")
+        if (do_labels) {
+          pl <- pl + geom_text_repel(aes(label = sample))
         }
-        else {
-          pl <- pl + scale_colour_manual(values = metadata(colData(this_dds))$palette$ggplot[[inter_vars[1]]])
-        }
+        do_plot(pl,
+                label= fig_label("01-covariate"),
+                caption=paste("Against ", covar, "in", dname)
+                )
+        cat("\n\n---\n\n")
       }
-      pl <- pl + geom_point(size = 2) +
-        facet_wrap(~label, scales = "free_y")
-      if (do_labels) {
-        pl <- pl + geom_text_repel(aes(label = sample))
-      }
-      do_plot(pl,
-              label= fig_label("01-covariate"),
-              caption=paste("Against ", covar, "in", dname)
-              )
-      cat("\n\n---\n\n")
     }
   }
 }

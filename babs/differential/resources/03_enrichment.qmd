@@ -77,7 +77,7 @@ link2path <- function(lname) {  file.path(knitr::opts_knit$get("output.dir"),lna
 ```{r}
 #| label: load2-enrich2
 if (!isTRUE(getOption('knitr.in.progress'))) {
-  params <- load_params("resources/03_enrichment", extra=TRUE)
+  params <- load_params(choose_staging("03_enrichment"))
 } else {
   gt(data.frame(Setting=names(params),
                 Value=unlist(params)))

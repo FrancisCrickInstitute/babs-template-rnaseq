@@ -42,7 +42,7 @@ source("R/output.r", local = knitr::knit_global())
 #| label: load2
 
 if (!isTRUE(getOption('knitr.in.progress'))) {
-  params <- load_params("resources/00_init", extra=TRUE)
+  params <- load_params(choose_staging("00_init"))
 } else {
   gt(data.frame(Setting=names(params),
                 Value=unlist(params)))
@@ -76,7 +76,7 @@ tx_path <-   normalizePath(file.path(
   paste0(as.character(sample_sheet[[file_col]]), ".genes.results")
 ))
 
-names(tx_path) <- as.character(sample_sheet[[name_col]])
+names(tx_path) <- as.character(sample_sheet[[file_col]])
 not_here <- !file.exists(tx_path)
 if (any(not_here)) {
   warning("Dropping samples", tx_path[not_here])

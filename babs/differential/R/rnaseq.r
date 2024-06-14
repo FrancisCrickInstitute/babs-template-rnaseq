@@ -115,7 +115,23 @@ default_names <- function(obj, prefix="", offset=0) {
 ##' @author Gavin Kelly
 ##' @export
 build_dds_list <- function(dds, spec) {
-  modelled_terms <- lapply(spec$sample_sets, function(x) lapply(x$models, function(y) if (is_formula(y$design)) all.vars(update(y$design, NULL ~ .))))
+  modelled_terms <- lapply(
+    spec$sample_sets,
+    function(x) {lapply(
+      x$models,
+      function(y) {
+        d <- c()
+        if (is_formula(y$design))
+          d <- all.vars(update(y$design, NULL ~ .))
+        if ("qc_formulae" %in% names(y)) {
+          if (is_formula(y$qc_formulae))
+            d <- c(d, all.vars(y$qc_formulae))
+          else
+            d <- c(d, unlist(lapply( y$qc_formulae, all.vars)))
+        }
+        d
+      })
+    })
   modelled_terms <-  unique(unlist(modelled_terms))
   if (!"palette" %in% names(spec$settings)) {
     spec$settings$palette="Set1"
@@ -165,22 +181,22 @@ build_dds_list <- function(dds, spec) {
     obj <- obj[,ind]
     metadata(obj)$full_model <- spec$full_model
     colData(obj) <- droplevels(colData(obj))
-    metadata(obj)$models <- mdlList
-    if ("qc_formulae" %in% names(set)) {
-      metadata(obj)$qc_formulae <- set$qc_formulae
-    } else {
-      metadata(obj)$qc_formulae <- update(
-        mdlList[[1]]$design,
-        as.formula(
-          paste0(
-            paste(all.vars(qc_formulae[[1]]), collapse="+"),
-            " ~ . ")
-        )
-      )
+
+    # If no models have qc_formulae, set the first model to have a sensible default based on design
+    if (!any(sapply(mdlList, function(x) "qc_formulae" %in% names(x)))) {
+      mdlList[[1]]$qc_formulae <- as.formula(
+        paste0(
+          paste(all.vars(mdlList[[1]]$design), collapse=" + "),
+          "~",
+          0))
     }
-    if (is_formula(metadata(obj)$qc_formulae)) {
-      metadata(obj)$qc_formulae <- list(I(metadata(obj)$qc_formulae))
-    } 
+    mdlList <- lapply(mdlList, function(mdl) {
+      if (is_formula(mdl$qc_formulae)) {
+        mdl$qc_formulae <- list(I(mdl$qc_formulae))
+      }
+      mdl
+    })
+    metadata(obj)$models <- mdlList
     if ("sample_swap" %in% names(set)) {
       for (x1 in names(set$sample_swap)) {
         i1 <- match(x1, colData(obj)$ID)
