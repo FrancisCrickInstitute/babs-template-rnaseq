@@ -311,6 +311,9 @@ R-$(RVERSION): $(CONTAINER_IMAGE)
 	setfacl -m u::rwx $@
 	$(call git-ignore,$@)
 
+.PHONY: R
+R: rocker.Renviron
+	$(CONTAINER) $(CONTAINER_FLAGS_INTERACTIVE) $(CONTAINER_IMAGE) R
 .PHONY: rstudio
 rstudio: ## Open this environment in RStudio
 	. $(source_dir)/shell/rstudio-rocker.sh

@@ -114,7 +114,7 @@ $(empty)
 endef
 
 # These targets will skip any computationally intensive 'include's
-excluded-targets=help clean maintainer-clean R-local
+excluded-targets=help clean maintainer-clean R-local R
 
 ## Deferred simple expansion - TMPSCRIPT won't exist when first called, then constant thereafter
 TMPSCRIPT = $(eval TMPSCRIPT := $$(shell mktemp -u $(staging_dir)/XXXXX))$(TMPSCRIPT)
