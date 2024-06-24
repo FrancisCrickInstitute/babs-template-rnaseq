@@ -1,6 +1,7 @@
 .PHONY: makefile module.mk 
 .PHONY: build clean maintainer-clean geo R-local
 
+diff_dir=.
 include shared.mk
 include module.mk
 include project.mk  ## Provides analysis parametrisation

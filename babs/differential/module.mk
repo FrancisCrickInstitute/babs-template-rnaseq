@@ -48,6 +48,7 @@ BIOCPARALLEL_WORKER_NUMBER=2
 ################################################################
 ## Directories
 ################################################################
+
 ## Location of qmds and multi-yaml files
 source_dir=resources
 ## Place where qmds will be generated

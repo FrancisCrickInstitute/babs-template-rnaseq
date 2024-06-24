@@ -1,4 +1,5 @@
 .PHONY: run build copy publish clean
+nfcore_dir=.
 include shared.mk
 include module.mk
 

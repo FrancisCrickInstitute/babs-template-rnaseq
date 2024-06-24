@@ -226,7 +226,7 @@ build_dds_list <- function(dds, spec) {
                                  if (class(colData(obj)[[x]]) != class(colData(dds)[[x]])) return(TRUE)
                                  if (is.factor(colData(obj)[[x]])) return(!all(levels(colData(obj)[[x]]) %in%  levels(colData(dds)[[x]])))
                                  if (is.character(colData(obj)[[x]])) return(!all(unique(colData(obj)[[x]]) %in%  levels(unique(dds)[[x]])))
-                                 return(!all(range(colData(obj)[[x]])==range(colData(obj)[[x]])))
+                                 return(!all(range(colData(obj)[[x]], na.rm=TRUE)==range(colData(dds)[[x]], na.rm=TRUE)))
                                })
         new_cols <- c(new_cols, old_cols[is_modified])
       }

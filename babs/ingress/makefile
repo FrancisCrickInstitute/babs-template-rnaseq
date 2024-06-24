@@ -1,3 +1,4 @@
+ingress_dir=.
 include shared.mk
 
 .PHONY: run build copy publish clean run-clean build-clean

@@ -1,3 +1,4 @@
+docs_dir=.
 include shared.mk
 
 .SILENT:
