@@ -641,8 +641,7 @@ for (dname_i in seq_along(ddsList)) {
             sep=", ", collapse=", ")
           if (length(removed)==0 || removed=="") removed <- "nothing"
           my_mat <- rowSums(sample_gene_factor[[qc_ind]]$terms[, , contrib, drop=FALSE], na.rm=TRUE, dims=2) +
-            sample_gene_factor[[qc_ind]]$resid +
-            sample_gene_factor[[qc_ind]]$const
+            sample_gene_factor[[qc_ind]]$resid
           my_pc <- prcomp(
             my_mat, 
             scale = FALSE)
