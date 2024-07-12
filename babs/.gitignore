@@ -3,3 +3,4 @@
 /fetch_ngs/
 /*.log
 .not-secret
+/docs/simulate/differential

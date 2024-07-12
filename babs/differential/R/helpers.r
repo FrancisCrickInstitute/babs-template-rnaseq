@@ -400,6 +400,13 @@ dmc2df <- function(dmc) {
 }
 
 choose_staging <- function(resource, staging="staging") {
-  files <- dir(staging, pattern=paste0("^", resource, ".*"))
-  file.path(staging, sub(".qmd$", "", files[menu(files, title="Select which staging file to use for parameters")]))
+  files <- dir(staging, pattern=paste0("^", resource, ".*\\.qmd"))
+  if (length(files)==1) {
+    print(paste("Using parameters from", files))
+    file.path(staging, sub(".qmd$", "", files))
+  } else if (length(files)==0) {
+    warning("No staging files from which to take parameters.")
+  } else {    
+    file.path(staging, sub(".qmd$", "", files[menu(files, title="Select which staging file to use for parameters")]))
   }
+}
