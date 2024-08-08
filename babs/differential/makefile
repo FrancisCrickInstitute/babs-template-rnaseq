@@ -315,9 +315,20 @@ R-$(RVERSION): $(CONTAINER_IMAGE)
 .PHONY: R
 R: rocker.Renviron
 	$(CONTAINER) $(CONTAINER_FLAGS_INTERACTIVE) $(CONTAINER_IMAGE) R
-.PHONY: rstudio
-rstudio: ## Open this environment in RStudio
-	. $(source_dir)/shell/rstudio-rocker.sh
+
+.PHONY: rstudio rstudio-slurm
+rstudio-slurm: ## Start RStudio on a node for this project. Can use variables SLURM--*, where *=(partition|cpus-per-task/time/mem). Look for an 'rstudio-server.log' file to appear, with instructions.
+	res=$$(sbatch  \
+--partition=$(SLURM--partition) \
+--cpus-per-task=$(SLURM--cpus-per-task) \
+--time='$(SLURM--time)' \
+--mem=$(SLURM--mem) \
+$(source_dir)/shell/rstudio-rocker.sh $(CONTAINER_IMAGE) ${SINGULARITY_VERSION} $$(hostname)) ;\
+	echo $$res "- please wait until job is allocated for futher instructions (./rstudio-server.log will appear)"
+
+rstudio: ## Start RStudio on this machine for this project.
+	. ./$(source_dir)/shell/rstudio-rocker.sh $(CONTAINER_IMAGE) ${SINGULARITY_VERSION}
+
 
 clean: ## Remove the staging folder and the log directory - these should never contain anything of lasting interest that can't be recreated
 	rm -rf $(staging_dir) $(log_dir)
