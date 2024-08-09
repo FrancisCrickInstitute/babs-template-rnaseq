@@ -107,6 +107,40 @@ param$set("spec",  params$spec, "Using analysis plan '{}'.", postpone=TRUE)
 param$set("alignment", params$alignment, "Using alignment settings '{}'")
   
 ```
+# Models
+
+```{r}
+#| label: formulae
+
+for (dataset in names(ddsList)) {
+  met <- metadata(ddsList[[dataset]])
+  cat("\n\n##", met$dmc$dataset_name %||% met$dmc$dataset,"\n\n")
+  if (!is.null(met$dmc$dataset_description)) {
+    cat(met$dmc$dataset_description, "\n\n")
+  }
+  mdls <- lapply(met$models, function(x) x$design)
+  mdls <- mdls[sapply(met$models, function(x) "comparisons" %in% names(x))]
+  for (mdl in names(mdls)) {
+    if (is.null(met$models[[mdl]]$name))  {
+      cat("\n\n### ",  mdl,  "{.unnumbered}\n\n", sep="")
+    } else { 
+      cat("\n\n### ", mdl, " - ", met$models[[mdl]]$name,  "{.unnumbered}\n\n", sep="")
+    }
+    if ("description" %in% names(met$models[[mdl]])) {
+      cat(met$models[[mdl]]$description, "\n\n")
+    }
+    cat("`",
+        Reduce(paste, sub("~", "Expression ~ ", deparse(mdls[[mdl]]))),
+        "`\n\n"
+        )
+  }
+}
+
+
+
+
+
+```
 
 # Find differential genes
 

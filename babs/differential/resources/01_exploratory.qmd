@@ -254,7 +254,11 @@ for (dataset in names(ddsList)) {
   mdls <- lapply(met$models, function(x) x$design)
   mdls <- mdls[sapply(met$models, function(x) "comparisons" %in% names(x))]
   for (mdl in names(mdls)) {
-    cat("\n\n###", met$models[[mdl]]$name %||% mdl,  "\n\n")
+    if (is.null(met$models[[mdl]]$name))  {
+      cat("\n\n### ",  mdl,  "{.unnumbered}\n\n", sep="")
+    } else { 
+      cat("\n\n### ", mdl, " - ", met$models[[mdl]]$name,  "{.unnumbered}\n\n", sep="")
+    }
     if ("description" %in% names(met$models[[mdl]])) {
       cat(met$models[[mdl]]$description, "\n\n")
     }
@@ -395,7 +399,7 @@ for (dname_i in seq_along(ddsList)) {
   this_dds <- ddsList[[dname_i]]
   dname <- metadata(this_dds)$dmc$dataset_name %||% names(ddsList)[dname_i]
   mdls <- sapply(metadata(this_dds)$models, function(mdl) "qc_formulae" %in% names(mdl))
-  for (mname in names(mdls)[mdls]) {
+  for (mname in names(mdls[mdls])) {
     qc_formulae <- metadata(this_dds)$models[[mname]]$qc_formulae
     design <- metadata(this_dds)$models[[mname]]$design
     if (sum(mdls)==1) {
