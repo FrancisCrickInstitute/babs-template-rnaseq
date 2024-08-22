@@ -111,7 +111,7 @@ assemble_partialised <- function(obj, reduced, extra=NULL) {
 ##' @return
 ##' @author Gavin Kelly
 get_lhs <- function(fml) {
-  if (is.list(fml) {
+  if (is.list(fml)) {
     unique(unlist(lapply(fml, get_lhs)))
   } else {
     lhs <- strsplit(as.character(fml)[[2]], " *\\+ *")[[1]]

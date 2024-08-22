@@ -1,0 +1,14 @@
+reference:
+- title: Utilities
+- subtitle: "Partial Residuals"
+  desc: >
+    Functions for selectively removing the systematic effect of
+    variables included in a predictive model, to allow patterns that
+    might otherwise be obscured to become apparent.
+- contents: 
+  - has_concept("partial")
+- title: "Everything Else"
+  desc: "Things yet to be categorised"
+  contents:
+  - -has_concept("partial")
+  

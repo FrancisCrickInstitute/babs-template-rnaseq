@@ -64,7 +64,7 @@ test/babs/nfcore/results:  test | airway/nfcore.tar.gz
 site: babs/differential/R
 	rm -rf site/R
 	cp -lr babs/differential/R site/
-
+	cd site && ./R-4.3.2 -e 'roxygen2::roxygenise(); pkgdown::build_site()'
 
 
 help: ## show help message

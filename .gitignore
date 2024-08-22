@@ -3,3 +3,8 @@ rnaseq_demo/
 /test/
 /airway/fastq/
 /airway/nfcore.tar.gz
+/site/R/
+/site/docs/
+/site/man/
+site/renv/.gitignore
+site/renv/settings.json
