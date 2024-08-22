@@ -51,10 +51,6 @@ sym_colour <- function(dat, lo="blue",zero="white", hi="red") {
 
 get_terms <- function(dds) {
   ret <- list(fixed=NULL, groups=NULL)
-  if ("full_model" %in% names(metadata(dds))) {
-    ret <- classify_terms(metadata(dds)$full_model)
-    return(ret)
-  }
   if ("model" %in% names(metadata(dds))) {
     ret$fixed <- all.vars(metadata(dds)$model$design)
     return(ret)
@@ -130,6 +126,7 @@ height=height_opt
   }
 }
       
+
 residual_heatmap_transform <- function(mat, cdata, fml) {
   assign("tmat", t(mat), envir=environment(fml))
   fml <- stats::update(fml, tmat ~ .)

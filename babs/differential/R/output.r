@@ -13,14 +13,14 @@
 write_assay <- function(ddsList, assay="vst", path="results", formula=NULL, terms_to_remove=NULL) {
   out <- list()
   for (i in names(ddsList)) {
-    if (assay=="norm") {
+    if (!is.null(formula)) {
+      part_resid <- partialise(ddsList[[i]], assay=assay)
+      x <- x - t(apply(part_resid$terms[,,terms_to_keep, drop=FALSE], 1:2,sum))
+    } else if (assay=="norm") {
+      part <- partialise(ddsList[[i]])
       x <- counts(ddsList[[i]], norm=TRUE)
     } else {
       x <- assay(ddsList[[i]], assay)
-    }
-    if (!is.null(formula)) {
-      part_resid <- residual_heatmap_transform(x, as.data.frame(colData(ddsList[[i]])), formula)
-      x <- x - t(apply(part_resid$terms[,,terms_to_keep, drop=FALSE], 1:2,sum))
     }
     content_frame <- cbind(mcols(ddsList[[i]]),x)
     head_frame <- as.data.frame(colData(ddsList[[i]]))

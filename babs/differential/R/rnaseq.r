@@ -179,7 +179,6 @@ build_dds_list <- function(dds, spec) {
       ind <- set
     }
     obj <- obj[,ind]
-    metadata(obj)$full_model <- spec$full_model
     colData(obj) <- droplevels(colData(obj))
 
     # If no models have qc_formulae, set the first model to have a sensible default based on design
@@ -787,10 +786,6 @@ tidy_per_gene <- function(mat, pdat,  tidy_fn) {
   list(mat=tidy_mat, pdat=tidy_pdat)
 }
 
-full_model <- function(mdlList) {
-  rhs <- lapply(mdlList, function(mdl) deparse1(mdl$design[[2]]))
-  fml <- stats::update(as.formula(paste("~", paste(rhs, collapse=" + "))), ~ . )
-}
 
 
 retrieve_contrast <- function (object, expanded = FALSE, listValues=c(1,-1)) {
