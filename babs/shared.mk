@@ -27,7 +27,7 @@ log_dir=logs
 samples_db = samples.db
 
 ################################################################
-# Executibles
+# Executables
 ################################################################
 ## Versions
 SINGULARITY_VERSION=3.11.3
@@ -118,7 +118,7 @@ include secret.mk
 ## Above, we set a default value of EXECUTOR. This can be over-
 ## ridden at the command line, e.g.
 ## `make target EXECUTOR=shell|singularity|docker`
-## 'shell' will run using the prevailing system executibles.
+## 'shell' will run using the prevailing system executables.
 ################################################################
 CONTAINERED=false#An internal flag
 BIND_DIR = $(shell $(GIT) rev-parse --show-toplevel || echo $(CURDIR))
@@ -164,6 +164,11 @@ endif
 
 ifeq ($(CONTAINERED),true)
 Renviron.site: | $(CONTAINER_IMAGE)
+optionalRenviron=Renviron.site
+containerPrefix=$(CONTAINER) $(CONTAINER_FLAGS) $(CONTAINER_IMAGE)
+else
+optionalRenviron=
+containerPrefix=
 endif
 
 ################################################################

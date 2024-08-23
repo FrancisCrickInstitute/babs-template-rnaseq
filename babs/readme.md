@@ -41,7 +41,7 @@ initial state of the module contains: an empty skeleton of an R
 project (split into an `R` folder which contains function definitions,
 and a `resources` folder which contains template markdown
 documents) and environment; a settings file `module.mk` that contains
-e.g. what the R executible is; and a `makefile` which serves two
+e.g. what the R executable is; and a `makefile` which serves two
 purposes.
 
 The first time this makefile is activated with `make run` in the
