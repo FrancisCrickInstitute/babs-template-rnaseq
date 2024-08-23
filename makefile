@@ -57,9 +57,9 @@ test/babs/nfcore/results:  test | airway/nfcore.tar.gz
 	cd test/babs/ingress && make run
 	cd test/babs/nfcore && tar -xzf ../../../airway/nfcore.tar.gz
 
-.PHONY: site
-site: 
-	cd site && make site
+.PHONY: pkgdown
+pkgdown: 
+	cd $@ && make site
 
 
 help: ## show help message
