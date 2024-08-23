@@ -1,7 +1,6 @@
 .DEFAULT_GOAL:=help
 all: differential
 .PHONY: all clean
-include shared.mk
 
 stages := ingress nfcore differential biologic 
 .PHONY: $(stages)

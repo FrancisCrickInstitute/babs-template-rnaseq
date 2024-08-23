@@ -42,13 +42,13 @@ EOF
 
 chmod +x ${workdir}/rsession.sh
 set -a
-. ./rocker.Renviron
+. ./Renviron.site
 set +a
 
 export SINGULARITY_BIND="${workdir}/run:/run, ${workdir}/tmp:/tmp, ${workdir}/database.conf:/etc/rstudio/database.conf, \
                          ${workdir}/rsession.sh:/etc/rstudio/rsession.sh, ${workdir}/var/lib/rstudio-server:/var/lib/rstudio-server, \
 			 ${workdir}/rsession.conf:/etc/rstudio/rsession.conf, ${workdir}/R:$HOME/.config/R, ${workdir}/rstudio:$HOME/.config/rstudio, \
-                         ${PWD}/rocker.Renviron:/usr/local/lib/R/etc/Renviron.site, /etc/ssl/certs/ca-bundle.crt, ${workdir}/rserver.sh, \
+                         ${PWD}/Renviron.site:/usr/local/lib/R/etc/Renviron.site, /etc/ssl/certs/ca-bundle.crt, ${workdir}/rserver.sh, \
                          $HOME/.ssh,/sys/fs/cgroup,${PWD},${RENV_PATHS_ROOT}"
 
 # Do not suspend idle sessions.

@@ -1,4 +1,17 @@
 .DEFAULT_GOAL=help
+################################################################
+## Things here are typically shared across all phases of the
+## analysis. There's originally one gold-reference copy of this file
+## that gets copied into each subdirectory (in case the subdirectory
+## gets shared by itself some time in the future), so it's recommended
+## that any necessary phase-specific changes are put into module.mk,
+## which will override things in shared.mk and secret.mk
+################################################################
+
+# The following can be set to singularity|docker|shell
+# and determines the environment in which quarto/R processes
+# will be run in.
+EXECUTOR = singularity
 
 ################################################################
 # Conventional file- and field- names
@@ -14,21 +27,29 @@ log_dir=logs
 samples_db = samples.db
 
 ################################################################
-# Executibles (can be overridden in module.mk's)
+# Executibles
 ################################################################
 ## Versions
 SINGULARITY_VERSION=3.11.3
 NEXTFLOW_VERSION=23.10.0
 RVERSION=4.3.2
 BIOCONDUCTOR_VERSION=3.18
+IMAGE=bioconductor/bioconductor_docker
+IMAGE_TAG=$(BIOCONDUCTOR_VERSION)-R-$(RVERSION)
+R=R
+QUARTO=quarto
+GIT=git
+
 ## Module loader
 ml = module is-loaded $1 || module load $1 || true # ie fall back to true (ie rely on system version if can't load a module)
 ## Define commands invoked by make
-R=R
 NEXTFLOW = $(call ml,Nextflow/$(NEXTFLOW_VERSION)); $(call ml,Singularity/$(SINGULARITY_VERSION)); $(call ml,CAMP_proxy); nextflow
 SQLITE = $(call ml,SQLite/3.42.0-GCCcore-12.3.0); sqlite3
-GIT=git
 make_rwx = setfacl -m u::rwx
+
+# Environment Variables
+BIOCPARALLEL_WORKER_NUMBER=2
+
 
 ################################################################
 # Standard folder and shortcut names
@@ -89,6 +110,62 @@ endef
 
 export slurm
 
+include secret.mk
+
+################################################################
+## Reproducible containers
+##
+## Above, we set a default value of EXECUTOR. This can be over-
+## ridden at the command line, e.g.
+## `make target EXECUTOR=shell|singularity|docker`
+## 'shell' will run using the prevailing system executibles.
+################################################################
+CONTAINERED=false#An internal flag
+BIND_DIR = $(shell $(GIT) rev-parse --show-toplevel || echo $(CURDIR))
+
+ifeq ($(EXECUTOR),singularity)
+CONTAINER= $(call ml,Singularity/$(SINGULARITY_VERSION)); singularity
+CONTAINER_IMAGE=$(SINGULARITY_ROOT)/$(IMAGE)_$(IMAGE_TAG).sif
+CONTAINER_BIND=--bind $(BIND_DIR),/tmp,$(RENV_PATHS_ROOT),$(CURDIR)/Renviron.site:/usr/local/lib/R/etc/Renviron.site
+CONTAINER_ENV=--env SQLITE_TMPDIR=/tmp,BIOCPARALLEL_WORKER_NUMBER=$(BIOCPARALLEL_WORKER_NUMBER),GITHUB_PAT=$${GITHUB_PAT}
+CONTAINER_FLAGS= exec $(CONTAINER_BIND) --pwd $(CURDIR) --containall --cleanenv $(CONTAINER_ENV)
+CONTAINER_FLAGS_INTERACTIVE= $(CONTAINER_FLAGS),DISPLAY=$${DISPLAY} 
+CONTAINER_SHELL = $(CONTAINER) $(patsubst exec,shell,$(CONTAINER_FLAGS_INTERACTIVE)) $(CONTAINER_IMAGE)
+$(CONTAINER_IMAGE): 
+	cd $(dir $(CONTAINER_IMAGE)) ;\
+	$(CONTAINER) pull docker://$(IMAGE):$(IMAGE_TAG)
+CONTAINERED=true
+
+else ifeq ($(EXECUTOR),docker)
+CONTAINER=docker
+CONTAINER_IMAGE=$(IMAGE)_$(IMAGE_TAG)
+CONTAINER_FLAGS=run \
+--mount type=bind,source="$(BIND_DIR)",target="$(BIND_DIR)" \
+--mount type=bind,source="/tmp",target="/tmp" \
+--mount type=bind,source="$(CURDIR)/Renviron.site",target="/usr/local/lib/R/etc/Renviron.site" \
+--workdir="$(CURDIR)" $(IMAGE):$(IMAGE_TAG)
+	mkdir -p $(dir $(CONTAINER_IMAGE))
+	touch $(CONTAINER_IMAGE)
+CONTAINER_SHELL = $(CONTAINER) $(patsubst run,exec -it,$(CONTAINER_FLAGS_INTERACTIVE)) $(CONTAINER_IMAGE) /bin/bash
+CONTAINERED=true
+$(CONTAINER_IMAGE): 
+	$(CONTAINER) pull docker://$(IMAGE):$(IMAGE_TAG)
+	echo "Proxy for docker image" > $@
+
+else ifeq ($(EXECUTOR),shell)
+  $(info " Not using containerisation so results are not necessarily reproducible")
+
+else ifeq ($(EXECUTOR),make)
+# This is what we use as internal option - effectively means we're already in the container,
+# so no need for any action here.
+else
+  $(error "# Don't recognise '$(EXECUTOR)' as an executor")
+endif
+
+ifeq ($(CONTAINERED),true)
+Renviron.site: | $(CONTAINER_IMAGE)
+endif
+
 ################################################################
 # Git-derived variables
 ################################################################
@@ -130,7 +207,6 @@ log=2>&1 | tee $2 $(log_dir)/$1.log
 #log=>$(subst -a,>)$(log_dir)/$1.log 2>&1
 # as above, but suppress stdout
 
-ifndef have-run-shared
 
 ################################################################
 ## Standard Goals
@@ -138,24 +214,28 @@ ifndef have-run-shared
 
 # Load secrets
 ##############
-# Originally, secret.mk should come from the parent directory.  If
+# Originally, secret.mk should come from the babs directory.  If
 # it's still there, make sure it's up-to-date and then copy it
 # here. If a secret.mk file can't be found anywhere, create a dummy
 # one out of a template.
 
-secret.mk: $(wildcard ../secret.mk) .not-secret
-	@if [ -f ../secret.mk ]; then \
-	  $(MAKE) --no-print-directory -C .. secret.mk >/dev/null ;\
+
+secret.mk: $(firstword $(wildcard ../secret.mk ../babs/secret.mk) .not-secret.mk) $(wildcard ../.babs)
+	@if [ -f "$<" ]; then \
+	  sed  's/=.*/=/; /## BABS/,$$d' $< > .not-secret.mk ;\
 	  cp $< $@ ;\
+	  if [ -f ../.babs ]; then \
+	    sed  -i '/^setting_/d' $@ ;\
+	    sed -r -n 's/^(\s*)(.*)\s*:\s*(.*$$)/setting_\2=\3/p' ../.babs >> $@ ;\
+	  fi ;\
 	else \
-	  if [ ! -f secret.mk ] ; then \
-	    cp .not-secret secret.mk ;\
-	    echo "Created a 'secret.mk' file - please customise it so that the pipeline will run on your system" ;\
-	    exit ;\
-	 fi ;\
+	  echo "Unable to find a 'secret.mk' file" ;\
+	  exit ;\
 	fi
-	$(GIT) add $(wildcard ../shared.mk) $(wildcard ../makefile) $(wildcard ../.gitignore) $(wildcard ../readme.md) $(wildcard ../.gitignore) $(wildcard ../.pipeline-version) 
-	$(GIT) add $(wildcard shared.mk) $(wildcard makefile) $(wildcard .gitignore) $(wildcard module.mk)
+	if [ "$<" = ".not-secret.mk" ]; then \
+	    echo "Created a blank 'secret.mk' file - please customise it so that the pipeline will run on your system" ;\
+	    exit ;\
+	fi
 
 
 .PHONY: print-%
@@ -170,15 +250,6 @@ help: ## Show help message
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage: `make command` where command is one of: \n"} /^[$$()% 0-9a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 
-ifneq ($(wildcard ../.not-secret),)
-.not-secret: ../.not-secret
-	@cp $< $@
-endif
-
-have-run-shared=true
-endif
-
-include secret.mk
 
 shortcut=$(empty)
 ifdef redirect_$(location)

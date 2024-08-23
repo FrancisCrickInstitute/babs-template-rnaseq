@@ -27,13 +27,10 @@ endif
 $(template_dir)/archive $(template_dir)/$(type):
 	mkdir -p $@
 
-ena=005/SRR1039515/SRR1039515_1 006/SRR1039516/SRR1039516_1 004/SRR1039514/SRR1039514_1 003/SRR1039513/SRR1039513_1 009/SRR1039519/SRR1039519_2 007/SRR1039517/SRR1039517_2 006/SRR1039516/SRR1039516_2 000/SRR1039520/SRR1039520_1 001/SRR1039521/SRR1039521_1 002/SRR1039522/SRR1039522_1 000/SRR1039510/SRR1039510_2 008/SRR1039518/SRR1039518_2 005/SRR1039515/SRR1039515_2 001/SRR1039511/SRR1039511_2 008/SRR1039508/SRR1039508_1 009/SRR1039509/SRR1039509_1 004/SRR1039514/SRR1039514_2 003/SRR1039513/SRR1039513_2 002/SRR1039512/SRR1039512_2 003/SRR1039523/SRR1039523_1 000/SRR1039510/SRR1039510_1 001/SRR1039511/SRR1039511_1 009/SRR1039519/SRR1039519_1 008/SRR1039508/SRR1039508_2 002/SRR1039512/SRR1039512_1 009/SRR1039509/SRR1039509_2 007/SRR1039517/SRR1039517_1 003/SRR1039523/SRR1039523_2 000/SRR1039520/SRR1039520_2 002/SRR1039522/SRR1039522_2 001/SRR1039521/SRR1039521_2 008/SRR1039518/SRR1039518_1
 
-
-
-airway/fastq:
+airway/fastq: airway/ena.txt
 	mkdir -p $@
-	cd @$; for i in ${ena}; do wget -nc ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR103/$$i.fastq.gz ; done
+	while read i; do wget -P $@ -nc ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR103/$$i.fastq.gz ; done < $<
 
 airway/nfcore.tar.gz: | test ## Cache the nfcore results for future speed
 	cd test/nfcore &&\
@@ -61,10 +58,8 @@ test/babs/nfcore/results:  test | airway/nfcore.tar.gz
 	cd test/babs/nfcore && tar -xzf ../../../airway/nfcore.tar.gz
 
 .PHONY: site
-site: babs/differential/R
-	rm -rf site/R
-	cp -lr babs/differential/R site/
-	cd site && ./R-4.3.2 -e 'roxygen2::roxygenise(); pkgdown::build_site()'
+site: 
+	cd site && make site
 
 
 help: ## show help message

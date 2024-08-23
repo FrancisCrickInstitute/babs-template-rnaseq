@@ -1,21 +1,11 @@
-# The following are system paths. Please set them to agree with your
-# local system. Watch out for trailing spaces, makefiles are very
-# 'literal' so a trailing space can get included value
-
-# where .sif's are stored:
-SINGULARITY_ROOT=/flask/apps/containers/all-singularity-images/
-# local renv cache:
-RENV_PATHS_ROOT=/nemo/stp/babs/working/software/renv
-# your chosen prefix (e.g.'rocker') to keep the pipeline somewhat isolated:
+SINGULARITY_ROOT = /flask/apps/containers/all-singularity-images/
+RENV_PATHS_ROOT = /nemo/stp/babs/working/software/renv
 RENV_PATHS_PREFIX=rocker
-# working space for large disposable files:
-SCRATCH_DIR=/flask/scratch/babs/bioinformatics/projects/$(or $(setting_Hash),$(USER))/
-# Nextflow cache:
-NXF_SINGULARITY_CACHEDIR=/flask/apps/containers/all-singularity-images/
+TEMPLATE_DIR = /nemo/stp/babs/working/bioinformatics/templates
+SCRATCH_DIR = /flask/scratch/babs/bioinformatics/projects/$(or $(setting_Hash),$(USER))/
+NXF_SINGULARITY_CACHEDIR = /flask/apps/containers/all-singularity-images/
 
 ## BABS-specific stuff
-
-TEMPLATE_DIR=/nemo/stp/babs/working/bioinformatics/templates
 
 .bp = $(subst /, ,$(setting_Path))
 .myname = $(firstword $(subst @,$(space),$(shell $(GIT) config --global user.email || echo $(USER))))
@@ -83,6 +73,17 @@ update-pm: ## Update the project management scripts
 	else \
 	  rsync -avzp $(TEMPLATE_DIR)/generic/.github/ `echo $(CURDIR) | sed 's|\(.*\)/babs/.*|\1/|'` ;\
 	fi
+
+babsfile?=../.babs
+
+ifneq ($(wildcard $(babsfile)),)
+.PHONY: secret.mk
+secret.mk: 
+	if [ -f $(babsfile) ]; then \
+	  sed  -i '/^setting_/d' $@ ;\
+	  sed -r -n 's/^(\s*)(.*)\s*:\s*(.*$$)/setting_\2=\3/p' $(babsfile) >> $@ ;\
+	fi
+endif
 
 
 # The following settings come from the .babs file. If that file still

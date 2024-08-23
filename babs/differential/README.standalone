@@ -1,0 +1,24 @@
+Stand-alone usage:
+
+We expect a sibling 'nfcore' directory parallel to this
+'differential' one, if we are to prepare things with a `make
+build`.  However, if you have pre-aligned data from another source,
+it is possible to omit that `build` stage, and instead arrange this
+directory to have all the prerequisites ready for a `make run`. You
+will need to select an (arbitrary) name to denote the set of
+samples that have been aligned.  We recommend a short mnemonic that
+represents this: for illustrative purposes we'll use the word 'human'.
+Assuming that (or change _every_ instance of it uniformly),
+here is the necessary structure:
+
+./extdata/metadata_human.csv - experiment table, with the ID's
+filled in
+
+./extdata/genes.results/human/*.genes.results - rsem quantified
+counts per sample (note the extra directory level 'human' when compared
+to standard nfcore results)
+
+./human.config - containing at least the line `human.org.db=org.Hs.eg.db`
+
+Given those three requirements, and at least one spec file, `make run` will
+produce the reports

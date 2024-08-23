@@ -139,9 +139,10 @@ $(staging_dir)/index.qmd : $(source_dir)/index.qmd $(qmds)
 $(staging_dir)/R.bib: R.bib
 	cp $< $@
 
-R.bib: renv.lock  | $(log_dir) rocker.Renviron
+R.bib: renv.lock  | $(log_dir) Renviron.site
 	$(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")' $(call log,bib)
-	$(GIT) add $@
+	$(GIT) add $@ $(wildcard shared.mk makefile .gitignore module.mk .not-secret.mk)
+	$(GIT) add $(wildcard ../shared.mk ../makefile ../.gitignore ../readme.md ../.gitignore ../.pipeline-version)
 
 renv.lock: resources/_dependencies.R $(wildcard pre.renv.lock)
 	if [ -f pre.renv.lock ] ; then \
@@ -166,7 +167,7 @@ resources/_dependencies.R: $(patsubst %,%.config,$(alignments))
 ##   being executed by container without slurm, so put what 'make' would normally execute in a temporary
 ##   shell script, and get container to call that script (so it naturally inherits all the command line
 ##   arguments etc)
-run  pages $(html_reports) scripts $(qmds) $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd  $(staging_dir)/R.bib renv.lock: $(CONTAINER_IMAGE)
+run  pages $(html_reports) scripts $(qmds) $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd  $(staging_dir)/R.bib renv.lock: Renviron.site
 	make -n -s $@ SUBMIT=false EXECUTOR=make > $(TMPSCRIPT)_bash 
 	$(CONTAINER) $(CONTAINER_FLAGS) $(CONTAINER_IMAGE) bash "$(TMPSCRIPT)_bash" || { echo "$(TMPSCRIPT)_bash failed." $(call log,container) ; exit 1; }
 	rm -f $(TMPSCRIPT)_bash
@@ -178,12 +179,14 @@ else
 #make-args=$(shell echo "$(MAKEFLAGS)" | sed -rn 's/^.* -- (.*)/\1/p') TAG=$(TAG) VERSION=$(VERSION)
 
     ifeq ($(CONTAINERED),true)
-slurm-container-prefix=$(CONTAINER) $(CONTAINER_FLAGS) $(CONTAINER_IMAGE) 
+slurm-container-prefix=$(CONTAINER) $(CONTAINER_FLAGS) $(CONTAINER_IMAGE)
+slurm-prereq=Renviron.site
     else
 slurm-container-prefix=
+slurm-prereq=
     endif
 #JFLAG= -j $(SLURM--cpus-per-task)# Haven't got parallel make working with quarto. race condition?
-run pages $(html_reports) scripts $(qmds) $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(staging_dir)/R.bib renv.lock: $(CONTAINER_IMAGE)
+run pages $(html_reports) scripts $(qmds) $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(staging_dir)/R.bib renv.lock: $(slurm-prereq)
 	echo "$$slurm" > $(TMPSCRIPT)_slurm
 	make -n -s $@ SUBMIT=false EXECUTOR=make > $(TMPSCRIPT)_slurm.sh
 	echo "$(slurm-container-prefix) $(TMPSCRIPT)_slurm.sh" >> $(TMPSCRIPT)_slurm
@@ -196,7 +199,7 @@ run pages $(html_reports) scripts $(qmds) $(staging_dir)/_quarto.yml $(staging_d
 endif
 
 
-## Back outside the executor/submission 
+## Back outside the executor/submission
 .PHONY: geo
 geo: geo/md5.txt  ## Gather everything into the 'geo' folder. Specify `version=`, `alignment=` and `spec=` to customise. Remember to `make clean-geo` when the files have been upload.
 geo/md5.txt:
@@ -295,11 +298,10 @@ $(log_dir) $(dir $(my_metadata)) data $(RESULTS_DIR)/$(VERSION) $(RESULTS_DIR) $
 	mkdir -p $@
 
 
-rocker.Renviron: 
+Renviron.site: 
 	echo "RENV_PATHS_PREFIX=$(RENV_PATHS_PREFIX)" > $@
 	echo "RENV_PATHS_ROOT=$(RENV_PATHS_ROOT)" >> $@
 	echo "RENV_PATHS_LIBRARY=renv/library" >> $@
-#	echo "RENV_CONFIG_PAK_ENABLED=TRUE" >> $@
 	$(GIT) add $@
 
 R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses)
@@ -313,7 +315,7 @@ R-$(RVERSION): $(CONTAINER_IMAGE)
 	$(call git-ignore,$@)
 
 .PHONY: R
-R: rocker.Renviron
+R: Renviron.site
 	$(CONTAINER) $(CONTAINER_FLAGS_INTERACTIVE) $(CONTAINER_IMAGE) R
 
 .PHONY: rstudio rstudio-slurm

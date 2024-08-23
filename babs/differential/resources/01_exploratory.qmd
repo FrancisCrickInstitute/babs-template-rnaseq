@@ -51,6 +51,7 @@ library(IHW)
 source("R/plot.r", local = knitr::knit_global())
 source("R/markdown.r", local = knitr::knit_global())
 source("R/rnaseq.r", local = knitr::knit_global())
+source("R/partial.r", local = knitr::knit_global())
 source("R/helpers.r", local = knitr::knit_global())
 source("R/output.r", local = knitr::knit_global())
 
