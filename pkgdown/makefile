@@ -63,7 +63,7 @@ publish:
 	git push origin gh-pages
 	mv ../docs .
 	git switch -
-	git stash pop
+	git stash pop || true
 
 
 ################################################################
