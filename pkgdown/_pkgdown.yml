@@ -1,3 +1,6 @@
+template:
+  bootstrap: 5
+  bootswatch: cosmo
 reference:
 - title: Utilities
 - subtitle: "Partial Residuals"
