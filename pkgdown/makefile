@@ -14,7 +14,16 @@ ifeq ($(SUBMIT),false)
 site: renv.lock## Create pkgdown site in ./docs
 	rm -rf R
 	cp -lr ../babs/differential/R .
+	sed  -i 's/^Version:.*/Version: $(patsubst v%,%,$(VERSION))/' DESCRIPTION
 	$(R) -e 'roxygen2::roxygenise(); pkgdown::build_site()'
+
+gh-pages: site
+	git switch gh-pages
+	mv docs ../
+	git add docs
+	git commit -m "Updating docs to those of $(VERSION)"
+	git push origin gh-pages
+	git switch -
 
 renv.lock: 
 	  $(R) -e 'library(renv); init(); renv::install(c("roxygen2", "pkgdown")); renv::snapshot(type="all")'
