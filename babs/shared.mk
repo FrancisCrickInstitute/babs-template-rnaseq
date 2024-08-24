@@ -212,6 +212,41 @@ log=2>&1 | tee $2 $(log_dir)/$1.log
 #log=>$(subst -a,>)$(log_dir)/$1.log 2>&1
 # as above, but suppress stdout
 
+################################################################
+## R IDE
+################################################################
+Renviron.site: 
+	echo "RENV_PATHS_PREFIX=$(RENV_PATHS_PREFIX)" > $@
+	echo "RENV_PATHS_ROOT=$(RENV_PATHS_ROOT)" >> $@
+	echo "RENV_PATHS_LIBRARY=renv/library" >> $@
+
+R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses)
+R-$(RVERSION): $(CONTAINER_IMAGE)
+	echo "#!/bin/bash" > $@
+	echo 'function R { $(CONTAINER) $(CONTAINER_FLAGS_INTERACTIVE) $(CONTAINER_IMAGE) R' \$$@  " ; }" >> $@
+	echo 'function Rscript { $(CONTAINER) $(CONTAINER_FLAGS_INTERACTIVE) $(CONTAINER_IMAGE) Rscript' \$$@  " ; }" >> $@
+	echo 'function conshell { $(CONTAINER_SHELL) ; }' >> $@
+	echo "[[ "'$$BASH_SOURCE'" == "'$$0'" ]] && R " \$$@ >> $@
+	setfacl -m u::rwx $@
+
+.PHONY: R
+R: Renviron.site
+	$(CONTAINER) $(CONTAINER_FLAGS_INTERACTIVE) $(CONTAINER_IMAGE) R
+
+.PHONY: rstudio rstudio-slurm
+rstudio-slurm: ## Start RStudio on a node for this project. Can use variables SLURM--*, where *=(partition|cpus-per-task/time/mem). Look for an 'rstudio-server.log' file to appear, with instructions.
+	res=$$(sbatch  \
+--partition=$(SLURM--partition) \
+--cpus-per-task=$(SLURM--cpus-per-task) \
+--time='$(SLURM--time)' \
+--mem=$(SLURM--mem) \
+$(source_dir)/shell/rstudio-rocker.sh $(CONTAINER_IMAGE) ${SINGULARITY_VERSION} $$(hostname)) ;\
+	echo $$res "- please wait until job is allocated for futher instructions (./rstudio-server.log will appear)"
+
+rstudio: ## Start RStudio on this machine for this project.
+	. ./$(source_dir)/shell/rstudio-rocker.sh $(CONTAINER_IMAGE) ${SINGULARITY_VERSION}
+
+
 
 ################################################################
 ## Standard Goals
@@ -222,10 +257,13 @@ log=2>&1 | tee $2 $(log_dir)/$1.log
 # Originally, secret.mk should come from the babs directory.  If
 # it's still there, make sure it's up-to-date and then copy it
 # here. If a secret.mk file can't be found anywhere, create a dummy
-# one out of a template.
+# one out of a template. path_to_secret can be set in the including
+# makefile in situations where that makefile isn't in a direct child
+# folder of the babs directory, but by default that variable will be
+# empty which works for the expected situation.
 
 
-secret.mk: $(firstword $(wildcard ../secret.mk ../babs/secret.mk) .not-secret.mk) $(wildcard ../.babs)
+secret.mk: $(firstword $(wildcard ../$(path_to_secret)secret.mk) .not-secret.mk) $(wildcard ../.babs)
 	@if [ -f "$<" ]; then \
 	  sed  's/=.*/=/; /## BABS/,$$d' $< > .not-secret.mk ;\
 	  cp $< $@ ;\
@@ -237,7 +275,7 @@ secret.mk: $(firstword $(wildcard ../secret.mk ../babs/secret.mk) .not-secret.mk
 	  echo "Unable to find a 'secret.mk' file" ;\
 	  exit ;\
 	fi
-	if [ "$<" = ".not-secret.mk" ]; then \
+	@if [ "$<" = ".not-secret.mk" ]; then \
 	    echo "Created a blank 'secret.mk' file - please customise it so that the pipeline will run on your system" ;\
 	    exit ;\
 	fi

@@ -1,5 +1,8 @@
 .PHONY: makefile
+#Custom settings so that shared.mk thinks that this folder is a subdirectory of '../babs'
 staging_dir=.
+path_to_secret=babs/
+source_dir=../babs/differential/resources
 include ../babs/shared.mk
 
 .PHONY: site
@@ -8,13 +11,13 @@ ifeq ($(SUBMIT),false)
     ifeq ($(CONTAINERED),false)
 ##    To be executed directly - no need for (further) wrapping in queue/container functionality
 
-site:  renv.lock## Create pkgdown site in ./docs
+site: renv.lock## Create pkgdown site in ./docs
 	rm -rf R
 	cp -lr ../babs/differential/R .
 	$(R) -e 'roxygen2::roxygenise(); pkgdown::build_site()'
 
 renv.lock: 
-	  $(R) -e 'library(renv); init(); renv::install(c("roxygen2", "pkgdown"))'
+	  $(R) -e 'library(renv); init(); renv::install(c("roxygen2", "pkgdown")); renv::snapshot(type="all")'
     else
 ##   To be executed by container without slurm, so put what 'make' would normally execute in a temporary
 ##   shell script, and get container to call that script (so it naturally inherits all the command line
@@ -44,38 +47,6 @@ endif
 ################################################################
 #### Helper goals
 ################################################################
-
-Renviron.site: 
-	echo "RENV_PATHS_PREFIX=$(RENV_PATHS_PREFIX)" > $@
-	echo "RENV_PATHS_ROOT=$(RENV_PATHS_ROOT)" >> $@
-	echo "RENV_PATHS_LIBRARY=renv/library" >> $@
-
-R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses)
-R-$(RVERSION): $(CONTAINER_IMAGE)
-	echo "#!/bin/bash" > $@
-	echo 'function R { $(CONTAINER) $(CONTAINER_FLAGS_INTERACTIVE) $(CONTAINER_IMAGE) R' \$$@  " ; }" >> $@
-	echo 'function Rscript { $(CONTAINER) $(CONTAINER_FLAGS_INTERACTIVE) $(CONTAINER_IMAGE) Rscript' \$$@  " ; }" >> $@
-	echo 'function conshell { $(CONTAINER_SHELL) ; }' >> $@
-	echo "[[ "'$$BASH_SOURCE'" == "'$$0'" ]] && R " \$$@ >> $@
-	setfacl -m u::rwx $@
-
-
-.PHONY: R
-R: Renviron.site
-	$(CONTAINER) $(CONTAINER_FLAGS_INTERACTIVE) $(CONTAINER_IMAGE) R
-
-.PHONY: rstudio rstudio-slurm
-rstudio-slurm: ## Start RStudio on a node for this project. Can use variables SLURM--*, where *=(partition|cpus-per-task/time/mem). Look for an 'rstudio-server.log' file to appear, with instructions.
-	res=$$(sbatch  \
---partition=$(SLURM--partition) \
---cpus-per-task=$(SLURM--cpus-per-task) \
---time='$(SLURM--time)' \
---mem=$(SLURM--mem) \
-$(source_dir)/shell/rstudio-rocker.sh $(CONTAINER_IMAGE) ${SINGULARITY_VERSION} $$(hostname)) ;\
-	echo $$res "- please wait until job is allocated for futher instructions (./rstudio-server.log will appear)"
-
-rstudio: ## Start RStudio on this machine for this project.
-	. ./$(source_dir)/shell/rstudio-rocker.sh $(CONTAINER_IMAGE) ${SINGULARITY_VERSION}
 
 
 clean: ## Remove the staging folder and the log directory - these should never contain anything of lasting interest that can't be recreated
