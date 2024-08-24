@@ -5,6 +5,8 @@ Authors@R:
     person("Gavin", "Kelly", , "gavin.kelly@crick.ac.uk", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0001-7219-560X"))
 Description: The helper functions for running a standard bulk RNASeq analysis.
+URL: https://github.com/FrancisCrickInstitute/babs-template-rnaseq
+BugReports: https://github.com/FrancisCrickInstitute/babs-template-rnaseq/issues
 License: CC BY NC 4.0
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)

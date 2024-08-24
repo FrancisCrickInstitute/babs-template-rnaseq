@@ -73,7 +73,7 @@ qmds=$(strip $(foreach section,$(sections),$($(section)_qmds)))
 html_reports=$(strip $(foreach section,$(sections),$($(section)_htmls)))
 
 ifeq ($(SUBMIT),false)
-    ifeq ($(CONTAINERED),false)
+    ifeq ($(CONTAIN),false)
 ##     To be executed directly - no further submission or containerisation wrapping needed
 .PHONY: run pages scripts
 

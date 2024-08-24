@@ -10,12 +10,16 @@ include ../babs/shared.mk
 wrapped-targets=site renv.lock
 
 ifeq ($(SUBMIT),false)
-    ifeq ($(CONTAINERED),false)
+    ifeq ($(CONTAIN),false)
 ##    To be executed directly - no need for (further) wrapping in queue/container functionality
 
 site: renv.lock## Create pkgdown site in ./docs
 	rm -rf R
 	cp -lr ../babs/differential/R .
+	mkdir -p pkgdown/assets/airways
+	if [ -d ../test/babs/differential/results/latest ]; then \
+	  rm -rf pkgdown/assets/airways && cp -Lr ../test/babs/differential/results/latest pkgdown/assets/airways ;\
+	fi
 	sed  -i 's/^Version:.*/Version: $(patsubst v%,%,$(VERSION))/' DESCRIPTION
 	rm -rf docs
 	$(R) -e 'roxygen2::roxygenise(); pkgdown::build_site()'
@@ -49,7 +53,7 @@ $(wrapped-targets): $(optionalRenviron)
 
 endif
 
-gh-pages: site
+publish:
 	git stash
 	git switch gh-pages || git switch --orphan gh-pages
 	rm -rf ../docs

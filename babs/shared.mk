@@ -120,7 +120,7 @@ include secret.mk
 ## `make target EXECUTOR=shell|singularity|docker`
 ## 'shell' will run using the prevailing system executables.
 ################################################################
-CONTAINERED=false#An internal flag
+CONTAIN=false#An internal flag
 BIND_DIR = $(shell $(GIT) rev-parse --show-toplevel || echo $(CURDIR))
 
 ifeq ($(EXECUTOR),singularity)
@@ -134,7 +134,7 @@ CONTAINER_SHELL = $(CONTAINER) $(patsubst exec,shell,$(CONTAINER_FLAGS_INTERACTI
 $(CONTAINER_IMAGE): 
 	cd $(dir $(CONTAINER_IMAGE)) ;\
 	$(CONTAINER) pull docker://$(IMAGE):$(IMAGE_TAG)
-CONTAINERED=true
+CONTAIN=true
 
 else ifeq ($(EXECUTOR),docker)
 CONTAINER=docker
@@ -147,7 +147,7 @@ CONTAINER_FLAGS=run \
 	mkdir -p $(dir $(CONTAINER_IMAGE))
 	touch $(CONTAINER_IMAGE)
 CONTAINER_SHELL = $(CONTAINER) $(patsubst run,exec -it,$(CONTAINER_FLAGS_INTERACTIVE)) $(CONTAINER_IMAGE) /bin/bash
-CONTAINERED=true
+CONTAIN=true
 $(CONTAINER_IMAGE): 
 	$(CONTAINER) pull docker://$(IMAGE):$(IMAGE_TAG)
 	echo "Proxy for docker image" > $@
@@ -162,7 +162,7 @@ else
   $(error "# Don't recognise '$(EXECUTOR)' as an executor")
 endif
 
-ifeq ($(CONTAINERED),true)
+ifeq ($(CONTAIN),true)
 Renviron.site: | $(CONTAINER_IMAGE)
 optionalRenviron=Renviron.site
 containerPrefix=$(CONTAINER) $(CONTAINER_FLAGS) $(CONTAINER_IMAGE)

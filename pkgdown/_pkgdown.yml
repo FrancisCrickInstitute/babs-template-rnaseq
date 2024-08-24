@@ -1,6 +1,14 @@
 template:
   bootstrap: 5
   bootswatch: cosmo
+navbar:
+  structure:
+    left:  [intro, reference, articles, demo, tutorials, news]
+    right: [search, github]
+  components:
+    demo:
+      text: "Demo"
+      href: /airways/index.html
 reference:
 - title: Utilities
 - subtitle: "Partial Residuals"
@@ -15,3 +23,7 @@ reference:
   contents:
   - -has_concept("partial")
   
+home:
+  links:
+  - text: Demo Results
+    href: /airways/index.html
