@@ -1,0 +1,11 @@
+[
+  {
+    "listing": "/index.html",
+    "items": [
+      "/00_init_GRCh38_v9.9.9-2-gf95e069_altered.html",
+      "/01_exploratory_analyse_GRCh38_v9.9.9-2-gf95e069_altered.html",
+      "/02_differential_analyse_GRCh38_v9.9.9-2-gf95e069_altered.html",
+      "/03_enrichment_analyse_GRCh38_v9.9.9-2-gf95e069_altered.html"
+    ]
+  }
+]
