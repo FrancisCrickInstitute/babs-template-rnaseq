@@ -35,7 +35,7 @@ home:
 repo:
   url:
     home: https://github.com/FrancisCrickInstitute/babs-template-rnaseq
-    source: https://github.com/FrancisCrickInstitute/babs-template-rnaseq/blob/master/
+    source: https://github.com/FrancisCrickInstitute/babs-template-rnaseq/blob/master/babs/differential/
     issue: https://github.com/FrancisCrickInstitute/babs-template-rnaseq/issues/
     user: https://github.com/BABS-STP
     

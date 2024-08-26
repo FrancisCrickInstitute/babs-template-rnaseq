@@ -21,6 +21,7 @@ site: renv.lock## Create pkgdown site in ./docs
 	  rm -rf pkgdown/assets/test && cp -Lr ../test/babs/differential/results/latest pkgdown/assets/test ;\
 	fi
 	sed  -i 's/^Version:.*/Version: $(patsubst v%,%,$(VERSION))/' DESCRIPTION
+	sed -i 's,/blob/[^/]*/babs/,/blob/$(shell git rev-parse --abbrev-ref HEAD)/babs/,' _pkgdown.yml
 	rm -rf docs
 	$(R) -e 'roxygen2::roxygenise(); pkgdown::build_site()'
 
