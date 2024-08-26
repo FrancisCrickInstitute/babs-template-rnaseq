@@ -16,9 +16,9 @@ ifeq ($(SUBMIT),false)
 site: renv.lock## Create pkgdown site in ./docs
 	rm -rf R
 	cp -lr ../babs/differential/R .
-	mkdir -p pkgdown/assets/airways
+	mkdir -p pkgdown/assets/test
 	if [ -d ../test/babs/differential/results/latest ]; then \
-	  rm -rf pkgdown/assets/airways && cp -Lr ../test/babs/differential/results/latest pkgdown/assets/airways ;\
+	  rm -rf pkgdown/assets/test && cp -Lr ../test/babs/differential/results/latest pkgdown/assets/test ;\
 	fi
 	sed  -i 's/^Version:.*/Version: $(patsubst v%,%,$(VERSION))/' DESCRIPTION
 	rm -rf docs
@@ -73,5 +73,6 @@ publish:
 
 clean: ## Remove the staging folder and the log directory - these should never contain anything of lasting interest that can't be recreated
 	rm -rf R docs man NAMESPACE Renviron.site secret.mk
+
 
 MAKEFLAGS += --no-builtin-rules

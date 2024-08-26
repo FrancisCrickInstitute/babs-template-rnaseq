@@ -1,0 +1,11 @@
+---
+title: The Pipeline
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{The RNASeq Pipeline structure}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+author: Gavin Kelly
+---
+
+## Some Stuff
