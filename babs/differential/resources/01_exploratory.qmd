@@ -554,7 +554,7 @@ for (dname_i in seq_along(ddsList)) {
     percentVar <- metadata(colData(this_dds)$.PCA)$percentVar
     done_aes <- c()
     for (qc_fml in qc_formulae) {
-      lhs <- set_diff(get_lhs(qc_fml), done_aes)
+      lhs <- setdiff(get_lhs(qc_fml), done_aes)
       for (aes_by in lhs) {
         ## For PCA plots, we do an unregressed PCA coloured by the first
         ## part of each aes, and optionally shaped by the second part.
@@ -610,7 +610,7 @@ for (dname_i in seq_along(ddsList)) {
             extra <- NULL
           }
           my_pc <- prcomp(
-            assemble_partialised(partials, qc_fml, extra=extra), 
+            t(assemble_partialised(partials, qc_fml, extra=extra)), 
             scale = FALSE)
           my_percent <- round(100 * my_pc$sdev^2/sum(my_pc$sdev^2))
           pc.df <- data.frame(
@@ -656,8 +656,13 @@ for (dname_i in seq_along(ddsList)) {
     fitFrame <- colDat
     yvar <- make.unique(c(colnames(fitFrame), "y", sep = ""))[ncol(fitFrame) + 1]
     for (formula_ind in seq_along(qc_formulae)) {
-      fml <- update(qc_formulae[[formula_ind]], 
-                   paste(yvar, "~ ."))
+      if (qc_formulae[[formula_ind]][[3]]==0) {
+        fml <- update(design, 
+                     paste(yvar, "~ ."))
+      } else {
+        fml <- update(qc_formulae[[formula_ind]], 
+                     paste(yvar, "~ ."))
+      }
       plotFrame <- expand.grid(
         Covariate = attr(terms(fml), "term.labels"),
         PC = 1:ncol(pc))

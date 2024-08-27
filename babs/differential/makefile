@@ -165,7 +165,7 @@ resources/_dependencies.R: $(patsubst %,%.config,$(alignments))
 ##   shell script, and get container to call that script (so it naturally inherits all the command line
 ##   arguments etc)
 run  pages $(html_reports) scripts $(qmds) $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd  $(staging_dir)/R.bib renv.lock: $(optionalRenviron)
-	make -n -s $@ SUBMIT=false EXECUTOR=make > $(TMPSCRIPT)_bash 
+	make -n -s --no-print-directory $@ SUBMIT=false EXECUTOR=make > $(TMPSCRIPT)_bash 
 	$(CONTAINER) $(CONTAINER_FLAGS) $(CONTAINER_IMAGE) bash "$(TMPSCRIPT)_bash" || { echo "$(TMPSCRIPT)_bash failed." $(call log,container) ; exit 1; }
 	rm -f $(TMPSCRIPT)_bash
     endif
@@ -176,7 +176,7 @@ else
 
 run pages $(html_reports) scripts $(qmds) $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(staging_dir)/R.bib renv.lock: $(optionalRenviron)
 	echo "$$slurm" > $(TMPSCRIPT)_slurm
-	make -n -s $@ SUBMIT=false EXECUTOR=make > $(TMPSCRIPT)_slurm.sh
+	make -n -s --no-print-directory $@ SUBMIT=false EXECUTOR=make > $(TMPSCRIPT)_slurm.sh
 	echo "$(containerPrefix) $(TMPSCRIPT)_slurm.sh" >> $(TMPSCRIPT)_slurm
 	echo 'r=$$?' >>  $(TMPSCRIPT)_slurm
 	echo '$(notification)' >> $(TMPSCRIPT)_slurm

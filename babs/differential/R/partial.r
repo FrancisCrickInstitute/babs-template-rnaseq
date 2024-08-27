@@ -43,7 +43,7 @@ partialise.matrix <- function(obj, cdata, fml) {
     out[,i,] <- pred
     const[i] <- attr(pred, "constant")
   }
-  ret <- list(terms=out, const=const, resid=fit$residuals, data=list(obj=mat, cdata=cdata, fml=fml))
+  ret <- list(terms=out, const=const, resid=fit$residuals, data=list(mat=obj, cdata=cdata, fml=fml))
   class(ret) <- "partialised"
   ret
 }
@@ -59,7 +59,7 @@ partialise.DESeqDataSet <- function(obj, assay="vst") {
     mat <-assay(vst(obj, nsub=min(1000, nrow(obj))))
   }
   partialise.matrix(
-    mat=mat,
+    obj=mat,
     cdata=as.data.frame(colData(obj)),
     fml=design(obj)
   )
