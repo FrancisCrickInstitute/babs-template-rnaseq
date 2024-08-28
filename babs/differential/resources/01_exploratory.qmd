@@ -56,7 +56,7 @@ source("R/helpers.r", local = knitr::knit_global())
 source("R/output.r", local = knitr::knit_global())
 
 fig_caption <- captioner()
-fig_label <- counter()
+do_plot <- plot_tracker(fig_caption)
 set.seed(1)
 
 
@@ -233,6 +233,9 @@ save(ddsList,
 ```
 
 
+
+# Datasets and Models
+
 We may examine the samples in different combinations, and leave out
 certain samples.  In the above table, the columns under the 'In
 Subset' group indicate these combinations are listed, and the
@@ -241,38 +244,22 @@ samples' inclusions are indicated.
 Each of those combinations may be analysed in
 potentially several ways, as formulated here:
 
-# Models
-
 ```{r}
 #| label: formulae
 
 for (dataset in names(ddsList)) {
+  dmc_heading(ddsList, dataset=dataset, model=NULL, depth="##")
   met <- metadata(ddsList[[dataset]])
-  cat("\n\n##", met$dmc$dataset_name %||% met$dmc$dataset,"\n\n")
-  if (!is.null(met$dmc$dataset_description)) {
-    cat(met$dmc$dataset_description, "\n\n")
-  }
   mdls <- lapply(met$models, function(x) x$design)
   mdls <- mdls[sapply(met$models, function(x) "comparisons" %in% names(x))]
   for (mdl in names(mdls)) {
-    if (is.null(met$models[[mdl]]$name))  {
-      cat("\n\n### ",  mdl,  "{.unnumbered}\n\n", sep="")
-    } else { 
-      cat("\n\n### ", mdl, " - ", met$models[[mdl]]$name,  "{.unnumbered}\n\n", sep="")
-    }
-    if ("description" %in% names(met$models[[mdl]])) {
-      cat(met$models[[mdl]]$description, "\n\n")
-    }
+    dmc_heading(ddsList, dataset=dataset, model=mdl, depth="###", numbered=FALSE)
     cat("`",
         Reduce(paste, sub("~", "Expression ~ ", deparse(mdls[[mdl]]))),
         "`\n\n"
         )
   }
 }
-
-
-
-
 
 ```
 
@@ -401,21 +388,20 @@ for (dname_i in seq_along(ddsList)) {
   dname <- metadata(this_dds)$dmc$dataset_name %||% names(ddsList)[dname_i]
   # Only produce visualisations for models with a qc formula
   # (if none supplied in the spec file, the first model will get one corresponding to its design formula)
+  dmc_heading(ddsList, dataset=dataset, model=NULL, depth="#")
   mdls <- sapply(metadata(this_dds)$models, function(mdl) "qc_formulae" %in% names(mdl))
   for (mname in names(mdls[mdls])) {
     qc_formulae <- metadata(this_dds)$models[[mname]]$qc_formulae
     design <- metadata(this_dds)$models[[mname]]$design
-    if (sum(mdls)==1) {
-      cat("\n\n# ", dname, "\n\n", sep = "")
-    } else {
-      cat("\n\n# ", dname, " - ", mname, "\n\n", sep = "")
+    if (sum(mdls)>1) {
+      dmc_heading(ddsList, dataset=dataset, model=mname, depth="##")
     }
     var_stab <- assay(this_dds, "vst")
     top <- order(apply(var_stab, 1, sd), decreasing = TRUE)[1:min(nrow(var_stab),param$get("top_n_variable"))]
     nice_legends <- separate_legend(ddsList[[dname_i]])
     pl <- do.call(gridExtra::arrangeGrob, c(nice_legends, ncol=ceiling(sqrt(length(nice_legends)))))
     do_plot(pl,
-            label= fig_label(paste0("01-legend-a-", dname_i)),
+            label= paste0("01-legend-a-", dname_i),
             caption=paste("Metadata colour-codings for",
                           metadata(ddsList[[dname_i]])$dmc$dataset_name %||% metadata(ddsList[[dname_i]])$dmc$dataset
                           ))
@@ -437,7 +423,7 @@ for (dname_i in seq_along(ddsList)) {
         show_legend=FALSE), 
       show_row_names = FALSE, show_column_names = TRUE)
     do_plot(pl,
-            label= fig_label("01-Heatmap"),
+            label= "01-Heatmap",
             caption=paste("Heatmap of variable genes,", dname),
             preview=first)
     first <- FALSE
@@ -457,7 +443,7 @@ for (dname_i in seq_along(ddsList)) {
         show_legend=FALSE),
       show_row_names = FALSE, show_column_names = TRUE)
     do_plot(pl,
-            label= fig_label("01-SuperV-Heatmap"),
+            label= "01-SuperV-Heatmap",
             caption=paste("Supervised Heatmap of variable genes,", dname))
     cat("\n\n---\n\n")
     
@@ -483,7 +469,7 @@ for (dname_i in seq_along(ddsList)) {
         col = metadata(colData(this_dds))$palette$Heatmap[vars],
         show_legend=FALSE))
     do_plot(pl,
-            label= fig_label("01-sampDist"),
+            label= "01-sampDist",
             caption=paste("Heatmap of sample distances,", dname))
     cat("\n\n---\n\n")
 
@@ -536,7 +522,7 @@ for (dname_i in seq_along(ddsList)) {
               show_legend=FALSE), 
             show_row_names = FALSE, show_column_names = TRUE)
           do_plot(pl,
-                  label= fig_label("01-Heatmap-correct"),
+                  label= "01-Heatmap-correct",
                   caption=my_caption
                   )
           cat("\n\n---\n\n")
@@ -584,7 +570,7 @@ for (dname_i in seq_along(ddsList)) {
           pl <- pl + geom_text_repel(aes(label = sample))
         }
         do_plot(pl,
-                label=fig_label("01_color"),
+                label="01_color",
                 caption=paste("Annotated by ", aes_by, "in", dname)
                 )
         cat("\n\n---\n\n")
@@ -641,7 +627,7 @@ for (dname_i in seq_along(ddsList)) {
             sep=", ", collapse=", ")          
           if (length(removed)==0 || removed=="") removed <- "nothing"
           do_plot(pl,
-                  label=fig_label("01-focus"),
+                  label="01-focus",
                   caption=paste("Annotated by", aes_by, "in", dname, "having removed", removed)
                   )
           cat("\n\n---\n\n")
@@ -693,7 +679,7 @@ for (dname_i in seq_along(ddsList)) {
         theme_bw() + 
         theme(aspect.ratio = length(unique(plotFrame$Covariate))/min(20, npc))
       do_plot(pl,
-              label=fig_label("01-covar"),
+              label="01-covar",
               caption=paste("Covariate association in", dname)
               )
       
@@ -773,7 +759,7 @@ for (dname_i in seq_along(ddsList)) {
           pl <- pl + geom_text_repel(aes(label = sample))
         }
         do_plot(pl,
-                label= fig_label("01-covariate"),
+                label= "01-covariate",
                 caption=paste("Against ", covar, "in", dname)
                 )
         cat("\n\n---\n\n")

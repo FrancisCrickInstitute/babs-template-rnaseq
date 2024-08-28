@@ -125,7 +125,62 @@ height=height_opt
     fn()
   }
 }
-      
+
+
+plot_tracker <- function(cap_fn) {
+  labels <- list()
+  function(pl, label, caption, height_mult=NA, min_height=0, max_height=Inf, preview=FALSE) {
+    if (label %in% names(labels)) {
+      labels[[label]] <<- labels[[label]] + 1
+    } else {
+      labels[[label]] <<- 1
+    }
+  if ("Heatmap" %in% class(pl)) {
+    fn <- function() {
+      draw(pl, heatmap_legend_side = "top")
+      cap_fn(caption)
+    }
+  } else if ("gtable" %in% class(pl)){
+    fn <- function() {
+      grid.draw(pl)
+      cap_fn(caption)
+    }
+  } else {
+    fn <- function() {
+      print(pl)
+      cap_fn(caption)
+    }
+  }
+  if (isTRUE(getOption('knitr.in.progress'))) {
+    height_opt <- ""
+    if (!is.na(height_mult)) {
+      height_opt <- paste0("#| fig.height: ", max(min(knitr::opts_chunk$get("fig.height") * height_mult,max_height), min_height))
+    }
+    fig_child <- knitr::knit_expand(
+      text=r"(```{r}
+#| label: fig-{{lbl}}
+{{height}}
+fn()
+```)",
+lbl=gsub("[^[:alnum:]]+", "-", paste0(label, "-", labels[[label]])),
+height=height_opt
+)
+    out <- knitr::knit_child(
+      text=fig_child,
+      quiet=TRUE,
+      envir=environment())
+    if (preview) {
+      cat(sub("(.*)(}.*)", "\\1 .preview-image\\2", out))
+    } else {
+      cat(out)
+    }
+    
+  } else {
+    fn()
+  }
+}}
+
+
 
 residual_heatmap_transform <- function(mat, cdata, fml) {
   assign("tmat", t(mat), envir=environment(fml))

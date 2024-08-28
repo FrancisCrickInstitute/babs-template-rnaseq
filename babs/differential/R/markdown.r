@@ -92,3 +92,65 @@ load_params <- function(prefix) {
     script_params <- knitr::knit_params(readLines(paste0(prefix,".qmd"))) %>%
       {setNames(lapply(., "[[", "value"), sapply(., "[[", "name"))}
   }
+
+##' Produce quarto headings corresponding to the data/model hierarchy
+##'
+##' Create markdown headings at a given level for either a dataset or
+##' a model. Use the short name, long name, and description as appropriate.
+##' @param obj Either a list of DESeqDataSet objects, or a Data/Model/Comparison hierarchy
+##' @param dataset The name of the dataset to use.
+##' @param model If the model is to be used to generate the heading info, give the name.
+##' @param depth A string denoting the markdown heading prefix
+##' @param numbered Do the headings need to be numbered
+##' @param describe Print the description text as the first paragraph of the section?
+##' @return A markdown string
+##' @author Gavin Kelly
+dmc_heading <- function(obj, dataset=1, model=NULL, depth="##", numbered=TRUE, describe=TRUE) {
+  heading <- paste0("\n\n", depth)
+  text <- ""
+  is_dmc <- is.list(obj[[dataset]])
+  if (is.null(model)) {
+    ## Doing a dataset
+    if (is_dmc) {
+      met <- metadata(obj[[dataset]][[1]][[1]])$dmc
+    } else { 
+      met <- metadata(obj[[dataset]])$dmc
+    }
+    heading <- c(heading, "Dataset", met$dataset)
+    if (!is.null(met$dataset_name)) {
+      heading <- c(heading, "-", met$dataset_name)
+    }
+    if (!is.null(met$dataset_description)) {
+      text <- paste0(met$dataset_description, "\n\n")
+    }
+  } else {
+    ## Doing a model
+    heading <- c(heading, "Model")
+    if (is_dmc) {
+      met <- metadata(obj[[dataset]][[model]][[1]])$dmc
+      heading <- c(heading, met$model)
+      if (!is.null(met$model_name)) {
+        heading <- c(heading, "-", met$model_name)
+      }
+      if (!is.null(met$model_description)) {
+        text <- paste0(met$model_description, "\n\n")
+      }
+    }
+    else {
+      heading <- c(heading, model)
+      met <- metadata(obj[[dataset]])$models[[model]]
+      if (!is.null(met$name)) {
+        heading <- c(heading, "-", met$name)
+      }
+      if (!is.null(met$description)) {
+        text <- paste0(met$description, "\n\n")
+      }
+    }
+  }
+  heading <- paste(heading, collapse=" ")
+  if (!numbered) {
+    heading <- paste0(heading, "{.unnumbered}")
+  }
+  if (!describe) text=""
+  cat(paste(heading, "\n\n", text))
+}
