@@ -56,7 +56,7 @@ source("R/output.r", local = knitr::knit_global())
 source("R/helpers.r", local = knitr::knit_global())
 
 fig_caption <- captioner()
-fig_label <- counter()
+do_plot <- plot_tracker(fig_caption)
 tbl_label <- counter()
 set.seed(1)
 
@@ -108,28 +108,28 @@ param$set("spec",  params$spec, "Using analysis plan '{}'.", postpone=TRUE)
 param$set("alignment", params$alignment, "Using alignment settings '{}'")
   
 ```
-# Models
+
+# Datasets and Models
+
+As in the exploratory analysis, we may examine the samples in different combinations, and leave out
+certain samples.  In the above table, the columns under the 'In
+Subset' group indicate these combinations are listed, and the
+samples' inclusions are indicated.
+
+Each of those combinations may be analysed in
+potentially several ways, as formulated here:
+
 
 ```{r}
 #| label: formulae
 
 for (dataset in names(ddsList)) {
   met <- metadata(ddsList[[dataset]])
-  cat("\n\n##", met$dmc$dataset_name %||% met$dmc$dataset,"\n\n")
-  if (!is.null(met$dmc$dataset_description)) {
-    cat(met$dmc$dataset_description, "\n\n")
-  }
+  dmc_heading(ddsList, dataset=dataset, model=NULL, depth="##")
   mdls <- lapply(met$models, function(x) x$design)
   mdls <- mdls[sapply(met$models, function(x) "comparisons" %in% names(x))]
   for (mdl in names(mdls)) {
-    if (is.null(met$models[[mdl]]$name))  {
-      cat("\n\n### ",  mdl,  "{.unnumbered}\n\n", sep="")
-    } else { 
-      cat("\n\n### ", mdl, " - ", met$models[[mdl]]$name,  "{.unnumbered}\n\n", sep="")
-    }
-    if ("description" %in% names(met$models[[mdl]])) {
-      cat(met$models[[mdl]]$description, "\n\n")
-    }
+    dmc_heading(ddsList, dataset=dataset, model=mdl, depth="##")
     cat("`",
         Reduce(paste, sub("~", "Expression ~ ", deparse(mdls[[mdl]]))),
         "`\n\n"
@@ -137,11 +137,8 @@ for (dataset in names(ddsList)) {
   }
 }
 
-
-
-
-
 ```
+
 
 # Find differential genes
 
@@ -337,8 +334,8 @@ for (dataset in names(summaries)) {
       facet_wrap(~Comparison) +
       theme_bw()
     do_plot(pl,
-            label=fig_label("summary-p"),
-            caption=paste0("p-Diagnostic for", dataset, model)
+            label="summary-p",
+            caption=paste("p-Diagnostic for", dataset, model)
             )
     cat("\n\n---\n\n")
   }
@@ -367,17 +364,11 @@ are sub-tabs for different experimental designs, if any
 #| label: fig-differential-MA
 first <- TRUE
 for (dataset in names(dds_model_comp)) {
+  dmc_heading(dds_model_comp, dataset=dataset, model=NULL, depth="##")
   met <- metadata(dds_model_comp[[dataset]][[1]][[1]])$dmc
-  cat("\n\n## ", met$dataset_name %||% met$dataset,"\n\n")
-  if (!is.null(met$dataset_description)) {
-    cat(met$dataset_description, "\n\n")
-  }
   for (mdl in names(dds_model_comp[[dataset]])) {
     met <- metadata(dds_model_comp[[dataset]][[mdl]][[1]])$dmc
-    cat("\n\n### ", met$model_name %||% met$model, "\n\n", sep="") 
-    if (!is.null(met$model_description)) {
-      cat(met$model_description, "\n\n")
-    }
+    dmc_heading(dds_model_comp, dataset=dataset, model=mdl, depth="###")
     this_mdl <- dds_model_comp[[dataset]][[mdl]]
     for (comp_name in names(this_mdl)) {
       res <- as.data.frame(mcols(this_mdl[[comp_name]])$results)
@@ -417,7 +408,7 @@ for (dataset in names(dds_model_comp)) {
       ind <- order(res$shrunkLFC)[c(1:5, nrow(res)-(0:4))]
       pl <- pl+ggrepel::geom_text_repel(size=4, data=res[ind,])
       do_plot(pl,
-              label=fig_label("02-MA"),
+              label="02-MA",
               caption=paste0("MA plot of differential genes ", sub(".*\\t", "", comp_name)),
               preview=first
               )
@@ -443,25 +434,17 @@ from the QC heatmaps which were blind to the experimental design.
 param$set("clustering_distance_rows", postpone=TRUE)
 param$set("clustering_distance_columns")
 for (dataset in names(dds_model_comp)) {
-  met <- metadata(dds_model_comp[[dataset]][[1]][[1]])$dmc
-  cat("\n\n## ", met$dataset_name %||% met$dataset,"\n\n")
-  if (!is.null(met$dataset_description)) {
-    cat(met$dataset_description, "\n\n")
-  }
+  dmc_heading(dds_model_comp, dataset=dataset, model=NULL, depth="##")
   nice_legends <- separate_legend(ddsList[[dataset]])
   pl <- do.call(gridExtra::grid.arrange, c(nice_legends, ncol=ceiling(sqrt(length(nice_legends)))))
   do_plot(pl,
-          label= fig_label("02-legend-a"),
+          label= "02-legend-a",
           caption=paste("Metadata colour-codings for",
                         metadata(ddsList[[dataset]])$dmc$dataset_name %||% metadata(ddsList[[dataset]])$dmc$dataset
                         ))
   for (mdl_name in names(dds_model_comp[[dataset]])) {
+    dmc_heading(dds_model_comp, dataset=dataset, model=mdl_name, depth="###")
     this_mdl <- dds_model_comp[[dataset]][[mdl_name]]
-    met <- metadata(this_mdl[[1]])$dmc
-    cat("\n\n### ", met$model_name %||% met$model, "\n\n", sep="") 
-    if (!is.null(met$model_description)) {
-      cat(met$model_description, "\n\n")
-    }
     first_done <- FALSE
     for (comp_name in names(this_mdl)) {
       this_comp <- this_mdl[[comp_name]]
@@ -540,7 +523,7 @@ for (dataset in names(dds_model_comp)) {
         row_names_gp = gpar(fontsize = 6),
         show_row_names = nrow(tidied_data$mat)<100)
       do_plot(pl,
-              label=fig_label("02-Heatmap"),
+              label="02-Heatmap",
               caption=paste0("Heatmap on ", name, "-differential genes. White for ", baseline_str),
               height_mult=nrow(tidied_data$mat)/30,
               max_height=15, min_height=5)
@@ -563,7 +546,7 @@ for (dataset in names(dds_model_comp)) {
             row_names_gp = gpar(fontsize = 6),
             show_row_names = nrow(tidied_data$mat)<100)
           do_plot(pl,
-                  label=fig_label("02-focussed"),
+                  label="02-focussed",
                   caption=paste0("Heatmap on differential genes ", name, ", ", term_name, "-focussed")
                   )
           cat('\n\n---\n\n')

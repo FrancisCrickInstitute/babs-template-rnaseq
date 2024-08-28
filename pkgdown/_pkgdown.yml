@@ -21,12 +21,17 @@ reference:
     might otherwise be obscured to become apparent.
 - contents: 
   - has_concept("partial")
+- subtitle: Dataset/Model/Comparison helpers
+  desc: "Functions that help with handling either the three-layered list corresponding to 'spec' descriptions of comparisons, or a simple list of DESeqDataSet objects"
+- contents:
+    - ends_with("dmc")
+    - starts_with("dmc")
 - title: "Everything Else"
   desc: "Things yet to be categorised"
-  contents:
+- contents:
   - -has_concept("partial")
 - title: About the package
-  contents: BABS.RNASeq  
+- contents: BABS.RNASeq  
 home:
   links:
   - text: Demo Results
