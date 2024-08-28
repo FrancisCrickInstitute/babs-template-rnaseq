@@ -2,6 +2,6 @@ pandoc: 3.1.1
 pkgdown: 2.1.0
 pkgdown_sha: ~
 articles:
-  BABS.RNASeq: BABS.RNASeq.html
-  pipeline: pipeline.html
-last_built: 2024-08-26T13:29Z
+  BABS-RNASeq: BABS-RNASeq.html
+  pipeline-infrastructure: pipeline-infrastructure.html
+last_built: 2024-08-28T13:42Z

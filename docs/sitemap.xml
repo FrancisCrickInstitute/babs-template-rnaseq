@@ -5,9 +5,9 @@
 <url><loc>/airways/02_differential_analyse_GRCh38_v9.9.9-2-gf95e069_altered.html</loc></url>
 <url><loc>/airways/03_enrichment_analyse_GRCh38_v9.9.9-2-gf95e069_altered.html</loc></url>
 <url><loc>/airways/index.html</loc></url>
-<url><loc>/articles/BABS.RNASeq.html</loc></url>
+<url><loc>/articles/BABS-RNASeq.html</loc></url>
 <url><loc>/articles/index.html</loc></url>
-<url><loc>/articles/pipeline.html</loc></url>
+<url><loc>/articles/pipeline-infrastructure.html</loc></url>
 <url><loc>/authors.html</loc></url>
 <url><loc>/index.html</loc></url>
 <url><loc>/reference/BABS.RNASeq-package.html</loc></url>
@@ -19,6 +19,7 @@
 <url><loc>/reference/check_model.html</loc></url>
 <url><loc>/reference/df2colorspace.html</loc></url>
 <url><loc>/reference/dmc2df.html</loc></url>
+<url><loc>/reference/dmc_heading.html</loc></url>
 <url><loc>/reference/do_plot.html</loc></url>
 <url><loc>/reference/do_tbl.html</loc></url>
 <url><loc>/reference/dropped_terms.html</loc></url>
@@ -45,10 +46,10 @@
 <url><loc>/reference/write_all_results.html</loc></url>
 <url><loc>/reference/write_assay.html</loc></url>
 <url><loc>/reference/write_results.html</loc></url>
-<url><loc>/test/00_init_GRCh38_v9.9.9-2-gf95e069_altered.html</loc></url>
-<url><loc>/test/01_exploratory_analyse_GRCh38_v9.9.9-2-gf95e069_altered.html</loc></url>
-<url><loc>/test/02_differential_analyse_GRCh38_v9.9.9-2-gf95e069_altered.html</loc></url>
-<url><loc>/test/03_enrichment_analyse_GRCh38_v9.9.9-2-gf95e069_altered.html</loc></url>
+<url><loc>/test/00_init_GRCh38_v9.9.9-2-g2ccef6a_altered.html</loc></url>
+<url><loc>/test/01_exploratory_analyse_GRCh38_v9.9.9-2-g2ccef6a_altered.html</loc></url>
+<url><loc>/test/02_differential_analyse_GRCh38_v9.9.9-2-g2ccef6a_altered.html</loc></url>
+<url><loc>/test/03_enrichment_analyse_GRCh38_v9.9.9-2-g2ccef6a_altered.html</loc></url>
 <url><loc>/test/index.html</loc></url>
 </urlset>
 
