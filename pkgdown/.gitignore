@@ -1,0 +1,15 @@
+logs/
+man/
+R/
+docs/
+renv/
+pkgdown/
+Renviron.site
+renv.lock
+NAMESPACE
+*_bash
+makefile
+secret.mk
+.Rbuildignore
+.not-secret.mk
+
