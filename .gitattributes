@@ -1,6 +1,7 @@
-#/makefile export-ignore
 /airway export-ignore
 /site export-ignore
+/test export-ignore
+/pkgdown export-ignore
 /readme.md export-ignore
 /.gitattributes export-ignore
 /babs/.pipeline-version export-subst

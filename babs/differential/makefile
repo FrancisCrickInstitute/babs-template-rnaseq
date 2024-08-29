@@ -301,6 +301,6 @@ MAKEFLAGS += --no-builtin-rules
 ifneq ($(wildcard ../shared.mk),)
 shared.mk: ../shared.mk
 	@cp $< $@
-	$(or $(GIT),git) add pre.renv.lock project.mk R renv $(source_dir) .Rprofile .Rbuildignore
+	$(or $(GIT),git) add $(wildcard pre.renv.lock project.mk R renv $(source_dir) .Rprofile .Rbuildignore)
 endif
 
