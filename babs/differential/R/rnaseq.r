@@ -28,7 +28,7 @@ norm_within <- function(df, grp, denominator, numerator, adj=0.01) {
 
 
 load_specs <- function(file="", context) {
-  if (file.exists(file)) {
+  if (file.exists(file.path("extdata",file))) {
     e <- as.environment(as.data.frame(colData(context)))
     list_ok <- function(...) rlang::dots_list(..., .ignore_empty="all")
     parent.env(e) <- environment()
@@ -50,7 +50,7 @@ load_specs <- function(file="", context) {
            },
            envir=e
            )
-    specs <- source(file, local=e)$value
+    specs <- source(file.path("extdata",file), local=e)$value
     assign("sample_set", expression, envir=e) # avoid evaluating any examples sample_sets.
     pkg_defaults <-default_spec_settings()
     new_settings <- setdiff(names(pkg_defaults), names(specs$settings))

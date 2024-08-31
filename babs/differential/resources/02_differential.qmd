@@ -55,18 +55,21 @@ source("R/partial.r", local = knitr::knit_global())
 source("R/output.r", local = knitr::knit_global())
 source("R/helpers.r", local = knitr::knit_global())
 
-fig_caption <- captioner()
-do_plot <- plot_tracker(fig_caption)
 tbl_label <- counter()
 set.seed(1)
 
+if (!isTRUE(getOption('knitr.in.progress'))) {
+  params <- load_params(choose_staging("02_differential"))
+}
+
+do_plot <- plot_tracker(params)
 
 knitr::opts_chunk$set(
   warning=FALSE, error=TRUE, message=FALSE,
   dev=c("ragg_png","pdf"), out.width="100%",
   dev.args=list(ragg_png=list(scaling=1.5)),
-  fig.width=14, fig.height=10,
-  results='asis', fig.cap=expression(fig_caption())
+  fig.width=14, fig.height=10, fig.process=rename_with_tag(params),
+  results='asis'
 )
 
 
@@ -79,9 +82,7 @@ link2path <- function(lname) {  file.path(knitr::opts_knit$get("output.dir"),lna
 ```{r}
 #| label: tbl-load-diff2
 #| tbl-cap: Context
-if (!isTRUE(getOption('knitr.in.progress'))) {
-  params <- load_params(choose_staging("02_differential"))
-} else {
+if (isTRUE(getOption('knitr.in.progress'))) {
   gt(data.frame(Setting=names(params),
                 Value=unlist(params)))
 }
@@ -99,7 +100,7 @@ if (!is.null(metadata(dds)$organism$org)) {
 }
 
 
-specs   <- load_specs(file=paste0(params$spec, ".spec"), context=dds)
+specs <- load_specs(file=paste0(params$spec, ".spec"), context=dds)
 
 param <- ParamList$new(defaults=specs$settings)
 # Calling the setter without a value will pick up the default (from the spec), _and_ alert it in the markdown, and return the default
@@ -228,7 +229,7 @@ value `M`):  anything before the `|` symbol identifies the
 experimental conditions that are being contrasted, and the part after
 the `|` identifies any stratification/conditioning of the data.
 
-In @fig-summary-p-1 we present some diagnostic plots of the observed
+In @fig-summaryp-1 we present some diagnostic plots of the observed
 p-values. Theoretically we want the pink part of the plot to have a
 solid peak on the left, and then make a reasonable plateau across
 higher p-values: gross deviations from this can indicate an absence of
@@ -334,7 +335,7 @@ for (dataset in names(summaries)) {
       facet_wrap(~Comparison) +
       theme_bw()
     do_plot(pl,
-            label="summary-p",
+            label="summaryp",
             caption=paste("p-Diagnostic for", dataset, model)
             )
     cat("\n\n---\n\n")

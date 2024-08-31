@@ -2,9 +2,9 @@
 .PHONY: build clean maintainer-clean geo R-local
 
 diff_dir=.
-include shared.mk
-include module.mk
-include project.mk  ## Provides analysis parametrisation
+include resources/make/shared.mk
+include resources/make/module.mk
+include resources/make/project.mk  ## Provides analysis parametrisation
 
 ifeq (,$(filter $(excluded-targets),$(MAKECMDGOALS)))
 ifneq (,$(excluded-targets))
@@ -14,10 +14,10 @@ endif
 
 
 samplesheets = $(patsubst %,$(my_metadata)_%.csv,$(alignments))
-configs = $(patsubst %,%.config,$(alignments))
+configs = $(patsubst %,extdata/%.config,$(alignments))
 genes_results = $(patsubst %,$(my_counts_dir)/%,$(alignments))
 
-file.spec = $(patsubst %,%.spec,$(specfiles))
+file.spec = $(patsubst %,extdata/%.spec,$(specfiles))
 
 ## Create a makefile per section. It will set up target-specific
 ## variables to inform subsequent targets of the alignment, spec-file,
@@ -29,37 +29,37 @@ file.spec = $(patsubst %,%.spec,$(specfiles))
 
 mk0 = $(patsubst %,$(staging_dir)/.make-%,$(filter 00_%,$(sections)))
 mk = $(patsubst %,$(staging_dir)/.make-%,$(filter-out 00_%,$(sections)))
-qmd_path=$(staging_dir)/$*_$(ispec)_$(ialign)$$(TAG).qmd
-qmd0_path=$(staging_dir)/$*_$(ialign)$$(TAG).qmd
+qmd_path=$(staging_dir)/$*_$(ispec)_$(ialign).qmd
+qmd0_path=$(staging_dir)/$*_$(ialign).qmd
 
 $(mk): $(staging_dir)/.make-% : $(file.spec) $(samplesheets) | $(staging_dir)
 	$(foreach ispec,$(specfiles),\
 	   $(foreach ialign,$(alignments),\
 	   echo '$(qmd_path): alignment=$(ialign)' >> $@;\
 	   echo '$(qmd_path): spec=$(ispec)' >> $@;\
-	   echo '$(qmd_path): script=$*_$(ispec)_$(ialign)$$(TAG)' >> $@;\
+	   echo '$(qmd_path): script=$*_$(ispec)_$(ialign)' >> $@;\
 	   echo '$(qmd_path): section=$*' >> $@;\
 	   echo '$(qmd_path): $(source_dir)/$*.qmd' >> $@;\
-	   echo '$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$*_$(ispec)_$(ialign)$$(TAG).html: $(my_counts_dir)/$(ialign) $(ispec).spec $(my_metadata)_$(ialign).csv $(qmd_path) $(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$($*_parent)$$(TAG).html' >> $@ ;\
+	   echo '$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$*_$(ispec)_$(ialign).html: $(my_counts_dir)/$(ialign) $(ispec).spec $(my_metadata)_$(ialign).csv $(qmd_path) $(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$($*_parent).html' >> $@ ;\
 	   echo '' >> $@ ;\
 	))
 	echo '$*_pages=$(foreach ispec,$(specfiles),$(foreach ialign,$(alignments),$*_$(ispec)_$(ialign)))' >> $@
-	echo '$*_qmds = $$(patsubst %,$(staging_dir)/%$$(TAG).qmd,$$($*_pages))'>> $@
-	echo '$*_htmls = $$(patsubst %,$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/%$$(TAG).html,$$($*_pages))'>> $@
+	echo '$*_qmds = $$(patsubst %,$(staging_dir)/%.qmd,$$($*_pages))'>> $@
+	echo '$*_htmls = $$(patsubst %,$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/%.html,$$($*_pages))'>> $@
 	echo '$*_htmls: $$($*_htmls)'>> $@
 
 $(mk0): $(staging_dir)/.make-% : $(samplesheets) | $(staging_dir)
 	$(foreach ialign,$(alignments),\
 	 echo '$(qmd0_path): alignment=$(ialign)' >> $@;\
-	 echo '$(qmd0_path): script=$*_$(ialign)$$(TAG)' >> $@;\
+	 echo '$(qmd0_path): script=$*_$(ialign)' >> $@;\
 	 echo '$(qmd0_path): section=$*' >> $@;\
 	 echo '$(qmd0_path): $(source_dir)/$*.qmd' >> $@;\
-	 echo '$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$*_$(ialign)$$(TAG).html: $(my_metadata)_$(ialign).csv $(qmd0_path)' >> $@ ;\
+	 echo '$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$*_$(ialign).html: $(my_metadata)_$(ialign).csv $(qmd0_path)' >> $@ ;\
 	 echo '' >> $@ ;\
 	)
 	echo '$*_pages=$(foreach ialign,$(alignments),$*_$(ialign))' >> $@
-	echo '$*_qmds = $$(patsubst %,$(staging_dir)/%$$(TAG).qmd,$$($*_pages))'>> $@
-	echo '$*_htmls = $$(patsubst %,$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/%$$(TAG).html,$$($*_pages))'>> $@
+	echo '$*_qmds = $$(patsubst %,$(staging_dir)/%.qmd,$$($*_pages))'>> $@
+	echo '$*_htmls = $$(patsubst %,$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/%.html,$$($*_pages))'>> $@
 	echo '$*_htmls: $$($*_htmls)'>> $@
 
 ifeq (,$(filter $(excluded-targets),$(MAKECMDGOALS)))
@@ -96,26 +96,27 @@ pages: $(html_reports) ## Generate the renders individually
 	ln -sfn  $(VERSION) $(RESULTS_DIR)/latest
 
 ## Render an individual page
-$(html_reports) : $(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%$(TAG).html : $(staging_dir)/%$(TAG).qmd $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(samplesheets)| $(log_dir) $(RESULTS_DIR)/$(VERSION) $(staging_dir)/$(RESULTS_DIR)/$(VERSION) $(staging_dir)/R.bib
+$(html_reports) : $(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%.html : $(staging_dir)/%.qmd $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(samplesheets)| $(log_dir) $(RESULTS_DIR)/$(VERSION) $(staging_dir)/$(RESULTS_DIR)/$(VERSION) $(staging_dir)/R.bib
 	$(QUARTO) render '$<' \
 	  --output-dir $(RESULTS_DIR)/$(VERSION)/ \
 	  --execute-dir $(CURDIR) $(call log,html-$*)
 
-html-%: $(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%$(TAG).html ## Create a single html file to be placed in the staging directory, '%' is a simplified filename e.g. `make html-01_exploratory_per-plan_GRCh38`.
-	echo "$(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%$(TAG).html"
+html-%: $(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%.html ## Create a single html file to be placed in the staging directory, '%' is a simplified filename e.g. `make html-01_exploratory_per-plan_GRCh38`.
+	echo "$(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%.html"
 
 scripts: $(qmds) ## Generate all the parametrised scripts, into the staging directory. But don't render
 
-$(qmds) : $(staging_dir)/%$(TAG).qmd : $(staging_dir)/.params.yml $(source_dir)/params.yml
+$(qmds) : $(staging_dir)/%.qmd : $(staging_dir)/.params.yml $(source_dir)/params.yml
 	$(QUARTO) run $(source_dir)/typescript/merge_yml.ts\
 	 --script=$(source_dir)/$(section).qmd\
+	 --target=$@\
 	 --alignment=$(alignment)\
 	 --spec=$(spec)\
 	 --fixed=$(source_dir)/params.yml\
 	 --author="$(shell git config user.name)"\
 	 --generated=$(staging_dir)/.params.yml > $@
-	sed -i -e 's#load_params("$(source_dir)/$(section)", extra=TRUE)#load_params("$(staging_dir)/$*$(TAG)")#' $@
-	sed -i -e 's#choose_staging("$(section)")#"$(staging_dir)/$*$(TAG)"#' $@
+	sed -i -e 's#load_params("$(source_dir)/$(section)", extra=TRUE)#load_params("$(staging_dir)/$*")#' $@
+	sed -i -e 's#choose_staging("$(section)")#"$(staging_dir)/$*"#' $@
 
 $(staging_dir)/_quarto.yml: $(source_dir)/_quarto.yml $(qmds)
 	$(QUARTO) run $(source_dir)/typescript/sidebar.ts\
@@ -123,22 +124,22 @@ $(staging_dir)/_quarto.yml: $(source_dir)/_quarto.yml $(qmds)
 	 --alignments="$(subst $(space),$(comma),$(alignments))"\
 	 --specfiles="$(subst $(space),$(comma),$(specfiles))"\
 	 --template=$< \
-	 --tag=$(TAG)\
+	 --tag=\
 	 --staging=$(staging_dir)\
 	 --repo="$(repo)" > $@
 
-$(staging_dir)/.params.yml:  project.mk
+$(staging_dir)/.params.yml:  resources/make/project.mk
 	echo '{$(foreach p,$(param_names),$p: "$($p)"$(comma))}' > $@
 
 $(staging_dir)/index.qmd : $(source_dir)/index.qmd $(qmds)
 	sed  's#^  contents: .*#  contents: [$(subst $(space),$(comma),$(patsubst $(staging_dir)/%,%,$(qmds)))]#' $< > $@
 
-$(staging_dir)/R.bib: R.bib
+$(staging_dir)/R.bib: extdata/R.bib
 	cp $< $@
 
-R.bib: renv.lock  | $(log_dir)
+extdata/R.bib: renv.lock  | $(log_dir)
 	$(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")' $(call log,bib)
-	$(GIT) add $@ $(wildcard shared.mk makefile .gitignore module.mk .not-secret.mk)
+	$(GIT) add $@ $(wildcard resources/make/shared.mk makefile .gitignore resources/make/module.mk resources/make/project.mk .not-secret.mk)
 	$(GIT) add $(wildcard ../shared.mk ../makefile ../.gitignore ../readme.md ../.gitignore ../.pipeline-version)
 
 renv.lock: resources/_dependencies.R $(wildcard pre.renv.lock)
@@ -155,7 +156,7 @@ renv.lock: resources/_dependencies.R $(wildcard pre.renv.lock)
 	$(GIT) rev-parse "v0.0.1" >/dev/null 2>&1 || $(GIT) tag v0.0.1 $(call log,renv,-a)
 
 resources/_dependencies.R: orgs=$(foreach align,$(alignments),$($(align).org.db))
-resources/_dependencies.R: $(patsubst %,%.config,$(alignments))
+resources/_dependencies.R: $(configs)
 	for o in $(orgs); do grep -F -q $$o $@ || echo "library($$o)" >> $@; done
 	touch $@
 	$(GIT) add $@
@@ -196,9 +197,9 @@ geo/md5.txt:
 	ln -s $(SCRATCH_DIR)geo shortcuts/geo
 	ln -fn $(my_counts_dir)/$(alignment)/*.genes.results shortcuts/geo/
 	ln -fn $(RESULTS_DIR)/$(version)/$(alignment)/$(spec)/*.xlsx shortcuts/geo/
-	$(SQLITE) $(samples_db) 'select fastq_1 from fastqs  where config_file="$(alignment)";' | \
+	$(SQLITE) extdata/$(samples_db) 'select fastq_1 from fastqs  where config_file="$(alignment)";' | \
 	while read -r fq ; do cp $${fq} shortcuts/geo/ ; done
-	$(SQLITE) $(samples_db) 'select fastq_2 from fastqs  where config_file="$(alignment)";' | \
+	$(SQLITE) extdata/$(samples_db) 'select fastq_2 from fastqs  where config_file="$(alignment)";' | \
 	while read -r fq ; do cp $${fq} shortcuts/geo/ ; done
 	pushd shortcuts/geo; md5sum *.* > geo.md5.txt; popd
 
@@ -223,7 +224,7 @@ ifneq ($(docs_dir),)
 $(docs_dir)/%:
 	$(MAKE) --no-print-directory -C $(docs_dir) $*
 
-$(file.spec): % : $(docs_dir)/%
+$(file.spec): extdata/% : $(docs_dir)/%
 	$(MAKE) --no-print-directory -C $(docs_dir) $*
 	cp $< $@
 	$(GIT) add $@ $<
@@ -244,16 +245,16 @@ ifneq ($(nfcore_dir),)
 $(nfcore_dir)/%:
 	$(MAKE)  --no-print-directory -C $(nfcore_dir) $*
 
-$(samplesheets) : $(my_metadata)_%.csv : $(nfcore_dir)/samplesheet_%.csv $(samples_db) $(my_metadata).csv
-	$(SQLITE) -header -csv  $(samples_db) --cmd '.import --csv --schema temp $(my_metadata).csv metadata' 'SELECT metadata.* FROM metadata INNER JOIN (SELECT * FROM "fastq_$*" GROUP BY $(samplesheet_id_column)) AS nfcore on metadata.$(metadata_id_column)=nfcore.$(samplesheet_id_column);' > $@
+$(samplesheets) : $(my_metadata)_%.csv : $(nfcore_dir)/samplesheet_%.csv extdata/$(samples_db) $(my_metadata).csv
+	$(SQLITE) -header -csv  extdata/$(samples_db) --cmd '.import --csv --schema temp $(my_metadata).csv metadata' 'SELECT metadata.* FROM metadata INNER JOIN (SELECT * FROM "fastq_$*" GROUP BY $(samplesheet_id_column)) AS nfcore on metadata.$(metadata_id_column)=nfcore.$(samplesheet_id_column);' > $@
 	$(GIT) add $@ $<
 
-$(samples_db): $(nfcore_dir)/$(samples_db) | $(file.spec) $(staging_dir)
+extdata/$(samples_db): $(nfcore_dir)/$(samples_db) | $(file.spec) $(staging_dir)
 	cp $< $@ || echo "No samples database in nfcore directory"
 	$(GIT) commit -m "Add template scripts, R functions, makefiles" || true
 
 
-$(configs): %.config: $(nfcore_dir)/%.config $(my_metadata)_%.csv  $(my_counts_dir)/%
+$(configs): extdata/%.config: $(nfcore_dir)/%.config $(my_metadata)_%.csv  $(my_counts_dir)/%
 	cp $< $@
 	$(GIT) add $@ $<
 
@@ -299,8 +300,8 @@ MAKEFLAGS += --no-builtin-rules
 # Originally, shared.mk comes from the parent directory. Copy it here
 # if necessary and applicable:
 ifneq ($(wildcard ../shared.mk),)
-shared.mk: ../shared.mk
+reesource/make/shared.mk: ../shared.mk
 	@cp $< $@
-	$(or $(GIT),git) add $(wildcard pre.renv.lock project.mk R renv $(source_dir) .Rprofile .Rbuildignore)
+	$(or $(GIT),git) add $(wildcard $@ pre.renv.lock resources/make/project.mk R renv $(source_dir) .Rprofile .Rbuildignore)
 endif
 

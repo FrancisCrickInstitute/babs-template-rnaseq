@@ -97,7 +97,7 @@ dds <- dds[ind,]
 
 txi[c("abundance", "counts", "length")] <- map(txi[c("abundance", "counts", "length")], ~ .[ind,])
 
-alignments <- strsplit(sub(paste0("^", params$alignment, "\\."), "", readLines(paste0(params$alignment, ".config"))), "=")
+alignments <- strsplit(sub(paste0("^", params$alignment, "\\."), "", readLines(paste0(file.path("extdata", params$alignment), ".config"))), "=")
 names(alignments) <- sapply(alignments, "[", 1)
 alignments <- lapply(alignments, function(x) paste(x[-1], collapse="="))
 

@@ -2,7 +2,7 @@ import { parse, stringify } from "https://deno.land/std/encoding/yaml.ts";
 import { parse as flag} from "https://deno.land/std/flags/mod.ts";
 
 const flags = flag(Deno.args, {string: [
-    "script", "fixed", "generated", "alignment", "spec", "author"
+    "script", "target", "fixed", "generated", "alignment", "spec", "author"
 ]});
 
 //// Gather the constituent parameters
@@ -48,6 +48,7 @@ const generated = parse(Deno.readTextFileSync(flags.generated));
 
 // Put them all together
 const params = {...fixed, ...fromScript.params, ...generated, ...perPage.params};
+params.script = flags.target;
 delete fromScript.params;
 delete perPage.params;
 

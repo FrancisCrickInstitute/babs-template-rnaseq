@@ -55,17 +55,21 @@ source("R/partial.r", local = knitr::knit_global())
 source("R/helpers.r", local = knitr::knit_global())
 source("R/output.r", local = knitr::knit_global())
 
-fig_caption <- captioner()
-do_plot <- plot_tracker(fig_caption)
 set.seed(1)
 
+
+if (!isTRUE(getOption('knitr.in.progress'))) {
+  params <- load_params(choose_staging("01_exploratory"))
+}
+
+do_plot <- plot_tracker(params)
 
 knitr::opts_chunk$set(
   warning=FALSE, error=TRUE, message=FALSE,
   dev=c("ragg_png","pdf"), out.width="100%",
   dev.args=list(ragg_png=list(scaling=1.5)),
-  fig.width=14, fig.height=10,
-  results='asis', fig.cap=expression(fig_caption())
+  fig.width=14, fig.height=10, fig.process=rename_with_tag(params),
+  results='asis'
 )
 
 link2path <- function(lname) {  file.path(knitr::opts_knit$get("output.dir"),lname) }
@@ -78,9 +82,7 @@ link2path <- function(lname) {  file.path(knitr::opts_knit$get("output.dir"),lna
 #| label: tbl-load-exp2
 #| tbl-cap: Context
 
-if (!isTRUE(getOption('knitr.in.progress'))) {
-  params <- load_params(choose_staging("01_exploratory"))
-} else {
+if (isTRUE(getOption('knitr.in.progress'))) {
   gt(data.frame(Setting=names(params),
                 Value=unlist(params)))
 }
@@ -125,7 +127,7 @@ data.frame(
 
 # Calling the setter without a value will pick up the default (from the spec), _and_ alert it in the markdown, and return the default
 set.seed(param$set("seed", postpone=TRUE))
-param$set("spec",  params$spec, "Using analysis plan '{}'.", postpone=TRUE)
+param$set("spec", params$spec, "Using analysis plan '{}'.", postpone=TRUE)
 param$set("alignment", params$alignment, "Using alignment settings '{}'", postpone=TRUE)
 param$set("baseline_heuristic", postpone=TRUE)
 param$set("LRT_effect", postpone=TRUE)
@@ -269,7 +271,7 @@ for (dataset in names(ddsList)) {
 ## Overall Heatmaps
 
 These visualisations are carried out blind to the experimental
-design. For the heatmap @fig-01-Heatmap-1, we select a subset of
+design. For the heatmap @fig-Heatmap-1, we select a subset of
 genes removing the (assumed uninformative) genes with flat expression
 levels across the whole sample set. We'd expect samples from the same
 experimental group to cluster together, in the sense that they are on
@@ -279,7 +281,7 @@ that are consistent with the expected expression profiles, and they
 will be revealed in the differential analysis.
 
 In case that heatmap doesn't cluster exactly according to the
-experimental design, in @fig-01-SuperV-Heatmap-1 we provide the
+experimental design, in @fig-SuperV-Heatmap-1 we provide the
 samples ordered according to one particular interpretation of the
 experimental design.  In simple (one-way) designs where there is only
 one covariate, this is a fairly straightforward way of gathering
@@ -288,7 +290,7 @@ obvious whether to sort first by genotype and then treatment, say, or
 perhaps the reverse, so for this 'supervised' clustering we chose the
 (arbitrary) order the 'model' was specified, above.
 
-The third heatmap @fig-01-sampDist-1 focuses on the pairwise
+The third heatmap @fig-sampDist-1 focuses on the pairwise
 similarity of samples, using a slightly different metric than the
 first, to emphasise that there's not one way of calculating how
 similar two samples are, transcriptome-wide.  The colours in the
@@ -298,7 +300,7 @@ of each pair of samples.
 
 ### Focussed Heatmaps
 
-Heatmap @fig-01-Heatmap-correct-1 is the first in a series of
+Heatmap @fig-Heatmap-correct-1 is the first in a series of
 'focussed' plots. By focussed, we mean that in turn we remove the main
 effect of some of the covariates, and then also optionally force the
 tree-structure to respect one of the remaining covariate (samples
@@ -323,7 +325,7 @@ The come a series of scatter plots of the first two
 Principal Components - a way of summarising all the genes down to just
 two 'metagenes' that attempt to encapsulate the variability across the
 samples in as faithful way as possible. Each plot
-(e.g. @fig-01-color-1) takes the PCs from the unadjusted data,
+(e.g. @fig-color-1) takes the PCs from the unadjusted data,
 and colours them by each of your covariates/treatments in turn. 
 
 ## Focussed Principal Component Scatterplots
@@ -331,7 +333,7 @@ and colours them by each of your covariates/treatments in turn.
 Principal components, just like clusters in the heatmaps, can be
 driven by a dominant effect that might mask other important
 effects. So again we have the flexibility to remove systematic effects
-before recalculating the PCs such as in @fig-01-focus-1 . which
+before recalculating the PCs such as in @fig-focus-1 . which
 regress out ('normalise away') the effect of a set of covariates. This
 'realigns' the principal components. We then colour by one of the
 experimental factors that hasn't been regressed out, hopefully
@@ -344,7 +346,7 @@ been - read the legends to double check!) be customised.
 ## PC-Covariate assocation
 
 We then revert to the PCA picture that is unadjusted for any
-covariates. In @fig-01-covar-1 the columns explore the lower-order principal
+covariates. In @fig-covar-1 the columns explore the lower-order principal
 components (which although not providing a universally strong signal
 transcriptome wide, might still detect biology that is affecting a
 smaller subset of genes, or a reasonably large set of genes to a
@@ -359,7 +361,7 @@ samples associate with each other.
 
 ## Partial Residuals of PCAs
 
-We use that information to derive the remaining plots such as @fig-01-covariate-1,
+We use that information to derive the remaining plots such as @fig-covariate-1,
 where we these components in the context of the various experimental
 factors, producing 'partial residual plots' of two selected PCs, being
 selected by the criteria of: 'best' being the PC most strongly
@@ -388,7 +390,7 @@ for (dname_i in seq_along(ddsList)) {
   dname <- metadata(this_dds)$dmc$dataset_name %||% names(ddsList)[dname_i]
   # Only produce visualisations for models with a qc formula
   # (if none supplied in the spec file, the first model will get one corresponding to its design formula)
-  dmc_heading(ddsList, dataset=dataset, model=NULL, depth="#")
+  dmc_heading(ddsList, dataset=names(ddsList)[dname_i], model=NULL, depth="#")
   mdls <- sapply(metadata(this_dds)$models, function(mdl) "qc_formulae" %in% names(mdl))
   for (mname in names(mdls[mdls])) {
     qc_formulae <- metadata(this_dds)$models[[mname]]$qc_formulae
@@ -401,7 +403,7 @@ for (dname_i in seq_along(ddsList)) {
     nice_legends <- separate_legend(ddsList[[dname_i]])
     pl <- do.call(gridExtra::arrangeGrob, c(nice_legends, ncol=ceiling(sqrt(length(nice_legends)))))
     do_plot(pl,
-            label= paste0("01-legend-a-", dname_i),
+            label= paste0("legend-", metadata(ddsList[[dname_i]])$dmc$dataset),
             caption=paste("Metadata colour-codings for",
                           metadata(ddsList[[dname_i]])$dmc$dataset_name %||% metadata(ddsList[[dname_i]])$dmc$dataset
                           ))
@@ -423,7 +425,7 @@ for (dname_i in seq_along(ddsList)) {
         show_legend=FALSE), 
       show_row_names = FALSE, show_column_names = TRUE)
     do_plot(pl,
-            label= "01-Heatmap",
+            label= "Heatmap",
             caption=paste("Heatmap of variable genes,", dname),
             preview=first)
     first <- FALSE
@@ -443,7 +445,7 @@ for (dname_i in seq_along(ddsList)) {
         show_legend=FALSE),
       show_row_names = FALSE, show_column_names = TRUE)
     do_plot(pl,
-            label= "01-SuperV-Heatmap",
+            label= "SuperV-Heatmap",
             caption=paste("Supervised Heatmap of variable genes,", dname))
     cat("\n\n---\n\n")
     
@@ -469,7 +471,7 @@ for (dname_i in seq_along(ddsList)) {
         col = metadata(colData(this_dds))$palette$Heatmap[vars],
         show_legend=FALSE))
     do_plot(pl,
-            label= "01-sampDist",
+            label= "sampDist",
             caption=paste("Heatmap of sample distances,", dname))
     cat("\n\n---\n\n")
 
@@ -522,7 +524,7 @@ for (dname_i in seq_along(ddsList)) {
               show_legend=FALSE), 
             show_row_names = FALSE, show_column_names = TRUE)
           do_plot(pl,
-                  label= "01-Heatmap-correct",
+                  label= "Heatmap-correct",
                   caption=my_caption
                   )
           cat("\n\n---\n\n")
@@ -570,7 +572,7 @@ for (dname_i in seq_along(ddsList)) {
           pl <- pl + geom_text_repel(aes(label = sample))
         }
         do_plot(pl,
-                label="01_color",
+                label="color",
                 caption=paste("Annotated by ", aes_by, "in", dname)
                 )
         cat("\n\n---\n\n")
@@ -627,7 +629,7 @@ for (dname_i in seq_along(ddsList)) {
             sep=", ", collapse=", ")          
           if (length(removed)==0 || removed=="") removed <- "nothing"
           do_plot(pl,
-                  label="01-focus",
+                  label="focus",
                   caption=paste("Annotated by", aes_by, "in", dname, "having removed", removed)
                   )
           cat("\n\n---\n\n")
@@ -679,7 +681,7 @@ for (dname_i in seq_along(ddsList)) {
         theme_bw() + 
         theme(aspect.ratio = length(unique(plotFrame$Covariate))/min(20, npc))
       do_plot(pl,
-              label="01-covar",
+              label="covar",
               caption=paste("Covariate association in", dname)
               )
       
@@ -759,7 +761,7 @@ for (dname_i in seq_along(ddsList)) {
           pl <- pl + geom_text_repel(aes(label = sample))
         }
         do_plot(pl,
-                label= "01-covariate",
+                label= "covariate",
                 caption=paste("Against ", covar, "in", dname)
                 )
         cat("\n\n---\n\n")

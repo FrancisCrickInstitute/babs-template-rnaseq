@@ -67,6 +67,15 @@ part.resid <- function(fit) {
 }
   
   
+
+rename_with_tag <- function(params) {
+  function(path, options) {
+    path2 <- file.path(dirname(path), gsub("([0-9]+)-fig-(.*)-1\\.(.*)", paste0("fig-\\1-\\2", params$TAG, ".\\3"), basename(path)))
+    file.rename(path, path2)
+    path2
+  }
+}
+
 ##' Generate captioned plot
 ##'
 ##' quarto-compatible plot wrapper
@@ -80,105 +89,64 @@ part.resid <- function(fit) {
 ##' @param cap_fn The function that will be called on the caption text
 ##' @return 
 ##' @author Gavin Kelly
-do_plot <- function(pl, label, caption, cap_fn=fig_caption, height_mult=NA, min_height=0, max_height=Inf, preview=FALSE) {
-  if ("Heatmap" %in% class(pl)) {
-    fn <- function() {
-      draw(pl, heatmap_legend_side = "top")
-      cap_fn(caption)
+plot_tracker <- function(params) {
+  fig_n <- 0
+  script <- tools::file_path_sans_ext(basename(params$script))
+  labels <- list()
+  tag <- params$TAG
+  function(pl, label, caption, height_mult=NA, min_height=0, max_height=Inf, preview=FALSE) {
+    if ("Heatmap" %in% class(pl)) {
+      fn <- function() {
+        draw(pl, heatmap_legend_side = "top")
+      }
+    } else if ("gtable" %in% class(pl)){
+      fn <- function() {
+        grid.draw(pl)
+      }
+    } else {
+      fn <- function() {
+        print(pl)
+      }
     }
-  } else if ("gtable" %in% class(pl)){
-    fn <- function() {
-      grid.draw(pl)
-      cap_fn(caption)
-    }
-  } else {
-    fn <- function() {
-      print(pl)
-      cap_fn(caption)
-    }
-  }
-  if (isTRUE(getOption('knitr.in.progress'))) {
-    height_opt <- ""
-    if (!is.na(height_mult)) {
-      height_opt <- paste0("#| fig.height: ", max(min(knitr::opts_chunk$get("fig.height") * height_mult,max_height), min_height))
-    }
-    fig_child <- knitr::knit_expand(
-      text=r"(```{r}
+    if (isTRUE(getOption('knitr.in.progress'))) {
+      height_opt <- ""
+      fig_n <<- fig_n + 1
+      if (! label %in% names(labels)) {
+        labels[[label]] <<- 0
+      }
+      labels[[label]] <<- labels[[label]]+1
+      label <- paste0(gsub("[^[:alnum:]]+", "-", label), "-", labels[[label]])
+      if (!is.na(height_mult)) {
+        height_opt <- paste0("#| fig.height: ", max(min(knitr::opts_chunk$get("fig.height") * height_mult,max_height), min_height))
+      }
+      fig_child <- knitr::knit_expand(
+        text=r"(```{r}
 #| label: fig-{{lbl}}
+#| fig.path: "{{script}}/{{fprefix}}-"
 {{height}}
 fn()
 ```)",
-lbl=gsub("[^[:alnum:]]+", "-",label),
-height=height_opt
+lbl=label,
+height=height_opt,
+script=script,
+fprefix=sprintf("%0.3i",fig_n)
 )
-    out <- knitr::knit_child(
-      text=fig_child,
-      quiet=TRUE,
-      envir=environment())
-    if (preview) {
-      cat(sub("(.*)(}.*)", "\\1 .preview-image\\2", out))
+      link <- paste0("fig-", sprintf("%0.3i",fig_n), "-", label, tag, ".pdf")
+      out <- knitr::knit_child(
+        text=fig_child,
+        options=list(fig.cap=paste0("[", caption, "](", script, "/", link,")")),
+        quiet=TRUE,
+        envir=environment())
+      if (preview) {
+        cat(sub("(.*)(}.*)", "\\1 .preview-image\\2", out))
+      } else {
+        cat(out)
+      }
     } else {
-      cat(out)
+      fn()
     }
-    
-  } else {
-    fn()
   }
 }
-
-
-plot_tracker <- function(cap_fn) {
-  labels <- list()
-  function(pl, label, caption, height_mult=NA, min_height=0, max_height=Inf, preview=FALSE) {
-    if (label %in% names(labels)) {
-      labels[[label]] <<- labels[[label]] + 1
-    } else {
-      labels[[label]] <<- 1
-    }
-  if ("Heatmap" %in% class(pl)) {
-    fn <- function() {
-      draw(pl, heatmap_legend_side = "top")
-      cap_fn(caption)
-    }
-  } else if ("gtable" %in% class(pl)){
-    fn <- function() {
-      grid.draw(pl)
-      cap_fn(caption)
-    }
-  } else {
-    fn <- function() {
-      print(pl)
-      cap_fn(caption)
-    }
-  }
-  if (isTRUE(getOption('knitr.in.progress'))) {
-    height_opt <- ""
-    if (!is.na(height_mult)) {
-      height_opt <- paste0("#| fig.height: ", max(min(knitr::opts_chunk$get("fig.height") * height_mult,max_height), min_height))
-    }
-    fig_child <- knitr::knit_expand(
-      text=r"(```{r}
-#| label: fig-{{lbl}}
-{{height}}
-fn()
-```)",
-lbl=gsub("[^[:alnum:]]+", "-", paste0(label, "-", labels[[label]])),
-height=height_opt
-)
-    out <- knitr::knit_child(
-      text=fig_child,
-      quiet=TRUE,
-      envir=environment())
-    if (preview) {
-      cat(sub("(.*)(}.*)", "\\1 .preview-image\\2", out))
-    } else {
-      cat(out)
-    }
-    
-  } else {
-    fn()
-  }
-}}
 
 
 

@@ -1,4 +1,5 @@
 .DEFAULT_GOAL=help
+SELF_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 ################################################################
 ## Things here are typically shared across all phases of the
 ## analysis. There's originally one gold-reference copy of this file
@@ -110,7 +111,7 @@ endef
 
 export slurm
 
-include secret.mk
+include $(SELF_DIR)secret.mk
 
 ################################################################
 ## Reproducible containers
@@ -263,7 +264,7 @@ rstudio: ## Start RStudio on this machine for this project.
 # empty which works for the expected situation.
 
 
-secret.mk: $(firstword $(wildcard ../$(path_to_secret)secret.mk) .not-secret.mk) $(wildcard ../.babs)
+$(SELF_DIR)secret.mk: $(firstword $(wildcard ../$(path_to_secret)secret.mk) .not-secret.mk) $(wildcard ../.babs)
 	@if [ -f "$<" ]; then \
 	  sed  's/=.*/=/; /## BABS/,$$d' $< > .not-secret.mk ;\
 	  cp $< $@ ;\
@@ -276,7 +277,8 @@ secret.mk: $(firstword $(wildcard ../$(path_to_secret)secret.mk) .not-secret.mk)
 	  exit ;\
 	fi
 	@if [ "$<" = ".not-secret.mk" ]; then \
-	    echo "Created a blank 'secret.mk' file - please customise it so that the pipeline will run on your system" ;\
+	    cp $< $@
+	    echo "Created a blank '$@' file - please customise it so that the pipeline will run on your system" ;\
 	    exit ;\
 	fi
 

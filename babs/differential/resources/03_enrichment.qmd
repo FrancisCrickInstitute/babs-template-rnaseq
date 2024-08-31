@@ -55,21 +55,25 @@ source("R/output.r", local = knitr::knit_global())
 source("R/helpers.r", local = knitr::knit_global())
 source("R/enrichment.r", local = knitr::knit_global())
 
-fig_caption <- captioner()
-do_plot <- plot_tracker(fig_caption)
+
 tbl_label <- counter()
 
 set.seed(1)
+
+if (!isTRUE(getOption('knitr.in.progress'))) {
+  params <- load_params(choose_staging("03_enrichment"))
+}
+do_plot <- plot_tracker(params)
 
 
 knitr::opts_chunk$set(
   warning=FALSE, error=TRUE, message=FALSE,
   dev=c("ragg_png","pdf"), out.width="100%",
   dev.args=list(ragg_png=list(scaling=1.5)),
-  fig.width=14, fig.height=10,
-  results='asis',
-  fig.cap=expression(fig_caption())
+  fig.width=14, fig.height=10, fig.process=rename_with_tag(params),
+  results='asis'
 )
+
 link2path <- function(lname) {  file.path(knitr::opts_knit$get("output.dir"),lname) }
 
 ```
@@ -77,9 +81,7 @@ link2path <- function(lname) {  file.path(knitr::opts_knit$get("output.dir"),lna
 
 ```{r}
 #| label: load2-enrich2
-if (!isTRUE(getOption('knitr.in.progress'))) {
-  params <- load_params(choose_staging("03_enrichment"))
-} else {
+if (isTRUE(getOption('knitr.in.progress'))) {
   gt(data.frame(Setting=names(params),
                 Value=unlist(params)))
 }

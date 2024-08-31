@@ -1,35 +1,4 @@
-##' Make captioning function that generates hyperlinks
-##'
-##' captioner returns a function that can be used in `fig.cap`.  Call
-##' the resulting function with a string containing the caption text,
-##' after any plot, to store a link to the pdf version of the
-##' plot. Call the function without any arguments (e.g. in the
-##' `fig.cap` argument of a chunk) to invoke the captioining mechanism
-##' in the markdown.
-##' @title Caption hyperlinking
-##' @return
-##' @author Gavin Kelly
-#' @export
-captioner <- function(ext="pdf") {
-  local({
-    captions <- character()
-    function(caption) {
-      if (missing(caption)) {
-        ret <- captions
-        if (length(ret)==0) ret <- ""
-        captions <<- character()
-        return(ret)
-      } else {
-        if (isTRUE(getOption('knitr.in.progress'))) {
-          link_caption <- paste0("[", caption, "](", knitr::fig_path(ext, number=length(captions)+1), ")")
-        } else {
-          link_caption <- caption
-        }
-        captions <<- c(captions, link_caption)
-      }
-    }
-  })
-}
+
 
 if (include_from_package <- FALSE) {
 
@@ -88,8 +57,8 @@ bookdown_label <- function(data, label="") {
     
 
 }
-load_params <- function(prefix) {
-    script_params <- knitr::knit_params(readLines(paste0(prefix,".qmd"))) %>%
+load_params <- function(script) {
+    script_params <- knitr::knit_params(readLines(paste0(script,".qmd"))) %>%
       {setNames(lapply(., "[[", "value"), sapply(., "[[", "name"))}
   }
 
