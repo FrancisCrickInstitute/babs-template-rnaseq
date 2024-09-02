@@ -33,7 +33,7 @@ renv.lock:
 ##   arguments etc)
 $(wrapped-targets): $(optionalRenviron)
 	make -n -s $@ SUBMIT=false EXECUTOR=make > $(TMPSCRIPT)_bash 
-	$(CONTAINER) $(CONTAINER_FLAGS) $(CONTAINER_IMAGE) bash "$(TMPSCRIPT)_bash" || { echo "$(TMPSCRIPT)_bash failed." $(call log,container) ; exit 1; }
+	$(CONTAINER) $(CONTAINER_OPTIONS) $(CONTAINER_IMAGE) bash "$(TMPSCRIPT)_bash" || { echo "$(TMPSCRIPT)_bash failed." $(call log,container) ; exit 1; }
 	rm -f $(TMPSCRIPT)_bash
     endif
 else
