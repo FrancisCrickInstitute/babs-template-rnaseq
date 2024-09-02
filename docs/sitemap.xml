@@ -41,10 +41,10 @@
 <url><loc>/reference/write_all_results.html</loc></url>
 <url><loc>/reference/write_assay.html</loc></url>
 <url><loc>/reference/write_results.html</loc></url>
-<url><loc>/test/00_init_GRCh38.html</loc></url>
-<url><loc>/test/01_exploratory_analyse_GRCh38.html</loc></url>
-<url><loc>/test/02_differential_analyse_GRCh38.html</loc></url>
-<url><loc>/test/03_enrichment_analyse_GRCh38.html</loc></url>
-<url><loc>/test/index.html</loc></url>
+<url><loc>/test/latest/00_init_GRCh38.html</loc></url>
+<url><loc>/test/latest/01_exploratory_analyse_GRCh38.html</loc></url>
+<url><loc>/test/latest/02_differential_analyse_GRCh38.html</loc></url>
+<url><loc>/test/latest/03_enrichment_analyse_GRCh38.html</loc></url>
+<url><loc>/test/latest/index.html</loc></url>
 </urlset>
 

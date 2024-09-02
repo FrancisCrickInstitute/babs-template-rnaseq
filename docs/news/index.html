@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RNASeq Template</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.11.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.11.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -39,6 +39,14 @@
     </div>
 
     <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.11.1" id="version-0111">Version 0.11.1<a class="anchor" aria-label="anchor" href="#version-0111"></a></h2>
+<div class="section level3">
+<h3 id="major-changes-0-11-1">Major Changes<a class="anchor" aria-label="anchor" href="#major-changes-0-11-1"></a></h3>
+<ul><li>
+<code>make R-local</code> now produces a file e.g. R-4.3.2 that by doesn’t include any additional bindings or environment variables within the container - people are increasingly putting settings in the <code>HOME</code> area that broke containment when running interactively. Instead, if you want to include extra access, set the variable <code>INTERACTIVE_SINGULARITY</code> in your <code>~/.bashrc</code> e.g. <code>export INTERACTIVE_SINGULARITY='--bind $$HOME/.Xauthority,$$HOME/.Xdefaults,$$HOME/.Xresources,$$HOME/.emacs.d,$$HOME/.ssh --env DISPLAY=$$DISPLAY'</code>. The double <code>$</code> means that those variables will get expanded at runtime, rather than at the point you generate <code>R-4.3.2</code> (which would mean that <code>DISPLAY</code> would be out of date).</li>
+</ul></div>
+</div>
+    <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.11.0" id="version-0110">Version 0.11.0<a class="anchor" aria-label="anchor" href="#version-0110"></a></h2>
 <div class="section level3">
 <h3 id="major-changes-0-11-0">Major Changes<a class="anchor" aria-label="anchor" href="#major-changes-0-11-0"></a></h3>
@@ -62,10 +70,16 @@
 <h3 id="major-changes-0-9-0">Major Changes<a class="anchor" aria-label="anchor" href="#major-changes-0-9-0"></a></h3>
 <ul><li>New <code>simulate</code> option in the <code>docs</code> folder that generates random data conforming to a spec file and experiment table, and generates a mock report prior to sequencing being done ## Minor Changes</li>
 <li>Improve model naming in the exploratory report, and add it to the differential page as well</li>
-<li>Fix the rstudio launcher # Version 0.8.0</li>
+<li>Fix the rstudio launcher</li>
 </ul></div>
+</div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.8.0" id="version-080">Version 0.8.0<a class="anchor" aria-label="anchor" href="#version-080"></a></h2>
 <div class="section level3">
-<h3 id="minor-changes-0-9-0">Minor Changes<a class="anchor" aria-label="anchor" href="#minor-changes-0-9-0"></a></h3>
+<h3 id="major-changes-0-8-0">Major Changes<a class="anchor" aria-label="anchor" href="#major-changes-0-8-0"></a></h3>
+</div>
+<div class="section level3">
+<h3 id="minor-changes-0-8-0">Minor Changes<a class="anchor" aria-label="anchor" href="#minor-changes-0-8-0"></a></h3>
 <ul><li>Fig recent bug in the partial PCA</li>
 </ul></div>
 </div>
