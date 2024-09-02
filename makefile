@@ -64,6 +64,24 @@ test/babs/nfcore/results:  test | airway/nfcore.tar.gz
 pkgdown: 
 	cd $@; make site
 
+major minor patch: lastNews=$(shell sed -n '1s/# Version //p' pkgdown/NEWS.md)
+major minor patch: lastTag:=$(subst ., ,$(patsubst v%,%,$(shell git describe --tags --abbrev=0 --match 'v*')))
+major minor patch: major=$(word 1,$(lastTag))
+major minor patch: minor=$(word 2,$(lastTag))
+major minor patch: patch=$(word 3,$(lastTag))
+major: new=$(shell echo $$(($(major)+1))).0.0
+minor: new=$(major).$(shell echo $$(($(minor)+1))).0
+patch: new=$(major).$(minor).$(shell echo $$(($(patch)+1)))
+
+major minor patch:## Edit files to bump the version
+	sed -i 's/Version: .*/Version: $(new)/' pkgdown/DESCRIPTION
+	echo "# Version $(new)" > pkgdown/tmp.md
+	echo "## Major Changes" >>  pkgdown/tmp.md
+	printf "## Minor Changes" >>  pkgdown/tmp.md
+	git log v$(lastNews)...HEAD --pretty=format:' - %s' --reverse >> pkgdown/tmp.md
+	cat pkgdown/NEWS.md >> pkgdown/tmp.md
+	mv pkgdown/tmp.md pkgdown/NEWS.md
+	echo "Please check pkgdown/NEWS.md and pkgdown/DESCRIPTION are correct. Then commit and tag v"$(new)
 
 help: ## show help message
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m\033[0m\n"} /^[$$()% 0-9a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
