@@ -277,7 +277,7 @@ $(SELF_DIR)secret.mk: $(firstword $(wildcard ../$(path_to_secret)secret.mk) .not
 	  exit ;\
 	fi
 	@if [ "$<" = ".not-secret.mk" ]; then \
-	    cp $< $@
+	    cp $< $@ ;\
 	    echo "Created a blank '$@' file - please customise it so that the pipeline will run on your system" ;\
 	    exit ;\
 	fi
