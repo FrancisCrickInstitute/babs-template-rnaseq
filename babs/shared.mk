@@ -264,7 +264,7 @@ rstudio: ## Start RStudio on this machine for this project.
 # empty which works for the expected situation.
 
 
-$(SELF_DIR)secret.mk: $(firstword $(wildcard ../$(path_to_secret)secret.mk) .not-secret.mk) $(wildcard ../.babs)
+$(SELF_DIR)secret.mk: $(firstword $(wildcard ../secret.mk ../babs/secret.mk) .not-secret.mk) $(wildcard ../.babs)
 	@if [ -f "$<" ]; then \
 	  sed  's/=.*/=/; /## BABS/,$$d' $< > .not-secret.mk ;\
 	  cp $< $@ ;\

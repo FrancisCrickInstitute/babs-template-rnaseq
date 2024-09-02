@@ -1,9 +1,8 @@
 .PHONY: makefile
 #Custom settings so that shared.mk thinks that this folder is a subdirectory of '../babs'
 staging_dir=.
-path_to_secret=babs/
 source_dir=../babs/differential/resources
-include ../babs/shared.mk
+include shared.mk
 
 .PHONY: site
 
@@ -13,7 +12,7 @@ ifeq ($(SUBMIT),false)
     ifeq ($(CONTAIN),false)
 ##    To be executed directly - no need for (further) wrapping in queue/container functionality
 
-site: renv.lock## Create pkgdown site in ./docs
+site: renv.lock .Rprofile## Create pkgdown site in ./docs
 	rm -rf R
 	cp -lr ../babs/differential/R .
 	mkdir -p pkgdown/assets/test
@@ -66,6 +65,14 @@ publish:
 	git switch -
 	git stash pop || true
 
+shared.mk: ../babs/shared.mk
+	cp $< $@
+
+.Rprofile: ../babs/differential/resources/renv/Rprofile renv/activate.R
+	cp $< $@
+renv/activate.R: ../babs/differential/resources/renv/activate.R
+	mkdir -p renv
+	cp $< $@
 
 ################################################################
 #### Helper goals
