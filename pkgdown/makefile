@@ -17,13 +17,13 @@ site: renv.lock .Rprofile## Create pkgdown site in ./docs
 	cp -lr ../babs/differential/R .
 	mkdir -p pkgdown/assets/test
 	if [ -d ../test/babs/differential/results/latest ]; then \
-	  rm -rf pkgdown/assets/test && cp -Lr ../test/babs/differential/results/latest pkgdown/assets/test ;\
+	  cp -Lr ../test/babs/differential/results/latest pkgdown/assets/test ;\
 	fi
 	sed  -i 's/^Version:.*/Version: $(patsubst v%,%,$(VERSION))/' DESCRIPTION
 	sed -i 's,/blob/[^/]*/babs/,/blob/$(shell git rev-parse --abbrev-ref HEAD)/babs/,' _pkgdown.yml
 	rm -rf docs
 	$(R) -e 'roxygen2::roxygenise(); pkgdown::build_site()'
-
+	rm -rf pkgdown
 
 renv.lock: 
 	  $(R) -e 'library(renv); init(); renv::install(c("roxygen2", "pkgdown")); renv::snapshot(type="all")'
@@ -80,7 +80,7 @@ renv/activate.R: ../babs/differential/resources/renv/activate.R
 
 
 clean: ## Remove the staging folder and the log directory - these should never contain anything of lasting interest that can't be recreated
-	rm -rf R docs man NAMESPACE Renviron.site secret.mk
+	rm -rf R docs man NAMESPACE Renviron.site secret.mk shared.mk renv renv.lock .Rprofile pkgdown
 
 
 MAKEFLAGS += --no-builtin-rules

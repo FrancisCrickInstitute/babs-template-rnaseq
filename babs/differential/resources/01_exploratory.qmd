@@ -401,7 +401,9 @@ for (dname_i in seq_along(ddsList)) {
     var_stab <- assay(this_dds, "vst")
     top <- order(apply(var_stab, 1, sd), decreasing = TRUE)[1:min(nrow(var_stab),param$get("top_n_variable"))]
     nice_legends <- separate_legend(ddsList[[dname_i]])
-    pl <- do.call(gridExtra::arrangeGrob, c(nice_legends, ncol=ceiling(sqrt(length(nice_legends)))))
+    pl <- do.call(gridExtra::arrangeGrob, c(
+      nice_legends,
+      ncol=ceiling(sqrt(length(nice_legends)))))
     do_plot(pl,
             label= paste0("legend-", metadata(ddsList[[dname_i]])$dmc$dataset),
             caption=paste("Metadata colour-codings for",

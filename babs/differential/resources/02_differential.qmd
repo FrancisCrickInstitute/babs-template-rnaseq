@@ -437,7 +437,9 @@ param$set("clustering_distance_columns")
 for (dataset in names(dds_model_comp)) {
   dmc_heading(dds_model_comp, dataset=dataset, model=NULL, depth="##")
   nice_legends <- separate_legend(ddsList[[dataset]])
-  pl <- do.call(gridExtra::grid.arrange, c(nice_legends, ncol=ceiling(sqrt(length(nice_legends)))))
+  pl <- do.call(gridExtra::arrangeGrob,c(
+    nice_legends,
+    ncol=ceiling(sqrt(length(nice_legends)))))
   do_plot(pl,
           label= "02-legend-a",
           caption=paste("Metadata colour-codings for",

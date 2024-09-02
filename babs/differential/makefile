@@ -167,7 +167,7 @@ resources/_dependencies.R: $(configs)
 ##   arguments etc)
 run  pages $(html_reports) scripts $(qmds) $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd  extdata/R.bib renv.lock: $(optionalRenviron)
 	make -n -s --no-print-directory $@ SUBMIT=false EXECUTOR=make > $(TMPSCRIPT)_bash 
-	$(CONTAINER) $(CONTAINER_FLAGS) $(CONTAINER_IMAGE) bash "$(TMPSCRIPT)_bash" || { echo "$(TMPSCRIPT)_bash failed." $(call log,container) ; exit 1; }
+	$(CONTAINER) $(CONTAINER_OPTIONS) $(CONTAINER_IMAGE) bash "$(TMPSCRIPT)_bash" || { echo "$(TMPSCRIPT)_bash failed." $(call log,container) ; exit 1; }
 	rm -f $(TMPSCRIPT)_bash
     endif
 else

@@ -129,9 +129,8 @@ CONTAINER= $(call ml,Singularity/$(SINGULARITY_VERSION)); singularity
 CONTAINER_IMAGE=$(SINGULARITY_ROOT)/$(IMAGE)_$(IMAGE_TAG).sif
 CONTAINER_BIND=--bind $(BIND_DIR),/tmp,$(RENV_PATHS_ROOT),$(CURDIR)/Renviron.site:/usr/local/lib/R/etc/Renviron.site
 CONTAINER_ENV=--env SQLITE_TMPDIR=/tmp,BIOCPARALLEL_WORKER_NUMBER=$(BIOCPARALLEL_WORKER_NUMBER),GITHUB_PAT=$${GITHUB_PAT}
-CONTAINER_FLAGS= exec $(CONTAINER_BIND) --pwd $(CURDIR) --containall --cleanenv $(CONTAINER_ENV)
-CONTAINER_FLAGS_INTERACTIVE= $(CONTAINER_FLAGS),DISPLAY=$${DISPLAY} 
-CONTAINER_SHELL = $(CONTAINER) $(patsubst exec,shell,$(CONTAINER_FLAGS_INTERACTIVE)) $(CONTAINER_IMAGE)
+CONTAINER_OPTIONS= exec $(CONTAINER_BIND) --pwd $(CURDIR) --containall --cleanenv $(CONTAINER_ENV)
+CONTAINER_SHELL_OPTIONS = $(patsubst exec,shell,$(CONTAINER_OPTIONS))
 $(CONTAINER_IMAGE): 
 	cd $(dir $(CONTAINER_IMAGE)) ;\
 	$(CONTAINER) pull docker://$(IMAGE):$(IMAGE_TAG)
@@ -166,7 +165,7 @@ endif
 ifeq ($(CONTAIN),true)
 Renviron.site: | $(CONTAINER_IMAGE)
 optionalRenviron=Renviron.site
-containerPrefix=$(CONTAINER) $(CONTAINER_FLAGS) $(CONTAINER_IMAGE)
+containerPrefix=$(CONTAINER) $(CONTAINER_OPTIONS) $(CONTAINER_IMAGE)
 else
 optionalRenviron=
 containerPrefix=
@@ -224,9 +223,9 @@ Renviron.site:
 R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses)
 R-$(RVERSION): $(CONTAINER_IMAGE)
 	echo "#!/bin/bash" > $@
-	echo 'function R { $(CONTAINER) $(CONTAINER_FLAGS_INTERACTIVE) $(CONTAINER_IMAGE) R' \$$@  " ; }" >> $@
-	echo 'function Rscript { $(CONTAINER) $(CONTAINER_FLAGS_INTERACTIVE) $(CONTAINER_IMAGE) Rscript' \$$@  " ; }" >> $@
-	echo 'function conshell { $(CONTAINER_SHELL) ; }' >> $@
+	echo 'function R { $(CONTAINER) $(CONTAINER_OPTIONS) $(INTERACTIVE_SINGULARITY) $(CONTAINER_IMAGE) R' \$$@  " ; }" >> $@
+	echo 'function Rscript { $(CONTAINER) $(CONTAINER_OPTIONS) $(INTERACTIVE_SINGULARITY) $(CONTAINER_IMAGE) Rscript' \$$@  " ; }" >> $@
+	echo 'function conshell {  $(CONTAINER) $(CONTAINER_SHELL_OPTIONS) $(INTERACTIVE_SINGULARITY) $(CONTAINER_IMAGE) ; }' >> $@
 	echo "[[ "'$$BASH_SOURCE'" == "'$$0'" ]] && R " \$$@ >> $@
 	setfacl -m u::rwx $@
 

@@ -1,3 +1,8 @@
+# Version 0.11.1
+## Major Changes
+* `make R-local` now produces a file e.g. R-4.3.2 that by doesn't include any additional bindings or environment variables within the container - people are increasingly putting settings in the `HOME` area that broke containment when running interactively. Instead, if you want to include extra access, set the variable `INTERACTIVE_SINGULARITY` in your `~/.bashrc` e.g. `export INTERACTIVE_SINGULARITY='--bind $$HOME/.Xauthority,$$HOME/.Xdefaults,$$HOME/.Xresources,$$HOME/.emacs.d,$$HOME/.ssh --env DISPLAY=$$DISPLAY'`. The double `$` means that those variables will get expanded at runtime, rather than at the point you generate `R-4.3.2` (which would mean that `DISPLAY` would be out of date).
+
+
 # Version 0.11.0
 ## Major Changes
 * Change the way version numbers are propagated to the quarto report - the qmd files don't get tagged now (to allow better cacheing - not yet implemented), but instead the figures get the git information inserted into their filenames.
@@ -17,7 +22,10 @@
 ## Minor Changes
 * Improve model naming in the exploratory report, and add it to the differential page as well
 * Fix the rstudio launcher
+
 # Version 0.8.0
+
+## Major Changes
 
 ## Minor Changes
 * Fig recent bug in the partial PCA
