@@ -257,16 +257,14 @@ rstudio: ## Start RStudio on this machine for this project.
 # Originally, secret.mk should come from the babs directory.  If
 # it's still there, make sure it's up-to-date and then copy it
 # here. If a secret.mk file can't be found anywhere, create a dummy
-# one out of a template. path_to_secret can be set in the including
-# makefile in situations where that makefile isn't in a direct child
-# folder of the babs directory, but by default that variable will be
-# empty which works for the expected situation.
+# one out of a template.
 
+$(SELF_DIR)secret.mk: preexisting=$(firstword $(wildcard ../secret.mk ../babs/secret.mk .not-secret.mk))
 
-$(SELF_DIR)secret.mk: $(firstword $(wildcard ../secret.mk ../babs/secret.mk) .not-secret.mk) $(wildcard ../.babs)
-	@if [ -f "$<" ]; then \
-	  sed  's/=.*/=/; /## BABS/,$$d' $< > .not-secret.mk ;\
-	  cp $< $@ ;\
+$(SELF_DIR)secret.mk: $(preexisting) $(wildcard ../.babs)
+	@if [ -f "$(preexisting)" ]; then \
+	  sed  's/=.*/=/; /## BABS/,$$d' $(preexisting) > .not-secret.mk ;\
+	  cp $(preexisting) $@ ;\
 	  if [ -f ../.babs ]; then \
 	    sed  -i '/^setting_/d' $@ ;\
 	    sed -r -n 's/^(\s*)(.*)\s*:\s*(.*$$)/setting_\2=\3/p' ../.babs >> $@ ;\
@@ -275,12 +273,10 @@ $(SELF_DIR)secret.mk: $(firstword $(wildcard ../secret.mk ../babs/secret.mk) .no
 	  echo "Unable to find a 'secret.mk' file" ;\
 	  exit ;\
 	fi
-	@if [ "$<" = ".not-secret.mk" ]; then \
-	    cp $< $@ ;\
+	@if [ "$(preexisting)" = ".not-secret.mk" ]; then \
 	    echo "Created a blank '$@' file - please customise it so that the pipeline will run on your system" ;\
 	    exit ;\
 	fi
-
 
 .PHONY: print-%
 print-%: ## `make print-varname` will show varname's value
