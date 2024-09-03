@@ -77,8 +77,9 @@ major minor patch:## Edit files to bump the version
 	sed -i 's/Version: .*/Version: $(new)/' pkgdown/DESCRIPTION
 	echo "# Version $(new)" > pkgdown/tmp.md
 	echo "## Major Changes" >>  pkgdown/tmp.md
-	printf "## Minor Changes" >>  pkgdown/tmp.md
+	echo "## Minor Changes" >>  pkgdown/tmp.md
 	git log v$(lastNews)...HEAD --pretty=format:' - %s' --reverse >> pkgdown/tmp.md
+	printf '\n' >> pkgdown/tmp.md
 	cat pkgdown/NEWS.md >> pkgdown/tmp.md
 	mv pkgdown/tmp.md pkgdown/NEWS.md
 	echo "Please check pkgdown/NEWS.md and pkgdown/DESCRIPTION are correct. Then commit and tag v"$(new)

@@ -1,3 +1,9 @@
+# Version 0.11.2
+## Major Changes
+## Minor Changes
+- Minor fix to pkgdown build process
+- Add easy version bumping to the factory
+
 # Version 0.11.1
 ## Major Changes
 * `make R-local` now produces a file e.g. R-4.3.2 that by doesn't include any additional bindings or environment variables within the container - people are increasingly putting settings in the `HOME` area that broke containment when running interactively. Instead, if you want to include extra access, set the variable `INTERACTIVE_SINGULARITY` in your `~/.bashrc` e.g. `export INTERACTIVE_SINGULARITY='--bind $$HOME/.Xauthority,$$HOME/.Xdefaults,$$HOME/.Xresources,$$HOME/.emacs.d,$$HOME/.ssh --env DISPLAY=$$DISPLAY'`. The double `$` means that those variables will get expanded at runtime, rather than at the point you generate `R-4.3.2` (which would mean that `DISPLAY` would be out of date).
