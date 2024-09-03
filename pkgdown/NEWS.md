@@ -1,12 +1,9 @@
-# Version 0.11.3
-## Major Changes
-## Minor Changes
-
-# Version 0.11.2
+# Version 0.11.4
 ## Major Changes
 ## Minor Changes
 - Minor fix to pkgdown build process
 - Add easy version bumping to the factory
+- Fix where update-module files get stored
 
 # Version 0.11.1
 ## Major Changes

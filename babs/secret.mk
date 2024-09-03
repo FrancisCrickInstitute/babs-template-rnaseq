@@ -62,7 +62,8 @@ update-module: ## Update the specific module you're currently using.
 	  if [ -f "$(targz)" ]; then \
 	    $(GIT) stash -m "Stashing state prior to pipeline update" &&\
 	    tar -xzf $(targz) babs/$(module) --strip-components=2  && \
-	    tar -xzf $(targz) babs/shared.mk babs/secret.mk babs/.pipeline-version --strip-components=1 -C ./$(wildcard resources/make/) && \
+	    tar -xzf $(targz) -C ./$(wildcard resources/make/) babs/shared.mk babs/secret.mk --strip-components=1  && \
+	    tar -xzf $(targz) babs/.pipeline-version --strip-components=1  && \
 	    cat .pipeline-version; \
 	  else \
 	    if [ -d "$(subst .tar.gz,,$(targz))" ]; then \
