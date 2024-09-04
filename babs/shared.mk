@@ -224,8 +224,8 @@ R-local: short_options=$(subst $(BIND_DIR),$${bind},$(subst $(CURDIR),$${wd},$(C
 R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses)
 R-$(RVERSION): $(CONTAINER_IMAGE)
 	@echo "#!/bin/bash" > $@
-	@echo "bind=$${1:-$(BIND_DIR)}" >> $@
-	@echo "wd=$${2:-$(CURDIR)}" >> $@
+	@echo 'bind=$${1:-$(BIND_DIR)}' >> $@
+	@echo 'wd=$${2:-$(CURDIR)}' >> $@
 	@echo 'function R { $(CONTAINER) $(short_options) $(INTERACTIVE_SINGULARITY) $(CONTAINER_IMAGE) R' \$$@  " ; }" >> $@
 	@echo 'function Rscript { $(CONTAINER) $(short_options) $(INTERACTIVE_SINGULARITY) $(CONTAINER_IMAGE) Rscript' \$$@  " ; }" >> $@
 	@echo 'function conshell {  $(CONTAINER) $(short_options) $(INTERACTIVE_SINGULARITY) $(CONTAINER_IMAGE) ; }' >> $@
