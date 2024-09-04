@@ -220,14 +220,19 @@ Renviron.site:
 	echo "RENV_PATHS_ROOT=$(RENV_PATHS_ROOT)" >> $@
 	echo "RENV_PATHS_LIBRARY=renv/library" >> $@
 
+R-local: short_options=$(subst $(BIND_DIR),$${bind},$(subst $(CURDIR),$${wd},$(CONTAINER_OPTIONS)))
 R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses)
 R-$(RVERSION): $(CONTAINER_IMAGE)
-	echo "#!/bin/bash" > $@
-	echo 'function R { $(CONTAINER) $(CONTAINER_OPTIONS) $(INTERACTIVE_SINGULARITY) $(CONTAINER_IMAGE) R' \$$@  " ; }" >> $@
-	echo 'function Rscript { $(CONTAINER) $(CONTAINER_OPTIONS) $(INTERACTIVE_SINGULARITY) $(CONTAINER_IMAGE) Rscript' \$$@  " ; }" >> $@
-	echo 'function conshell {  $(CONTAINER) $(CONTAINER_SHELL_OPTIONS) $(INTERACTIVE_SINGULARITY) $(CONTAINER_IMAGE) ; }' >> $@
-	echo "[[ "'$$BASH_SOURCE'" == "'$$0'" ]] && R " \$$@ >> $@
-	setfacl -m u::rwx $@
+	@echo "#!/bin/bash" > $@
+	@echo "bind=$${1:-$(BIND_DIR)}" >> $@
+	@echo "wd=$${2:-$(CURDIR)}" >> $@
+	@echo 'function R { $(CONTAINER) $(short_options) $(INTERACTIVE_SINGULARITY) $(CONTAINER_IMAGE) R' \$$@  " ; }" >> $@
+	@echo 'function Rscript { $(CONTAINER) $(short_options) $(INTERACTIVE_SINGULARITY) $(CONTAINER_IMAGE) Rscript' \$$@  " ; }" >> $@
+	@echo 'function conshell {  $(CONTAINER) $(short_options) $(INTERACTIVE_SINGULARITY) $(CONTAINER_IMAGE) ; }' >> $@
+	@echo "[[ "'$$BASH_SOURCE'" == "'$$0'" ]] && R " \$$@ >> $@
+	@setfacl -m u::rwx $@
+	@echo 'Using the following extra Singularity options: INTERACTIVE_SINGULARITY=$(INTERACTIVE_SINGULARITY)'
+	@echo 'You may want to customise this (in your bashrc?) to things you need for an interactive environment (e.g. --bind /nemo, --env $$$$DISPLAY)'
 
 .PHONY: R
 R: Renviron.site

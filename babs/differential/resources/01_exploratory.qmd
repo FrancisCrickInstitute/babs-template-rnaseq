@@ -481,6 +481,7 @@ for (dname_i in seq_along(ddsList)) {
     do_focus <- length(vars) > 1
 
     if (do_focus) {
+      design(this_dds) <- design
       partials <- partialise(this_dds)
       ## lhs terms are those separated by a `+`.  Each lhs terms is plotted
       ## consecutively, and composite ones `a:b` are used to apply multiple
