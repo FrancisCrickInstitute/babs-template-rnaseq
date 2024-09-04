@@ -123,3 +123,7 @@ dmc_heading <- function(obj, dataset=1, model=NULL, depth="##", numbered=TRUE, d
   if (!describe) text=""
   cat(paste(heading, "\n\n", text))
 }
+
+var_heading <- function(..., depth) {
+  paste0('\n\n', strrep("#", depth), " ",  paste0(...), '\n\n')
+}

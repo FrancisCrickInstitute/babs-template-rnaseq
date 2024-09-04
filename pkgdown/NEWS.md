@@ -1,3 +1,7 @@
+# Version 0.12.1
+## Major Changes
+## Minor Changes
+- Improve the heading layout in the exploratory plots
 # Version 0.12.0
 ## Major Changes
 - Fix a bug in the "partial" plots of the exploratory analyses, where the design wasn't set so nothing being was removed. Impact was only in lack of visualisations, rather than anything incorrect being produced.
