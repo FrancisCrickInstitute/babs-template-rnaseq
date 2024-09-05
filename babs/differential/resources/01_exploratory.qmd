@@ -487,7 +487,7 @@ for (dname_i in seq_along(ddsList)) {
       ## consecutively, and composite ones `a:b` are used to apply multiple
       ## aesthetics within a plot. The first (`a`) part is used for colour,
       ## and the optional second is used for shape
-      cat(var_heading("Focussed Heatmaps", depth=2 + (sum(mdls)>1),  depth=2 + (sum(mdls)>1)))
+      cat(var_heading("Focussed Heatmaps",   depth=2 + (sum(mdls)>1)))
       for (qc_fml in qc_formulae) {
         lhs <- get_lhs(qc_fml)
         for (aes_by in c("", lhs)) {
