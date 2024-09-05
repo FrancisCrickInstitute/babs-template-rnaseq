@@ -265,14 +265,15 @@ rstudio: ## Start RStudio on this machine for this project.
 # one out of a template.
 
 $(SELF_DIR)secret.mk: preexisting=$(firstword $(wildcard ../secret.mk ../babs/secret.mk .not-secret.mk))
+$(SELF_DIR)secret.mk: babsfile=$(firstword $(wildcard ../../.babs ../.babs .babs))
 
-$(SELF_DIR)secret.mk: $(preexisting) $(wildcard ../.babs)
+$(SELF_DIR)secret.mk: $(preexisting) $(babsfile)
 	@if [ -f "$(preexisting)" ]; then \
 	  sed  's/=.*/=/; /## BABS/,$$d' $(preexisting) > .not-secret.mk ;\
 	  cp $(preexisting) $@ ;\
-	  if [ -f ../.babs ]; then \
+	  if [ -f $(babsfile) ]; then \
 	    sed  -i '/^setting_/d' $@ ;\
-	    sed -r -n 's/^(\s*)(.*)\s*:\s*(.*$$)/setting_\2=\3/p' ../.babs >> $@ ;\
+	    sed -r -n 's/^(\s*)(.*)\s*:\s*(.*$$)/setting_\2=\3/p' $(babsfile) >> $@ ;\
 	  fi ;\
 	else \
 	  echo "Unable to find a 'secret.mk' file" ;\
