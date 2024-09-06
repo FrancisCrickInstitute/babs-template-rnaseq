@@ -1,0 +1,2424 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.3.433">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Gavin Kelly">
+<meta name="description" content="Differential analysis of GRCh38-aligned data according to plan ‘analyse’">
+
+<title>Analysis results - Differential analysis GRCh38 analyse</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for citations */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+}
+.hanging-indent div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
+}
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
+}
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 20,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+</head>
+
+<body class="nav-sidebar floating nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-dark ">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">Analysis results</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="https://github.com/BABS-STP/" rel="" target=""><i class="bi bi-github" role="img">
+</i> 
+ <span class="menu-text">Github repository</span></a>
+  </li>  
+</ul>
+            <div class="quarto-navbar-tools">
+</div>
+          </div> <!-- /navcollapse -->
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar,#quarto-sidebar-glass" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+      <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./02_differential_analyse_GRCh38.html">4 Differential analysis</a></li></ol></nav>
+      <a class="flex-grow-1" role="button" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar,#quarto-sidebar-glass" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+      </a>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal sidebar-navigation floating overflow-auto">
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./../multiqc-GRCh38/multiqc_report.html" class="sidebar-item-text sidebar-link" target="&quot;_blank&quot;">
+ <span class="menu-text">1 MultiQC Report</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./00_init_GRCh38.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">2 Initialisation</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./01_exploratory_analyse_GRCh38.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">3 Exploratory analysis</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./02_differential_analyse_GRCh38.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">4 Differential analysis</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./03_enrichment_analyse_GRCh38.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">5 Enrichment analysis</span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar,#quarto-sidebar-glass"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#preface" id="toc-preface" class="nav-link active" data-scroll-target="#preface"><span class="header-section-number">1</span> Preface</a></li>
+  <li><a href="#datasets-and-models" id="toc-datasets-and-models" class="nav-link" data-scroll-target="#datasets-and-models"><span class="header-section-number">2</span> Datasets and Models</a>
+  <ul class="collapse">
+  <li><a href="#dataset-d1---all" id="toc-dataset-d1---all" class="nav-link" data-scroll-target="#dataset-d1---all"><span class="header-section-number">2.1</span> Dataset D1 - All</a></li>
+  <li><a href="#model-m1---simple" id="toc-model-m1---simple" class="nav-link" data-scroll-target="#model-m1---simple"><span class="header-section-number">2.2</span> Model M1 - Simple</a></li>
+  <li><a href="#model-m2---line-only" id="toc-model-m2---line-only" class="nav-link" data-scroll-target="#model-m2---line-only"><span class="header-section-number">2.3</span> Model M2 - Line-only</a></li>
+  <li><a href="#model-m3---treatment-only" id="toc-model-m3---treatment-only" class="nav-link" data-scroll-target="#model-m3---treatment-only"><span class="header-section-number">2.4</span> Model M3 - Treatment-only</a></li>
+  </ul></li>
+  <li><a href="#find-differential-genes" id="toc-find-differential-genes" class="nav-link" data-scroll-target="#find-differential-genes"><span class="header-section-number">3</span> Find differential genes</a>
+  <ul class="collapse">
+  <li><a href="#summary-tables" id="toc-summary-tables" class="nav-link" data-scroll-target="#summary-tables"><span class="header-section-number">3.1</span> Summary Tables</a></li>
+  </ul></li>
+  <li><a href="#scatterplot-of-differential-genes" id="toc-scatterplot-of-differential-genes" class="nav-link" data-scroll-target="#scatterplot-of-differential-genes"><span class="header-section-number">4</span> Scatterplot of differential genes</a>
+  <ul class="collapse">
+  <li><a href="#dataset-d1---all-1" id="toc-dataset-d1---all-1" class="nav-link" data-scroll-target="#dataset-d1---all-1"><span class="header-section-number">4.1</span> Dataset D1 - All</a>
+  <ul class="collapse">
+  <li><a href="#model-m1---simple-1" id="toc-model-m1---simple-1" class="nav-link" data-scroll-target="#model-m1---simple-1"><span class="header-section-number">4.1.1</span> Model M1 - Simple</a></li>
+  <li><a href="#model-m2---line-only-1" id="toc-model-m2---line-only-1" class="nav-link" data-scroll-target="#model-m2---line-only-1"><span class="header-section-number">4.1.2</span> Model M2 - Line-only</a></li>
+  <li><a href="#model-m3---treatment-only-1" id="toc-model-m3---treatment-only-1" class="nav-link" data-scroll-target="#model-m3---treatment-only-1"><span class="header-section-number">4.1.3</span> Model M3 - Treatment-only</a></li>
+  </ul></li>
+  </ul></li>
+  <li><a href="#differential-heatmaps" id="toc-differential-heatmaps" class="nav-link" data-scroll-target="#differential-heatmaps"><span class="header-section-number">5</span> Differential Heatmaps</a>
+  <ul class="collapse">
+  <li><a href="#dataset-d1---all-2" id="toc-dataset-d1---all-2" class="nav-link" data-scroll-target="#dataset-d1---all-2"><span class="header-section-number">5.1</span> Dataset D1 - All</a>
+  <ul class="collapse">
+  <li><a href="#model-m1---simple-2" id="toc-model-m1---simple-2" class="nav-link" data-scroll-target="#model-m1---simple-2"><span class="header-section-number">5.1.1</span> Model M1 - Simple</a></li>
+  <li><a href="#model-m2---line-only-2" id="toc-model-m2---line-only-2" class="nav-link" data-scroll-target="#model-m2---line-only-2"><span class="header-section-number">5.1.2</span> Model M2 - Line-only</a></li>
+  <li><a href="#model-m3---treatment-only-2" id="toc-model-m3---treatment-only-2" class="nav-link" data-scroll-target="#model-m3---treatment-only-2"><span class="header-section-number">5.1.3</span> Model M3 - Treatment-only</a></li>
+  </ul></li>
+  </ul></li>
+  <li><a href="#terms-of-use" id="toc-terms-of-use" class="nav-link" data-scroll-target="#terms-of-use"><span class="header-section-number">6</span> Terms Of Use</a></li>
+  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references"><span class="header-section-number">7</span> References</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Differential analysis GRCh38 analyse</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">GRCh38</div>
+    <div class="quarto-category">analyse</div>
+    <div class="quarto-category">Differential</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    Differential analysis of GRCh38-aligned data according to plan ‘analyse’
+  </div>
+</div>
+
+<div class="quarto-title-meta-author">
+  <div class="quarto-title-meta-heading">Author</div>
+  <div class="quarto-title-meta-heading">Affiliation</div>
+  
+    <div class="quarto-title-meta-contents">
+    <p class="author">Gavin Kelly </p>
+  </div>
+    <div class="quarto-title-meta-contents">
+        <p class="affiliation">
+            BABS - Francis Crick Institute
+          </p>
+      </div>
+    </div>
+
+<div class="quarto-title-meta">
+
+      
+  
+    
+  </div>
+  
+
+</header>
+
+<section id="preface" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Preface</h1>
+<p>We load in all the necessary additional R packages, and set up some initial parameters.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="tbl-load-diff2" class="anchored">
+
+<div id="ydgabwknrs" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#ydgabwknrs table {
+  font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#ydgabwknrs thead, #ydgabwknrs tbody, #ydgabwknrs tfoot, #ydgabwknrs tr, #ydgabwknrs td, #ydgabwknrs th {
+  border-style: none;
+}
+
+#ydgabwknrs p {
+  margin: 0;
+  padding: 0;
+}
+
+#ydgabwknrs .gt_table {
+  display: table;
+  border-collapse: collapse;
+  line-height: normal;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#ydgabwknrs .gt_caption {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+#ydgabwknrs .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#ydgabwknrs .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 3px;
+  padding-bottom: 5px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#ydgabwknrs .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#ydgabwknrs .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#ydgabwknrs .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#ydgabwknrs .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#ydgabwknrs .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#ydgabwknrs .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#ydgabwknrs .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#ydgabwknrs .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#ydgabwknrs .gt_spanner_row {
+  border-bottom-style: hidden;
+}
+
+#ydgabwknrs .gt_group_heading {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  text-align: left;
+}
+
+#ydgabwknrs .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#ydgabwknrs .gt_from_md > :first-child {
+  margin-top: 0;
+}
+
+#ydgabwknrs .gt_from_md > :last-child {
+  margin-bottom: 0;
+}
+
+#ydgabwknrs .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#ydgabwknrs .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#ydgabwknrs .gt_stub_row_group {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+  vertical-align: top;
+}
+
+#ydgabwknrs .gt_row_group_first td {
+  border-top-width: 2px;
+}
+
+#ydgabwknrs .gt_row_group_first th {
+  border-top-width: 2px;
+}
+
+#ydgabwknrs .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#ydgabwknrs .gt_first_summary_row {
+  border-top-style: solid;
+  border-top-color: #D3D3D3;
+}
+
+#ydgabwknrs .gt_first_summary_row.thick {
+  border-top-width: 2px;
+}
+
+#ydgabwknrs .gt_last_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#ydgabwknrs .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#ydgabwknrs .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#ydgabwknrs .gt_last_grand_summary_row_top {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: double;
+  border-bottom-width: 6px;
+  border-bottom-color: #D3D3D3;
+}
+
+#ydgabwknrs .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#ydgabwknrs .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#ydgabwknrs .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#ydgabwknrs .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#ydgabwknrs .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#ydgabwknrs .gt_sourcenote {
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#ydgabwknrs .gt_left {
+  text-align: left;
+}
+
+#ydgabwknrs .gt_center {
+  text-align: center;
+}
+
+#ydgabwknrs .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#ydgabwknrs .gt_font_normal {
+  font-weight: normal;
+}
+
+#ydgabwknrs .gt_font_bold {
+  font-weight: bold;
+}
+
+#ydgabwknrs .gt_font_italic {
+  font-style: italic;
+}
+
+#ydgabwknrs .gt_super {
+  font-size: 65%;
+}
+
+#ydgabwknrs .gt_footnote_marks {
+  font-size: 75%;
+  vertical-align: 0.4em;
+  position: initial;
+}
+
+#ydgabwknrs .gt_asterisk {
+  font-size: 100%;
+  vertical-align: 0;
+}
+
+#ydgabwknrs .gt_indent_1 {
+  text-indent: 5px;
+}
+
+#ydgabwknrs .gt_indent_2 {
+  text-indent: 10px;
+}
+
+#ydgabwknrs .gt_indent_3 {
+  text-indent: 15px;
+}
+
+#ydgabwknrs .gt_indent_4 {
+  text-indent: 20px;
+}
+
+#ydgabwknrs .gt_indent_5 {
+  text-indent: 25px;
+}
+</style>
+<table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false"><caption>Table&nbsp;1:  <p>Context</p> </caption>
+  <thead>
+    <tr class="gt_col_headings">
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1" scope="col" id="Setting">Setting</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1" scope="col" id="Value">Value</th>
+    </tr>
+  </thead>
+  <tbody class="gt_table_body">
+    <tr><td headers="Setting" class="gt_row gt_left">section</td>
+<td headers="Value" class="gt_row gt_left">Differential analysis</td></tr>
+    <tr><td headers="Setting" class="gt_row gt_left">res_dir</td>
+<td headers="Value" class="gt_row gt_left">results/v9.9.9</td></tr>
+    <tr><td headers="Setting" class="gt_row gt_left">VERSION</td>
+<td headers="Value" class="gt_row gt_left">v9.9.9</td></tr>
+    <tr><td headers="Setting" class="gt_row gt_left">TAG</td>
+<td headers="Value" class="gt_row gt_left">_v9.9.9-2-g5981c75_altered</td></tr>
+    <tr><td headers="Setting" class="gt_row gt_left">staging_dir</td>
+<td headers="Value" class="gt_row gt_left">staging</td></tr>
+    <tr><td headers="Setting" class="gt_row gt_left">file_col</td>
+<td headers="Value" class="gt_row gt_left">ID</td></tr>
+    <tr><td headers="Setting" class="gt_row gt_left">name_col</td>
+<td headers="Value" class="gt_row gt_left">sample_name</td></tr>
+    <tr><td headers="Setting" class="gt_row gt_left">metadata</td>
+<td headers="Value" class="gt_row gt_left">extdata/metadata_GRCh38.csv</td></tr>
+    <tr><td headers="Setting" class="gt_row gt_left">counts</td>
+<td headers="Value" class="gt_row gt_left">extdata/genes.results/GRCh38/</td></tr>
+    <tr><td headers="Setting" class="gt_row gt_left">alignment</td>
+<td headers="Value" class="gt_row gt_left">GRCh38</td></tr>
+    <tr><td headers="Setting" class="gt_row gt_left">spec</td>
+<td headers="Value" class="gt_row gt_left">analyse</td></tr>
+    <tr><td headers="Setting" class="gt_row gt_left">script</td>
+<td headers="Value" class="gt_row gt_left">staging/02_differential_analyse_GRCh38.qmd</td></tr>
+  </tbody>
+  
+  
+</table>
+</div>
+</div>
+</div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled" title="Setting analysis parameter">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Setting analysis parameter
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li>A random seed of 1 is used to ensure reproduciblity</li>
+<li>Using analysis plan ‘analyse’.</li>
+<li>Using alignment settings ‘GRCh38’</li>
+</ul>
+</div>
+</div>
+</section>
+<section id="datasets-and-models" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Datasets and Models</h1>
+<p>As in the exploratory analysis, we may examine the samples in different combinations, and leave out certain samples. In the above table, the columns under the ‘In Subset’ group indicate these combinations are listed, and the samples’ inclusions are indicated.</p>
+<p>Each of those combinations may be analysed in potentially several ways, as formulated here:</p>
+<section id="dataset-d1---all" class="level2" data-number="2.1">
+<h2 data-number="2.1" class="anchored" data-anchor-id="dataset-d1---all"><span class="header-section-number">2.1</span> Dataset D1 - All</h2>
+<p>All samples included</p>
+</section>
+<section id="model-m1---simple" class="level2" data-number="2.2">
+<h2 data-number="2.2" class="anchored" data-anchor-id="model-m1---simple"><span class="header-section-number">2.2</span> Model M1 - Simple</h2>
+<p>Including treatment and line, so that we can look at either one of those effects while accounting for any systematic changes in the other. But no interaction, so when there is a modifying effect (of treatment type on the response to line, or vice versa) will be unaccounted for and genes exhibiting this behaviour will tend not to be selected. There is no replication (ie no line x treatment combination has more than one sample, so we have to restrict our model to at most this complexity.</p>
+<p><code>Expression ~ treatment + cellLine</code></p>
+</section>
+<section id="model-m2---line-only" class="level2" data-number="2.3">
+<h2 data-number="2.3" class="anchored" data-anchor-id="model-m2---line-only"><span class="header-section-number">2.3</span> Model M2 - Line-only</h2>
+<p>Just including a line effect, and totally ignoring treatment. So any systematic treatment effect will not be accounted for, and genes exhibiting a change due to treatment will tend not to be selected</p>
+<p><code>Expression ~ cellLine</code></p>
+</section>
+<section id="model-m3---treatment-only" class="level2" data-number="2.4">
+<h2 data-number="2.4" class="anchored" data-anchor-id="model-m3---treatment-only"><span class="header-section-number">2.4</span> Model M3 - Treatment-only</h2>
+<p>Just including a treatment effect, and totally ignoring treatment. So any systematic differences between lines will not be accounted for, and genes exhibiting a dependencey on line will tend not to be selected</p>
+<p><code>Expression ~ treatment</code></p>
+</section>
+</section>
+<section id="find-differential-genes" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Find differential genes</h1>
+<p>We use DESeq2 <span class="citation" data-cites="pkg_DESeq2">(<a href="#ref-pkg_DESeq2" role="doc-biblioref">Love, Anders, and Huber 2024</a>)</span> to find differential genes using the negative binomial distribution to model counts, with IHW <span class="citation" data-cites="IHW2016">(<a href="#ref-IHW2016" role="doc-biblioref">Ignatiadis et al. 2016</a>)</span> for multiple-testing correction with greater power than Benjamini-Hochberg, and ashr <span class="citation" data-cites="pkg_ashr">(<a href="#ref-pkg_ashr" role="doc-biblioref">Stephens et al. 2023</a>)</span> for effect-size shrinkage to ensure reported fold-changes are more robust.</p>
+<div class="callout callout-style-default callout-note callout-titled" title="Setting analysis parameter">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Setting analysis parameter
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li>The threshold of statistical significance is 0.05</li>
+<li>The threshold for absolute effect size is 0</li>
+<li>Default independent filtering</li>
+<li>Use the ‘min’ heuristic to centre the colour-scale</li>
+<li>Use the ‘default’ summary of an LRT ‘effect size’</li>
+</ul>
+</div>
+</div>
+<p><a class="download-excel btn btn-primary" href="differential_analyse_D1.xlsx"> Open Spreadsheet ‘D1’</a></p>
+<section id="summary-tables" class="level2" data-number="3.1">
+<h2 data-number="3.1" class="anchored" data-anchor-id="summary-tables"><span class="header-section-number">3.1</span> Summary Tables</h2>
+<p>Here we summarise the results of the differential testing. Each sample-set gets its own table (flick between tabs to choose which), within which the different models, and their null hypotheses, are enumerated.</p>
+<p>In the ‘Significant’ column we tally the number of significant genes (for pairwise comparisons, separated into up or down, where A-B being labelled up means expression is higher in A; for omnibus comparisons, a broad categorisation of the most extreme groups, as described above.) We also tally the total number of genes exhibiting that behaviour (ie not necessarily statistically signficant) - these might not always add up to the same value, as there is an independent filter of low-signal genes whose effect varies from comparison to comparison.</p>
+<p>Our naming convention for a comparison often looks like <code>A-B|M</code> - again, because this is an semi-automated report, this mightn’t be optimal, but the rationale is <code>A-B</code> refers to the two experimental conditions being compared (a ‘upward’ fold change will be reported if the expression is higher in <code>A</code> than it is in <code>B</code>). The <code>|M</code> part refers to the fact that we may have looked at that <code>A-B</code> comparison conditional upon some other variable (which in this example takes the value <code>M</code>): anything before the <code>|</code> symbol identifies the experimental conditions that are being contrasted, and the part after the <code>|</code> identifies any stratification/conditioning of the data.</p>
+<p>In <a href="#fig-summaryp-1">Figure&nbsp;1</a> we present some diagnostic plots of the observed p-values. Theoretically we want the pink part of the plot to have a solid peak on the left, and then make a reasonable plateau across higher p-values: gross deviations from this can indicate an absence of differential behaviour (lack of left-peak) or a model mis-specification that might need investigating. The blue tracks indicate p-values corresponding to very lowly expressed genes, which would typically struggle to provide evidence of differential behaviour, and so show an example of what a ‘bad’ pink trace might look like.</p>
+<div id="tbl-summary" class="cell tbl-parent quarto-layout-panel anchored">
+<div class="panel-caption table-caption">
+<p>Table&nbsp;2: Summaries</p>
+</div>
+<div class="quarto-layout-row quarto-layout-valign-top">
+<div class="cell quarto-layout-cell" style="flex-basis: 100.0%;justify-content: center;">
+<div class="cell-output-display">
+<div id="tbl-summary-D1" data-ref-parent="tbl-summary" class="anchored">
+
+<div id="hwxckrjkrd" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#hwxckrjkrd table {
+  font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#hwxckrjkrd thead, #hwxckrjkrd tbody, #hwxckrjkrd tfoot, #hwxckrjkrd tr, #hwxckrjkrd td, #hwxckrjkrd th {
+  border-style: none;
+}
+
+#hwxckrjkrd p {
+  margin: 0;
+  padding: 0;
+}
+
+#hwxckrjkrd .gt_table {
+  display: table;
+  border-collapse: collapse;
+  line-height: normal;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#hwxckrjkrd .gt_caption {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+#hwxckrjkrd .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#hwxckrjkrd .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 3px;
+  padding-bottom: 5px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#hwxckrjkrd .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#hwxckrjkrd .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#hwxckrjkrd .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#hwxckrjkrd .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#hwxckrjkrd .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#hwxckrjkrd .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#hwxckrjkrd .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#hwxckrjkrd .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#hwxckrjkrd .gt_spanner_row {
+  border-bottom-style: hidden;
+}
+
+#hwxckrjkrd .gt_group_heading {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  text-align: left;
+}
+
+#hwxckrjkrd .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#hwxckrjkrd .gt_from_md > :first-child {
+  margin-top: 0;
+}
+
+#hwxckrjkrd .gt_from_md > :last-child {
+  margin-bottom: 0;
+}
+
+#hwxckrjkrd .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#hwxckrjkrd .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#hwxckrjkrd .gt_stub_row_group {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+  vertical-align: top;
+}
+
+#hwxckrjkrd .gt_row_group_first td {
+  border-top-width: 2px;
+}
+
+#hwxckrjkrd .gt_row_group_first th {
+  border-top-width: 2px;
+}
+
+#hwxckrjkrd .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#hwxckrjkrd .gt_first_summary_row {
+  border-top-style: solid;
+  border-top-color: #D3D3D3;
+}
+
+#hwxckrjkrd .gt_first_summary_row.thick {
+  border-top-width: 2px;
+}
+
+#hwxckrjkrd .gt_last_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#hwxckrjkrd .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#hwxckrjkrd .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#hwxckrjkrd .gt_last_grand_summary_row_top {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: double;
+  border-bottom-width: 6px;
+  border-bottom-color: #D3D3D3;
+}
+
+#hwxckrjkrd .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#hwxckrjkrd .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#hwxckrjkrd .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#hwxckrjkrd .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#hwxckrjkrd .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#hwxckrjkrd .gt_sourcenote {
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#hwxckrjkrd .gt_left {
+  text-align: left;
+}
+
+#hwxckrjkrd .gt_center {
+  text-align: center;
+}
+
+#hwxckrjkrd .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#hwxckrjkrd .gt_font_normal {
+  font-weight: normal;
+}
+
+#hwxckrjkrd .gt_font_bold {
+  font-weight: bold;
+}
+
+#hwxckrjkrd .gt_font_italic {
+  font-style: italic;
+}
+
+#hwxckrjkrd .gt_super {
+  font-size: 65%;
+}
+
+#hwxckrjkrd .gt_footnote_marks {
+  font-size: 75%;
+  vertical-align: 0.4em;
+  position: initial;
+}
+
+#hwxckrjkrd .gt_asterisk {
+  font-size: 100%;
+  vertical-align: 0;
+}
+
+#hwxckrjkrd .gt_indent_1 {
+  text-indent: 5px;
+}
+
+#hwxckrjkrd .gt_indent_2 {
+  text-indent: 10px;
+}
+
+#hwxckrjkrd .gt_indent_3 {
+  text-indent: 15px;
+}
+
+#hwxckrjkrd .gt_indent_4 {
+  text-indent: 20px;
+}
+
+#hwxckrjkrd .gt_indent_5 {
+  text-indent: 25px;
+}
+</style>
+<table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false"><caption>(a) <p>D1</p> </caption>
+  <thead>
+    <tr class="gt_heading">
+      <td colspan="4" class="gt_heading gt_title gt_font_normal" style="">Genelist summary</td>
+    </tr>
+    <tr class="gt_heading">
+      <td colspan="4" class="gt_heading gt_subtitle gt_font_normal gt_bottom_border" style="">D1</td>
+    </tr>
+    <tr class="gt_col_headings">
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1" scope="col" id="Comparison">Comparison</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_center" rowspan="1" colspan="1" scope="col" id="Group">Group</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="Significant">Significant</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="Total">Total</th>
+    </tr>
+  </thead>
+  <tbody class="gt_table_body">
+    <tr class="gt_group_heading_row">
+      <th colspan="4" class="gt_group_heading" style="background-color: #BEE2E9;" scope="colgroup" id="M1">M1</th>
+    </tr>
+    <tr class="gt_row_group_first"><td headers="M1  Comparison" class="gt_row gt_left">C1.Untreated - Dexamethasone</td>
+<td headers="M1  Group" class="gt_row gt_center">Down</td>
+<td headers="M1  Significant" class="gt_row gt_right">1860</td>
+<td headers="M1  Total" class="gt_row gt_right">7386</td></tr>
+    <tr><td headers="M1  Comparison" class="gt_row gt_left">C1.Untreated - Dexamethasone</td>
+<td headers="M1  Group" class="gt_row gt_center">Up</td>
+<td headers="M1  Significant" class="gt_row gt_right">1528</td>
+<td headers="M1  Total" class="gt_row gt_right">7608</td></tr>
+    <tr><td headers="M1  Comparison" class="gt_row gt_left">C2.N061011 - N052611</td>
+<td headers="M1  Group" class="gt_row gt_center">Up</td>
+<td headers="M1  Significant" class="gt_row gt_right">273</td>
+<td headers="M1  Total" class="gt_row gt_right">8558</td></tr>
+    <tr><td headers="M1  Comparison" class="gt_row gt_left">C2.N061011 - N052611</td>
+<td headers="M1  Group" class="gt_row gt_center">Down</td>
+<td headers="M1  Significant" class="gt_row gt_right">238</td>
+<td headers="M1  Total" class="gt_row gt_right">8194</td></tr>
+    <tr><td headers="M1  Comparison" class="gt_row gt_left">C2.N080611 - N052611</td>
+<td headers="M1  Group" class="gt_row gt_center">Down</td>
+<td headers="M1  Significant" class="gt_row gt_right">741</td>
+<td headers="M1  Total" class="gt_row gt_right">8490</td></tr>
+    <tr><td headers="M1  Comparison" class="gt_row gt_left">C2.N080611 - N052611</td>
+<td headers="M1  Group" class="gt_row gt_center">Up</td>
+<td headers="M1  Significant" class="gt_row gt_right">583</td>
+<td headers="M1  Total" class="gt_row gt_right">8848</td></tr>
+    <tr><td headers="M1  Comparison" class="gt_row gt_left">C2.N080611 - N061011</td>
+<td headers="M1  Group" class="gt_row gt_center">Down</td>
+<td headers="M1  Significant" class="gt_row gt_right">927</td>
+<td headers="M1  Total" class="gt_row gt_right">8654</td></tr>
+    <tr><td headers="M1  Comparison" class="gt_row gt_left">C2.N080611 - N061011</td>
+<td headers="M1  Group" class="gt_row gt_center">Up</td>
+<td headers="M1  Significant" class="gt_row gt_right">685</td>
+<td headers="M1  Total" class="gt_row gt_right">8684</td></tr>
+    <tr><td headers="M1  Comparison" class="gt_row gt_left">C2.N61311 - N052611</td>
+<td headers="M1  Group" class="gt_row gt_center">Down</td>
+<td headers="M1  Significant" class="gt_row gt_right">717</td>
+<td headers="M1  Total" class="gt_row gt_right">7764</td></tr>
+    <tr><td headers="M1  Comparison" class="gt_row gt_left">C2.N61311 - N052611</td>
+<td headers="M1  Group" class="gt_row gt_center">Up</td>
+<td headers="M1  Significant" class="gt_row gt_right">567</td>
+<td headers="M1  Total" class="gt_row gt_right">7816</td></tr>
+    <tr><td headers="M1  Comparison" class="gt_row gt_left">C2.N61311 - N061011</td>
+<td headers="M1  Group" class="gt_row gt_center">Down</td>
+<td headers="M1  Significant" class="gt_row gt_right">649</td>
+<td headers="M1  Total" class="gt_row gt_right">8621</td></tr>
+    <tr><td headers="M1  Comparison" class="gt_row gt_left">C2.N61311 - N061011</td>
+<td headers="M1  Group" class="gt_row gt_center">Up</td>
+<td headers="M1  Significant" class="gt_row gt_right">476</td>
+<td headers="M1  Total" class="gt_row gt_right">8131</td></tr>
+    <tr><td headers="M1  Comparison" class="gt_row gt_left">C2.N61311 - N080611</td>
+<td headers="M1  Group" class="gt_row gt_center">Up</td>
+<td headers="M1  Significant" class="gt_row gt_right">902</td>
+<td headers="M1  Total" class="gt_row gt_right">8578</td></tr>
+    <tr><td headers="M1  Comparison" class="gt_row gt_left">C2.N61311 - N080611</td>
+<td headers="M1  Group" class="gt_row gt_center">Down</td>
+<td headers="M1  Significant" class="gt_row gt_right">916</td>
+<td headers="M1  Total" class="gt_row gt_right">8760</td></tr>
+    <tr class="gt_group_heading_row">
+      <th colspan="4" class="gt_group_heading" style="background-color: #BEE2E9;" scope="colgroup" id="M2">M2</th>
+    </tr>
+    <tr class="gt_row_group_first"><td headers="M2  Comparison" class="gt_row gt_left">C3.N061011 - N052611</td>
+<td headers="M2  Group" class="gt_row gt_center">Down</td>
+<td headers="M2  Significant" class="gt_row gt_right">86</td>
+<td headers="M2  Total" class="gt_row gt_right">9731</td></tr>
+    <tr><td headers="M2  Comparison" class="gt_row gt_left">C3.N061011 - N052611</td>
+<td headers="M2  Group" class="gt_row gt_center">Up</td>
+<td headers="M2  Significant" class="gt_row gt_right">86</td>
+<td headers="M2  Total" class="gt_row gt_right">9952</td></tr>
+    <tr><td headers="M2  Comparison" class="gt_row gt_left">C3.N080611 - N052611</td>
+<td headers="M2  Group" class="gt_row gt_center">Down</td>
+<td headers="M2  Significant" class="gt_row gt_right">310</td>
+<td headers="M2  Total" class="gt_row gt_right">8869</td></tr>
+    <tr><td headers="M2  Comparison" class="gt_row gt_left">C3.N080611 - N052611</td>
+<td headers="M2  Group" class="gt_row gt_center">Up</td>
+<td headers="M2  Significant" class="gt_row gt_right">207</td>
+<td headers="M2  Total" class="gt_row gt_right">9055</td></tr>
+    <tr><td headers="M2  Comparison" class="gt_row gt_left">C3.N080611 - N061011</td>
+<td headers="M2  Group" class="gt_row gt_center">Down</td>
+<td headers="M2  Significant" class="gt_row gt_right">381</td>
+<td headers="M2  Total" class="gt_row gt_right">8706</td></tr>
+    <tr><td headers="M2  Comparison" class="gt_row gt_left">C3.N080611 - N061011</td>
+<td headers="M2  Group" class="gt_row gt_center">Up</td>
+<td headers="M2  Significant" class="gt_row gt_right">220</td>
+<td headers="M2  Total" class="gt_row gt_right">8632</td></tr>
+    <tr><td headers="M2  Comparison" class="gt_row gt_left">C3.N61311 - N052611</td>
+<td headers="M2  Group" class="gt_row gt_center">Down</td>
+<td headers="M2  Significant" class="gt_row gt_right">221</td>
+<td headers="M2  Total" class="gt_row gt_right">8406</td></tr>
+    <tr><td headers="M2  Comparison" class="gt_row gt_left">C3.N61311 - N052611</td>
+<td headers="M2  Group" class="gt_row gt_center">Up</td>
+<td headers="M2  Significant" class="gt_row gt_right">192</td>
+<td headers="M2  Total" class="gt_row gt_right">8346</td></tr>
+    <tr><td headers="M2  Comparison" class="gt_row gt_left">C3.N61311 - N061011</td>
+<td headers="M2  Group" class="gt_row gt_center">Up</td>
+<td headers="M2  Significant" class="gt_row gt_right">197</td>
+<td headers="M2  Total" class="gt_row gt_right">8340</td></tr>
+    <tr><td headers="M2  Comparison" class="gt_row gt_left">C3.N61311 - N061011</td>
+<td headers="M2  Group" class="gt_row gt_center">Down</td>
+<td headers="M2  Significant" class="gt_row gt_right">195</td>
+<td headers="M2  Total" class="gt_row gt_right">8998</td></tr>
+    <tr><td headers="M2  Comparison" class="gt_row gt_left">C3.N61311 - N080611</td>
+<td headers="M2  Group" class="gt_row gt_center">Up</td>
+<td headers="M2  Significant" class="gt_row gt_right">368</td>
+<td headers="M2  Total" class="gt_row gt_right">9798</td></tr>
+    <tr><td headers="M2  Comparison" class="gt_row gt_left">C3.N61311 - N080611</td>
+<td headers="M2  Group" class="gt_row gt_center">Down</td>
+<td headers="M2  Significant" class="gt_row gt_right">292</td>
+<td headers="M2  Total" class="gt_row gt_right">9885</td></tr>
+    <tr class="gt_group_heading_row">
+      <th colspan="4" class="gt_group_heading" style="background-color: #BEE2E9;" scope="colgroup" id="M3">M3</th>
+    </tr>
+    <tr class="gt_row_group_first"><td headers="M3  Comparison" class="gt_row gt_left">C4.Untreated - Dexamethasone</td>
+<td headers="M3  Group" class="gt_row gt_center">Down</td>
+<td headers="M3  Significant" class="gt_row gt_right">1274</td>
+<td headers="M3  Total" class="gt_row gt_right">8501</td></tr>
+    <tr><td headers="M3  Comparison" class="gt_row gt_left">C4.Untreated - Dexamethasone</td>
+<td headers="M3  Group" class="gt_row gt_center">Up</td>
+<td headers="M3  Significant" class="gt_row gt_right">964</td>
+<td headers="M3  Total" class="gt_row gt_right">8775</td></tr>
+  </tbody>
+  
+  
+</table>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="quarto-layout-row quarto-layout-valign-top">
+<div class="cell quarto-layout-cell" style="flex-basis: 100.0%;justify-content: center;">
+<div class="cell-output-display">
+<div id="tbl-summaryfit-D1" data-ref-parent="tbl-summary" class="anchored">
+
+<div id="typmtyapbz" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#typmtyapbz table {
+  font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#typmtyapbz thead, #typmtyapbz tbody, #typmtyapbz tfoot, #typmtyapbz tr, #typmtyapbz td, #typmtyapbz th {
+  border-style: none;
+}
+
+#typmtyapbz p {
+  margin: 0;
+  padding: 0;
+}
+
+#typmtyapbz .gt_table {
+  display: table;
+  border-collapse: collapse;
+  line-height: normal;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#typmtyapbz .gt_caption {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+#typmtyapbz .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#typmtyapbz .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 3px;
+  padding-bottom: 5px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#typmtyapbz .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#typmtyapbz .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#typmtyapbz .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#typmtyapbz .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#typmtyapbz .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#typmtyapbz .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#typmtyapbz .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#typmtyapbz .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#typmtyapbz .gt_spanner_row {
+  border-bottom-style: hidden;
+}
+
+#typmtyapbz .gt_group_heading {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  text-align: left;
+}
+
+#typmtyapbz .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#typmtyapbz .gt_from_md > :first-child {
+  margin-top: 0;
+}
+
+#typmtyapbz .gt_from_md > :last-child {
+  margin-bottom: 0;
+}
+
+#typmtyapbz .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#typmtyapbz .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#typmtyapbz .gt_stub_row_group {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+  vertical-align: top;
+}
+
+#typmtyapbz .gt_row_group_first td {
+  border-top-width: 2px;
+}
+
+#typmtyapbz .gt_row_group_first th {
+  border-top-width: 2px;
+}
+
+#typmtyapbz .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#typmtyapbz .gt_first_summary_row {
+  border-top-style: solid;
+  border-top-color: #D3D3D3;
+}
+
+#typmtyapbz .gt_first_summary_row.thick {
+  border-top-width: 2px;
+}
+
+#typmtyapbz .gt_last_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#typmtyapbz .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#typmtyapbz .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#typmtyapbz .gt_last_grand_summary_row_top {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: double;
+  border-bottom-width: 6px;
+  border-bottom-color: #D3D3D3;
+}
+
+#typmtyapbz .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#typmtyapbz .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#typmtyapbz .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#typmtyapbz .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#typmtyapbz .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#typmtyapbz .gt_sourcenote {
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#typmtyapbz .gt_left {
+  text-align: left;
+}
+
+#typmtyapbz .gt_center {
+  text-align: center;
+}
+
+#typmtyapbz .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#typmtyapbz .gt_font_normal {
+  font-weight: normal;
+}
+
+#typmtyapbz .gt_font_bold {
+  font-weight: bold;
+}
+
+#typmtyapbz .gt_font_italic {
+  font-style: italic;
+}
+
+#typmtyapbz .gt_super {
+  font-size: 65%;
+}
+
+#typmtyapbz .gt_footnote_marks {
+  font-size: 75%;
+  vertical-align: 0.4em;
+  position: initial;
+}
+
+#typmtyapbz .gt_asterisk {
+  font-size: 100%;
+  vertical-align: 0;
+}
+
+#typmtyapbz .gt_indent_1 {
+  text-indent: 5px;
+}
+
+#typmtyapbz .gt_indent_2 {
+  text-indent: 10px;
+}
+
+#typmtyapbz .gt_indent_3 {
+  text-indent: 15px;
+}
+
+#typmtyapbz .gt_indent_4 {
+  text-indent: 20px;
+}
+
+#typmtyapbz .gt_indent_5 {
+  text-indent: 25px;
+}
+</style>
+<table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false"><caption>(b) <p>D1 model-fit stats</p> </caption>
+  <thead>
+    <tr class="gt_heading">
+      <td colspan="3" class="gt_heading gt_title gt_font_normal" style="">Model-fit summary</td>
+    </tr>
+    <tr class="gt_heading">
+      <td colspan="3" class="gt_heading gt_subtitle gt_font_normal gt_bottom_border" style="">D1</td>
+    </tr>
+    <tr class="gt_col_headings">
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1" scope="col" id="Model">Model</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1" scope="col" id="Low Count">Low Count</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="Outlier">Outlier</th>
+    </tr>
+  </thead>
+  <tbody class="gt_table_body">
+    <tr><td headers="Model" class="gt_row gt_left">M1</td>
+<td headers="Low Count" class="gt_row gt_left">15240;13482;12896;14654</td>
+<td headers="Outlier" class="gt_row gt_right">NA</td></tr>
+    <tr><td headers="Model" class="gt_row gt_left">M2</td>
+<td headers="Low Count" class="gt_row gt_left">10551;12310;12896;13482</td>
+<td headers="Outlier" class="gt_row gt_right">NA</td></tr>
+    <tr><td headers="Model" class="gt_row gt_left">M3</td>
+<td headers="Low Count" class="gt_row gt_left">12895</td>
+<td headers="Outlier" class="gt_row gt_right">63</td></tr>
+  </tbody>
+  
+  
+</table>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="fig-summaryp-1" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-001-summaryp-1_v9.9.9-2-g5981c75_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;1: <a href="02_differential_analyse_GRCh38/fig-001-summaryp-1_v9.9.9-2-g5981c75_altered.pdf">p-Diagnostic for D1 M1</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-summaryp-2" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-002-summaryp-2_v9.9.9-2-g5981c75_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;2: <a href="02_differential_analyse_GRCh38/fig-002-summaryp-2_v9.9.9-2-g5981c75_altered.pdf">p-Diagnostic for D1 M2</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-summaryp-3" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-003-summaryp-3_v9.9.9-2-g5981c75_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;3: <a href="02_differential_analyse_GRCh38/fig-003-summaryp-3_v9.9.9-2-g5981c75_altered.pdf">p-Diagnostic for D1 M3</a></figcaption>
+</figure>
+</div>
+<hr>
+</section>
+</section>
+<section id="scatterplot-of-differential-genes" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> Scatterplot of differential genes</h1>
+<p>Here we plot the fold-change across all genes on the vertical axis, against their overall expression on the horizontal. Statistically significant genes are highlighted in colour, and we attempt to auto-label as many gene symbols as might be legible.</p>
+<p>The fold-changes are regularised (‘shrunk’) to reflect their reliability: genes with large variability between replicates are moved towards the horizontal axis, to de-emphasise them and to provide a more reliable prediction of behaviour in future replications.</p>
+<p>Again, select the dataset you wish to examine via the tabs - there are sub-tabs for different experimental designs, if any (e.g.&nbsp;removing/ignoring batch effects).</p>
+<section id="dataset-d1---all-1" class="level2" data-number="4.1">
+<h2 data-number="4.1" class="anchored" data-anchor-id="dataset-d1---all-1"><span class="header-section-number">4.1</span> Dataset D1 - All</h2>
+<p>All samples included</p>
+<section id="model-m1---simple-1" class="level3" data-number="4.1.1">
+<h3 data-number="4.1.1" class="anchored" data-anchor-id="model-m1---simple-1"><span class="header-section-number">4.1.1</span> Model M1 - Simple</h3>
+<p>Including treatment and line, so that we can look at either one of those effects while accounting for any systematic changes in the other. But no interaction, so when there is a modifying effect (of treatment type on the response to line, or vice versa) will be unaccounted for and genes exhibiting this behaviour will tend not to be selected. There is no replication (ie no line x treatment combination has more than one sample, so we have to restrict our model to at most this complexity.</p>
+<div id="fig-02-MA-1" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-004-02-MA-1_v9.9.9-2-g5981c75_altered.png" class="preview-image img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;4: <a href="02_differential_analyse_GRCh38/fig-004-02-MA-1_v9.9.9-2-g5981c75_altered.pdf">MA plot of differential genes C1.Untreated - Dexamethasone</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-02-MA-2" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-005-02-MA-2_v9.9.9-2-g5981c75_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;5: <a href="02_differential_analyse_GRCh38/fig-005-02-MA-2_v9.9.9-2-g5981c75_altered.pdf">MA plot of differential genes C2.N061011 - N052611</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-02-MA-3" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-006-02-MA-3_v9.9.9-2-g5981c75_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;6: <a href="02_differential_analyse_GRCh38/fig-006-02-MA-3_v9.9.9-2-g5981c75_altered.pdf">MA plot of differential genes C2.N080611 - N052611</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-02-MA-4" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-007-02-MA-4_v9.9.9-2-g5981c75_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;7: <a href="02_differential_analyse_GRCh38/fig-007-02-MA-4_v9.9.9-2-g5981c75_altered.pdf">MA plot of differential genes C2.N080611 - N061011</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-02-MA-5" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-008-02-MA-5_v9.9.9-2-g5981c75_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;8: <a href="02_differential_analyse_GRCh38/fig-008-02-MA-5_v9.9.9-2-g5981c75_altered.pdf">MA plot of differential genes C2.N61311 - N052611</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-02-MA-6" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-009-02-MA-6_v9.9.9-2-g5981c75_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;9: <a href="02_differential_analyse_GRCh38/fig-009-02-MA-6_v9.9.9-2-g5981c75_altered.pdf">MA plot of differential genes C2.N61311 - N061011</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-02-MA-7" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-010-02-MA-7_v9.9.9-2-g5981c75_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;10: <a href="02_differential_analyse_GRCh38/fig-010-02-MA-7_v9.9.9-2-g5981c75_altered.pdf">MA plot of differential genes C2.N61311 - N080611</a></figcaption>
+</figure>
+</div>
+<hr>
+</section>
+<section id="model-m2---line-only-1" class="level3" data-number="4.1.2">
+<h3 data-number="4.1.2" class="anchored" data-anchor-id="model-m2---line-only-1"><span class="header-section-number">4.1.2</span> Model M2 - Line-only</h3>
+<p>Just including a line effect, and totally ignoring treatment. So any systematic treatment effect will not be accounted for, and genes exhibiting a change due to treatment will tend not to be selected</p>
+<div id="fig-02-MA-8" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-011-02-MA-8_v9.9.9-2-g5981c75_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;11: <a href="02_differential_analyse_GRCh38/fig-011-02-MA-8_v9.9.9-2-g5981c75_altered.pdf">MA plot of differential genes C3.N061011 - N052611</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-02-MA-9" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-012-02-MA-9_v9.9.9-2-g5981c75_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;12: <a href="02_differential_analyse_GRCh38/fig-012-02-MA-9_v9.9.9-2-g5981c75_altered.pdf">MA plot of differential genes C3.N080611 - N052611</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-02-MA-10" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-013-02-MA-10_v9.9.9-2-g5981c75_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;13: <a href="02_differential_analyse_GRCh38/fig-013-02-MA-10_v9.9.9-2-g5981c75_altered.pdf">MA plot of differential genes C3.N080611 - N061011</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-02-MA-11" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-014-02-MA-11_v9.9.9-2-g5981c75_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;14: <a href="02_differential_analyse_GRCh38/fig-014-02-MA-11_v9.9.9-2-g5981c75_altered.pdf">MA plot of differential genes C3.N61311 - N052611</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-02-MA-12" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-015-02-MA-12_v9.9.9-2-g5981c75_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;15: <a href="02_differential_analyse_GRCh38/fig-015-02-MA-12_v9.9.9-2-g5981c75_altered.pdf">MA plot of differential genes C3.N61311 - N061011</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-02-MA-13" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-016-02-MA-13_v9.9.9-2-g5981c75_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;16: <a href="02_differential_analyse_GRCh38/fig-016-02-MA-13_v9.9.9-2-g5981c75_altered.pdf">MA plot of differential genes C3.N61311 - N080611</a></figcaption>
+</figure>
+</div>
+<hr>
+</section>
+<section id="model-m3---treatment-only-1" class="level3" data-number="4.1.3">
+<h3 data-number="4.1.3" class="anchored" data-anchor-id="model-m3---treatment-only-1"><span class="header-section-number">4.1.3</span> Model M3 - Treatment-only</h3>
+<p>Just including a treatment effect, and totally ignoring treatment. So any systematic differences between lines will not be accounted for, and genes exhibiting a dependencey on line will tend not to be selected</p>
+<div id="fig-02-MA-14" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-017-02-MA-14_v9.9.9-2-g5981c75_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;17: <a href="02_differential_analyse_GRCh38/fig-017-02-MA-14_v9.9.9-2-g5981c75_altered.pdf">MA plot of differential genes C4.Untreated - Dexamethasone</a></figcaption>
+</figure>
+</div>
+<hr>
+</section>
+</section>
+</section>
+<section id="differential-heatmaps" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> Differential Heatmaps</h1>
+<p>Here we present heatmaps of the differential genelists. Note that these will, by definition, divide the samples along lines of the experimental groups, so should be interpreted differently from the QC heatmaps which were blind to the experimental design.</p>
+<div class="callout callout-style-default callout-note callout-titled" title="Setting analysis parameter">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Setting analysis parameter
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li>The value of clustering_distance_rows is euclidean</li>
+<li>The value of clustering_distance_columns is euclidean</li>
+</ul>
+</div>
+</div>
+<section id="dataset-d1---all-2" class="level2" data-number="5.1">
+<h2 data-number="5.1" class="anchored" data-anchor-id="dataset-d1---all-2"><span class="header-section-number">5.1</span> Dataset D1 - All</h2>
+<p>All samples included</p>
+<div id="fig-02-legend-a-1" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-018-02-legend-a-1_v9.9.9-2-g5981c75_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;18: <a href="02_differential_analyse_GRCh38/fig-018-02-legend-a-1_v9.9.9-2-g5981c75_altered.pdf">Metadata colour-codings for All</a></figcaption>
+</figure>
+</div>
+<section id="model-m1---simple-2" class="level3" data-number="5.1.1">
+<h3 data-number="5.1.1" class="anchored" data-anchor-id="model-m1---simple-2"><span class="header-section-number">5.1.1</span> Model M1 - Simple</h3>
+<p>Including treatment and line, so that we can look at either one of those effects while accounting for any systematic changes in the other. But no interaction, so when there is a modifying effect (of treatment type on the response to line, or vice versa) will be unaccounted for and genes exhibiting this behaviour will tend not to be selected. There is no replication (ie no line x treatment combination has more than one sample, so we have to restrict our model to at most this complexity.</p>
+<div id="fig-02-Heatmap-1" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-019-02-Heatmap-1_v9.9.9-2-g5981c75_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;19: <a href="02_differential_analyse_GRCh38/fig-019-02-Heatmap-1_v9.9.9-2-g5981c75_altered.pdf">Heatmap on C1.Untreated - Dexamethasone-differential genes. White for treatment=Dexamethasone,cellLine=N052611</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-02-Heatmap-2" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-020-02-Heatmap-2_v9.9.9-2-g5981c75_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;20: <a href="02_differential_analyse_GRCh38/fig-020-02-Heatmap-2_v9.9.9-2-g5981c75_altered.pdf">Heatmap on C2.N061011 - N052611-differential genes. White for cellLine=N052611,treatment=Dexamethasone</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-02-Heatmap-3" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-021-02-Heatmap-3_v9.9.9-2-g5981c75_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;21: <a href="02_differential_analyse_GRCh38/fig-021-02-Heatmap-3_v9.9.9-2-g5981c75_altered.pdf">Heatmap on C2.N080611 - N052611-differential genes. White for cellLine=N052611,treatment=Dexamethasone</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-02-Heatmap-4" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-022-02-Heatmap-4_v9.9.9-2-g5981c75_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;22: <a href="02_differential_analyse_GRCh38/fig-022-02-Heatmap-4_v9.9.9-2-g5981c75_altered.pdf">Heatmap on C2.N080611 - N061011-differential genes. White for cellLine=N061011,treatment=Untreated</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-02-Heatmap-5" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-023-02-Heatmap-5_v9.9.9-2-g5981c75_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;23: <a href="02_differential_analyse_GRCh38/fig-023-02-Heatmap-5_v9.9.9-2-g5981c75_altered.pdf">Heatmap on C2.N61311 - N052611-differential genes. White for cellLine=N052611,treatment=Dexamethasone</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-02-Heatmap-6" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-024-02-Heatmap-6_v9.9.9-2-g5981c75_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;24: <a href="02_differential_analyse_GRCh38/fig-024-02-Heatmap-6_v9.9.9-2-g5981c75_altered.pdf">Heatmap on C2.N61311 - N061011-differential genes. White for cellLine=N061011,treatment=Untreated</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-02-Heatmap-7" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-025-02-Heatmap-7_v9.9.9-2-g5981c75_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;25: <a href="02_differential_analyse_GRCh38/fig-025-02-Heatmap-7_v9.9.9-2-g5981c75_altered.pdf">Heatmap on C2.N61311 - N080611-differential genes. White for cellLine=N080611,treatment=Untreated</a></figcaption>
+</figure>
+</div>
+<hr>
+</section>
+<section id="model-m2---line-only-2" class="level3" data-number="5.1.2">
+<h3 data-number="5.1.2" class="anchored" data-anchor-id="model-m2---line-only-2"><span class="header-section-number">5.1.2</span> Model M2 - Line-only</h3>
+<p>Just including a line effect, and totally ignoring treatment. So any systematic treatment effect will not be accounted for, and genes exhibiting a change due to treatment will tend not to be selected</p>
+<div id="fig-02-Heatmap-8" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-026-02-Heatmap-8_v9.9.9-2-g5981c75_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;26: <a href="02_differential_analyse_GRCh38/fig-026-02-Heatmap-8_v9.9.9-2-g5981c75_altered.pdf">Heatmap on C3.N061011 - N052611-differential genes. White for colData(this_comp)[most_decreasing, var_roles$all]=N052611</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-02-Heatmap-9" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-027-02-Heatmap-9_v9.9.9-2-g5981c75_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;27: <a href="02_differential_analyse_GRCh38/fig-027-02-Heatmap-9_v9.9.9-2-g5981c75_altered.pdf">Heatmap on C3.N080611 - N052611-differential genes. White for colData(this_comp)[most_decreasing, var_roles$all]=N052611</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-02-Heatmap-10" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-028-02-Heatmap-10_v9.9.9-2-g5981c75_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;28: <a href="02_differential_analyse_GRCh38/fig-028-02-Heatmap-10_v9.9.9-2-g5981c75_altered.pdf">Heatmap on C3.N080611 - N061011-differential genes. White for colData(this_comp)[most_decreasing, var_roles$all]=N061011</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-02-Heatmap-11" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-029-02-Heatmap-11_v9.9.9-2-g5981c75_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;29: <a href="02_differential_analyse_GRCh38/fig-029-02-Heatmap-11_v9.9.9-2-g5981c75_altered.pdf">Heatmap on C3.N61311 - N052611-differential genes. White for colData(this_comp)[most_decreasing, var_roles$all]=N052611</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-02-Heatmap-12" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-030-02-Heatmap-12_v9.9.9-2-g5981c75_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;30: <a href="02_differential_analyse_GRCh38/fig-030-02-Heatmap-12_v9.9.9-2-g5981c75_altered.pdf">Heatmap on C3.N61311 - N061011-differential genes. White for colData(this_comp)[most_decreasing, var_roles$all]=N061011</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-02-Heatmap-13" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-031-02-Heatmap-13_v9.9.9-2-g5981c75_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;31: <a href="02_differential_analyse_GRCh38/fig-031-02-Heatmap-13_v9.9.9-2-g5981c75_altered.pdf">Heatmap on C3.N61311 - N080611-differential genes. White for colData(this_comp)[most_decreasing, var_roles$all]=N080611</a></figcaption>
+</figure>
+</div>
+<hr>
+</section>
+<section id="model-m3---treatment-only-2" class="level3" data-number="5.1.3">
+<h3 data-number="5.1.3" class="anchored" data-anchor-id="model-m3---treatment-only-2"><span class="header-section-number">5.1.3</span> Model M3 - Treatment-only</h3>
+<p>Just including a treatment effect, and totally ignoring treatment. So any systematic differences between lines will not be accounted for, and genes exhibiting a dependencey on line will tend not to be selected</p>
+<div id="fig-02-Heatmap-14" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="02_differential_analyse_GRCh38/fig-032-02-Heatmap-14_v9.9.9-2-g5981c75_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;32: <a href="02_differential_analyse_GRCh38/fig-032-02-Heatmap-14_v9.9.9-2-g5981c75_altered.pdf">Heatmap on C4.Untreated - Dexamethasone-differential genes. White for colData(this_comp)[most_decreasing, var_roles$all]=Dexamethasone</a></figcaption>
+</figure>
+</div>
+<hr>
+</section>
+</section>
+</section>
+<section id="terms-of-use" class="level1" data-number="6">
+<h1 data-number="6"><span class="header-section-number">6</span> Terms Of Use</h1>
+<p>The Crick has a <a href="https://intranet.crick.ac.uk/our-crick/library-information-services/pages/guidelines-publication">publication policy</a> and we expect to be included on publications, regardless of funding arrangements. Any use of these results in publication must be discussed with BABS regarding authorship. If not authorship then the BABS analyst must receive a named acknowledgement. Please also cite the following sources which have enabled the analysis to be carried out.</p>
+</section>
+<section id="references" class="level1" data-number="7">
+<h1 data-number="7"><span class="header-section-number">7</span> References</h1>
+<div id="refs" class="references csl-bib-body hanging-indent" role="list">
+<div id="ref-IHW2016" class="csl-entry" role="listitem">
+Ignatiadis, Nikolaos, Bernd Klaus, Judith Zaugg, and Wolfgang Huber. 2016. <span>“Data-Driven Hypothesis Weighting Increases Detection Power in Genome-Scale Multiple Testing.”</span> <em>Nature Methods</em>. <a href="https://doi.org/10.1038/nmeth.3885">https://doi.org/10.1038/nmeth.3885</a>.
+</div>
+<div id="ref-pkg_DESeq2" class="csl-entry" role="listitem">
+Love, Michael, Simon Anders, and Wolfgang Huber. 2024. <em>DESeq2: Differential Gene Expression Analysis Based on the Negative Binomial Distribution</em>. <a href="https://doi.org/10.18129/B9.bioc.DESeq2">https://doi.org/10.18129/B9.bioc.DESeq2</a>.
+</div>
+<div id="ref-pkg_ashr" class="csl-entry" role="listitem">
+Stephens, Matthew, Peter Carbonetto, David Gerard, Mengyin Lu, Lei Sun, Jason Willwerscheid, and Nan Xiao. 2023. <em>Ashr: Methods for Adaptive Shrinkage, Using Empirical Bayes</em>. <a href="https://github.com/stephens999/ashr">https://github.com/stephens999/ashr</a>.
+</div>
+</div>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>
