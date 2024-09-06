@@ -232,6 +232,7 @@ publish: $(pubdir) ## Copy results to final location. Either 'outputs' folder (d
 build: run  ##  'build' is deprecated - `make run` is now sufficient.
 
 ifneq ($(docs_dir),)
+pre-dir=$(docs_dir)
 $(docs_dir)/%:
 	$(MAKE) --no-print-directory -C $(docs_dir) $*
 
@@ -242,6 +243,7 @@ $(file.spec): extdata/% : $(docs_dir)/% | extdata
 endif
 
 ifneq ($(ingress_dir),)
+pre-dir=$(ingress_dir)
 $(ingress_dir)/%:
 	$(MAKE) --no-print-directory -C $(ingress_dir) $*
 
@@ -253,6 +255,7 @@ endif
 
 
 ifneq ($(nfcore_dir),)
+pre-dir=$(nfcore_dir)
 $(nfcore_dir)/%:
 	$(MAKE)  --no-print-directory -C $(nfcore_dir) $*
 
@@ -264,11 +267,6 @@ extdata/$(samples_db): $(nfcore_dir)/$(samples_db) | $(file.spec) $(staging_dir)
 	cp $< $@ || echo "No samples database in nfcore directory"
 	$(GIT) commit -m "Add template scripts, R functions, makefiles" || true
 
-
-$(configs): extdata/%.config: $(nfcore_dir)/%.config $(my_metadata)_%.csv  $(my_counts_dir)/% | extdata
-	cp $< $@
-	$(GIT) add $@ $<
-
 multiqc_results = $(patsubst $(nfcore_dir)/results/%/multiqc/star_rsem/multiqc_report.html,$\
   $(RESULTS_DIR)/multiqc-%,$\
   $(wildcard $(nfcore_dir)/results/*/multiqc/star_rsem/multiqc_report.html))
@@ -276,7 +274,6 @@ multiqc_results = $(patsubst $(nfcore_dir)/results/%/multiqc/star_rsem/multiqc_r
 $(multiqc_results) : $(RESULTS_DIR)/multiqc-% : $(nfcore_dir)/results/%/multiqc/star_rsem/multiqc_report.html
 	mkdir -p $@
 	cp -lr $(nfcore_dir)/results/$*/multiqc/star_rsem/. $@ || cp -r $(nfcore_dir)/results/$*/multiqc/star_rsem/. $@
-
 
 $(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/results/%/star_rsem/rsem.merged.gene_counts.tsv  $(multiqc_results)
 	dir=$(if $($*.group-as),$($*.group-as),$*);\
@@ -286,6 +283,9 @@ $(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/results/%/star_rsem/rsem.mer
 
 endif
 
+$(configs): extdata/%.config: $(pre-dir)/%.config $(my_metadata)_%.csv  $(my_counts_dir)/% | extdata
+	cp $< $@
+	$(GIT) add $@ $<
 
 
 ################################################################

@@ -12,10 +12,10 @@ ifeq ($(SUBMIT),false)
     ifeq ($(CONTAIN),false)
 ##    To be executed directly - no need for (further) wrapping in queue/container functionality
 
-site: renv.lock .Rprofile## Create pkgdown site in ./docs
+site: renv.lock ## Create pkgdown site in ./docs
 	rm -rf R
 	cp -lr ../babs/differential/R .
-	mkdir -p pkgdown/assets/test
+	mkdir -p pkgdown/assets
 	if [ -d ../test/babs/differential/results/latest ]; then \
 	  cp -Lr ../test/babs/differential/results/latest pkgdown/assets/test ;\
 	fi
@@ -25,7 +25,7 @@ site: renv.lock .Rprofile## Create pkgdown site in ./docs
 	$(R) -e 'roxygen2::roxygenise(); pkgdown::build_site()'
 	rm -rf pkgdown
 
-renv.lock: 
+renv.lock: .Rprofile
 	  $(R) -e 'library(renv); init(); renv::install(c("roxygen2", "pkgdown")); renv::snapshot(type="all")'
     else
 ##   To be executed by container without slurm, so put what 'make' would normally execute in a temporary

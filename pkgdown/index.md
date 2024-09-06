@@ -6,8 +6,11 @@ author: Gavin Kelly
 ## Introduction
 
 This site provides the documentation on the BABS bulk RNASeq
-pipeline. There are three somewhat distinct aspects to the
+pipeline. There are several somewhat distinct aspects to the
 documentation, and they'll be covered on this site:
+
+- [The nature of the 'spec' file](articles/spec.rmd) that determines the statistical
+  analysis that will be carried out on the data.
 
 - How the github repository turns itself into the starting point
   for a new project (e.g. obviously we don't want all the meta

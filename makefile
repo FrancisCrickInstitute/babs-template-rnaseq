@@ -40,29 +40,30 @@ airway/nfcore.tar.gz: | test ## Cache the nfcore results for future speed
 
 test: airway/fastq ## Generate a test folder setup for the airway data
 	mkdir -p $@/babs
+	touch $@/.babs
 	rsync -av  babs/. $@/babs/. --exclude '.~' --exclude 'docs'
-	cd $@ && git init
-	cd $@/babs && \
+	( cd $@ && git init )
+	( cd $@/babs && \
 	ln -s ../../airway/fastq fastq && \
 	cp -r ../../airway/docs . && \
 	cp    ../../babs/docs/makefile ../../babs/docs/readme.md ../../babs/docs/.gitignore docs/ && \
 	git add makefile &&  \
 	git commit -m "Restart git repo for testing" && \
-	git tag v9.9.9
+	git tag v9.9.9 )
 
 .PHONY: test-nfcore test-differential
 test-nfcore: test/babs/nfcore/results ## Fast-forward to before the differential analysis, by using a cached run of nfcore
 
 test-differential: test/babs/nfcore/results
-	cd test/babs/differential; make run
+	( cd test/babs/differential; make run )
 
 test/babs/nfcore/results:  test | airway/nfcore.tar.gz
-	cd test/babs/ingress; make run
-	cd test/babs/nfcore && tar -xzf ../../../airway/nfcore.tar.gz
+	( cd test/babs/ingress; make run )
+	( cd test/babs/nfcore && tar -xzf ../../../airway/nfcore.tar.gz )
 
 .PHONY: pkgdown
 pkgdown: 
-	cd $@; make site
+	( cd $@; make site )
 
 major minor patch: lastNews=$(shell sed -n '1s/# Version //p' pkgdown/NEWS.md)
 major minor patch: lastTag:=$(subst ., ,$(patsubst v%,%,$(shell git describe --tags --abbrev=0 --match 'v*')))

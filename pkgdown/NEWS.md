@@ -1,3 +1,10 @@
+# Version 0.12.2
+## Major Changes
+## Minor Changes
+Tighten up the documentation on how to work with pre-existing
+alignments. Split the documentation so that the intro to specfiles is
+separate from the installation/usage docs.
+
 # Version 0.12.1
 ## Major Changes
 ## Minor Changes

@@ -130,7 +130,9 @@ CONTAINER_IMAGE=$(SINGULARITY_ROOT)/$(IMAGE)_$(IMAGE_TAG).sif
 CONTAINER_BIND=--bind $(BIND_DIR),/tmp,$(RENV_PATHS_ROOT),$(CURDIR)/Renviron.site:/usr/local/lib/R/etc/Renviron.site
 CONTAINER_ENV=--env SQLITE_TMPDIR=/tmp,BIOCPARALLEL_WORKER_NUMBER=$(BIOCPARALLEL_WORKER_NUMBER),GITHUB_PAT=$${GITHUB_PAT}
 CONTAINER_OPTIONS= exec $(CONTAINER_BIND) --pwd $(CURDIR) --containall --cleanenv $(CONTAINER_ENV)
+short_options=$(subst $(BIND_DIR),$${bind},$(subst $(CURDIR),$${wd},$(CONTAINER_OPTIONS)))
 CONTAINER_SHELL_OPTIONS = $(patsubst exec,shell,$(CONTAINER_OPTIONS))
+short_shell_options=$(patsubst exec,shell,$(short_options))
 $(CONTAINER_IMAGE): 
 	cd $(dir $(CONTAINER_IMAGE)) ;\
 	$(CONTAINER) pull docker://$(IMAGE):$(IMAGE_TAG)
@@ -220,7 +222,6 @@ Renviron.site:
 	echo "RENV_PATHS_ROOT=$(RENV_PATHS_ROOT)" >> $@
 	echo "RENV_PATHS_LIBRARY=renv/library" >> $@
 
-R-local: short_options=$(subst $(BIND_DIR),$${bind},$(subst $(CURDIR),$${wd},$(CONTAINER_OPTIONS)))
 R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses)
 R-$(RVERSION): $(CONTAINER_IMAGE)
 	@echo "#!/bin/bash" > $@
@@ -228,7 +229,7 @@ R-$(RVERSION): $(CONTAINER_IMAGE)
 	@echo 'wd=$${2:-$(CURDIR)}' >> $@
 	@echo 'function R { $(CONTAINER) $(short_options) $(INTERACTIVE_SINGULARITY) $(CONTAINER_IMAGE) R' \$$@  " ; }" >> $@
 	@echo 'function Rscript { $(CONTAINER) $(short_options) $(INTERACTIVE_SINGULARITY) $(CONTAINER_IMAGE) Rscript' \$$@  " ; }" >> $@
-	@echo 'function conshell {  $(CONTAINER) $(short_options) $(INTERACTIVE_SINGULARITY) $(CONTAINER_IMAGE) ; }' >> $@
+	@echo 'function conshell {  $(CONTAINER) $(short_shell_options) $(INTERACTIVE_SINGULARITY) $(CONTAINER_IMAGE) ; }' >> $@
 	@echo "[[ "'$$BASH_SOURCE'" == "'$$0'" ]] && R " \$$@ >> $@
 	@setfacl -m u::rwx $@
 	@echo 'Using the following extra Singularity options: INTERACTIVE_SINGULARITY=$(INTERACTIVE_SINGULARITY)'
