@@ -269,10 +269,10 @@ $(SELF_DIR)secret.mk: preexisting=$(firstword $(wildcard ../secret.mk ../babs/se
 $(SELF_DIR)secret.mk: babsfile=$(firstword $(wildcard ../../.babs ../.babs .babs))
 
 $(SELF_DIR)secret.mk: $(preexisting) $(babsfile)
-	@if [ -f "$(preexisting)" ]; then \
+	@if [ -n "$(preexisting)" ]; then \
 	  sed  's/=.*/=/; /## BABS/,$$d' $(preexisting) > .not-secret.mk ;\
 	  cp $(preexisting) $@ ;\
-	  if [ -f $(babsfile) ]; then \
+	  if [ -n "$(babsfile)" ]; then \
 	    sed  -i '/^setting_/d' $@ ;\
 	    sed -r -n 's/^(\s*)(.*)\s*:\s*(.*$$)/setting_\2=\3/p' $(babsfile) >> $@ ;\
 	  fi ;\
