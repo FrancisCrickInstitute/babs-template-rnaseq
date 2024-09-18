@@ -71,24 +71,39 @@ sample_sheet[sapply(sample_sheet, is.character)] <- lapply(
   sample_sheet[sapply(sample_sheet, is.character)], 
   as.factor)
 
-tx_path <-   normalizePath(file.path(
-  params$counts,
-  paste0(as.character(sample_sheet[[file_col]]), ".genes.results")
-))
+tx2gene <- file.path(params$counts, "star_salmon/salmon_tx2gene.tsv")
+if (file.exists(tx2gene)) {
+  tx_path <- file.path(
+    params$counts,
+    "star_salmon",
+    sample_sheet[[file_col]], "quant.sf"
+    )
+    tx_args <- list(type="salmon", tx2gene=read.table(tx2gene))
+} else {
+  tx_path <-   file.path(
+    params$counts,
+    paste0(as.character(sample_sheet[[file_col]]), ".genes.results")
+  )
+tx_args <- list(type="rsem")
+}  
 
-names(tx_path) <- as.character(sample_sheet[[file_col]])
+
 not_here <- !file.exists(tx_path)
+names(tx_path) <- as.character(sample_sheet[[file_col]])
+
 if (any(not_here)) {
   warning("Dropping samples", tx_path[not_here])
   tx_path <- tx_path[!not_here]
   sample_sheet <- sample_sheet[!not_here,]
 }
 
+tx_args$files <- tx_path
+
 onames <- data.frame(original=names(sample_sheet),
                      new=make.names(names(sample_sheet)))
 names(sample_sheet) <- onames$new
 
-txi <- tximport(tx_path, type="rsem")
+txi <- do.call(tximport, tx_args)
 txi$length[txi$length==0] <- 1
 
 dds <- DESeqDataSetFromTximport(txi, sample_sheet, ~ 1) # ok to have fixed trivial design - it'll get swapped out
@@ -154,3 +169,4 @@ colnames(dds) <- trim_names(colnames(dds))
 save(dds, file=file.path("data",paste0("counts_", params$alignment, ".rda")))
 saveRDS(dds, file=file.path("data",paste0("counts_", params$alignment, ".rds")))
 ```
+

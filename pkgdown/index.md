@@ -9,8 +9,14 @@ This site provides the documentation on the BABS bulk RNASeq
 pipeline. There are several somewhat distinct aspects to the
 documentation, and they'll be covered on this site:
 
-- [The nature of the 'spec' file](articles/spec.rmd) that determines the statistical
-  analysis that will be carried out on the data.
+- [The nature of the 'spec' file](articles/spec.html) that determines
+  the statistical analysis that will be carried out on the data. This
+  is the most important document in your understanding of the benefits
+  the pipeline can bring.
+
+- What to do once you've got such a starting point for a new
+  project. Users of the template will want to start
+  [here](articles/BABS-RNASeq.html).
 
 - How the github repository turns itself into the starting point
   for a new project (e.g. obviously we don't want all the meta
@@ -23,7 +29,4 @@ documentation, and they'll be covered on this site:
   wanting to develop extra template functionality will want to start
   [here](articles/pipeline-infrastructure.html).
   
-- What to do once you've got such a starting point for a new
-  project. Users of the template will want to start
-  [here](articles/BABS-RNASeq.html).
 

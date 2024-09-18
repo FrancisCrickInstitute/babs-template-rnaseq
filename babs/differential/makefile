@@ -33,6 +33,7 @@ qmd_path=$(staging_dir)/$*_$(ispec)_$(ialign).qmd
 qmd0_path=$(staging_dir)/$*_$(ialign).qmd
 
 $(mk): $(staging_dir)/.make-% : $(file.spec) $(samplesheets) | $(staging_dir)
+	rm -f $@ 
 	$(foreach ispec,$(specfiles),\
 	   $(foreach ialign,$(alignments),\
 	   echo '$(qmd_path): alignment=$(ialign)' >> $@;\
@@ -49,11 +50,12 @@ $(mk): $(staging_dir)/.make-% : $(file.spec) $(samplesheets) | $(staging_dir)
 	echo '$*_htmls: $$($*_htmls)'>> $@
 
 $(mk0): $(staging_dir)/.make-% : $(samplesheets) | $(staging_dir)
+	rm -f $@ 
 	$(foreach ialign,$(alignments),\
 	 echo '$(qmd0_path): alignment=$(ialign)' >> $@;\
 	 echo '$(qmd0_path): script=$*_$(ialign)' >> $@;\
 	 echo '$(qmd0_path): section=$*' >> $@;\
-	 echo '$(qmd0_path): $(source_dir)/$*.qmd' >> $@;\
+	 echo '$(qmd0_path): $(source_dir)/$*.qmd $(my_counts_dir)/$(ialign)' >> $@;\
 	 echo '$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$*_$(ialign).html: $(my_metadata)_$(ialign).csv $(qmd0_path)' >> $@ ;\
 	 echo '' >> $@ ;\
 	)
@@ -275,15 +277,20 @@ $(multiqc_results) : $(RESULTS_DIR)/multiqc-% : $(nfcore_dir)/results/%/multiqc/
 	mkdir -p $@
 	cp -lr $(nfcore_dir)/results/$*/multiqc/star_rsem/. $@ || cp -r $(nfcore_dir)/results/$*/multiqc/star_rsem/. $@
 
-$(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/results/%/star_rsem/rsem.merged.gene_counts.tsv  $(multiqc_results)
+$(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/results/%/$(or $(%.aligner),star_salmon)/$(subst star_,,$(or $(%.aligner),star_salmon)).merged.gene_counts.tsv  $(multiqc_results)
 	dir=$(if $($*.group-as),$($*.group-as),$*);\
 	mkdir -p $(my_counts_dir)/$${dir} ;\
-	cp -l $(nfcore_dir)/results/$${dir}/star_rsem/*.genes.results $(my_counts_dir)/$${dir}/ || cp  $(nfcore_dir)/results/$${dir}/star_rsem/*.genes.results $(my_counts_dir)/$${dir}/
+	if [ "$($*.aligner)" = star_salmon ]; then \
+	  for s in $(nfcore_dir)/results/$${dir}/star_salmon/*/quant.sf; do d=$(my_counts_dir)/$${dir}/star_salmon/$$(basename $$(dirname $$s)); mkdir -p $$d; cp -l $$s $$d/; done ;\
+	  cp $(nfcore_dir)/results/$${dir}/star_salmon/salmon_tx2gene.tsv $(my_counts_dir)/$${dir}/star_salmon/ ;\
+	else \
+	  cp -l $(nfcore_dir)/results/$${dir}/star_rsem/*.genes.results $(my_counts_dir)/$${dir}/ || cp  $(nfcore_dir)/results/$${dir}/star_rsem/*.genes.results $(my_counts_dir)/$${dir}/ ;\
+	fi
 
 
 endif
 
-$(configs): extdata/%.config: $(pre-dir)/%.config $(my_metadata)_%.csv  $(my_counts_dir)/% | extdata
+$(configs): extdata/%.config: $(pre-dir)/%.config $(my_metadata)_%.csv  | extdata
 	cp $< $@
 	$(GIT) add $@ $<
 

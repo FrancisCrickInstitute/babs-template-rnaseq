@@ -58,9 +58,13 @@ export SINGULARITYENV_RSTUDIO_SESSION_TIMEOUT=0
 
 export SINGULARITYENV_USER=$(id -un)
 export SINGULARITYENV_PASSWORD=$(openssl rand -base64 15)
-# get unused socket per https://unix.stackexchange.com/a/132524
-# tiny race condition between the python & singularity commands
-readonly PORT=$(python -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()')
+while
+  PORT=$(shuf -n 1 -i 49152-65535)
+  netstat -atun | grep -q "$PORT"
+do
+  continue
+done
+
 
 ## Produce the informative message
 
@@ -96,7 +100,7 @@ fi
 
 echo "#!/bin/sh" > ${workdir}/rserver.sh
 
-if [ ! -z "$3" ] && [ ! -z "${NTFY}"]; then
+if [ ! -z "$3" ] && [ ! -z "${NTFY}" ]; then
 cat >> ${workdir}/rserver.sh <<END
 curl -s -H "Title: RStudio server ready" -H "Tag:information_source"  https://ntfy.sh/${NTFY} \
  -d "Access server on port ${PORT} - see rstudio-server.log for details. To cancel any slurm job, scancel -f ${SLURM_JOB_ID}"  >/dev/null 2>&1

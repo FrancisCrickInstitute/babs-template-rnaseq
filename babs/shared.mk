@@ -130,9 +130,7 @@ CONTAINER_IMAGE=$(SINGULARITY_ROOT)/$(IMAGE)_$(IMAGE_TAG).sif
 CONTAINER_BIND=--bind $(BIND_DIR),/tmp,$(RENV_PATHS_ROOT),$(CURDIR)/Renviron.site:/usr/local/lib/R/etc/Renviron.site
 CONTAINER_ENV=--env SQLITE_TMPDIR=/tmp,BIOCPARALLEL_WORKER_NUMBER=$(BIOCPARALLEL_WORKER_NUMBER),GITHUB_PAT=$${GITHUB_PAT}
 CONTAINER_OPTIONS= exec $(CONTAINER_BIND) --pwd $(CURDIR) --containall --cleanenv $(CONTAINER_ENV)
-short_options=$(subst $(BIND_DIR),$${bind},$(subst $(CURDIR),$${wd},$(CONTAINER_OPTIONS)))
 CONTAINER_SHELL_OPTIONS = $(patsubst exec,shell,$(CONTAINER_OPTIONS))
-short_shell_options=$(patsubst exec,shell,$(short_options))
 $(CONTAINER_IMAGE): 
 	cd $(dir $(CONTAINER_IMAGE)) ;\
 	$(CONTAINER) pull docker://$(IMAGE):$(IMAGE_TAG)
@@ -225,29 +223,28 @@ Renviron.site:
 R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses)
 R-$(RVERSION): $(CONTAINER_IMAGE)
 	@echo "#!/bin/bash" > $@
-	@echo 'bind=$${1:-$(BIND_DIR)}' >> $@
-	@echo 'wd=$${2:-$(CURDIR)}' >> $@
-	@echo 'function R { $(CONTAINER) $(short_options) $(INTERACTIVE_SINGULARITY) $(CONTAINER_IMAGE) R' \$$@  " ; }" >> $@
-	@echo 'function Rscript { $(CONTAINER) $(short_options) $(INTERACTIVE_SINGULARITY) $(CONTAINER_IMAGE) Rscript' \$$@  " ; }" >> $@
-	@echo 'function conshell {  $(CONTAINER) $(short_shell_options) $(INTERACTIVE_SINGULARITY) $(CONTAINER_IMAGE) ; }' >> $@
-	@echo "[[ "'$$BASH_SOURCE'" == "'$$0'" ]] && R " \$$@ >> $@
-	@setfacl -m u::rwx $@
-	@echo 'Using the following extra Singularity options: INTERACTIVE_SINGULARITY=$(INTERACTIVE_SINGULARITY)'
+	@echo 'function babs-R { $(CONTAINER) $(CONTAINER_OPTIONS) $(BABS_SINGULARITY_INTERACTIVE_EXTRAS) $(CONTAINER_IMAGE) R' \$$@  " ; }" >> $@
+	@echo 'function babs-Rscript { $(CONTAINER) $(CONTAINER_OPTIONS) $(BABS_SINGULARITY_INTERACTIVE_EXTRAS) $(CONTAINER_IMAGE) Rscript' \$$@  " ; }" >> $@
+	@echo 'function babs-conshell {  $(CONTAINER) $(CONTAINER_SHELL_OPTIONS) $(BABS_SINGULARITY_INTERACTIVE_EXTRAS) $(CONTAINER_IMAGE) ; }' >> $@
+	@echo "[[ "'$$BASH_SOURCE'" == "'$$0'" ]] && babs-R " \$$@ >> $@
+	@$(make_rwx) $@
+	@echo 'Using the following extra Singularity options: BABS_SINGULARITY_INTERACTIVE_EXTRAS=$(BABS_SINGULARITY_INTERACTIVE_EXTRAS)'
 	@echo 'You may want to customise this (in your bashrc?) to things you need for an interactive environment (e.g. --bind /nemo, --env $$$$DISPLAY)'
 
-.PHONY: R
-R: Renviron.site
-	$(CONTAINER) $(CONTAINER_FLAGS_INTERACTIVE) $(CONTAINER_IMAGE) R
+.PHONY: R  rstudio rstudio-slurm
+R rstudio rstudio-slurm: Renviron.site
 
-.PHONY: rstudio rstudio-slurm
+R:
+	$(CONTAINER) $(CONTAINER_OPTIONS) $(BABS_SINGULARITY_INTERACTIVE_EXTRAS) $(CONTAINER_IMAGE) R
+
 rstudio-slurm: ## Start RStudio on a node for this project. Can use variables SLURM--*, where *=(partition|cpus-per-task/time/mem). Look for an 'rstudio-server.log' file to appear, with instructions.
-	res=$$(sbatch  \
+	@res=$$(sbatch  \
 --partition=$(SLURM--partition) \
 --cpus-per-task=$(SLURM--cpus-per-task) \
 --time='$(SLURM--time)' \
 --mem=$(SLURM--mem) \
 $(source_dir)/shell/rstudio-rocker.sh $(CONTAINER_IMAGE) ${SINGULARITY_VERSION} $$(hostname)) ;\
-	echo $$res "- please wait until job is allocated for futher instructions (./rstudio-server.log will appear)"
+	echo $$res "- please wait until job is allocated, at which point ./rstudio-server.log will appear, explaining how to access the session."
 
 rstudio: ## Start RStudio on this machine for this project.
 	. ./$(source_dir)/shell/rstudio-rocker.sh $(CONTAINER_IMAGE) ${SINGULARITY_VERSION}

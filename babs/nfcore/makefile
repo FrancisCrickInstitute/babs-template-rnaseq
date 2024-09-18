@@ -39,7 +39,7 @@ $(gene_counts) : results/%/star_rsem/rsem.merged.gene_counts.tsv : samplesheet_%
 	$(NEXTFLOW) run nf-core/rnaseq \
 	--input $< \
 	--outdir results/$*/ \
-	--aligner star_rsem \
+	--aligner $(or $($*.aligner),star_rsem) \
 	--fasta $(realpath $($*.genome_fasta)) \
 	--gtf $(realpath $($*.gtf)) \
 	-w $(workdir) \

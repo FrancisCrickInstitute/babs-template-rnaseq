@@ -25,20 +25,28 @@ TLDR:
 ```
 ts clone hash=ab123
 ```
-will do the follow steps (you can do `ts -n clone hash=ab123` to
-see what it's going to do). This does everything discussed in the rest of this section.
+
+(you can do `ts -n clone hash=ab123` to see what it's going to
+do). This does everything discussed in the rest of this section, but
+directly into a directory that conforms to BABS' usual project
+structure based on the ticket ID. It only works if you have BABS' `ts`
+command 'installed' ( it's just an alias `alias ts=make -f
+/nemo/stp/babs/working/time/makefile` that is probably obsolescent.)
 
 
-The whole pipeline is stored at
-`/nemo/stp/babs/working/bioinformatics/templates/rnaseq.tar.gz`. This
-archive is contains a `babs` folder that contains the logic, but also
-includes a `.github` folder and a `.gitignore` file so watch out if
-you want to preserve your existing copies of those. The expectation is
-that the `babs` folder from the archive will live alongside the `.babs`
-file: the only the other thing the pipeline needs is the `docs` folder
-that is in the project's repo. You can either `git clone` that (from
-nemo or from github), or you can create a `git worktree` from the nemo
-copy which allows other users to see you have a branch. 
+The whole pipeline release is stored at
+`/nemo/stp/babs/working/bioinformatics/templates/rnaseq.tar.gz`, and
+on the [github release
+page](https://github.com/FrancisCrickInstitute/babs-template-rnaseq/releases).
+This archive is contains a `babs` folder that contains the logic, but
+also includes a `.github` folder and a `.gitignore` file so watch out
+if you want to preserve your existing copies of those. The expectation
+is that the `babs` folder from the archive will live alongside the
+`.babs` file: the only the other thing the pipeline needs is the
+`docs` folder that is in the project's repo. You can either `git
+clone` that (from nemo or from github), or you can create a `git
+worktree` from the nemo copy which allows other users to see you have
+a branch.
 
 Some project repositories used to come with an old version of the
 pipeline 'installed'. I recommend you remove that if applicable, just
@@ -54,6 +62,84 @@ one can simply
 
 to get the pipeline.
 
+## Prerequisites in `docs`
+
+The pipeline expects the following prerequisites in the `babs/docs`
+folder. Most of them should have been prepared during the design
+discussions.
+
+### experiment_table.csv
+
+The [experiment
+table](https://bioinformatics.thecrick.org/babs/working-with-us/experiment-table-preparation/)
+CSV file containing sample level experimental meta data.
+
+> * :loudspeaker: This file must be in CSV format
+> * :loudspeaker: Please check the first column, which must be named `ID`. It is left blank at the design stage, but must be filled in with labels that correspond to the IDs used in the fastq files.
+> * :loudspeaker: If there's another column in the table that has unduplicated text values, that column is picked up as a convenient sample label - otherwise the ID column will be used as the label.
+	  
+It is best practice to create a draft of this file using the
+information provided in proposal document, prior to the design
+meeting. The table can
+then be used to frame the experimental design discussion with the
+scientist, where required comparisons and potential confounding
+covariates can be checked.
+
+This table will be cross referenced against the samples passing QC
+when submitted to the ASF to ensure the experimental aims can be
+achieved with the samples being sequenced.
+
+In the analysis, this file will be the sole source of truth for the
+experimental metadata. Columns that only contain numeric values will
+be treated as such in the analysis, so if they are used in a design
+without first casting them to a character vector, it will be assumed
+that you are interested in genes that follow a strict linear
+gradient. Using a numeric "Replicate" column is particularly fraught -
+actually the intent underlying any use of a column to denote replicate
+should always be questioned.
+
+### *.spec
+
+These denote the statistical analysis plan(s) that will be carried
+out. Usually there will be just one, but you can have more, which will
+create multiple results-websites. There is a [whole article on spec
+files](../articles/BABS-RNASeq.html).
+
+### *.config
+
+These define the extra parameters needed to specify the alignment
+process.  Most of them are in direct correspondence to the nfcore
+parameters - we require something along he following lines:
+
+
+```
+genome_fasta=/path/to/fasta.fa
+gtf=/path/to/genome.gtf
+org.db=org.Hs.eg.db
+nfcore=-profile crick -resume -r 3.10.1
+```
+
+It's recommended to name the config file after the genome being used
+(e.g. GRCh38), as this label will be propagated through to subsequent
+files names. Again, you can have multiple config files (nfcore will be
+called as many times, and each spec file will be applied to each set
+of results). So for dual genomes, you can analyse them separately, or
+include an additional fasta option in a single config file. We use
+star_rsem as the default aligner - if you want to use Salmon, then an additional line:
+
+```
+aligner=star_salmon
+```
+
+in the config will suffice.
+
+
+### samplesheet.csv
+
+This file contains the locations of the fastq files and is generated
+at the point the pipeline is run - if fastq files are in an
+non-traditional place, it will be necessary to generate this file
+yourself, in accordance with standard nfcore requirements.
 
 ## Usage
 
@@ -84,14 +170,16 @@ the three main inputs, metadata needs to be transferred from the
 `docs` folder (the original source of experiment table and spec files
 that describe the analysis to be carried out), and data (the aligned
 counts) need to be transferred from the `nfcore` module. Achieving
-that should just be a matter of running `make build` in the
-`differential` folder.  If you're taking counts etc from different
-sources, then it's possible to join the pipeline just at this
-`differential` stage by manually 'simulating' the `make build`. Set an
-environment variable that stores a tag (alphanumeric please) that
-identifies how you quantified your data: I'm going to use the tag
-`GRCh38` as a toy value.  Then you'll need to achieve the following to
-enable a manual analysis:
+that should just be a matter of running `make run` in the
+`differential` folder. However:
+
+If you're taking counts etc from different sources, then it's possible
+to join the pipeline just at this `differential` stage by manually
+'simulating' the 'gathering' stage that `make run` would do in an
+end-to-end context. Set an environment variable that stores a tag
+(alphanumeric please) that identifies how you quantified your data:
+I'm going to use the tag `GRCh38` as a toy value.  Then you'll need to
+achieve the following to enable a manual analysis:
 
 ```
 cd differential
@@ -130,6 +218,12 @@ sufficient (you _can_ copy changes back to their original source
 modules for reference, but if the 'originals' remain older then they
 won't overwrite these local copies even if another build is carried
 out.)
+
+This will not work if there are sibling folders from the pipeline
+present, as the pipeline may still consult those directories for the
+prerequisites - if you experience problems, please move any of the
+folders `docs`/`ingress`/`nfcore` so that they're not next to the
+`differential` folder.
 
 ### Differential analysis
 
