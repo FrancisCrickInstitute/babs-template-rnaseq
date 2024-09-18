@@ -49,7 +49,7 @@ $(mk): $(staging_dir)/.make-% : $(file.spec) $(samplesheets) | $(staging_dir)
 	echo '$*_htmls = $$(patsubst %,$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/%.html,$$($*_pages))'>> $@
 	echo '$*_htmls: $$($*_htmls)'>> $@
 
-$(mk0): $(staging_dir)/.make-% : $(samplesheets) | $(staging_dir)
+$(mk0): $(staging_dir)/.make-% : $(samplesheets) $(genes_results) | $(staging_dir)
 	rm -f $@ 
 	$(foreach ialign,$(alignments),\
 	 echo '$(qmd0_path): alignment=$(ialign)' >> $@;\
