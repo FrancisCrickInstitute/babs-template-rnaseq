@@ -277,7 +277,7 @@ $(multiqc_results) : $(RESULTS_DIR)/multiqc-% : $(nfcore_dir)/results/%/multiqc/
 	mkdir -p $@
 	cp -lr $(nfcore_dir)/results/$*/multiqc/star_rsem/. $@ || cp -r $(nfcore_dir)/results/$*/multiqc/star_rsem/. $@
 
-$(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/results/%/$(or $(%.aligner),star_salmon)/$(subst star_,,$(or $(%.aligner),star_salmon)).merged.gene_counts.tsv  $(multiqc_results)
+$(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/results/%/$(or $(%.aligner),star_rsem)/$(subst star_,,$(or $(%.aligner),star_rsem)).merged.gene_counts.tsv  $(multiqc_results)
 	dir=$(if $($*.group-as),$($*.group-as),$*);\
 	mkdir -p $(my_counts_dir)/$${dir} ;\
 	if [ "$($*.aligner)" = star_salmon ]; then \
