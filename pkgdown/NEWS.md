@@ -1,3 +1,8 @@
+# Version 0.13.0
+## Major Changes
+ - Add Salmon as an aligner option.  In any config, we can now have an additional `aligner=star_salmon` line (on its own, _not_ as part of the nfcore line)
+## Minor Changes
+ - Rename the test-fast-forwarders
 # Version 0.12.2
 ## Major Changes
 ## Minor Changes
