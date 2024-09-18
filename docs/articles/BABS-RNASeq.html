@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RNASeq Template</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.12.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.13.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -83,21 +83,26 @@ haven’t done it before:</p>
 </h3>
 <p>TLDR:</p>
 <pre><code>ts clone hash=ab123</code></pre>
-<p>will do the follow steps (you can do
-<code>ts -n clone hash=ab123</code> to see what it’s going to do). This
-does everything discussed in the rest of this section.</p>
-<p>The whole pipeline is stored at
-<code>/nemo/stp/babs/working/bioinformatics/templates/rnaseq.tar.gz</code>.
-This archive is contains a <code>babs</code> folder that contains the
-logic, but also includes a <code>.github</code> folder and a
-<code>.gitignore</code> file so watch out if you want to preserve your
-existing copies of those. The expectation is that the <code>babs</code>
-folder from the archive will live alongside the <code>.babs</code> file:
-the only the other thing the pipeline needs is the <code>docs</code>
-folder that is in the project’s repo. You can either
-<code>git clone</code> that (from nemo or from github), or you can
-create a <code>git worktree</code> from the nemo copy which allows other
-users to see you have a branch.</p>
+<p>(you can do <code>ts -n clone hash=ab123</code> to see what it’s
+going to do). This does everything discussed in the rest of this
+section, but directly into a directory that conforms to BABS’ usual
+project structure based on the ticket ID. It only works if you have
+BABS’ <code>ts</code> command ‘installed’ ( it’s just an alias
+<code>alias ts=make -f /nemo/stp/babs/working/time/makefile</code> that
+is probably obsolescent.)</p>
+<p>The whole pipeline release is stored at
+<code>/nemo/stp/babs/working/bioinformatics/templates/rnaseq.tar.gz</code>,
+and on the <a href="https://github.com/FrancisCrickInstitute/babs-template-rnaseq/releases" class="external-link">github
+release page</a>. This archive is contains a <code>babs</code> folder
+that contains the logic, but also includes a <code>.github</code> folder
+and a <code>.gitignore</code> file so watch out if you want to preserve
+your existing copies of those. The expectation is that the
+<code>babs</code> folder from the archive will live alongside the
+<code>.babs</code> file: the only the other thing the pipeline needs is
+the <code>docs</code> folder that is in the project’s repo. You can
+either <code>git clone</code> that (from nemo or from github), or you
+can create a <code>git worktree</code> from the nemo copy which allows
+other users to see you have a branch.</p>
 <p>Some project repositories used to come with an old version of the
 pipeline ‘installed’. I recommend you remove that if applicable, just
 leaving the <code>docs</code> folder out of the all the
@@ -107,6 +112,83 @@ leaving the <code>docs</code> folder out of the all the
 <pre><code> tar -xzf
  /nemo/stp/babs/working/bioinformatics/templates/rnaseq.tar.gz</code></pre>
 <p>to get the pipeline.</p>
+</div>
+</div>
+<div class="section level2">
+<h2 id="prerequisites-in-docs">Prerequisites in <code>docs</code><a class="anchor" aria-label="anchor" href="#prerequisites-in-docs"></a>
+</h2>
+<p>The pipeline expects the following prerequisites in the
+<code>babs/docs</code> folder. Most of them should have been prepared
+during the design discussions.</p>
+<div class="section level3">
+<h3 id="experiment_table-csv">experiment_table.csv<a class="anchor" aria-label="anchor" href="#experiment_table-csv"></a>
+</h3>
+<p>The <a href="https://bioinformatics.thecrick.org/babs/working-with-us/experiment-table-preparation/" class="external-link">experiment
+table</a> CSV file containing sample level experimental meta data.</p>
+<blockquote>
+<ul>
+<li>:loudspeaker: This file must be in CSV format</li>
+<li>:loudspeaker: Please check the first column, which must be named
+<code>ID</code>. It is left blank at the design stage, but must be
+filled in with labels that correspond to the IDs used in the fastq
+files.</li>
+<li>:loudspeaker: If there’s another column in the table that has
+unduplicated text values, that column is picked up as a convenient
+sample label - otherwise the ID column will be used as the label.</li>
+</ul>
+</blockquote>
+<p>It is best practice to create a draft of this file using the
+information provided in proposal document, prior to the design meeting.
+The table can then be used to frame the experimental design discussion
+with the scientist, where required comparisons and potential confounding
+covariates can be checked.</p>
+<p>This table will be cross referenced against the samples passing QC
+when submitted to the ASF to ensure the experimental aims can be
+achieved with the samples being sequenced.</p>
+<p>In the analysis, this file will be the sole source of truth for the
+experimental metadata. Columns that only contain numeric values will be
+treated as such in the analysis, so if they are used in a design without
+first casting them to a character vector, it will be assumed that you
+are interested in genes that follow a strict linear gradient. Using a
+numeric “Replicate” column is particularly fraught - actually the intent
+underlying any use of a column to denote replicate should always be
+questioned.</p>
+</div>
+<div class="section level3">
+<h3 id="spec">*.spec<a class="anchor" aria-label="anchor" href="#spec"></a>
+</h3>
+<p>These denote the statistical analysis plan(s) that will be carried
+out. Usually there will be just one, but you can have more, which will
+create multiple results-websites. There is a <a href="../articles/BABS-RNASeq.html">whole article on spec files</a>.</p>
+</div>
+<div class="section level3">
+<h3 id="config">*.config<a class="anchor" aria-label="anchor" href="#config"></a>
+</h3>
+<p>These define the extra parameters needed to specify the alignment
+process. Most of them are in direct correspondence to the nfcore
+parameters - we require something along he following lines:</p>
+<pre><code>genome_fasta=/path/to/fasta.fa
+gtf=/path/to/genome.gtf
+org.db=org.Hs.eg.db
+nfcore=-profile crick -resume -r 3.10.1</code></pre>
+<p>It’s recommended to name the config file after the genome being used
+(e.g. GRCh38), as this label will be propagated through to subsequent
+files names. Again, you can have multiple config files (nfcore will be
+called as many times, and each spec file will be applied to each set of
+results). So for dual genomes, you can analyse them separately, or
+include an additional fasta option in a single config file. We use
+star_rsem as the default aligner - if you want to use Salmon, then an
+additional line:</p>
+<pre><code><span><span class="va">aligner</span><span class="op">=</span><span class="va">star_salmon</span></span></code></pre>
+<p>in the config will suffice.</p>
+</div>
+<div class="section level3">
+<h3 id="samplesheet-csv">samplesheet.csv<a class="anchor" aria-label="anchor" href="#samplesheet-csv"></a>
+</h3>
+<p>This file contains the locations of the fastq files and is generated
+at the point the pipeline is run - if fastq files are in an
+non-traditional place, it will be necessary to generate this file
+yourself, in accordance with standard nfcore requirements.</p>
 </div>
 </div>
 <div class="section level2">
@@ -143,14 +225,16 @@ To get the three main inputs, metadata needs to be transferred from the
 spec files that describe the analysis to be carried out), and data (the
 aligned counts) need to be transferred from the <code>nfcore</code>
 module. Achieving that should just be a matter of running
-<code>make build</code> in the <code>differential</code> folder. If
-you’re taking counts etc from different sources, then it’s possible to
-join the pipeline just at this <code>differential</code> stage by
-manually ‘simulating’ the <code>make build</code>. Set an environment
-variable that stores a tag (alphanumeric please) that identifies how you
-quantified your data: I’m going to use the tag <code>GRCh38</code> as a
-toy value. Then you’ll need to achieve the following to enable a manual
-analysis:</p>
+<code>make run</code> in the <code>differential</code> folder.
+However:</p>
+<p>If you’re taking counts etc from different sources, then it’s
+possible to join the pipeline just at this <code>differential</code>
+stage by manually ‘simulating’ the ‘gathering’ stage that
+<code>make run</code> would do in an end-to-end context. Set an
+environment variable that stores a tag (alphanumeric please) that
+identifies how you quantified your data: I’m going to use the tag
+<code>GRCh38</code> as a toy value. Then you’ll need to achieve the
+following to enable a manual analysis:</p>
 <pre><code>cd differential
 
 export alignment=GRCh38 # change `mytag` to a meaningful but arbitrary tag
@@ -184,6 +268,11 @@ are sufficient (you <em>can</em> copy changes back to their original
 source modules for reference, but if the ‘originals’ remain older then
 they won’t overwrite these local copies even if another build is carried
 out.)</p>
+<p>This will not work if there are sibling folders from the pipeline
+present, as the pipeline may still consult those directories for the
+prerequisites - if you experience problems, please move any of the
+folders <code>docs</code>/<code>ingress</code>/<code>nfcore</code> so
+that they’re not next to the <code>differential</code> folder.</p>
 </div>
 <div class="section level3">
 <h3 id="differential-analysis">Differential analysis<a class="anchor" aria-label="anchor" href="#differential-analysis"></a>
