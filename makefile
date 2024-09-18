@@ -51,8 +51,8 @@ test: airway/fastq ## Generate a test folder setup for the airway data
 	git commit -m "Restart git repo for testing" && \
 	git tag v9.9.9 )
 
-.PHONY: test-nfcore test-differential
-test-nfcore: test/babs/nfcore/results ## Fast-forward to before the differential analysis, by using a cached run of nfcore
+.PHONY: test-ff-nfcore test-differential
+test-ff-nfcore: test/babs/nfcore/results ## Fast-forward to before the differential analysis, by using a cached run of nfcore
 
 test-differential: test/babs/nfcore/results
 	( cd test/babs/differential; make run )
