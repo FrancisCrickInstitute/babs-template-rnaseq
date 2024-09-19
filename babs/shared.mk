@@ -70,20 +70,22 @@ diff_dir?=$(wildcard ../differential)
 ## Propagation of docs files
 ## 'Earliest' presence of a propagated file is taken as definitive.
 ################################################################
+early_spec_dir=$(firstword $(wildcard $(docs_dir) $(ingress_dir) $(diff_dir)/extdata))
+specfiles=$(patsubst $(early_spec_dir)/%.spec,%,$(wildcard $(early_spec_dir)/*.spec))
+
+#early_align=$(firstword $(wildcard $(docs_dir) $(ingress_dir) $(nfcore_dir) $(diff_dir)/extdata))
+
 ifneq ($(diff_dir),)
 alignments=$(patsubst $(diff_dir)/$(my_counts_dir)/%,%,$(wildcard $(diff_dir)/$(my_counts_dir)/*))
-specfiles=$(patsubst $(diff_dir)/%.spec,%,$(wildcard $(diff_dir)/*.spec))
 endif
 ifneq ($(nfcore_dir),)
 alignments=$(patsubst $(nfcore_dir)/results/%,%,$(wildcard $(nfcore_dir)/results/*))
 endif
 ifneq ($(ingress_dir),)
 alignments=$(patsubst $(ingress_dir)/%.config,%,$(wildcard $(ingress_dir)/*.config))
-specfiles=$(patsubst $(ingress_dir)/%.spec,%,$(wildcard $(ingress_dir)/*.spec))
 endif
 ifneq ($(docs_dir),)
 alignments=$(patsubst $(docs_dir)/%.config,%,$(wildcard $(docs_dir)/*.config))
-specfiles=$(patsubst $(docs_dir)/%.spec,%,$(wildcard $(docs_dir)/*.spec))
 endif
 
 ################################################################
@@ -223,19 +225,19 @@ Renviron.site:
 R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses)
 R-$(RVERSION): $(CONTAINER_IMAGE)
 	@echo "#!/bin/bash" > $@
-	@echo 'function babs-R { $(CONTAINER) $(CONTAINER_OPTIONS) $(BABS_SINGULARITY_INTERACTIVE_EXTRAS) $(CONTAINER_IMAGE) R' \$$@  " ; }" >> $@
-	@echo 'function babs-Rscript { $(CONTAINER) $(CONTAINER_OPTIONS) $(BABS_SINGULARITY_INTERACTIVE_EXTRAS) $(CONTAINER_IMAGE) Rscript' \$$@  " ; }" >> $@
-	@echo 'function babs-conshell {  $(CONTAINER) $(CONTAINER_SHELL_OPTIONS) $(BABS_SINGULARITY_INTERACTIVE_EXTRAS) $(CONTAINER_IMAGE) ; }' >> $@
+	@echo 'function babs-R { $(CONTAINER) $(CONTAINER_OPTIONS) $${BABS_SINGULARITY_INTERACTIVE_EXTRAS} $(CONTAINER_IMAGE) R' \$$@  " ; }" >> $@
+	@echo 'function babs-Rscript { $(CONTAINER) $(CONTAINER_OPTIONS) $${BABS_SINGULARITY_INTERACTIVE_EXTRAS} $(CONTAINER_IMAGE) Rscript' \$$@  " ; }" >> $@
+	@echo 'function babs-conshell {  $(CONTAINER) $(CONTAINER_SHELL_OPTIONS) $${BABS_SINGULARITY_INTERACTIVE_EXTRAS} $(CONTAINER_IMAGE) ; }' >> $@
 	@echo "[[ "'$$BASH_SOURCE'" == "'$$0'" ]] && babs-R " \$$@ >> $@
 	@$(make_rwx) $@
 	@echo 'Using the following extra Singularity options: BABS_SINGULARITY_INTERACTIVE_EXTRAS=$(BABS_SINGULARITY_INTERACTIVE_EXTRAS)'
-	@echo 'You may want to customise this (in your bashrc?) to things you need for an interactive environment (e.g. --bind /nemo, --env $$$$DISPLAY)'
+	@echo 'You may want to customise this (in your bashrc?) to things you need for an interactive environment (e.g. --bind /nemo, --env $$DISPLAY)'
 
 .PHONY: R  rstudio rstudio-slurm
 R rstudio rstudio-slurm: Renviron.site
 
 R:
-	$(CONTAINER) $(CONTAINER_OPTIONS) $(BABS_SINGULARITY_INTERACTIVE_EXTRAS) $(CONTAINER_IMAGE) R
+	$(CONTAINER) $(CONTAINER_OPTIONS) $${BABS_SINGULARITY_INTERACTIVE_EXTRAS} $(CONTAINER_IMAGE) R
 
 rstudio-slurm: ## Start RStudio on a node for this project. Can use variables SLURM--*, where *=(partition|cpus-per-task/time/mem). Look for an 'rstudio-server.log' file to appear, with instructions.
 	@res=$$(sbatch  \

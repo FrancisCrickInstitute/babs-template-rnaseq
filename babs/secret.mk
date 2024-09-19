@@ -9,7 +9,8 @@ RENV_PATHS_ROOT=/nemo/stp/babs/working/software/renv
 # your chosen prefix (e.g.'rocker') to keep the pipeline somewhat isolated:
 RENV_PATHS_PREFIX=rocker
 # working space for large disposable files:
-SCRATCH_DIR=/flask/scratch/babs/bioinformatics/projects/$(or $(setting_Hash),$(USER))/
+# Use either the hash set in the .babs file, or the project part of the path
+SCRATCH_DIR=/flask/scratch/babs/$(USER)/projects/$(or $(setting_Hash),$(word 9,$(subst /, ,$(CURDIR))))
 # Nextflow cache:
 NXF_SINGULARITY_CACHEDIR=/flask/apps/containers/all-singularity-images/
 
