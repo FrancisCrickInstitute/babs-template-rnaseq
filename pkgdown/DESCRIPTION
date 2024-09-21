@@ -1,6 +1,6 @@
 Package: BABS.RNASeq
 Title: Functions for BABS RNASeq pipeline
-Version: 0.13.0
+Version: 0.14.0
 Authors@R: 
     person("Gavin", "Kelly", , "gavin.kelly@crick.ac.uk", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0001-7219-560X"))

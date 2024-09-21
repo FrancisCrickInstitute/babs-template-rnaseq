@@ -89,18 +89,19 @@ dropped_terms <- function(obj, reduced, extra=NULL) {
 ##' @param obj The result of a previous 'partialise'
 ##' @param reduced A formula, the right-hand-side of which contains the terms that will be used to predict the response
 ##' @param extra A character vector of any extra terms that the formula didn't contain
+##' @param resids Boolean indicating whether to include the residuals (default) or not
 ##' @return A matrix of the same dimensions as the original input to 'partialise'
 ##' @author Gavin Kelly
 ##' @family partial
 ##' @export
-assemble_partialised <- function(obj, reduced, extra=NULL) {
+assemble_partialised <- function(obj, reduced, extra=NULL, resids=TRUE) {
   terms <-intersect(
     dimnames(obj$terms)[[3]],
     c(labels(terms(reduced)), extra)
   )
   t(
     rowSums(obj$terms[, , terms, drop=FALSE], na.rm=TRUE, dims=2) +
-      obj$resid)
+      (if(resids) obj$resid else 0))
 }
 
 ##' Get the 'aesthetic' terms that will be requested from a qc formula

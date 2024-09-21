@@ -159,6 +159,15 @@ param$set("filterFun", postpone=TRUE)
 param$set("baseline_heuristic", postpone=TRUE)
 param$set("LRT_effect")
 
+rds_name <- file.path("data", paste0(basename(params$spec),"_x_", params$alignment, ".rds"))
+
+if (interactive() && file.exists(rds_name)) {
+  dds_model_comp <- decompress_dmc(readRDS(rds_name))
+  # In an interactive session, you may want to skip the rest of this code chunk if you are
+  # sure that the saved rds object represents the latest analysis.
+}
+
+
 ## For each dataset, fit all its models
 dds_model_comp <- lapply(
   ddsList,
@@ -184,12 +193,12 @@ dds_model_comp <- map_depth(
 
 
 
-dds_name <- paste0(basename(params$spec),"_x_", params$alignment)
 local({
   dds_model_comp <- compress_dmc(dds_model_comp)
-  save(dds_model_comp, file=file.path("data", paste0(dds_name, ".rda")))
-  saveRDS(dds_model_comp, file=file.path("data", paste0(dds_name, ".rds")))
+  saveRDS(dds_model_comp, file=rds_name)
+  save(dds_model_comp, file=sub("rds$", "rda", rds_name))
 })
+
 
 xl_files <- write_results(dds_model_comp, param, dir=params$res_dir)
 iwalk(xl_files,

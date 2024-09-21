@@ -109,6 +109,8 @@ define slurm
 #SBATCH --mem=$(SLURM--mem)
 #SBATCH --job-name=$(notdir $(CURDIR))
 #SBATCH --output=slurm-%x-%A_%a.out
+export MAKEFLAGS="$(MAKEFLAGS)"
+$(containerPrefix) make $@ SUBMIT=false EXECUTOR=make
 endef
 
 export slurm
@@ -167,7 +169,7 @@ endif
 ifeq ($(CONTAIN),true)
 Renviron.site: | $(CONTAINER_IMAGE)
 optionalRenviron=Renviron.site
-containerPrefix=$(CONTAINER) $(CONTAINER_OPTIONS) $(CONTAINER_IMAGE)
+containerPrefix=$(CONTAINER) $(CONTAINER_OPTIONS) --env MAKEFLAGS="$(MAKEFLAGS)" $(CONTAINER_IMAGE)
 else
 optionalRenviron=
 containerPrefix=
@@ -177,7 +179,7 @@ endif
 # Git-derived variables
 ################################################################
 PROJECT_HOME:=$(shell $(GIT) rev-parse --show-toplevel 2>/dev/null || echo $(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
-TAG := _$(shell $(GIT) describe --tags --dirty=_altered --always --long 2>/dev/null || echo "uncontrolled")# e.g. v1.0.2-2-ace1729a
+TAG = _$(shell $(GIT) describe --tags --dirty=_altered --always --long 2>/dev/null || echo "uncontrolled")# e.g. v1.0.2-2-ace1729a
 VERSION := $(shell $(GIT) describe --tags --abbrev=0 2>/dev/null || echo "vX.Y.Z")#e.g. v1.0.2
 git-ignore=touch .gitignore && grep -qxF '$(1)' .gitignore || echo '$(1)' >> .gitignore
 
@@ -198,7 +200,7 @@ $(empty)
 endef
 
 # These targets will skip any computationally intensive 'include's
-excluded-targets=help clean maintainer-clean R-local R
+excluded-targets=help clean maintainer-clean R-local R print-%
 
 ## Deferred simple expansion - TMPSCRIPT won't exist when first called, then constant thereafter
 TMPSCRIPT = $(eval TMPSCRIPT := $$(shell mktemp -u $(staging_dir)/XXXXX))$(TMPSCRIPT)
@@ -225,9 +227,9 @@ Renviron.site:
 R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses)
 R-$(RVERSION): $(CONTAINER_IMAGE)
 	@echo "#!/bin/bash" > $@
-	@echo 'function babs-R { $(CONTAINER) $(CONTAINER_OPTIONS) $${BABS_SINGULARITY_INTERACTIVE_EXTRAS} $(CONTAINER_IMAGE) R' \$$@  " ; }" >> $@
-	@echo 'function babs-Rscript { $(CONTAINER) $(CONTAINER_OPTIONS) $${BABS_SINGULARITY_INTERACTIVE_EXTRAS} $(CONTAINER_IMAGE) Rscript' \$$@  " ; }" >> $@
-	@echo 'function babs-conshell {  $(CONTAINER) $(CONTAINER_SHELL_OPTIONS) $${BABS_SINGULARITY_INTERACTIVE_EXTRAS} $(CONTAINER_IMAGE) ; }' >> $@
+	@echo 'function babs-R { $(CONTAINER) $(CONTAINER_OPTIONS) '$${BABS_SINGULARITY_INTERACTIVE_EXTRAS}' $(CONTAINER_IMAGE) R' \$$@  " ; }" >> $@
+	@echo 'function babs-Rscript { $(CONTAINER) $(CONTAINER_OPTIONS) '$${BABS_SINGULARITY_INTERACTIVE_EXTRAS}' $(CONTAINER_IMAGE) Rscript' \$$@  " ; }" >> $@
+	@echo 'function babs-conshell {  $(CONTAINER) $(CONTAINER_SHELL_OPTIONS) '$${BABS_SINGULARITY_INTERACTIVE_EXTRAS}' $(CONTAINER_IMAGE) ; }' >> $@
 	@echo "[[ "'$$BASH_SOURCE'" == "'$$0'" ]] && babs-R " \$$@ >> $@
 	@$(make_rwx) $@
 	@echo 'Using the following extra Singularity options: BABS_SINGULARITY_INTERACTIVE_EXTRAS=$(BABS_SINGULARITY_INTERACTIVE_EXTRAS)'
@@ -237,7 +239,8 @@ R-$(RVERSION): $(CONTAINER_IMAGE)
 R rstudio rstudio-slurm: Renviron.site
 
 R:
-	$(CONTAINER) $(CONTAINER_OPTIONS) $${BABS_SINGULARITY_INTERACTIVE_EXTRAS} $(CONTAINER_IMAGE) R
+	@echo "Starting R $(RVERSION) in container $(CONTAINER_IMAGE) with extra options $${BABS_SINGULARITY_INTERACTIVE_EXTRAS} ..."
+	@$(CONTAINER) $(CONTAINER_OPTIONS) $(shell echo $${BABS_SINGULARITY_INTERACTIVE_EXTRAS}) $(CONTAINER_IMAGE) R
 
 rstudio-slurm: ## Start RStudio on a node for this project. Can use variables SLURM--*, where *=(partition|cpus-per-task/time/mem). Look for an 'rstudio-server.log' file to appear, with instructions.
 	@res=$$(sbatch  \

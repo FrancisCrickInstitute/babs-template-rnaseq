@@ -1,3 +1,10 @@
+# Version 0.14.0
+## Major Changes
+ - Refactor the container/submission so that it doesn't rely on intermediate shell scripts.
+## Minor Changes
+ - Fix how `BABS_SINGULARITY_INTERACTIVE_EXTRAS` is sent to IDEs.
+ - Fix a regression that put nfcore in the differential container.
+ - Make the scratch path more traceable
 # Version 0.13.0
 ## Major Changes
  - Add Salmon as an aligner option.  In any config, we can now have an additional `aligner=star_salmon` line (on its own, _not_ as part of the nfcore line)

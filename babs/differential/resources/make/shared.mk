@@ -70,20 +70,22 @@ diff_dir?=$(wildcard ../differential)
 ## Propagation of docs files
 ## 'Earliest' presence of a propagated file is taken as definitive.
 ################################################################
+early_spec_dir=$(firstword $(wildcard $(docs_dir) $(ingress_dir) $(diff_dir)/extdata))
+specfiles=$(patsubst $(early_spec_dir)/%.spec,%,$(wildcard $(early_spec_dir)/*.spec))
+
+#early_align=$(firstword $(wildcard $(docs_dir) $(ingress_dir) $(nfcore_dir) $(diff_dir)/extdata))
+
 ifneq ($(diff_dir),)
 alignments=$(patsubst $(diff_dir)/$(my_counts_dir)/%,%,$(wildcard $(diff_dir)/$(my_counts_dir)/*))
-specfiles=$(patsubst $(diff_dir)/%.spec,%,$(wildcard $(diff_dir)/*.spec))
 endif
 ifneq ($(nfcore_dir),)
 alignments=$(patsubst $(nfcore_dir)/results/%,%,$(wildcard $(nfcore_dir)/results/*))
 endif
 ifneq ($(ingress_dir),)
 alignments=$(patsubst $(ingress_dir)/%.config,%,$(wildcard $(ingress_dir)/*.config))
-specfiles=$(patsubst $(ingress_dir)/%.spec,%,$(wildcard $(ingress_dir)/*.spec))
 endif
 ifneq ($(docs_dir),)
 alignments=$(patsubst $(docs_dir)/%.config,%,$(wildcard $(docs_dir)/*.config))
-specfiles=$(patsubst $(docs_dir)/%.spec,%,$(wildcard $(docs_dir)/*.spec))
 endif
 
 ################################################################
@@ -220,33 +222,31 @@ Renviron.site:
 	echo "RENV_PATHS_ROOT=$(RENV_PATHS_ROOT)" >> $@
 	echo "RENV_PATHS_LIBRARY=renv/library" >> $@
 
-R-local: short_options=$(subst $(BIND_DIR),$${bind},$(subst $(CURDIR),$${wd},$(CONTAINER_OPTIONS)))
 R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses)
 R-$(RVERSION): $(CONTAINER_IMAGE)
 	@echo "#!/bin/bash" > $@
-	@echo "bind=$${1:-$(BIND_DIR)}" >> $@
-	@echo "wd=$${2:-$(CURDIR)}" >> $@
-	@echo 'function R { $(CONTAINER) $(short_options) $(INTERACTIVE_SINGULARITY) $(CONTAINER_IMAGE) R' \$$@  " ; }" >> $@
-	@echo 'function Rscript { $(CONTAINER) $(short_options) $(INTERACTIVE_SINGULARITY) $(CONTAINER_IMAGE) Rscript' \$$@  " ; }" >> $@
-	@echo 'function conshell {  $(CONTAINER) $(short_options) $(INTERACTIVE_SINGULARITY) $(CONTAINER_IMAGE) ; }' >> $@
-	@echo "[[ "'$$BASH_SOURCE'" == "'$$0'" ]] && R " \$$@ >> $@
-	@setfacl -m u::rwx $@
-	@echo 'Using the following extra Singularity options: INTERACTIVE_SINGULARITY=$(INTERACTIVE_SINGULARITY)'
-	@echo 'You may want to customise this (in your bashrc?) to things you need for an interactive environment (e.g. --bind /nemo, --env $$$$DISPLAY)'
+	@echo 'function babs-R { $(CONTAINER) $(CONTAINER_OPTIONS) $${BABS_SINGULARITY_INTERACTIVE_EXTRAS} $(CONTAINER_IMAGE) R' \$$@  " ; }" >> $@
+	@echo 'function babs-Rscript { $(CONTAINER) $(CONTAINER_OPTIONS) $${BABS_SINGULARITY_INTERACTIVE_EXTRAS} $(CONTAINER_IMAGE) Rscript' \$$@  " ; }" >> $@
+	@echo 'function babs-conshell {  $(CONTAINER) $(CONTAINER_SHELL_OPTIONS) $${BABS_SINGULARITY_INTERACTIVE_EXTRAS} $(CONTAINER_IMAGE) ; }' >> $@
+	@echo "[[ "'$$BASH_SOURCE'" == "'$$0'" ]] && babs-R " \$$@ >> $@
+	@$(make_rwx) $@
+	@echo 'Using the following extra Singularity options: BABS_SINGULARITY_INTERACTIVE_EXTRAS=$(BABS_SINGULARITY_INTERACTIVE_EXTRAS)'
+	@echo 'You may want to customise this (in your bashrc?) to things you need for an interactive environment (e.g. --bind /nemo, --env $$DISPLAY)'
 
-.PHONY: R
-R: Renviron.site
-	$(CONTAINER) $(CONTAINER_FLAGS_INTERACTIVE) $(CONTAINER_IMAGE) R
+.PHONY: R  rstudio rstudio-slurm
+R rstudio rstudio-slurm: Renviron.site
 
-.PHONY: rstudio rstudio-slurm
+R:
+	$(CONTAINER) $(CONTAINER_OPTIONS) $${BABS_SINGULARITY_INTERACTIVE_EXTRAS} $(CONTAINER_IMAGE) R
+
 rstudio-slurm: ## Start RStudio on a node for this project. Can use variables SLURM--*, where *=(partition|cpus-per-task/time/mem). Look for an 'rstudio-server.log' file to appear, with instructions.
-	res=$$(sbatch  \
+	@res=$$(sbatch  \
 --partition=$(SLURM--partition) \
 --cpus-per-task=$(SLURM--cpus-per-task) \
 --time='$(SLURM--time)' \
 --mem=$(SLURM--mem) \
 $(source_dir)/shell/rstudio-rocker.sh $(CONTAINER_IMAGE) ${SINGULARITY_VERSION} $$(hostname)) ;\
-	echo $$res "- please wait until job is allocated for futher instructions (./rstudio-server.log will appear)"
+	echo $$res "- please wait until job is allocated, at which point ./rstudio-server.log will appear, explaining how to access the session."
 
 rstudio: ## Start RStudio on this machine for this project.
 	. ./$(source_dir)/shell/rstudio-rocker.sh $(CONTAINER_IMAGE) ${SINGULARITY_VERSION}
@@ -265,14 +265,15 @@ rstudio: ## Start RStudio on this machine for this project.
 # one out of a template.
 
 $(SELF_DIR)secret.mk: preexisting=$(firstword $(wildcard ../secret.mk ../babs/secret.mk .not-secret.mk))
+$(SELF_DIR)secret.mk: babsfile=$(firstword $(wildcard ../../.babs ../.babs .babs))
 
-$(SELF_DIR)secret.mk: $(preexisting) $(wildcard ../.babs)
-	@if [ -f "$(preexisting)" ]; then \
+$(SELF_DIR)secret.mk: $(preexisting) $(babsfile)
+	@if [ -n "$(preexisting)" ]; then \
 	  sed  's/=.*/=/; /## BABS/,$$d' $(preexisting) > .not-secret.mk ;\
 	  cp $(preexisting) $@ ;\
-	  if [ -f ../.babs ]; then \
+	  if [ -n "$(babsfile)" ]; then \
 	    sed  -i '/^setting_/d' $@ ;\
-	    sed -r -n 's/^(\s*)(.*)\s*:\s*(.*$$)/setting_\2=\3/p' ../.babs >> $@ ;\
+	    sed -r -n 's/^(\s*)(.*)\s*:\s*(.*$$)/setting_\2=\3/p' $(babsfile) >> $@ ;\
 	  fi ;\
 	else \
 	  echo "Unable to find a 'secret.mk' file" ;\

@@ -3,7 +3,7 @@
 # 'literal' so a trailing space can get included value
 
 # where .sif's are stored:
-SINGULARITY_ROOT=/flask/apps/containers/all-singularity-images/
+SINGULARITY_ROOT=/flask/apps/containers/all-singularity-images
 # local renv cache:
 RENV_PATHS_ROOT=/nemo/stp/babs/working/software/renv
 # your chosen prefix (e.g.'rocker') to keep the pipeline somewhat isolated:
