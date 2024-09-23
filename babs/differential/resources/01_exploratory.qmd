@@ -226,7 +226,7 @@ table1(dds, ddsList) %>%
 
 
 for (assay in c("counts", "norm", "vst")) {
-  write_assay(ddsList, assay=assay, path=params$res_dir)
+  write_assay(ddsList, assay=assay, path=params$res_dir, suffix=paste0("_",params$alignment, "_", params$spec))
 }
 
 save(ddsList,

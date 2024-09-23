@@ -5,12 +5,13 @@
 ##' @param ddsList A list of [DESeq2::DESeqDataSet-class()] objects 
 ##' @param assay The assay to be output (or 'norm' for normalised counts)
 ##' @param path Where to put the text files
+##' @param suffix Additional identifier information for the filename
 ##' @param formula The model that will be used to estimate the normalisation offsets
 ##' @param terms_to_remove The 'Terms' estimated from the above model that will be removed (subtracted) from values of the assay.
 ##' @return A list of file paths to the excel files
 ##' @author Gavin Kelly
 ##' @export
-write_assay <- function(ddsList, assay="vst", path="results", formula=NULL, terms_to_remove=NULL) {
+write_assay <- function(ddsList, assay="vst", path="results", suffix="", formula=NULL, terms_to_remove=NULL) {
   out <- list()
   for (i in names(ddsList)) {
     if (!is.null(formula)) {
@@ -28,7 +29,7 @@ write_assay <- function(ddsList, assay="vst", path="results", formula=NULL, term
     spacer_frame <- as.data.frame(mcols(ddsList[[i]]))[rep(1, ncol(head_frame)),]
     spacer_frame[] <- ""
     row.names(spacer_frame) <- colnames(head_frame)
-    fname <- file.path(path, paste0(i,"_",assay, ".txt"))
+    fname <- file.path(path, paste0(assay, suffix,"_", i, ".txt"))
     out[[i]] <- fname
     write.table(cbind(spacer_frame, t(head_frame)), file=fname, quote=FALSE, sep="\t", col.names=NA)
     write.table(content_frame, file=fname,
@@ -147,7 +148,7 @@ write_results <- function(ddsList, param, dir=".", assays=NULL) {
                                  value = unlist(si$platform),
                                  stringsAsFactors = FALSE),
               headerStyle=hs2)
-    out[[dataset]] <- file.path(dir, paste0("differential_", param$get("spec"), "_", dataset, ".xlsx"))
+    out[[dataset]] <- file.path(dir, paste0("differential_", param$get("alignment"), "_", param$get("spec"), "_",dataset, ".xlsx"))
     (saveWorkbook(wb, out[[dataset]], overwrite=TRUE))
   }
   out
