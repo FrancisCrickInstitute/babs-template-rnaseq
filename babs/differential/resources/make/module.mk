@@ -16,10 +16,10 @@ source_dir=resources
 staging_dir=staging
 ## place within the staging directory where renders will be placed
 RESULTS_DIR = results
+staged_results=$(staging_dir)/$(RESULTS_DIR)/$(VERSION)
 ## Where to store key information transferred from nfcore run
 my_counts_dir=extdata/genes.results
 my_metadata=extdata/metadata
-
 
 ################################################################
 ## GEO settings

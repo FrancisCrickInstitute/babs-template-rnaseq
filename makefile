@@ -46,6 +46,7 @@ test: airway/fastq ## Generate a test folder setup for the airway data
 	( cd $@/babs && \
 	ln -s ../../airway/fastq fastq && \
 	cp -r ../../airway/docs . && \
+	if [ -n "$(aligner)" ]; then echo "aligner=$(aligner)" >> docs/GRCh38.config; fi && \
 	cp    ../../babs/docs/makefile ../../babs/docs/readme.md ../../babs/docs/.gitignore docs/ && \
 	git add makefile &&  \
 	git commit -m "Restart git repo for testing" && \

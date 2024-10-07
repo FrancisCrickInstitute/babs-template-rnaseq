@@ -3,11 +3,11 @@ import { parse as flag} from "https://deno.land/std/flags/mod.ts";
 import { createExtractor, Format, Parser } from "https://deno.land/std/encoding/front_matter/mod.ts";
 
 const flags = flag(Deno.args, {
-    string: ["template", "staging", "tag", "repo", "sections", "alignments", "specfiles"]
+    string: ["template", "staging", "repo", "sections", "alignments", "specfiles"]
 });
 
 const quarto = parse(Deno.readTextFileSync(flags.template));
-const qmdre = new RegExp(flags.tag.concat(".qmd$"));
+const qmdre = new RegExp(".qmd$");
 const extractYAML = createExtractor({ [Format.YAML]: parse as Parser });
 const qmds = Array.from(Deno.readDirSync(flags.staging))
     .filter( f => qmdre.test(f.name))
@@ -40,15 +40,15 @@ for (const a in alignments) {
 	}]};
     
     for (const nospec in nospecs) {
-	thisalign.contents.push(qmd2nav(nospecs[nospec]+"_"+alignments[a]+flags.tag + ".qmd", flags, short_align));
+	thisalign.contents.push(qmd2nav(nospecs[nospec]+"_"+alignments[a] + ".qmd", flags, short_align));
     }
     if (specfiles.length==1) {
-	thisalign.contents = thisalign.contents.concat(hasspecs.map(x => qmd2nav(x + "_" + specfiles[0] + "_"+alignments[a] + flags.tag + ".qmd", flags, short_align)));
+	thisalign.contents = thisalign.contents.concat(hasspecs.map(x => qmd2nav(x + "_" + specfiles[0] + "_"+alignments[a] + ".qmd", flags, short_align)));
     } else {
 	for (const spec in specfiles) {
 	    thisalign.contents.push({
 		section: specfiles[spec],
-		contents: hasspecs.map(x => qmd2nav(x + "_" + specfiles[spec] + "_"+alignments[a] + flags.tag + ".qmd", flags, short_align +" " + specfiles[spec]))
+		contents: hasspecs.map(x => qmd2nav(x + "_" + specfiles[spec] + "_"+alignments[a] +  ".qmd", flags, short_align +" " + specfiles[spec]))
 	    });
 	}
     }
