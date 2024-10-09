@@ -6,10 +6,8 @@ include resources/make/shared.mk
 include resources/make/module.mk
 include resources/make/project.mk  ## Provides analysis parametrisation
 
-ifeq (,$(filter $(excluded-targets),$(MAKECMDGOALS)))
-ifneq (,$(excluded-targets))
+ifeq (,$(filter $(or $(excluded-targets),help),$(or $(MAKECMDGOALS),help)))
 include $(patsubst %,$(staging_dir)/.make-%,$(sections))
-endif
 endif
 
 
@@ -155,9 +153,9 @@ renv.lock: resources/_dependencies.R $(wildcard resources/renv/renv.lock) .Rprof
 	  $(GIT) stash push -m "Pipeline stashed. Use 'git stash pop' to retrieve it" -- $@ $(call log,renv) ;\
 	  $(R) -e 'library(renv); init(bioconductor=TRUE); snapshot()' ;\
 	fi
-	$(GIT) add renv.lock renv/.gitignore .Rprofile renv/activate.R $(call log,renv,-a)
-	$(GIT) add $@ $(wildcard resources/make/shared.mk makefile .gitignore resources/make/module.mk resources/make/project.mk .not-secret.mk)
+	$(GIT) add renv.lock renv .Rprofile $(source_dir)
 	$(GIT) add $(wildcard ../shared.mk ../makefile ../.gitignore ../readme.md ../.gitignore ../.pipeline-version)
+	$(GIT) add $(wildcard makefile R .Rbuildignore .gitignore)
 	$(GIT) commit -m 'Renv initialised by pipeline\n\n' || echo "No initialisation files need commiting" $(call log,renv,-a) 
 
 

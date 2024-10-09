@@ -7,7 +7,7 @@ SINGULARITY_ROOT=/flask/apps/containers/all-singularity-images
 # local renv cache:
 RENV_PATHS_ROOT=/nemo/stp/babs/working/software/renv
 # your chosen prefix (e.g.'rocker') to keep the pipeline somewhat isolated:
-RENV_PATHS_PREFIX=rocker
+RENV_PATHS_PREFIX=$(subst /,-,$(IMAGE))
 # working space for large disposable files:
 # Use either the hash set in the .babs file, or the project part of the path
 SCRATCH_DIR=/flask/scratch/babs/$(USER)/projects/$(or $(setting_Hash),$(word 9,$(subst /, ,$(CURDIR))))
@@ -29,7 +29,8 @@ url_intranet = $(patsubst /nemo/stp/babs/www/html/internal%,https://bioinformati
 url_internet = $(patsubst /nemo/stp/babs/www/html/external%,https://bioinformatics.crick.ac.uk%,$(redirect_internet))
 repo=https://github.com/BABS-STP/$(setting_Hash)
 
-.PHONY: update-pipeline get-pipeline
+.PHONY: update-pipeline get-pipeline update-module
+excluded-targets += update-pipeline get-pipeline update-module
 
 ifeq ($(version),)
 targz=$(TEMPLATE_DIR)/$(setting_Type).tar.gz
