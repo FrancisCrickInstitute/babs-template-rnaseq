@@ -6,13 +6,11 @@ include module.mk
 configs = $(patsubst %,%.config,$(alignments))
 samplesheets = $(patsubst %,samplesheet_%.csv,$(alignments))
 
-ifeq (,$(filter $(excluded-targets),$(MAKECMDGOALS)))
-ifneq (,$(excluded-targets))
+ifneq (,$(filter-out $(or $(excluded-targets),$(MAKECMDGOALS)),$(MAKECMDGOALS)))
 include $(configs)
 endif
-endif
 
-gene_counts = $(patsubst %,results/%/$(or $(%.aligner),star_rsem)/$(subst star_,,$(or $(%.aligner),star_rsem)).merged.gene_counts.tsv,$(alignments))
+gene_counts = $(patsubst %,results/%/merged.gene_counts.tsv,$(alignments))
 
 refdir = $(realpath $($*.index_dir)/$($*.genome_fasta_md5)/$($*.gtf_md5))
 workdir = $(SCRATCH_DIR)/nf_work/
@@ -23,7 +21,12 @@ run: $(gene_counts) ## Generate NF-CORE alignments, one folder for each config-s
 $(patsubst %,results/%,$(alignments)):
 	mkdir -p $@
 
-$(gene_counts) : results/%/$(or $(%.aligner),star_rsem)/$(subst star_,,$(or $(%.aligner),star_rsem)).merged.gene_counts.tsv : samplesheet_%.csv results/% | $(log_dir) $(workdir)
+$(gene_counts) : results/%/merged.gene_counts.tsv : results/%/$(or $(%.aligner),star_rsem)/$(subst star_,,$(or $(%.aligner),star_rsem)).merged.gene_counts.tsv
+	ln -s $(subst results/$*/,,$<) $@
+	ln -s multiqc/$(%.aligner),star_rsem)/ results/$*/multi-qc
+
+gene_counts_real = $(patsubst %,results/%/$(or $(%.aligner),star_rsem)/$(subst star_,,$(or $(%.aligner),star_rsem)).merged.gene_counts.tsv,$(alignments))
+$(gene_counts_real) : results/%/$(or $(%.aligner),star_rsem)/$(subst star_,,$(or $(%.aligner),star_rsem)).merged.gene_counts.tsv : samplesheet_%.csv  | $(log_dir) $(workdir)
 	mkdir -p results/$*
 	export NXF_SINGULARITY_CACHEDIR="$(NXF_SINGULARITY_CACHEDIR)" ;\
 	export NXF_SINGULARITY_LIBRARYDIR="$(NXF_SINGULARITY_CACHEDIR)" ;\
@@ -51,14 +54,6 @@ $(gene_counts) : results/%/$(or $(%.aligner),star_rsem)/$(subst star_,,$(or $(%.
 	fi
 	$(NEXTFLOW) clean -f
 
-$(workdir):
-	mkdir -p $(workdir)
-
-################################################################
-#### Bootrap all relevant data from outside
-################################################################
-
-build: $(samplesheets) ## Build all necessary inputs: samplesheets for each matching alignment '.config' from 'docs'.
 
 
 field=$(shell sed '/^$$/d; s/^$*./"/;s/=.*/" TEXT/' "$*.config" | paste -sd ',')
@@ -66,26 +61,42 @@ insfield=$(shell sed '/^$$/d; s/^$*./"/;s/=.*/"/' "$*.config" | paste -sd ',')
 vals=$(shell sed -r '/^$$/d; s/.*=(.*)/"\1"/' "$*.config" | paste -sd ',')
 
 
-$(samplesheets): samplesheet_%.csv: %.config $(samples_db)
-	$(SQLITE) $(samples_db) 'DROP TABLE IF EXISTS "config_$*";' \
-	'CREATE TABLE "config_$*" ($(field));' \
-	'INSERT INTO "config_$*" ($(insfield)) VALUES ($(vals));' \
-	'CREATE TABLE "fastq_$*" AS SELECT * FROM fastqs NATURAL JOIN "config_$*" ;'; \
-	$(SQLITE) -header -csv  $(samples_db) 'SELECT $(samplesheet_id_column) AS sample, fastq_1, fastq_2, strandedness FROM "fastq_$*";' > $@
+$(samplesheets): samplesheet_%.csv: %.config $(samplesheet_fname).csv
+	rm -f '$*.db'
+	$(SQLITE) '$*.db' ".import --csv $(samplesheet_fname).csv fastqs" \
+	"ALTER TABLE fastqs ADD COLUMN universal text;" \
+	"UPDATE fastqs SET universal='yes';"; \
+	$(SQLITE) '$*.db' 'CREATE TABLE config ($(field));' \
+	'INSERT INTO config ($(insfield)) VALUES ($(vals));' \
+	'CREATE TABLE fastq AS SELECT * FROM fastqs NATURAL JOIN config ;'; \
+	$(SQLITE) -header -csv '$*.db' 'SELECT $(samplesheet_id_column) AS sample, fastq_1, fastq_2, strandedness FROM fastq;' > $@
+	rm -f '$*.db'
 	if [ ! -z "$($*.grep)" ]; then grep $($*.grep) $@ > $@.tmp; mv $@.tmp $@; fi
 	$(GIT) add $@
 
-ifneq ($(ingress_dir),)
-$(ingress_dir)/%:
-	$(MAKE) --no-print-directory -C $(ingress_dir) $*
-$(configs) : %.config : $(ingress_dir)/%.config
-	cp $< $@
-	md5sum $(shell sed -n 's/^$*.genome_fasta=//p' $<) | awk '{print "$*.genome_fasta_md5=" $$1}' >> $@
-	md5sum $(shell sed -n 's/^$*.gtf=//p' $<) | awk '{print "$*.gtf_md5=" $$1}' >> $@
-	$(GIT) add $@
-$(samples_db): $(ingress_dir)/$(samples_db)
-	cp $< $@
+$(workdir):
+	mkdir -p $(workdir)
+
+################################################################
+#### Bootrap all relevant data from outside
+################################################################
+
+build: $(samplesheet_fname).csv ## Build all necessary inputs: samplesheets for each matching alignment '.config' from 'docs'.
+
+ifneq ($(docs_dir),)
+$(docs_dir)/%:
+	$(MAKE) --no-print-directory -C $(docs_dir) $*
+$(configs): %.config: $(docs_dir)/%.config
+	$(MAKE) --no-print-directory -C $(ingress_dir) $*.config
+	cp $(ingress_dir)/$*.config $@
+	$(GIT) add $@ $<
+$(samplesheet_fname).csv: $(docs_dir)/$(samplesheet_fname).csv
+	$(MAKE) --no-print-directory -C $(ingress_dir) $(samplesheet_fname).csv
+	cp $(ingress_dir)/$(samplesheet_fname).csv $@
+	$(GIT) add $@ $<
+
 endif
+
 
 
 $(log_dir):
@@ -107,7 +118,6 @@ run-clean:
 
 build-clean:  ## Remove files only needed for re-`run`ning. Downstream steps will still work if `run` has already completed.
 	rm -f $(samplesheets)
-	rm -f $(samples_db)
 
 
 clean-complete: clean-build ## Complete reset. Donwstream steps will no `build` (and perhaps might not even run even if they've already been built.)

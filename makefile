@@ -35,7 +35,7 @@ airway/fastq: airway/ena.txt
 airway/nfcore.tar.gz: | test ## Cache the nfcore results for future speed
 	cd test/nfcore &&\
 	make run &&\
-	tar -czf ../../$@ samplesheet_GRCh38.csv samples.db GRCh38.config results/GRCh38/multiqc results/GRCh38/star_rsem/*.genes.results results/GRCh38/star_rsem/rsem.merged.gene_counts.tsv
+	tar -czf ../../$@ samplesheet_GRCh38.csv samplesheet.csv GRCh38.config results/GRCh38/multiqc results/GRCh38/star_rsem/*.genes.results results/GRCh38/merged.gene_counts.tsv results/GRCh38/star_rsem/rsem.merged.gene_counts.tsv
 
 
 test: airway/fastq ## Generate a test folder setup for the airway data
@@ -48,8 +48,7 @@ test: airway/fastq ## Generate a test folder setup for the airway data
 	cp -r ../../airway/docs . && \
 	if [ -n "$(aligner)" ]; then echo "aligner=$(aligner)" >> docs/GRCh38.config; fi && \
 	cp    ../../babs/docs/makefile ../../babs/docs/readme.md ../../babs/docs/.gitignore docs/ && \
-	git add makefile &&  \
-	git commit -m "Restart git repo for testing" && \
+	git commit --allow-empty -m "Restart git repo for testing" && \
 	git tag v9.9.9 )
 
 .PHONY: test-ff-nfcore test-differential
@@ -85,6 +84,10 @@ major minor patch:## Edit files to bump the version
 	cat pkgdown/NEWS.md >> pkgdown/tmp.md
 	mv pkgdown/tmp.md pkgdown/NEWS.md
 	echo "Please check pkgdown/NEWS.md and pkgdown/DESCRIPTION are correct. Then commit and tag v"$(new)
+
+.PHONY: clean
+clean:
+	rm -rf test
 
 help: ## show help message
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m\033[0m\n"} /^[$$()% 0-9a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)

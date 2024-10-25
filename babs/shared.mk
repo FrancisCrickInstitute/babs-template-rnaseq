@@ -14,6 +14,12 @@ EXECUTOR = singularity
 ################################################################
 # Conventional directory-, file- and field- names
 ################################################################
+samplesheet_fname=samplesheet
+experiment_table = experiment_table
+samplesheet_id_column = sample
+metadata_id_column = ID
+name_col = sample_name
+samples_db = samples.db
 
 ## Location of qmds and multi-yaml files
 source_dir=resources
@@ -28,7 +34,6 @@ staged_results=$(staging_dir)/$(RESULTS_DIR)/$(VERSION)
 # csv file names (excluding ext)
 log_dir=logs
 
-.DEFAULT_GOAL=help
 SELF_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 
 
@@ -47,7 +52,11 @@ GIT=git
 
 ## Module loader
 ml = module is-loaded $1 || module load $1 || true # ie fall back to true (ie rely on system version if can't load a module)
+## Define commands invoked by make
+NEXTFLOW = $(call ml,Nextflow/$(NEXTFLOW_VERSION)); $(call ml,Singularity/$(SINGULARITY_VERSION)); $(call ml,CAMP_proxy); nextflow
+SQLITE = $(call ml,SQLite/3.42.0-GCCcore-12.3.0); sqlite3
 make_rwx = setfacl -m u::rwx
+
 
 # Environment Variables
 BIOCPARALLEL_WORKER_NUMBER=2
@@ -68,11 +77,37 @@ include $(SELF_DIR)secret.mk
 ################################################################
 excluded-targets += $(pubdir)/$(VERSION)
 
-publish_results=results
 publish_intranet=www_internal
 publish_internet=www_external
 publish_outputs=outputs
-location=outputs
+
+docs_dir?=$(wildcard ../docs)
+ingress_dir?=$(wildcard ../ingress)
+nfcore_dir?=$(wildcard ../nfcore)
+diff_dir?=$(wildcard ../differential)
+
+
+################################################################
+## Propagation of docs files
+## 'Earliest' presence of a propagated file is taken as definitive.
+################################################################
+early_spec_dir=$(firstword $(wildcard $(docs_dir) $(diff_dir)/extdata))
+specfiles=$(patsubst $(early_spec_dir)/%.spec,%,$(wildcard $(early_spec_dir)/*.spec))
+
+#early_align=$(firstword $(wildcard $(docs_dir) $(ingress_dir) $(nfcore_dir) $(diff_dir)/extdata))
+
+ifneq ($(diff_dir),)
+alignments=$(patsubst $(diff_dir)/$(my_counts_dir)/%,%,$(wildcard $(diff_dir)/$(my_counts_dir)/*))
+endif
+ifneq ($(nfcore_dir),)
+alignments=$(patsubst $(nfcore_dir)/results/%,%,$(wildcard $(nfcore_dir)/results/*))
+endif
+ifneq ($(ingress_dir),)
+alignments=$(patsubst $(ingress_dir)/%.config,%,$(wildcard $(ingress_dir)/*.config))
+endif
+ifneq ($(docs_dir),)
+alignments=$(patsubst $(docs_dir)/%.config,%,$(wildcard $(docs_dir)/*.config))
+endif
 
 shortcut=$(empty)
 ifdef redirect_$(location)
@@ -95,7 +130,7 @@ ifdef url_$(location)
 endif
 	ln -sfn $(redirect_$(location)) $(pubdir)
 endif
-	mkdir -p $<
+	mkdir -p $@
 	ln -sfn $(VERSION) $(pubdir)/latest
 
 
@@ -296,21 +331,19 @@ renv/activate.R: $(wildcard resources/renv/activate.R)
 # here. If a secret.mk file can't be found anywhere, create a dummy
 # one out of a template.
 
-$(SELF_DIR)secret.mk: preexisting=$(firstword $(wildcard $(PROJECT_HOME)/secret.mk $(PROJECT_HOME)/babs/secret.mk $(SELF_DIR)not-secret.mk))
-$(SELF_DIR)secret.mk: babsfile=$(wildcard $(PROJECT_HOME)/.babs)
 
-$(SELF_DIR)secret.mk: $(preexisting) $(babsfile)
-	@if [ -n "$(preexisting)" ]; then \
-	  cp $(preexisting) $@ ;\
-	  if [ -n "$(babsfile)" ]; then \
+$(SELF_DIR)secret.mk: $(firstword $(wildcard $(PROJECT_HOME)/secret.mk $(PROJECT_HOME)/babs/secret.mk $(SELF_DIR)not-secret.mk) xxx) $(wildcard $(PROJECT_HOME)/.babs)
+	@if [ ! "$<" == xxx ]; then \
+	  cp $< $@ ;\
+	  if [ -n "$(wildcard $(PROJECT_HOME)/.babs)" ]; then \
 	    sed  -i '/^setting_/d' $@ ;\
-	    sed -r -n 's/^(\s*)(.*)\s*:\s*(.*$$)/setting_\2=\3/p' $(babsfile) >> $@ ;\
+	    sed -r -n 's/^(\s*)(.*)\s*:\s*(.*$$)/setting_\2=\3/p' $(wildcard $(PROJECT_HOME)/.babs) >> $@ ;\
 	  fi ;\
 	else \
 	  echo "Unable to find a 'secret.mk' file" ;\
 	  exit ;\
 	fi
-	@if [ "$(preexisting)" = "$(SELF_DIR)not-secret.mk" ]; then \
+	@if [ "$<" = "$(SELF_DIR)not-secret.mk" ]; then \
 	    echo "Created a blank '$@' file - please customise it so that the pipeline will run on your system" ;\
 	    exit ;\
 	fi

@@ -1,12 +1,12 @@
 .PHONY: makefile module.mk 
 .PHONY: build clean maintainer-clean geo R-local
-
+.DEFAULT_GOAL=help
 diff_dir=.
 include resources/make/shared.mk
 include resources/make/module.mk
 include resources/make/project.mk  ## Provides analysis parametrisation
 
-ifeq (,$(filter $(or $(excluded-targets),help),$(or $(MAKECMDGOALS),help)))
+ifneq (,$(filter-out $(or $(excluded-targets),$(MAKECMDGOALS)),$(MAKECMDGOALS)))
 include $(patsubst %,$(staging_dir)/.make-%,$(sections))
 endif
 
@@ -67,10 +67,8 @@ $(mk0): $(staging_dir)/.make-% : $(samplesheets) $(genes_results) | $(staging_di
 	echo '$*_htmls = $$(patsubst %,$(staged_results)/%.html,$$($*_pages))'>> $@
 	echo '$*_htmls: $$($*_htmls)'>> $@
 
-ifeq (,$(filter $(excluded-targets),$(MAKECMDGOALS)))
-ifneq (,$(excluded-targets))
+ifneq (,$(filter-out $(or $(excluded-targets),$(MAKECMDGOALS)),$(MAKECMDGOALS)))
 include $(configs)
-endif
 endif
 
 qmds=$(strip $(foreach section,$(sections),$($(section)_qmds)))
@@ -184,31 +182,23 @@ endif
 
 ## Back outside the executor/submission
 
-.Rprofile: $(wildcard resources/renv/Rprofile)
-	mkdir -p renv
-	$(GIT) mv $< $@ || mv $< $@
-renv/activate.R: $(wildcard resources/renv/activate.R)
-	mkdir -p renv
-	$(GIT) mv $< $@ || mv $< $@
 
-
-.PHONY: geo
-geo: geo/md5.txt  ## Gather everything into the 'geo' folder. Specify `version=`, `alignment=` and `spec=` to customise. Remember to `make clean-geo` when the files have been upload.
-geo/md5.txt:
-	mkdir -p $(SCRATCH_DIR)geo
-	mkdir -p shortcuts
-	ln -s $(SCRATCH_DIR)geo shortcuts/geo
-	ln -fn $(my_counts_dir)/$(alignment)/*.genes.results shortcuts/geo/
-	ln -fn $(RESULTS_DIR)/$(VERSION)/$(alignment)/$(spec)/*.xlsx shortcuts/geo/
-	$(SQLITE) extdata/$(samples_db) 'select fastq_1 from fastqs  where config_file="$(alignment)";' | \
-	while read -r fq ; do cp $${fq} shortcuts/geo/ ; done
-	$(SQLITE) extdata/$(samples_db) 'select fastq_2 from fastqs  where config_file="$(alignment)";' | \
-	while read -r fq ; do cp $${fq} shortcuts/geo/ ; done
-	pushd shortcuts/geo; md5sum *.* > geo.md5.txt; popd
+# .PHONY: geo
+# geo: geo/md5.txt  ## Gather everything into the 'geo' folder. Specify `version=`, `alignment=` and `spec=` to customise. Remember to `make clean-geo` when the files have been upload.
+# geo/md5.txt:
+# 	mkdir -p $(SCRATCH_DIR)geo
+# 	mkdir -p shortcuts
+# 	ln -s $(SCRATCH_DIR)geo shortcuts/geo
+# 	ln -fn $(my_counts_dir)/$(alignment)/*.genes.results shortcuts/geo/
+# 	ln -fn $(RESULTS_DIR)/$(VERSION)/$(alignment)/$(spec)/*.xlsx shortcuts/geo/
+# 	$(SQLITE) extdata/$(samples_db) 'select fastq_1 from fastqs  where config_file="$(alignment)";' | \
+# 	while read -r fq ; do cp $${fq} shortcuts/geo/ ; done
+# 	$(SQLITE) extdata/$(samples_db) 'select fastq_2 from fastqs  where config_file="$(alignment)";' | \
+# 	while read -r fq ; do cp $${fq} shortcuts/geo/ ; done
+# 	pushd shortcuts/geo; md5sum *.* > geo.md5.txt; popd
 
 .PHONY: publish
-publish: $(pubdir) ## Copy results to final location. Either 'outputs' folder (default), intranet (`make publish location=intranet`) or internet
-	mkdir -p $(pubdir)/$(VERSION)
+publish: $(pubdir)/$(VERSION) ## Copy results to final location. Either 'outputs' folder (default), intranet (`make publish location=intranet`) or internet
 	cp --no-preserve=mode -r $(RESULTS_DIR)/$(VERSION)/. $(extra_files) $(pubdir)/$(VERSION)
 	cp --no-preserve=mode --recursive --dereference --no-clobber $(RESULTS_DIR)/multiqc-* $(pubdir)/
 	ln -sfn $(VERSION) $(pubdir)/latest
@@ -221,53 +211,45 @@ publish: $(pubdir) ## Copy results to final location. Either 'outputs' folder (d
 #### Bootstrap all relevant data from outside
 ################################################################
 
-build: run  ##  'build' is deprecated - `make run` is now sufficient.
+build: $(my_metadata).csv $(file.spec) $(samplesheets) $(genes_results) ##  'build' is deprecated - `make run` is now sufficient.
 
 ifneq ($(docs_dir),)
-pre-dir=$(docs_dir)
 $(docs_dir)/%:
 	$(MAKE) --no-print-directory -C $(docs_dir) $*
-
 $(file.spec): extdata/% : $(docs_dir)/% | extdata
-	$(MAKE) --no-print-directory -C $(docs_dir) $*
 	cp $< $@
 	$(GIT) add $@ $<
-endif
-
-ifneq ($(ingress_dir),)
-pre-dir=$(ingress_dir)
-$(ingress_dir)/%:
-	$(MAKE) --no-print-directory -C $(ingress_dir) $*
-
-$(my_metadata).csv: $(ingress_dir)/$(experiment_table).csv | $(dir $(my_metadata))
+$(my_metadata).csv: $(docs_dir)/$(experiment_table).csv | $(dir $(my_metadata))
 	$(MAKE) --no-print-directory -C $(ingress_dir) $(experiment_table).csv
-	cp $< $@
+	cp $(ingress_dir)/$(experiment_table).csv $@
+	$(GIT) add $@ $<
+$(configs): extdata/%.config: $(docs_dir)/%.config | extdata
+	$(MAKE) --no-print-directory -C $(ingress_dir) $*.config
+	cp $(ingress_dir)/$*.config $@
 	$(GIT) add $@ $<
 endif
 
 
 ifneq ($(nfcore_dir),)
-pre-dir=$(nfcore_dir)
 $(nfcore_dir)/%:
-	$(MAKE)  --no-print-directory -C $(nfcore_dir) $*
+	$(MAKE) --no-print-directory -C $(nfcore_dir) $*
 
-$(samplesheets) : $(my_metadata)_%.csv : $(nfcore_dir)/samplesheet_%.csv extdata/$(samples_db) $(my_metadata).csv
-	$(SQLITE) -header -csv  extdata/$(samples_db) --cmd '.import --csv --schema temp $(my_metadata).csv metadata' 'SELECT metadata.* FROM metadata INNER JOIN (SELECT * FROM "fastq_$*" GROUP BY $(samplesheet_id_column)) AS nfcore on metadata.$(metadata_id_column)=nfcore.$(samplesheet_id_column);' > $@
-	$(GIT) add $@ $<
+# All the nfcore dependencies on docs - if docs samplesheet changes, recalculate everything.  If a config changes, just recalc that.
 
-extdata/$(samples_db): $(nfcore_dir)/$(samples_db) | $(file.spec) $(staging_dir)
-	cp $< $@ || echo "No samples database in nfcore directory"
-	$(GIT) commit -m "Add template scripts, R functions, makefiles" || true
+$(nfcore_dir)/samplesheet_%.csv: $(docs_dir)/%.config $(docs_dir)/$(samplesheet_fname).csv
+$(nfcore_dir)/results/%/merged.gene_counts.tsv : $(docs_dir)/%.config $(docs_dir)/$(samplesheet_fname).csv
 
-multiqc_results = $(patsubst $(nfcore_dir)/results/%/multiqc/star_rsem/multiqc_report.html,$\
-  $(RESULTS_DIR)/multiqc-%,$\
-  $(wildcard $(nfcore_dir)/results/*/multiqc/star_rsem/multiqc_report.html))
-# multiqc_report.html has no recipe, but OK to include it as a prereq as it has to exist by definition of multiqc_results
-$(multiqc_results) : $(RESULTS_DIR)/multiqc-% : $(nfcore_dir)/results/%/multiqc/star_rsem/multiqc_report.html
-	mkdir -p $@
-	cp -lr $(nfcore_dir)/results/$*/multiqc/star_rsem/. $@ || cp -r $(nfcore_dir)/results/$*/multiqc/star_rsem/. $@
 
-$(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/results/%/$(or $(%.aligner),star_rsem)/$(subst star_,,$(or $(%.aligner),star_rsem)).merged.gene_counts.tsv  $(multiqc_results)
+## Recipes for copying & generating files from nfcore results
+$(samplesheets) : $(my_metadata)_%.csv : $(nfcore_dir)/samplesheet_%.csv $(my_metadata).csv
+	rm -f '$*.db'
+	$(SQLITE) '$*.db' '.import --csv  $< $*'  ;\
+	$(SQLITE) '$*.db' '.import --csv  $(my_metadata).csv metadata'  ;\
+	$(SQLITE) -header -csv '$*.db' 'SELECT metadata.* FROM metadata INNER JOIN (SELECT * FROM "$*" GROUP BY $(samplesheet_id_column)) AS nfcore on metadata.$(metadata_id_column)=nfcore.$(samplesheet_id_column);' > $@
+	rm -f '$*.db'
+	$(GIT) add $@
+
+$(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/results/%/merged.gene_counts.tsv 
 	dir=$(if $($*.group-as),$($*.group-as),$*);\
 	mkdir -p $(my_counts_dir)/$${dir} ;\
 	if [ "$($*.aligner)" = star_salmon ]; then \
@@ -276,13 +258,10 @@ $(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/results/%/$(or $(%.aligner),
 	else \
 	  cp -l $(nfcore_dir)/results/$${dir}/star_rsem/*.genes.results $(my_counts_dir)/$${dir}/ || cp  $(nfcore_dir)/results/$${dir}/star_rsem/*.genes.results $(my_counts_dir)/$${dir}/ ;\
 	fi
-
+	mkdir -p $(RESULTS_DIR)/multiqc-$*
+	cp -lr $(nfcore_dir)/results/$*/multi-qc/. $(RESULTS_DIR)/multiqc-$* || cp -r $(nfcore_dir)/results/$*/multi-qc/. $(RESULTS_DIR)/multiqc-$*
 
 endif
-
-$(configs): extdata/%.config: $(pre-dir)/%.config $(my_metadata)_%.csv  | extdata
-	cp $< $@
-	$(GIT) add $@ $<
 
 
 ################################################################
