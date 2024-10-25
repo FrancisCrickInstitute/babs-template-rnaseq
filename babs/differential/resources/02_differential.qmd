@@ -107,7 +107,7 @@ param <- ParamList$new(defaults=specs$settings)
 set.seed(param$set("seed", postpone=TRUE))
 param$set("spec",  params$spec, "Using analysis plan '{}'.", postpone=TRUE)
 param$set("alignment", params$alignment, "Using alignment settings '{}'")
-  
+
 ```
 
 # Datasets and Models
@@ -277,8 +277,8 @@ unclassed <- lapply(summaries,
 pval_frame <- dds_model_comp %>%
   map_dmc(~as.data.frame(mcols(.x)$results)) %>%
   map_dmc(function(x) {bind_rows(x, .id="Comparison")}, depth="model")
-                      
-                      
+
+
 
 ## for (dataset in names(summaries)) {
 ##   #options(htmltools.preserve.raw=TRUE)
@@ -336,7 +336,7 @@ for (dataset in names(summaries)) {
 
 ```{r}
 #| label: fig-summaryp
-  
+
 for (dataset in names(summaries)) {
   for (model in names(pval_frame[[dataset]])) {
     pl <- ggplot(pval_frame[[dataset]][[model]], aes(x=pvalue, fill=baseMean<1)) +
@@ -517,7 +517,7 @@ for (dataset in names(dds_model_comp)) {
       } else {
         col_split <- apply(sapply(pdat[, var_roles$by, drop=FALSE], as.character), 1, paste, collapse=" ")
       }
-      
+
       ha <- ComplexHeatmap::HeatmapAnnotation(
         df=pdat,
         col=metadata(colData(this_comp))$palette$Heatmap[names(pdat)],

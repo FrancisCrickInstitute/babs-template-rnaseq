@@ -214,7 +214,7 @@ where this is the case, we report back two useful measures:
    when the number of statistically differential genes in a pathway is
    exactly as expected from the sizes of the pathway and differential
    genelist.
-   
+
  - Proportion of Differential - To give some 'scientific significance'
    context, we also report the fraction of the pathway that is
    actually differential. Theoretically it's possible for a pathway
@@ -254,7 +254,7 @@ broadly similar magnitudes but opposite directions...)
 
 # Get a data.frame with the dds objects in a column
 dds_df <- tibble::as_tibble(dmc2df(dds_model_comp))
-  
+
 # Enumerate all functional-approach x dds combos
 approach_df <- cross_join(
   tibble(approach_name=names(approaches), approach_params=approaches),

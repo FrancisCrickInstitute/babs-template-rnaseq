@@ -197,7 +197,7 @@ table1 <- function(dds, ddsList) {
       transform(m, row.names=Row.names, Row.names=NULL)[row.names(samp),,drop=FALSE]
     }
   )
-  
+
   extra_meta <- extra_meta[sapply(extra_meta, function(x) ncol(x)!=0 & nrow(x)!=0)]
   # Generate tab_spanner parameters for each datasets extra columns
   ts_extra <- lapply(names(extra_meta),
@@ -210,7 +210,7 @@ table1 <- function(dds, ddsList) {
     x},
     ts_extra,
     accumulate=TRUE)
-  
+
   df <- cbind(samp, do.call(cbind, unname(extra_meta)))
   clabel <- setNames(as.list(names(df)), 1:ncol(df))
   names(df) <- names(clabel)
@@ -377,7 +377,7 @@ play.
 ```{r}
 #| label: fig-qc-visualisation
 
-                       
+
 param$set("top_n_variable", postpone=TRUE)
 param$set("clustering_distance_rows", postpone=TRUE)
 param$set("clustering_distance_columns", postpone=TRUE)
@@ -450,7 +450,7 @@ for (dname_i in seq_along(ddsList)) {
             label= "SuperV-Heatmap",
             caption=paste("Supervised Heatmap of variable genes,", dname))
     cat("\n\n---\n\n")
-    
+
     poisd <- PoiClaClu::PoissonDistance(t(counts(this_dds, normalized = TRUE)))
     samplePoisDistMatrix <- as.matrix(poisd$dd)
     if (length(vars) > 1) {
@@ -534,7 +534,7 @@ for (dname_i in seq_along(ddsList)) {
         } # next covariate
       }   # next qc_formula
     }
-    
+
     cat(var_heading("Principal Component Scatterplots of PCs ", param$get("pc_x"), " and ", param$get("pc_y"), 
         " coloured by covariate", depth=2 + (sum(mdls)>1)))
     do_labels <- nrow(colDat) < 10
@@ -582,8 +582,8 @@ for (dname_i in seq_along(ddsList)) {
       } # next covariate
       done_aes <- c(done_aes, lhs)
     } # next formula
-    
-    
+
+
     if (do_focus) {
       cat(var_heading("Focussed Principal Component Scatterplots of PCs ", param$get("pc_x"), " and ", param$get("pc_y"), 
           " coloured by covariate", depth=2 + (sum(mdls)>1)))
@@ -687,7 +687,7 @@ for (dname_i in seq_along(ddsList)) {
               label="covar",
               caption=paste("Covariate association in", dname)
               )
-      
+
       cat(var_heading("Partial Residuals of Associated PCs ", formula_ind, depth=2 + (sum(mdls)>1)))
       factors_1 <- attr(terms(fit1), "factors")
       many_levels <- sapply(colDat, function(x) length(unique(x)))

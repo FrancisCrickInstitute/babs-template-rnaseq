@@ -365,7 +365,8 @@ fit_comparison <- function(comp, model_dds, mdl, ...) {
   if (is_formula(comp)) { # Do the usual DESeq2 LRT
     return(list(fitLRT(model_dds, mdl=mdl, reduced=comp, ...)))
   } else if (class(comp)=="post_hoc") { #Multiple-comparisons
-    contrs <- emcontrasts(dds=model_dds, spec=comp$spec, extra=comp[-1])
+    strip <- c("spec","name","description")
+    contrs <- emcontrasts(dds=model_dds, spec=comp$spec, extra=comp[setdiff(names(comp), strip)])
     if (length(contrs)==0) return(list())
     if (comp$LRT %||% FALSE) { # Do LRT-equivalents of the multiple ward tests
       mdl_mat <- metadata(model_dds)$model$mat %||% model.matrix(mdl$design, as.data.frame(colData(model_dds)))
