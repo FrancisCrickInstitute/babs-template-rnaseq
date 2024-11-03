@@ -21,12 +21,7 @@ run: $(gene_counts) ## Generate NF-CORE alignments, one folder for each config-s
 $(patsubst %,results/%,$(alignments)):
 	mkdir -p $@
 
-$(gene_counts) : results/%/merged.gene_counts.tsv : results/%/$(or $(%.aligner),star_rsem)/$(subst star_,,$(or $(%.aligner),star_rsem)).merged.gene_counts.tsv
-	ln -s $(subst results/$*/,,$<) $@
-	ln -s multiqc/$(%.aligner),star_rsem)/ results/$*/multi-qc
-
-gene_counts_real = $(patsubst %,results/%/$(or $(%.aligner),star_rsem)/$(subst star_,,$(or $(%.aligner),star_rsem)).merged.gene_counts.tsv,$(alignments))
-$(gene_counts_real) : results/%/$(or $(%.aligner),star_rsem)/$(subst star_,,$(or $(%.aligner),star_rsem)).merged.gene_counts.tsv : samplesheet_%.csv  | $(log_dir) $(workdir)
+$(gene_counts) : results/%/merged.gene_counts.tsv : samplesheet_%.csv  | $(log_dir) $(workdir)
 	mkdir -p results/$*
 	export NXF_SINGULARITY_CACHEDIR="$(NXF_SINGULARITY_CACHEDIR)" ;\
 	export NXF_SINGULARITY_LIBRARYDIR="$(NXF_SINGULARITY_CACHEDIR)" ;\
@@ -42,7 +37,7 @@ $(gene_counts_real) : results/%/$(or $(%.aligner),star_rsem)/$(subst star_,,$(or
 	$(NEXTFLOW) run nf-core/rnaseq \
 	--input $< \
 	--outdir results/$*/ \
-	--aligner $(or $($*.aligner),star_rsem) \
+	--aligner $($*.aligner) \
 	--fasta $(realpath $($*.genome_fasta)) \
 	--gtf $(realpath $($*.gtf)) \
 	-w $(workdir) \
@@ -53,6 +48,8 @@ $(gene_counts_real) : results/%/$(or $(%.aligner),star_rsem)/$(subst star_,,$(or
 	    then mkdir -p "$(refdir)" && mv results/$*/genome/index/* "$(refdir)"/;\
 	fi
 	$(NEXTFLOW) clean -f
+	ln -sfn $($*.aligner)/$(subst star_,,$($*.aligner)).merged.gene_counts.tsv $@
+	ln -sfn multiqc/$($*.aligner)/ results/$*/multi-qc
 
 
 

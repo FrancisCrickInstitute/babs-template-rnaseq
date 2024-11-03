@@ -33,9 +33,11 @@ airway/fastq: airway/ena.txt
 	while read i; do wget -P $@ -nc ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR103/$$i.fastq.gz ; done < $<
 
 airway/nfcore.tar.gz: | test ## Cache the nfcore results for future speed
-	cd test/nfcore &&\
+	cd test/babs/nfcore &&\
 	make run &&\
-	tar -czf ../../$@ samplesheet_GRCh38.csv samplesheet.csv GRCh38.config results/GRCh38/multiqc results/GRCh38/star_rsem/*.genes.results results/GRCh38/merged.gene_counts.tsv results/GRCh38/star_rsem/rsem.merged.gene_counts.tsv
+	tar -czf docs-ingress.tar.gz ../docs ../ingress &&\
+	tar -czf  ../../../$@ samplesheet_GRCh38.csv samplesheet.csv GRCh38.config results/GRCh38/multiqc results/GRCh38/star_rsem/*.genes.results results/GRCh38/multi-qc results/GRCh38/star_rsem/rsem.merged.gene_counts.tsv results/GRCh38/merged.gene_counts.tsv docs-ingress.tar.gz &&\
+	rm -f docs-ingress.tar.gz
 
 
 test: airway/fastq ## Generate a test folder setup for the airway data
@@ -58,8 +60,9 @@ test-differential: test/babs/nfcore/results
 	( cd test/babs/differential; make run )
 
 test/babs/nfcore/results:  test | airway/nfcore.tar.gz
-	( cd test/babs/ingress; make run )
-	( cd test/babs/nfcore && tar -xzf ../../../airway/nfcore.tar.gz )
+	( cd test/babs/ingress && make run )
+	( cd test/babs/nfcore && tar  -xzf ../../../airway/nfcore.tar.gz )
+	( cd test/babs && tar -xzf nfcore/docs-ingress.tar.gz && rm -f nfcore/docs-ingress.tar.gz)
 
 .PHONY: pkgdown
 pkgdown: 

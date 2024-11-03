@@ -6,6 +6,9 @@ stages := ingress nfcore differential biologic
 .PHONY: $(stages)
 $(stages): % : %.log
 
+differential: nfcore
+nfcore: ingress
+ingress: docs
 
 %.log : 
 	cd $*; $(MAKE) --no-print-directory run  >> $*.err 2>&1

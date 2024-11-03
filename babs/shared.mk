@@ -6,6 +6,23 @@
 ## that any necessary phase-specific changes are put into module.mk,
 ## which will override things in shared.mk and secret.mk
 ################################################################
+samplesheet_fname=samplesheet
+experiment_table = experiment_table
+samplesheet_id_column = sample
+metadata_id_column = ID
+name_col = sample_name
+samples_db = samples.db
+
+NEXTFLOW = $(call ml,Nextflow/$(NEXTFLOW_VERSION)); $(call ml,Singularity/$(SINGULARITY_VERSION)); $(call ml,CAMP_proxy); nextflow
+SQLITE = $(call ml,SQLite/3.42.0-GCCcore-12.3.0); sqlite3
+
+
+
+docs_dir?=$(wildcard ../docs)
+ingress_dir?=$(wildcard ../ingress)
+nfcore_dir?=$(wildcard ../nfcore)
+diff_dir?=$(wildcard ../differential)
+
 # The following can be set to singularity|docker|shell
 # and determines the environment in which quarto/R processes
 # will be run in.
@@ -14,12 +31,6 @@ EXECUTOR = singularity
 ################################################################
 # Conventional directory-, file- and field- names
 ################################################################
-samplesheet_fname=samplesheet
-experiment_table = experiment_table
-samplesheet_id_column = sample
-metadata_id_column = ID
-name_col = sample_name
-samples_db = samples.db
 
 ## Location of qmds and multi-yaml files
 source_dir=resources
@@ -29,7 +40,8 @@ staging_dir=staging
 RESULTS_DIR = results
 ## Convenient shortcut for immediate quarto output
 staged_results=$(staging_dir)/$(RESULTS_DIR)/$(VERSION)
-
+## Where to store scripts necessary to launch rstudio
+rstudio-launch-dir=.rstudio-launch
 
 # csv file names (excluding ext)
 log_dir=logs
@@ -52,11 +64,8 @@ GIT=git
 
 ## Module loader
 ml = module is-loaded $1 || module load $1 || true # ie fall back to true (ie rely on system version if can't load a module)
-## Define commands invoked by make
-NEXTFLOW = $(call ml,Nextflow/$(NEXTFLOW_VERSION)); $(call ml,Singularity/$(SINGULARITY_VERSION)); $(call ml,CAMP_proxy); nextflow
-SQLITE = $(call ml,SQLite/3.42.0-GCCcore-12.3.0); sqlite3
 make_rwx = setfacl -m u::rwx
-
+makeg_rwx = setfacl -m g::rwx
 
 # Environment Variables
 BIOCPARALLEL_WORKER_NUMBER=2
@@ -71,21 +80,6 @@ git-ignore=touch .gitignore && grep -qxF '$(1)' .gitignore || echo '$(1)' >> .gi
 
 
 include $(SELF_DIR)secret.mk
-
-################################################################
-# Recipes for functionality 
-################################################################
-excluded-targets += $(pubdir)/$(VERSION)
-
-publish_intranet=www_internal
-publish_internet=www_external
-publish_outputs=outputs
-
-docs_dir?=$(wildcard ../docs)
-ingress_dir?=$(wildcard ../ingress)
-nfcore_dir?=$(wildcard ../nfcore)
-diff_dir?=$(wildcard ../differential)
-
 
 ################################################################
 ## Propagation of docs files
@@ -109,7 +103,18 @@ ifneq ($(docs_dir),)
 alignments=$(patsubst $(docs_dir)/%.config,%,$(wildcard $(docs_dir)/*.config))
 endif
 
-shortcut=$(empty)
+################################################################
+## Publishing (moving) generated results and providing shortcuts
+################################################################
+
+excluded-targets += $(pubdir)/$(VERSION)
+
+publish_intranet=www_internal
+publish_internet=www_external
+publish_outputs=outputs
+location=outputs
+
+shortcut=$()
 ifdef redirect_$(location)
 shortcut=shortcuts/
 endif
@@ -187,19 +192,34 @@ CONTAINER= $(call ml,Singularity/$(SINGULARITY_VERSION)); $(CONTAINER_VARS) sing
 CONTAINER_IMAGE=$(SINGULARITY_ROOT)/$(IMAGE)_$(IMAGE_TAG).sif
 CONTAINER_BIND=--bind $(BIND_DIR),/tmp,$(RENV_PATHS_ROOT),$(CURDIR)/Renviron.site:/usr/local/lib/R/etc/Renviron.site
 CONTAINER_ENV=--env SQLITE_TMPDIR=/tmp,BIOCPARALLEL_WORKER_NUMBER=$(BIOCPARALLEL_WORKER_NUMBER),GITHUB_PAT=$${GITHUB_PAT}
-CONTAINER_OPTIONS= exec $(CONTAINER_BIND) --pwd $(CURDIR) --containall --cleanenv $(and $(CONTAINER_OVERLAY),--overlay $(CONTAINER_OVERLAY)) $(CONTAINER_ENV)
+CONTAINER_OVERLAY_PATH=$(and $(CONTAINER_OVERLAY),$(BABS_SINGULARITY_OVERLAYS)/$(IMAGE)/$(IMAGE_TAG)/$(CONTAINER_OVERLAY).img)
+CONTAINER_OPTIONS= exec $(CONTAINER_BIND) --pwd $(CURDIR) --containall --cleanenv $(and $(CONTAINER_OVERLAY),--overlay $(CONTAINER_OVERLAY_PATH)) $(CONTAINER_ENV)
 CONTAINER_SHELL_OPTIONS = $(patsubst exec,shell,$(CONTAINER_OPTIONS))
 $(CONTAINER_IMAGE): 
 	cd $(dir $(CONTAINER_IMAGE)) ;\
 	$(CONTAINER) pull docker://$(IMAGE):$(IMAGE_TAG)
+	$(makeg_rwx) $(CONTAINER_IMAGE)
 CONTAIN=true
 
 # Persistent overlays - can put include a union filesystem with the underlying image, for e.g extra binaries.
 ifdef CONTAINER_OVERLAY
+
 CONTAINER_VARS=env SINGULARITYENV_PREPEND_PATH=/singularity-bin:/singularity-bin/bin
-$(CONTAINER_OVERLAY): resources/shell/overlay_$(basename $(notdir $(CONTAINER_OVERLAY))).sh Renviron.site
-	$(CONTAINER) overlay create --sparse --size $(or $(CONTAINER_OVERLAY_SIZE),1024) --create-dir /singularity-bin $(CONTAINER_OVERLAY)
+$(BABS_SINGULARITY_OVERLAYS)/$(IMAGE)/$(IMAGE_TAG)/$(CONTAINER_OVERLAY): resources/shell/overlay_$(basename $(CONTAINER_OVERLAY)).sh Renviron.site
+	mkdir -p $(BABS_SINGULARITY_OVERLAYS)/$(IMAGE)/$(IMAGE_TAG)
+	$(CONTAINER) overlay create --sparse --size $(or $(CONTAINER_OVERLAY_SIZE),1024) --create-dir /singularity-bin $(CONTAINER_OVERLAY_PATH)
 	[ ! -f "$<" ] || $(CONTAINER) $(CONTAINER_OPTIONS) $(CONTAINER_IMAGE) /bin/bash $<
+
+.PHONY: def-file
+def-file: resources/singularity/$(notdir $(CONTAINER_OVERLAY))).def
+resources/singularity/$(notdir $(CONTAINER_OVERLAY))).def: resources/shell/overlay_$(basename $(notdir $(CONTAINER_OVERLAY))).sh
+	echo "Bootstrap: docker" > $@
+	echo "From: $(IMAGE):$(IMAGE_TAG)" >> $@
+	echo "%files" >> $@
+	echo "resources/shell/overlay_$(basename $(notdir $(CONTAINER_OVERLAY))).sh  /tmp/install.sh"
+	echo "%post" >> $@
+	echo "source /tmp/install.sh" >> $@
+	echo "rm -f /tmp/install.sh" >> $@
 endif
 
 else ifeq ($(EXECUTOR),docker)
@@ -230,13 +250,14 @@ endif
 
 ifeq ($(CONTAIN),true)
 Renviron.site: | $(CONTAINER_IMAGE)
-optionalRenviron=Renviron.site $(CONTAINER_OVERLAY)
+optionalRenviron=Renviron.site $(CONTAINER_OVERLAY_PATH)
 containerPrefix=$(CONTAINER) $(CONTAINER_OPTIONS) --env MAKEFLAGS="$(MAKEFLAGS)" $(CONTAINER_IMAGE)
 else
 optionalRenviron=
 containerPrefix=
 endif
 
+def-file:   ## with CONTAINER_OVERLAY=name, creates a container definition file that will include the overlay
 
 ################################################################
 #Standard makefile hacks
@@ -251,6 +272,7 @@ define newline
 
 $(empty)
 endef
+bslash := \$(empty)
 
 #We don't need any of the c default rules
 MAKEFLAGS += --no-builtin-rules
@@ -276,9 +298,9 @@ log=2>&1 | tee $2 $(log_dir)/$1.log
 ## Recipes for calling R/Rstudio
 ##
 ################################################################
-excluded-targets += R R-local R-$(RVERSION) rstudio rstudio-slurm
+excluded-targets += R R-local R-$(RVERSION)
 
-.PHONY: R R-local R-$(RVERSION) rstudio rstudio-slurm
+.PHONY: R R-local R-$(RVERSION)
 
 R R-$(RVERSION) rstudio rstudio-slurm: $(optionalRenviron)
 
@@ -287,33 +309,59 @@ Renviron.site:  $(CONTAINER_IMAGE)
 	echo "RENV_PATHS_ROOT=$(RENV_PATHS_ROOT)" >> $@
 	echo "RENV_PATHS_LIBRARY=renv/library" >> $@
 
-R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses)
-R-$(RVERSION): 
-	@echo "#!/bin/bash" > $@
-	@echo 'function babs-R { $(CONTAINER) $(CONTAINER_OPTIONS) '$${BABS_SINGULARITY_INTERACTIVE_EXTRAS}' $(CONTAINER_IMAGE) R' \$$@  " ; }" >> $@
-	@echo 'function babs-Rscript { $(CONTAINER) $(CONTAINER_OPTIONS) '$${BABS_SINGULARITY_INTERACTIVE_EXTRAS}' $(CONTAINER_IMAGE) Rscript' \$$@  " ; }" >> $@
-	@echo 'function babs-conshell {  $(CONTAINER) $(CONTAINER_SHELL_OPTIONS) '$${BABS_SINGULARITY_INTERACTIVE_EXTRAS}' $(CONTAINER_IMAGE) ; }' >> $@
-	@echo "[[ "'$$BASH_SOURCE'" == "'$$0'" ]] && babs-R " \$$@ >> $@
-	@$(make_rwx) $@
-	@echo 'Using the following extra Singularity options: BABS_SINGULARITY_INTERACTIVE_EXTRAS='$${BABS_SINGULARITY_INTERACTIVE_EXTRAS}
-	@echo 'You may want to customise this (in your bashrc?) to things you need for an interactive environment (e.g. --bind /nemo, --env $$DISPLAY)'
+rstudio-binds=--bind ./run:/run,./database.conf:/etc/rstudio/database.conf,$\
+./rsession.sh:/etc/rstudio/rsession.sh,./var/lib/rstudio-server:/var/lib/rstudio-server,$\
+./rsession.conf:/etc/rstudio/rsession.conf,./R:$$HOME/.config/R,./rstudio:$$HOME/.config/rstudio,$\
+/etc/ssl/certs/ca-bundle.crt,$$HOME/.ssh,/sys/fs/cgroup
 
+rstudio-envs=--env RSTUDIO_SESSION_TIMEOUT=0,USER=$$(id -un),PASSWORD=$$PASSWORD
+
+define doInContainer
+#!/usr/bin/env bash
+project_root=$$(git rev-parse --show-toplevel || echo $${PWD})
+bn=$$(basename $$0)
+if [[ "$$bn" =~ ^my-.* ]]; then
+e1=$${bn#my-}
+extra=$$(eval echo $${BABS_SINGULARITY_INTERACTIVE_EXTRAS})
+cmd=$${BABS_CMD:-$${e1%-*}}
+else
+cmd=$${BABS_CMD:-$${bn%-*}}
+extra=""
+fi
+if [ "$$cmd" == rstudio ]; then
+export PASSWORD=$$(openssl rand -base64 15)
+export caller="$(CONTAINER) $(CONTAINER_OPTIONS) $(rstudio-binds) $(rstudio-envs) $${extra} $(CONTAINER_IMAGE)"
+cd $(rstudio-launch-dir)
+source launch.sh
+elif [ "$$cmd" == ondemand ]; then
+export PASSWORD=$$(openssl rand -base64 15)
+export caller="$(CONTAINER) $(CONTAINER_OPTIONS) $(rstudio-binds) $(rstudio-envs) $${extra} $(CONTAINER_IMAGE)"
+cd $(rstudio-launch-dir)
+export hname=$$(hostname)
+sbatch launch.sh
+echo "Waiting for submission to be accepted. Further instructions will appear here, or if the queue is busy you can safely cancel (Ctrl+C) this local process and instead monitor $(rstudio-launch-dir)/server.log"
+tail -f --retry server.log 2>/dev/null | sed '/scancel -f/ q' 
+elif [ "$$cmd" == shell ]; then
+$(CONTAINER) $(CONTAINER_SHELL_OPTIONS) $${extra} $(CONTAINER_IMAGE) 
+else
+$(CONTAINER) $(CONTAINER_OPTIONS) $${extra} $(CONTAINER_IMAGE) $${cmd} $$@
+fi
+
+endef
+export doInContainer
+
+R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses)
+
+R-$(RVERSION): 
+	@echo "$${doInContainer}" | sed -e 's#--pwd $(CURDIR)#--pwd $${PWD}#' -e 's#--bind $(BIND_DIR)#--bind $${project_root}#' -e 's#$(CURDIR)/Renviron.site#$${PWD}/Renviron.site#' > $@
+	@$(make_rwx) $@
+	mkdir -p $(rstudio-launch-dir)/
+	cp resources/shell/rstudio-launch.sh $(rstudio-launch-dir)/launch.sh
 
 R:
 	@echo "Starting R $(RVERSION) in container $(CONTAINER_IMAGE) with extra options $${BABS_SINGULARITY_INTERACTIVE_EXTRAS} ..."
 	@$(CONTAINER) $(CONTAINER_OPTIONS) $(shell echo $${BABS_SINGULARITY_INTERACTIVE_EXTRAS}) $(CONTAINER_IMAGE) R
 
-rstudio-slurm: ## Start RStudio on a node for this project. Can use variables SLURM--*, where *=(partition|cpus-per-task/time/mem). Look for an 'rstudio-server.log' file to appear, with instructions.
-	@res=$$(sbatch  \
---partition=$(SLURM--partition) \
---cpus-per-task=$(SLURM--cpus-per-task) \
---time='$(SLURM--time)' \
---mem=$(SLURM--mem) \
-$(source_dir)/shell/rstudio-rocker.sh $(CONTAINER_IMAGE) ${SINGULARITY_VERSION} $$(hostname)) ;\
-	echo $$res "- please wait until job is allocated, at which point ./rstudio-server.log will appear, explaining how to access the session."
-
-rstudio: ## Start RStudio on this machine for this project.
-	. ./$(source_dir)/shell/rstudio-rocker.sh $(CONTAINER_IMAGE) ${SINGULARITY_VERSION}
 
 .Rprofile: $(wildcard resources/renv/Rprofile)
 	mkdir -p renv
@@ -323,14 +371,14 @@ renv/activate.R: $(wildcard resources/renv/activate.R)
 	mkdir -p renv
 	[ ! -f "$<" ] || $(GIT) mv $< $@ || mv $< $@
 
+
 ################################################################
 ## Generate secrets
 ################################################################
-# Originally, secret.mk should come from the babs directory.  If
+# Originally, secret.mk should come from the project directory.  If
 # it's still there, make sure it's up-to-date and then copy it
 # here. If a secret.mk file can't be found anywhere, create a dummy
 # one out of a template.
-
 
 $(SELF_DIR)secret.mk: $(firstword $(wildcard $(PROJECT_HOME)/secret.mk $(PROJECT_HOME)/babs/secret.mk $(SELF_DIR)not-secret.mk) xxx) $(wildcard $(PROJECT_HOME)/.babs)
 	@if [ ! "$<" == xxx ]; then \

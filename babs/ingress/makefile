@@ -26,10 +26,11 @@ $(docs_dir)/%:
 
 $(configs): %.config: $(docs_dir)/%.config
 	tr -d '\r' < $< | sed  's/^$*\.//' > $@
-	grep -q "^genome_fasta" $@ || echo "WARNING: No genom_fasta set in $*.config"
+	grep -q "^genome_fasta" $@ || echo "WARNING: No genome_fasta set in $*.config"
 	grep -q "^gtf" $@ || echo "WARNING: No gtf set in $*.config"
 	grep -q "^universal" $@ || sed -i -e '$$auniversal=yes' $@
 	grep -q "^strandedness" $@ || sed -i -e '$$astrandedness=auto' $@
+	grep -q "^aligner" $@ || sed -i -e '$$aaligner=star_rsem' $@
 	md5sum $(shell sed -n 's/^genome_fasta=//p' $<) | awk '{print "genome_fasta_md5=" $$1}' >> $@
 	md5sum $(shell sed -n 's/^gtf=//p' $<) | awk '{print "gtf_md5=" $$1}' >> $@
 	sed -i 's/^/$*./' $@
