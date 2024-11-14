@@ -318,33 +318,48 @@ rstudio-envs=--env RSTUDIO_SESSION_TIMEOUT=0,USER=$$(id -un),PASSWORD=$$PASSWORD
 
 define doInContainer
 #!/usr/bin/env bash
-project_root=$$(git rev-parse --show-toplevel || echo $${PWD})
+image='$(CONTAINER_IMAGE)'
+
+pwd=$$(realpath .)
+project_root=$$(git rev-parse --show-toplevel || echo $${pwd})
 bn=$$(basename $$0)
 if [[ "$$bn" =~ ^my-.* ]]; then
-e1=$${bn#my-}
-extra=$$(eval echo $${BABS_SINGULARITY_INTERACTIVE_EXTRAS})
-cmd=$${BABS_CMD:-$${e1%-*}}
+    e1=$${bn#my-}
+    extra=$$(eval echo $${BABS_SINGULARITY_INTERACTIVE_EXTRAS})
+    cmd=$${BABS_CMD:-$${e1%-*}}
 else
-cmd=$${BABS_CMD:-$${bn%-*}}
-extra=""
+    cmd=$${BABS_CMD:-$${bn%-*}}
+    extra=""
 fi
-if [ "$$cmd" == rstudio ]; then
-export PASSWORD=$$(openssl rand -base64 15)
-export caller="$(CONTAINER) $(CONTAINER_OPTIONS) $(rstudio-binds) $(rstudio-envs) $${extra} $(CONTAINER_IMAGE)"
-cd $(rstudio-launch-dir)
-source launch.sh
-elif [ "$$cmd" == ondemand ]; then
-export PASSWORD=$$(openssl rand -base64 15)
-export caller="$(CONTAINER) $(CONTAINER_OPTIONS) $(rstudio-binds) $(rstudio-envs) $${extra} $(CONTAINER_IMAGE)"
-cd $(rstudio-launch-dir)
-export hname=$$(hostname)
-sbatch launch.sh
-echo "Waiting for submission to be accepted. Further instructions will appear here, or if the queue is busy you can safely cancel (Ctrl+C) this local process and instead monitor $(rstudio-launch-dir)/server.log"
-tail -f --retry server.log 2>/dev/null | sed '/scancel -f/ q' 
-elif [ "$$cmd" == shell ]; then
-$(CONTAINER) $(CONTAINER_SHELL_OPTIONS) $${extra} $(CONTAINER_IMAGE) 
+
+if [[ -f Renviron.site ]]; then
+    renvironBind=,$${pwd}/Renviron.site:/usr/local/lib/R/etc/Renviron.site
 else
-$(CONTAINER) $(CONTAINER_OPTIONS) $${extra} $(CONTAINER_IMAGE) $${cmd} $$@
+    renvironBind=""
+fi
+
+export PASSWORD=$$(openssl rand -base64 15)
+export caller="$(CONTAINER) $(CONTAINER_OPTIONS) $(rstudio-binds) $(rstudio-envs) $${extra} $${image}"
+
+
+if [ "$$cmd" == rstudio ]; then
+    cd $(rstudio-launch-dir)
+    source rstudio.sh
+elif [ "$cmd" == shiny ]; then
+    export caller="$(CONTAINER) $(CONTAINER_OPTIONS) $${extra} $${image}"
+    cd .rstudio-launch
+    source shiny.sh
+elif [ "$$cmd" == ondemand ]; then
+    cd $(rstudio-launch-dir)
+    rm -f server.log
+    export hname=$$(hostname)
+    sbatch rstudio.sh
+    echo "Waiting for submission to be accepted. Further instructions will appear here, or if the queue is busy you can safely cancel (Ctrl+C) this local process and instead monitor $(rstudio-launch-dir)/server.log"
+    tail -f --retry server.log 2>/dev/null | sed '/scancel -f/ q' 
+elif [ "$$cmd" == shell ]; then
+    $(CONTAINER) $(CONTAINER_SHELL_OPTIONS) $${extra} $${image} 
+else
+    $(CONTAINER) $(CONTAINER_OPTIONS) $${extra} $${image} $${cmd} $$@
 fi
 
 endef
@@ -353,10 +368,12 @@ export doInContainer
 R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses)
 
 R-$(RVERSION): 
-	@echo "$${doInContainer}" | sed -e 's#--pwd $(CURDIR)#--pwd $${PWD}#' -e 's#--bind $(BIND_DIR)#--bind $${project_root}#' -e 's#$(CURDIR)/Renviron.site#$${PWD}/Renviron.site#' > $@
+	@echo "$${doInContainer}" | sed -e 's#--pwd $(CURDIR)#--pwd $${pwd}#' -e 's#--bind $(BIND_DIR)#--bind $${project_root}#'  -e 's#,$(CURDIR)/Renviron.site:/usr/local/lib/R/etc/Renviron.site#$${renvironBind}#' > $@
 	@$(make_rwx) $@
 	mkdir -p $(rstudio-launch-dir)/
-	cp resources/shell/rstudio-launch.sh $(rstudio-launch-dir)/launch.sh
+	cp resources/shell/rstudio-launch.sh $(rstudio-launch-dir)/rstudio.sh
+	cp resources/shell/rstudio-launch.sh $(rstudio-launch-dir)/shiny.sh
+
 
 R:
 	@echo "Starting R $(RVERSION) in container $(CONTAINER_IMAGE) with extra options $${BABS_SINGULARITY_INTERACTIVE_EXTRAS} ..."

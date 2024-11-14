@@ -559,7 +559,7 @@ fitLRT <- function(dds, mdl, reduced, ...) {
     ## unsupported_ind <- apply(reduced==0, 2, all)
     ## reduced <- reduced[, !unsupported_ind]
     ## colnames(reduced) <- .resNames(colnames(reduced))
-    reduced <- reduced[,colnames(reduced) %in% colnames(full), drop=FALSE]
+    reduced <- reduced[,.resNames(colnames(reduced)) %in% colnames(full), drop=FALSE]
     metadata(dds)$reduced_mat <- reduced
   } else {
     full <- mdl$design
