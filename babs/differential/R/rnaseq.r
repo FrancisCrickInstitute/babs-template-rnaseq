@@ -115,6 +115,15 @@ default_names <- function(obj, prefix="", offset=0) {
 ##' @author Gavin Kelly
 ##' @export
 build_dds_list <- function(dds, spec) {
+  if ("models" %in% names(spec)) {
+    spec$sample_sets <- lapply(
+      spec$sample_sets,
+      function(ss) {
+        ss$models <- c(spec$models, ss$models)
+        ss
+      })
+    spec$models <- NULL
+  }
   modelled_terms <- lapply(
     spec$sample_sets,
     function(x) {lapply(

@@ -172,6 +172,40 @@ then in a position to test the significance of contrasts (e.g.
 individual log fold-changes between conditions) and terms in the model
 (e.g whether batch effect is necessary or not):
 
+#### Universal models
+
+Sometimes all/some models should apply to all `sample_sets` in a spec
+file. To save typing, it's possible to elevate the models to the
+top-level within a `specification`, so for example:
+
+```r
+specification(
+  models = list(
+          powerful = model(
+          design = ~treatment
+        )
+  ),
+  sample_sets =list( 
+    all = sample_set(
+      subset = TRUE,
+      models = list(
+        accurate = model(
+          design = ~treatment + batch
+        ),
+      )
+    ),
+    batch1 = sample_set(
+      subset = batch=="B1"
+      )
+    )    
+  )
+)
+```
+
+will result in the `all` dataset having two models (the universal one
+from the top of the spec file, and a specific one), whereas the
+`batch` dataset will have only the universal one.
+
 ### Comparisons
 
 DESeq2 has multiple ways of specifying a contrast. All of these are
