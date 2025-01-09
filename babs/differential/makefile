@@ -227,6 +227,9 @@ $(configs): extdata/%.config: $(docs_dir)/%.config | extdata
 	$(MAKE) --no-print-directory -C $(ingress_dir) $*.config
 	cp $(ingress_dir)/$*.config $@
 	$(GIT) add $@ $<
+else
+$(my_metadata).csv $(configs):
+	touch $@
 endif
 
 
@@ -260,7 +263,11 @@ $(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/results/%/merged.gene_counts
 	fi
 	mkdir -p $(RESULTS_DIR)/multiqc-$*
 	cp -lr $(nfcore_dir)/results/$*/multi-qc/. $(RESULTS_DIR)/multiqc-$* || cp -r $(nfcore_dir)/results/$*/multi-qc/. $(RESULTS_DIR)/multiqc-$*
-
+else
+$(samplesheets):
+	touch $@
+$(genes_results):
+	mkdir -p $@
 endif
 
 

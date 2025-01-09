@@ -396,7 +396,7 @@ for (dname_i in seq_along(ddsList)) {
     qc_formulae <- metadata(this_dds)$models[[mname]]$qc_formulae
     design <- metadata(this_dds)$models[[mname]]$design
     if (sum(mdls)>1) {
-      dmc_heading(ddsList, dataset=dataset, model=mname, depth="##")
+      dmc_heading(ddsList, dataset=dname, model=mname, depth="##")
     }
     var_stab <- assay(this_dds, "vst")
     top <- order(apply(var_stab, 1, sd), decreasing = TRUE)[1:min(nrow(var_stab),param$get("top_n_variable"))]

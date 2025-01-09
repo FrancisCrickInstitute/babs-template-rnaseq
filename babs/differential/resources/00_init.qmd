@@ -48,6 +48,21 @@ if (!isTRUE(getOption('knitr.in.progress'))) {
                 Value=unlist(params)))
 }
 
+preprocessed <- file.path("extdata", paste0(params$alignment, ".rda"))
+if (file.exists(preprocessed)) {
+  tmp <- load(preprocessed)
+  dds <- get(tmp)
+  save(dds, file=file.path("data",paste0("counts_", params$alignment, ".rda")))
+  saveRDS(dds, file=file.path("data",paste0("counts_", params$alignment, ".rds")))
+  knitr::knit_exit()
+}
+
+```
+
+
+```{r}
+#| label: load3
+
 
 if (grepl("\\.csv$", params$metadata)) {
   sample_sheet <- read.csv(params$metadata, header=TRUE, check.names=FALSE)
