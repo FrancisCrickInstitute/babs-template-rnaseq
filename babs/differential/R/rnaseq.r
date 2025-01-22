@@ -115,15 +115,37 @@ default_names <- function(obj, prefix="", offset=0) {
 ##' @author Gavin Kelly
 ##' @export
 build_dds_list <- function(dds, spec) {
-  if ("models" %in% names(spec)) {
-    spec$sample_sets <- lapply(
-      spec$sample_sets,
-      function(ss) {
-        ss$models <- c(spec$models, ss$models)
-        ss
-      })
-    spec$models <- NULL
+  # Function to recurse down the spec > sample_sets > models > comparisons hierarchy, and cascade down values of a given field as it encounters them.
+  trickle_down <- function(field, to="comparisons", default=NULL, merge_fn=function(x,y) {if (is.null(x)) y else x}, obj=spec, current_level="spec") {
+    if (field %in% names(obj)) {
+      mine <- merge_fn(obj[[field]], default)
+    } else {
+      mine <- default
+    }
+    if (current_level==to) {
+      obj[[field]] <- mine
+    } else {
+      next_level=list(spec="sample_sets", sample_sets="models", models="comparisons")[[current_level]]
+      obj[[next_level]] <- lapply(
+        obj[[next_level]],
+        function(x) trickle_down(field=field, to=to, default=mine, merge_fn=merge_fn, obj=x, current_level=next_level))
+    }
+    obj
   }
+  # Share any top-level models down to each sample-set
+  spec <- trickle_down(field="models", to="sample_sets", merge_fn=c)
+  # Fill in any missing qc_formulae with values from closest parent if necessary
+  spec <- trickle_down(field="qc_formulae", to="models")
+  # Conjunct or cascade any top-level subsetting - if missing, use all samples
+  spec <- trickle_down(field="subset", to="sample_sets", default=TRUE, merge_fn=`&`)
+  # Cascade any spec-wide transforms
+  spec <- trickle_down(field="transform", to="sample_sets")
+  # various model parameters that might be shared across datasets/everything
+  spec <- trickle_down(field="drop_unsupported_combinations", to="models")
+  spec <- trickle_down(field="drop_incomplete", to="models")
+  spec <- trickle_down(field="varNames", to="sample_sets", merge_fn=modifyList, default=list())
+  spec <- trickle_down(field="varDescriptions", to="sample_sets", merge_fn=modifyList, default=list())
+  
   modelled_terms <- lapply(
     spec$sample_sets,
     function(x) {lapply(
@@ -132,11 +154,12 @@ build_dds_list <- function(dds, spec) {
         d <- c()
         if (is_formula(y$design))
           d <- all.vars(update(y$design, NULL ~ .))
-        if ("qc_formulae" %in% names(y)) {
-          if (is_formula(y$qc_formulae))
-            d <- c(d, all.vars(y$qc_formulae))
+        qc_form <- y$qc_formulae
+        if (!is.null(qc_form)) {
+          if (is_formula(qc_form))
+            d <- c(d, all.vars(qc_form))
           else
-            d <- c(d, unlist(lapply( y$qc_formulae, all.vars)))
+            d <- c(d, unlist(lapply(qc_form, all.vars)))
         }
         d
       })
@@ -183,12 +206,23 @@ build_dds_list <- function(dds, spec) {
     }
     if (is.list(set)) {
       ind <- set$subset
+      if (length(ind)==1 && ind=="all") ind=TRUE
       mdlList <- c(mdlList, set$models)
     } else {
       ind <- set
     }
     obj <- obj[,ind]
     colData(obj) <- droplevels(colData(obj))
+    if ("varNames" %in% spec$sample_sets[[i_set]]) {
+      varNames <- sapply(names(colData(dds)), identity)
+      varNames[names(spec$sample_sets[[i_set]]$varNames)] <- unlist(spec$sample_sets[[i_set]]$varNames)
+      mcols(colData(obj))$name <- varNames
+    }
+    if ("varDescriptions" %in% spec$sample_sets[[i_set]]) {
+      varDescriptions <- sapply(names(colData(dds)), identity)
+      varDescriptions[names(spec$sample_sets[[i_set]]$varDescriptions)] <- unlist(spec$sample_sets[[i_set]]$varDescriptions)
+      mcols(colData(obj))$description <- varDescriptions
+    }
 
     # If no models have qc_formulae, set the first model to have a sensible default based on design
     if (!any(sapply(mdlList, function(x) "qc_formulae" %in% names(x)))) {
@@ -214,9 +248,10 @@ build_dds_list <- function(dds, spec) {
         colData(obj)[i2, -1] <- tmp
       }
     }
-    if ("transform" %in% names(set)) {
+    tr <- set$transform
+    mc <- mcols(colData(obj))
+    if (!is.null(tr)) {
       .mu <- purrr::partial(mutate, .data=as.data.frame(colData(obj)))
-      tr <- set$transform
       tr[[1]] <- .mu
       cnames <- colnames(obj)
       colData(obj) <- S4Vectors::DataFrame(eval(tr))
@@ -434,6 +469,13 @@ check_model <- function(dds) {
   mdl$dropped <- FALSE
   if (is_formula(mdl$design) ) {
     df <- as.data.frame(colData(dds))
+    na_covars <- apply(is.na(df[all.vars(mdl$design)]), 1, any)
+    if ("drop_incomplete" %in% names(mdl) && mdl$drop_incomplete==TRUE && any(na_covars)) {
+      warning("Dropping samples ", paste0(row.names(df)[na_covars], collapse=", "), " as they have incomplete metadata")
+      dds <- dds[, !na_covars]
+      colData(dds) <- droplevels(colData(dds))
+      df <- as.data.frame(colData(dds))
+    }
     df$.x <- counts(dds, norm=TRUE)[1,]
     fml <- as.formula(paste0(".x ~ ", as.character(DESeq2::design(dds)[2])))
     fit <- lm(fml, data=df)
@@ -901,3 +943,4 @@ default_spec_settings <- function() {
 	LRT_effect = "default"  ## For the "white" colour in differential heatmaps
    )
 }
+

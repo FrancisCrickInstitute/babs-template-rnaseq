@@ -134,6 +134,8 @@ param$set("LRT_effect", postpone=TRUE)
 param$set("baseMeanMin")
 
 ddsList <- build_dds_list(dds, specs)
+dtag <- dmc_factory(ddsList, type="dataset")
+mtag <- dmc_factory(ddsList, type="model")
 
 
 #Which features are zero across all samples in all datasets
@@ -385,31 +387,30 @@ param$set("pc_x", 1, postpone=TRUE)
 param$set("pc_y", 2)
 first <- TRUE
 
-for (dname_i in seq_along(ddsList)) {
-  this_dds <- ddsList[[dname_i]]
-  dname <- metadata(this_dds)$dmc$dataset_name %||% names(ddsList)[dname_i]
+for (dataset_id in names(ddsList)) {
+  this_dds <- ddsList[[dataset_id]]
+  dataset_name <- metadata(this_dds)$dmc$dataset_name %||% dataset_id
   # Only produce visualisations for models with a qc formula
   # (if none supplied in the spec file, the first model will get one corresponding to its design formula)
-  dmc_heading(ddsList, dataset=names(ddsList)[dname_i], model=NULL, depth="#")
+  dmc_heading(ddsList, dataset=dataset_id, model=NULL, depth="#")
   mdls <- sapply(metadata(this_dds)$models, function(mdl) "qc_formulae" %in% names(mdl))
-  for (mname in names(mdls[mdls])) {
-    qc_formulae <- metadata(this_dds)$models[[mname]]$qc_formulae
-    design <- metadata(this_dds)$models[[mname]]$design
+  for (model_id in names(mdls[mdls])) {
+    qc_formulae <- metadata(this_dds)$models[[model_id]]$qc_formulae
+    design <- metadata(this_dds)$models[[model_id]]$design
     if (sum(mdls)>1) {
-      dmc_heading(ddsList, dataset=dname, model=mname, depth="##")
+      dmc_heading(ddsList, dataset=dataset_id, model=model_id, depth="##")
     }
     var_stab <- assay(this_dds, "vst")
     top <- order(apply(var_stab, 1, sd), decreasing = TRUE)[1:min(nrow(var_stab),param$get("top_n_variable"))]
-    nice_legends <- separate_legend(ddsList[[dname_i]])
+    nice_legends <- separate_legend(ddsList[[dataset_id]])
     pl <- do.call(gridExtra::arrangeGrob, c(
       nice_legends,
       ncol=ceiling(sqrt(length(nice_legends)))))
     do_plot(pl,
-            label= paste0("legend-", metadata(ddsList[[dname_i]])$dmc$dataset),
-            caption=paste("Metadata colour-codings for",
-                          metadata(ddsList[[dname_i]])$dmc$dataset_name %||% metadata(ddsList[[dname_i]])$dmc$dataset
-                          ))
-    cat(var_heading("Overall Heatmap of Variable Genes in ", dname,  depth=2 + (sum(mdls)>1)))
+            label= paste0("legend-", dataset_id),
+            caption=paste("Metadata colour-codings for", dtag(dataset_id))
+            )
+    cat(var_heading("Overall Heatmap of Variable Genes in ", dtag(dataset_id),  depth=2 + (sum(mdls)>1)))
     plotDat <- var_stab[top, ]
     plotDat <- plotDat - rowMeans(plotDat)
     vars <- all.vars(design)#get_terms(this_dds)
@@ -428,7 +429,7 @@ for (dname_i in seq_along(ddsList)) {
       show_row_names = FALSE, show_column_names = TRUE)
     do_plot(pl,
             label= "Heatmap",
-            caption=paste("Heatmap of variable genes,", dname),
+            caption=paste("Heatmap of variable genes in", dtag(dataset_id)),
             preview=first)
     first <- FALSE
     cat("\n\n---\n\n")
@@ -448,7 +449,7 @@ for (dname_i in seq_along(ddsList)) {
       show_row_names = FALSE, show_column_names = TRUE)
     do_plot(pl,
             label= "SuperV-Heatmap",
-            caption=paste("Supervised Heatmap of variable genes,", dname))
+            caption=paste("Supervised Heatmap of variable genes in", dtag(dataset_id)))
     cat("\n\n---\n\n")
 
     poisd <- PoiClaClu::PoissonDistance(t(counts(this_dds, normalized = TRUE)))
@@ -474,7 +475,7 @@ for (dname_i in seq_along(ddsList)) {
         show_legend=FALSE))
     do_plot(pl,
             label= "sampDist",
-            caption=paste("Heatmap of sample distances,", dname))
+            caption=paste("Heatmap of sample distances in", dtag(dataset_id)))
     cat("\n\n---\n\n")
 
     is_vary <- sapply(colDat[vars], function(v) length(unique(v)) != 1)
@@ -501,9 +502,9 @@ for (dname_i in seq_along(ddsList)) {
           if (aes_by=="") {
             ## To generate an unsplit (but regressed) heatmap we denote
             ## that by having aes as an empty string.
-            my_caption <- paste("In",  dname, "having removed", removed)
+            my_caption <- paste("In",  dtag(dataset_id), "having removed", removed)
           } else {
-            my_caption <- paste("Split on", split_by, "in",  dname, "having removed", removed)
+            my_caption <- paste("Split on", split_by, "in",  dtag(dataset_id), "having removed", removed)
           }
           top <- order(apply(part_res, 1, sd), decreasing = TRUE)[1:min(nrow(part_res),param$get("top_n_variable"))]
           plotDat <- part_res[top, ]
@@ -576,7 +577,7 @@ for (dname_i in seq_along(ddsList)) {
         }
         do_plot(pl,
                 label="color",
-                caption=paste("Annotated by ", aes_by, "in", dname)
+                caption=paste("Annotated by", aes_by, "in", dtag(dataset_id))
                 )
         cat("\n\n---\n\n")
       } # next covariate
@@ -633,7 +634,7 @@ for (dname_i in seq_along(ddsList)) {
           if (length(removed)==0 || removed=="") removed <- "nothing"
           do_plot(pl,
                   label="focus",
-                  caption=paste("Annotated by", aes_by, "in", dname, "having removed", removed)
+                  caption=paste("Annotated by", aes_by, "in", dtag(dataset_id), "having removed", removed)
                   )
           cat("\n\n---\n\n")
         } # next covariate
@@ -663,6 +664,10 @@ for (dname_i in seq_along(ddsList)) {
       for (ipc in 1:npc) {
         fitFrame[[yvar]] <- pc[, ipc]
         fit1 <- lm(fml, data = fitFrame)
+		ind_complete <- intersect(row.names(fitFrame), names(residuals(fit1)))
+        if (length(ind_complete) < nrow(fitFrame)) {
+          fit1 <- lm(fml, data = fitFrame[ind_complete,])
+        }
         fit_selected[[ipc]] <- MASS::stepAIC(fit1, trace = 0)
         ind <- attr(terms(fit_selected[[ipc]]), "term.labels")
         if (length(ind)) {
@@ -685,7 +690,7 @@ for (dname_i in seq_along(ddsList)) {
         theme(aspect.ratio = length(unique(plotFrame$Covariate))/min(20, npc))
       do_plot(pl,
               label="covar",
-              caption=paste("Covariate association in", dname)
+              caption=paste("Covariate association in", dtag(dataset_id))
               )
 
       cat(var_heading("Partial Residuals of Associated PCs ", formula_ind, depth=2 + (sum(mdls)>1)))
@@ -765,7 +770,7 @@ for (dname_i in seq_along(ddsList)) {
         }
         do_plot(pl,
                 label= "covariate",
-                caption=paste("Against ", covar, "in", dname)
+                caption=paste("Against", covar, "in", dtag(dataset_id))
                 )
         cat("\n\n---\n\n")
       }

@@ -28,6 +28,12 @@ partialise.matrix <- function(obj, cdata, fml) {
   fit <- lm(fml, data=cdata)
   fit1 <- fit
   class(fit1) <- "lm"
+  newdata <- cdata
+  if ("xlevels" %in% names(fit)) {
+    for (i in names(fit$xlevels)) {
+      levels(newdata[[i]])[!(levels(newdata[[i]]) %in% fit$xlevels[[i]])] <- NA
+    }
+  }
   ind <- c("coefficients","residuals","effects","fitted.values")
   for (i in 1:nrow(obj)) {
     if (nrow(obj)==1) {
@@ -35,7 +41,7 @@ partialise.matrix <- function(obj, cdata, fml) {
     } else {
       fit1[ind] <- lapply(fit[ind], function(x) x[,i])
     }
-    pred <- predict(fit1, type="terms")
+    pred <- predict(fit1, type="terms", newdata=newdata)
     if (i==1) {
       out <- array(0, c(rev(dim(obj)), ncol(pred)), dimnames=c(rev(dimnames(obj)), list(colnames(pred))))
       const <- numeric(dim(out)[2])
@@ -44,6 +50,8 @@ partialise.matrix <- function(obj, cdata, fml) {
     const[i] <- attr(pred, "constant")
   }
   ret <- list(terms=out, const=const, resid=fit$residuals, data=list(mat=obj, cdata=cdata, fml=fml))
+  pred <- apply(out, 1:2, sum, na.rm=TRUE)
+  ret$resid <- t(obj - const - t(pred))
   class(ret) <- "partialised"
   ret
 }

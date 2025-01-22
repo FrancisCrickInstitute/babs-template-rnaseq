@@ -124,6 +124,35 @@ dmc_heading <- function(obj, dataset=1, model=NULL, depth="##", numbered=TRUE, d
   cat(paste(heading, "\n\n", text))
 }
 
+report_span <- function(id, type, name="", description="" ) {
+  sprintf("%s '%s'", type, id)
+  }
+
+dmc_factory <- function(obj, type, report=report_span) {
+  is_dmc <- is.list(obj[[1]])
+  if (is_dmc) {
+  } else {
+    all_datasets <- lapply(obj, function(x) c(metadata(x)$dmc))
+    all_models <- Reduce(c, lapply(obj, function(x) metadata(x)$models))
+  }
+  if (type=="dataset") {
+    function(id) report_span(id, type=type,
+                      name=all_datasets[[id]]$name %||% all_datasets[[id]]$dataset,
+                      description=all_datasets[[id]]$description %||% name)
+  } else if (type=="model") {
+    function(id)  report_span(id, type=type,
+                       name=all_models[[id]]$name %||% all_models[[id]]$model,
+                       description=all_models[[id]]$description %||% name)
+  } else if (type=="comparison") {
+    function(id)  report_span(id, type=type,
+                       name=all_comparisons[[id]]$name %||% all_comparisons[[id]]$comparison,
+                       description=all_comparisons[[id]]$description %||% name)
+  } else {
+    function(id)  report_span(id, type=type, name="", description="")
+  }
+}
+
+
 var_heading <- function(..., depth) {
   paste0('\n\n', strrep("#", depth), " ",  paste0(...), '\n\n')
 }
