@@ -91,7 +91,7 @@ specfiles=$(patsubst $(early_spec_dir)/%.spec,%,$(wildcard $(early_spec_dir)/*.s
 #early_align=$(firstword $(wildcard $(docs_dir) $(ingress_dir) $(nfcore_dir) $(diff_dir)/extdata))
 
 ifneq ($(diff_dir),)
-alignments=$(patsubst $(diff_dir)/$(my_counts_dir)/%,%,$(wildcard $(diff_dir)/$(my_counts_dir)/*))
+alignments=$(patsubst $(diff_dir)/extdata/%.config,%,$(wildcard $(diff_dir)/extdata/*.config))
 endif
 ifneq ($(nfcore_dir),)
 alignments=$(patsubst $(nfcore_dir)/results/%,%,$(wildcard $(nfcore_dir)/results/*))

@@ -58,11 +58,21 @@ test-ff-nfcore: test/babs/nfcore/results ## Fast-forward to before the different
 
 test-differential: test/babs/nfcore/results
 	( cd test/babs/differential; make run )
+	cp test/babs/differential/data/counts_GRCh38.rda airway/preprocessed.rda
 
 test/babs/nfcore/results:  test | airway/nfcore.tar.gz
 	( cd test/babs/ingress && make run )
 	( cd test/babs/nfcore && tar  -xzf ../../../airway/nfcore.tar.gz )
 	( cd test/babs && tar -xzf nfcore/docs-ingress.tar.gz && rm -f nfcore/docs-ingress.tar.gz)
+
+test/isolated-analysis: ## Provide an example of what an isolated differential analysis folder looks like.
+	rm -rf $@
+	cp -r babs/differential $@
+	cp babs/shared.mk babs/secret.mk $@/resources/make/
+	mkdir $@/extdata
+	cp test/babs/docs/analyse.spec $@/extdata
+	cp airway/preprocessed.rda $@/extdata/
+	grep org.db airway/docs/GRCh38.config > $@/extdata/preprocessed.config 
 
 .PHONY: pkgdown
 pkgdown: 
