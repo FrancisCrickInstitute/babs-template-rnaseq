@@ -568,6 +568,89 @@ for (dataset in names(dds_model_comp)) {
   } # next model
 } #next dataset
 
+```
+
+
+# Differential curves
+
+We can also plot summaries of clusters of differential genes. Here we
+split expression data of the differential genes into twelve clusters,
+having first removed the participant-to-participant variability, and
+stochastic noise. We aggregate expression within each cluster, and
+then plot the profiles per cluster - the clusters are ordered in
+decreasing number of constituent genes, and their cardinality is
+encoded into the name of the cluster, e.g. `|1|=1000` means this is
+the largest cluster, and represents 1000 genes.
+
+
+```{r}
+#| label: fig-differential-curve
+
+
+assemble_partialised <- function(obj, reduced, extra=NULL, resids=TRUE) {
+  terms <-intersect(
+    dimnames(obj$terms)[[3]],
+    c(labels(terms(reduced)), extra)
+  )
+  t(
+    rowSums(obj$terms[, , terms, drop=FALSE], na.rm=TRUE, dims=2) +
+      (if(resids) obj$resid else 0))
+}
+
+for (dataset_id in names(dds_model_comp)) {
+  for (model_id in names(dds_model_comp[[dataset_id]])) {
+    for (comp_id in names(dds_model_comp[[dataset_id]][[model_id]])) {
+      this_dds <- dds_model_comp[[dataset_id]][[model_id]][[comp_id]]
+      is_diff <- grepl("^.*\\*", mcols(this_dds)$results$class)
+      if ("profile_plots" %in% names(metadata(this_dds)$model) && any(is_diff)) {
+        partials <- partialise.matrix(
+          assay(this_dds[is_diff,], "vst"),
+          as.data.frame(colData(this_dds)),
+          fml=metadata(this_dds)$model$design)
+        curves <- metadata(this_dds)$model$profile_plots
+        for (i in seq_along(curves)) {  
+          mat <- assemble_partialised(partials, update(curves[[i]], NULL ~ .), resids=FALSE)
+          DEmat <- t(scale(t(mat)))
+          hr <- hclust(as.dist(1-cor(t(DEmat), method="pearson")), method="complete")
+          hclustk <-  cutree(hr, k=12)
+          tbl <- table(hclustk)
+          r <- paste0("|", rank(-tbl, ties="first"), "|=", tbl)
+          hclustk[] <- r[hclustk]
+          hclustk <- factor(hclustk, levels=names(sort(table(hclustk), decreasing=TRUE)))
+          centres <- apply(DEmat, 2, function(samp) tapply(samp, hclustk, mean))
+          clustered_df <- cbind(as.data.frame(t(centres)), as.data.frame(colData(this_dds)))
+          
+          
+          pl <- ggplot(clustered_df %>% pivot_longer(cols=1:12),
+                      eval(curves[[i]][[2]])
+                      ) +
+            facet_wrap(~name) +
+            theme_bw() +
+            geom_point(aes(y=value)) +
+            geom_line(aes(y=value))
+  
+          do_plot(pl,
+                  label=paste("02-curve", dataset_id, model_id, comp_id, i, sep="-"),
+                  caption=paste0(i, "-profile curves")
+                  )
+          cat('\n\n---\n\n')
+        }
+      }
+    }
+  }
+}
+
+
+      
+
+  ## ind <- which(hclustk=="|7|=927")
+  ## mcols(this_comp)$results[ind,]
+  ## ind <- "ENSG00000005483"
+  ## plotFrame <- colData(this_comp)
+  ## plotFrame$Y <- assay(this_comp, "vst")[ind,]
+  ## ggplot(as.data.frame(plotFrame),
+  ##        aes(x=Ct, y=Y, colour=eventual, group=Participant)) +
+  ##   geom_line()
 
 ```
 

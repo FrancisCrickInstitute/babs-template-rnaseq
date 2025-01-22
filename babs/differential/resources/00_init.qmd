@@ -15,8 +15,8 @@ echo: false
 code-summary: "Show the code"
 params:
   section: Initialisation
-
 ---
+
 ```{r}
 #| label: load1
 #| output: false

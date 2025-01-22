@@ -145,6 +145,7 @@ build_dds_list <- function(dds, spec) {
   spec <- trickle_down(field="drop_incomplete", to="models")
   spec <- trickle_down(field="varNames", to="sample_sets", merge_fn=modifyList, default=list())
   spec <- trickle_down(field="varDescriptions", to="sample_sets", merge_fn=modifyList, default=list())
+  spec <- trickle_down(field="profile_plots", to="models", merge_fn=modifyList, default=list())
   
   modelled_terms <- lapply(
     spec$sample_sets,
@@ -181,46 +182,46 @@ build_dds_list <- function(dds, spec) {
   names(spec$sample_sets) <- default_names(spec$sample_sets, prefix="D")
   offset_c <- 0
   offset_m <- 0
-  for (i_set in seq_along(spec$sample_sets)) {
-    names(spec$sample_sets[[i_set]]$models) <- default_names(spec$sample_sets[[i_set]]$models, prefix="M", offset=offset_m)
-    offset_m <- offset_m + length(spec$sample_sets[[i_set]]$models)
-    for (i_mdl in seq_along(spec$sample_sets[[i_set]]$models)) {
-      if ("comparisons" %in% names(spec$sample_sets[[i_set]]$models[[i_mdl]])) {
-        names(spec$sample_sets[[i_set]]$models[[i_mdl]]$comparisons) <- default_names(spec$sample_sets[[i_set]]$models[[i_mdl]]$comparisons, prefix="C", offset=offset_c)
-        offset_c <- offset_c + length(spec$sample_sets[[i_set]]$models[[i_mdl]]$comparisons)
+  for (dataset_i in seq_along(spec$sample_sets)) {
+    names(spec$sample_sets[[dataset_i]]$models) <- default_names(spec$sample_sets[[dataset_i]]$models, prefix="M", offset=offset_m)
+    offset_m <- offset_m + length(spec$sample_sets[[dataset_i]]$models)
+    for (model_i in seq_along(spec$sample_sets[[dataset_i]]$models)) {
+      if ("comparisons" %in% names(spec$sample_sets[[dataset_i]]$models[[model_i]])) {
+        names(spec$sample_sets[[dataset_i]]$models[[model_i]]$comparisons) <- default_names(spec$sample_sets[[dataset_i]]$models[[model_i]]$comparisons, prefix="C", offset=offset_c)
+        offset_c <- offset_c + length(spec$sample_sets[[dataset_i]]$models[[model_i]]$comparisons)
       }
     }
-    set <- spec$sample_sets[[i_set]]
+    dataset_spec <- spec$sample_sets[[dataset_i]]
     mdlList <- spec$models
     obj <- dds
-    if ("baseline" %in% names(set)) {
-      if (!is.list(set$baseline$ind)) {
-        is_numerator <- !is.na(set$baseline$ind)
-        norm <- counts(obj[,set$baseline$ind[is_numerator]]) + set$baseline$adj
+    if ("baseline" %in% names(dataset_spec)) {
+      if (!is.list(dataset_spec$baseline$ind)) {
+        is_numerator <- !is.na(dataset_spec$baseline$ind)
+        norm <- counts(obj[,dataset_spec$baseline$ind[is_numerator]]) + dataset_spec$baseline$adj
       } else {
-        is_numerator <- sapply(set$baseline$ind, function(x) !all(is.na(x)))!=0
-        norm <- sapply(set$baseline$ind[is_numerator], function(x) rowSums(counts(obj[,x]))) + set$baseline$adj
+        is_numerator <- sapply(dataset_spec$baseline$ind, function(x) !all(is.na(x)))!=0
+        norm <- sapply(dataset_spec$baseline$ind[is_numerator], function(x) rowSums(counts(obj[,x]))) + dataset_spec$baseline$adj
       }
       obj <- obj[,is_numerator]
       normalizationFactors(obj) <- norm
     }
-    if (is.list(set)) {
-      ind <- set$subset
+    if (is.list(dataset_spec)) {
+      ind <- dataset_spec$subset
       if (length(ind)==1 && ind=="all") ind=TRUE
-      mdlList <- c(mdlList, set$models)
+      mdlList <- c(mdlList, dataset_spec$models)
     } else {
-      ind <- set
+      ind <- dataset_spec
     }
     obj <- obj[,ind]
     colData(obj) <- droplevels(colData(obj))
-    if ("varNames" %in% spec$sample_sets[[i_set]]) {
+    if ("varNames" %in% dataset_spec) {
       varNames <- sapply(names(colData(dds)), identity)
-      varNames[names(spec$sample_sets[[i_set]]$varNames)] <- unlist(spec$sample_sets[[i_set]]$varNames)
+      varNames[names(dataset_spec$varNames)] <- unlist(dataset_spec$varNames)
       mcols(colData(obj))$name <- varNames
     }
-    if ("varDescriptions" %in% spec$sample_sets[[i_set]]) {
+    if ("varDescriptions" %in% dataset_spec) {
       varDescriptions <- sapply(names(colData(dds)), identity)
-      varDescriptions[names(spec$sample_sets[[i_set]]$varDescriptions)] <- unlist(spec$sample_sets[[i_set]]$varDescriptions)
+      varDescriptions[names(dataset_spec$varDescriptions)] <- unlist(dataset_spec$varDescriptions)
       mcols(colData(obj))$description <- varDescriptions
     }
 
@@ -239,16 +240,16 @@ build_dds_list <- function(dds, spec) {
       mdl
     })
     metadata(obj)$models <- mdlList
-    if ("sample_swap" %in% names(set)) {
-      for (x1 in names(set$sample_swap)) {
+    if ("sample_swap" %in% names(dataset_spec)) {
+      for (x1 in names(dataset_spec$sample_swap)) {
         i1 <- match(x1, colData(obj)$ID)
-        i2 <- match(set$sample_swap[[x1]], colData(obj)$ID)
+        i2 <- match(dataset_spec$sample_swap[[x1]], colData(obj)$ID)
         tmp <- colData(obj)[i1, -1, drop=FALSE]
         colData(obj)[i1, -1] <- colData(obj)[i2, -1, drop=FALSE]
         colData(obj)[i2, -1] <- tmp
       }
     }
-    tr <- set$transform
+    tr <- dataset_spec$transform
     mc <- mcols(colData(obj))
     if (!is.null(tr)) {
       .mu <- purrr::partial(mutate, .data=as.data.frame(colData(obj)))
@@ -282,13 +283,13 @@ build_dds_list <- function(dds, spec) {
         metadata(colData(obj))$palette$ggplot[new_cols] <- new_meta$ggplot[new_cols]
       }
     }
-    if ("collapse" %in% names(set)) {
-      mf <- model.frame(set$collapse, data.frame(colData(obj)))
+    if ("collapse" %in% names(dataset_spec)) {
+      mf <- model.frame(dataset_spec$collapse, data.frame(colData(obj)))
       ind <- match(do.call(paste, c(mf, sep="\r")),
                    do.call(paste, c(unique(mf), sep="\r")))
       obj <- collapseReplicates(obj, groupby=factor(ind), renameCols=FALSE)
     }
-    ddsList[[names(spec$sample_sets)[i_set]]] <- obj
+    ddsList[[names(spec$sample_sets)[dataset_i]]] <- obj
   }
   ddsList <- imap(ddsList,
                   function(obj, dname) {
