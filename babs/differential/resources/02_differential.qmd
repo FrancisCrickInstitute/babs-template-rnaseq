@@ -571,7 +571,7 @@ for (dataset in names(dds_model_comp)) {
 ```
 
 
-# Differential curves
+# Differential Profiles
 
 We can also plot summaries of clusters of differential genes. Here we
 split expression data of the differential genes into twelve clusters,
@@ -597,12 +597,14 @@ assemble_partialised <- function(obj, reduced, extra=NULL, resids=TRUE) {
       (if(resids) obj$resid else 0))
 }
 
+exists_profile_plot <- FALSE
 for (dataset_id in names(dds_model_comp)) {
   for (model_id in names(dds_model_comp[[dataset_id]])) {
     for (comp_id in names(dds_model_comp[[dataset_id]][[model_id]])) {
       this_dds <- dds_model_comp[[dataset_id]][[model_id]][[comp_id]]
       is_diff <- grepl("^.*\\*", mcols(this_dds)$results$class)
       if ("profile_plots" %in% names(metadata(this_dds)$model) && any(is_diff)) {
+        exists_profile_plot <- TRUE
         partials <- partialise.matrix(
           assay(this_dds[is_diff,], "vst"),
           as.data.frame(colData(this_dds)),
@@ -639,7 +641,9 @@ for (dataset_id in names(dds_model_comp)) {
     }
   }
 }
-
+if (!exists_profile_plot) {
+  cat("\n\nNo profiles were generated, either because none were specified, or those that were corresponded to comparisons with no statistically significant differential genes.\n\n")
+}
 
       
 
