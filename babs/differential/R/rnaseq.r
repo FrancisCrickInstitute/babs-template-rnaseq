@@ -207,7 +207,6 @@ build_dds_list <- function(dds, spec) {
     }
     if (is.list(dataset_spec)) {
       ind <- dataset_spec$subset
-      if (length(ind)==1 && ind=="all") ind=TRUE
       mdlList <- c(mdlList, dataset_spec$models)
     } else {
       ind <- dataset_spec
@@ -943,5 +942,46 @@ default_spec_settings <- function() {
 	baseline_heuristic = "min",  ## For the "white" colour in differential heatmaps
 	LRT_effect = "default"  ## For the "white" colour in differential heatmaps
    )
+}
+
+
+add_org_annotation <- function(dds, org, keytype="ENSEMBL", extra_mcols=list(entrez="ENTREZID", symbol="SYMBOL")) {
+  metadata(dds)$organism <- list(org=org)
+  metadata(dds)$count_source <- params$count_source
+  if (is.null(org) || system.file(package=org)=="") {
+    if (is.null(row.names(dds))) {
+      warning("Couldn't load ", org, ", so using row-numbers for feature annotation")
+      row.names(dds) <- paste0("gene", 1:nrow(dds))
+    } else {
+      warning("Couldn't load ", org, ", so using row-names for feature annotation")
+    }
+    for (extra in names(extra_mcols)) {
+      mcols(dds)[[extra]] <- row.names(dds)
+    }
+    metadata(dds)$symbol_source <- "row.names"
+  } else {
+    library(org, character.only=TRUE)
+    if (is.null(row.names(dds))) {
+      row.names(dds) <- head(keys(eval(parse(text=org)), keytype), nrow(dds))
+    }
+    o <- eval(parse(text = org))
+    if (any(names(extra_mcols)) %in% names(mcols(dds))) {
+      warning(collapse(intersect(names(extra_mcols), names(mcols(dds))), sep=","), " are already in the data object.  NOT overwriting them")
+    }
+    for (extra in setdiff(names(extra_mcols), names(mcols(dds)))) {
+      if (extra_mcols[[extra]] %in% columns(o)) {
+        mcols(dds)[[extra]] <- mapIds(
+          o,
+          keys=row.names(dds),
+          column=extra_mcols[[extra]],
+          keytype=keytype,
+          multiVals="first")[row.names(dds)]
+      } else {
+        warning("Couldn't find ", extra_mcols[[extra]], " in ", org, ".  Using ", keytype, " for '", extra, "' instead.")
+        mcols(dds)[[extra]] <- row.names(dds)
+      }
+    }
+  }
+  dds
 }
 

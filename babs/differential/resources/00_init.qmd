@@ -48,10 +48,55 @@ if (!isTRUE(getOption('knitr.in.progress'))) {
                 Value=unlist(params)))
 }
 
+alignments <- strsplit(sub(paste0("^", params$alignment, "\\."),
+                          "",
+                          readLines(paste0(file.path("extdata", params$alignment), ".config"))), "=")
+names(alignments) <- sapply(alignments, "[", 1)
+alignments <- lapply(alignments, function(x) paste(x[-1], collapse="="))
+
+
+organism <- list(org=alignments$org.db)
+
+
 preprocessed <- file.path("extdata", paste0(params$alignment, ".rda"))
 if (file.exists(preprocessed)) {
-  tmp <- load(preprocessed)
-  dds <- get(tmp)
+  objNames <- load(preprocessed)
+  isdds <- sapply(objNames, function(x) class(get(x))=="DESeqDataSet")
+  if (!any(isdds)) stop(preprocessed, " does not contain any DESeqDataSet objects")
+  if (length(which(isdds))>1) warning(preprocessed, " contains many DESeqDataSet objects, only using ", objnames[isdds][1])
+  dds <- get(objNames[isdds][1])
+  dds <- add_org_annotation(dds, organism$org)
+  save(dds, file=file.path("data",paste0("counts_", params$alignment, ".rda")))
+  saveRDS(dds, file=file.path("data",paste0("counts_", params$alignment, ".rds")))
+  knitr::knit_exit()
+}
+
+preprocessed <- file.path("extdata", paste0(params$alignment, ".rds"))
+if (file.exists(preprocessed)) {
+  dds <- add_org_annotation(readRDS(preprocessed), organism$org)
+  save(dds, file=file.path("data",paste0("counts_", params$alignment, ".rda")))
+  saveRDS(dds, file=file.path("data",paste0("counts_", params$alignment, ".rds")))
+  knitr::knit_exit()
+}
+
+to_simulate <- file.path("extdata", paste0(params$alignment, ".csv"))
+if (file.exists(to_simulate)) {
+  df <- read.csv(to_simulate)
+  
+  dds <- DESeqDataSetFromMatrix(
+    countData=matrix(
+      rnbinom(nrow(df) * 1000, size=100, prob=0.5),
+      1000,
+      nrow(df)),
+    colData=df,
+    design=~1,
+    )
+  if (all(table(df[[1]])==1)) {
+    colnames(dds) <- as.character(df[[1]])
+  } else {
+    colnames(dds) <- as.character(1:ncol(ds))
+  }
+  dds <- add_org_annotation(dds, organism$org)
   save(dds, file=file.path("data",paste0("counts_", params$alignment, ".rda")))
   saveRDS(dds, file=file.path("data",paste0("counts_", params$alignment, ".rds")))
   knitr::knit_exit()
@@ -122,6 +167,7 @@ txi <- do.call(tximport, tx_args)
 txi$length[txi$length==0] <- 1
 
 dds <- DESeqDataSetFromTximport(txi, sample_sheet, ~ 1) # ok to have fixed trivial design - it'll get swapped out
+metadata(mcols(dds))$init <- onames
 ind <- rowSums(counts(dds)!=0) > 0
 dds <- dds[ind,]
 
@@ -131,44 +177,7 @@ alignments <- strsplit(sub(paste0("^", params$alignment, "\\."), "", readLines(p
 names(alignments) <- sapply(alignments, "[", 1)
 alignments <- lapply(alignments, function(x) paste(x[-1], collapse="="))
 
-
-organism <- list(org=alignments$org.db)
-metadata(dds)$organism <- organism
-metadata(dds)$count_source <- params$count_source
-metadata(mcols(dds))$init <- onames
-
-if (is.null(organism$org) || system.file(package=organism$org)=="") {
-  mcols(dds)$entrez <- row.names(dds)
-  mcols(dds)$symbol <- row.names(dds)
-  metadata(dds)$symbol_source <- "row.names"
-} else {
-  
-  library(organism$org, character.only=TRUE)
-  
-  mcols(dds)$entrez <- mapIds(
-    eval(parse(text = organism$org)),
-    keys=row.names(dds),
-    column="ENTREZID",
-    keytype="ENSEMBL",
-    multiVals="first")[row.names(dds)]
-  
-  o <- eval(parse(text = organism$org))
-  my_column <- if ("SYMBOL" %in% columns(o)) "SYMBOL" else columns(o)[1]
-  metadata(dds)$symbol_source <- my_column
-  mcols(dds)$symbol <- mapIds(
-    o,
-    keys=row.names(dds),
-    column=my_column,
-    keytype="ENSEMBL",
-    multiVals="first")[row.names(dds)]
-  
-  mcols(dds)$entrez <- mapIds(
-    o,
-    keys=row.names(dds),
-    column="ENTREZID",
-    keytype="ENSEMBL",
-    multiVals="first")[row.names(dds)]
-}
+dds <- add_org_annotation(dds, organism$org)
 
 trim_names <- function(names) {
   chars <- strsplit(names, "")

@@ -603,7 +603,9 @@ for (dataset_id in names(dds_model_comp)) {
     for (comp_id in names(dds_model_comp[[dataset_id]][[model_id]])) {
       this_dds <- dds_model_comp[[dataset_id]][[model_id]][[comp_id]]
       is_diff <- grepl("^.*\\*", mcols(this_dds)$results$class)
-      if ("profile_plots" %in% names(metadata(this_dds)$model) && any(is_diff)) {
+      if ("profile_plots" %in% names(metadata(this_dds)$model) &&
+            length(metadata(this_dds)$model)>0
+          && any(is_diff)) {
         exists_profile_plot <- TRUE
         partials <- partialise.matrix(
           assay(this_dds[is_diff,], "vst"),
@@ -642,7 +644,7 @@ for (dataset_id in names(dds_model_comp)) {
   }
 }
 if (!exists_profile_plot) {
-  cat("\n\nNo profiles were generated, either because none were specified, or those that were corresponded to comparisons with no statistically significant differential genes.\n\n")
+  cat('\n\nNo profiles were generated, either because none were specified, or those that were corresponded to comparisons with no statistically significant differential genes.\n\n')
 }
 
       
