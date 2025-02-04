@@ -225,6 +225,13 @@ prerequisites - if you experience problems, please move any of the
 folders `docs`/`ingress`/`nfcore` so that they're not next to the
 `differential` folder.
 
+### Complete Isolation Starting from a DESeqDataSet
+
+There is a [separate vignette](DESeqDataSet.html) on how to get a subset of
+the pipeline that starts from a single DESeqDataSet object alongside a
+spec-file, and produces the reports from there.
+
+
 ### Differential analysis
 
 The vast majority of work is carried out by:

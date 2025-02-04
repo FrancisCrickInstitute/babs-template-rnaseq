@@ -36,6 +36,24 @@ load_specs <- function(file="", context) {
     assign("sample_set", list_ok, envir=e)
     assign("model", list_ok, envir=e)
     assign("specification", list_ok, envir=e)
+    assign("comparison",
+           function(x, name=NULL, description=NULL,...) {
+             if (is_formula(x) && length(x)==3) {
+                 out <- list(spec=x,...)
+                 class(out) <- "post_hoc"
+             } else {
+               out <- x
+             }
+             attributes(out) <- c(attributes(out), list(name=name, description=description))
+             out
+           },
+           envir=e)
+    assign("profile_plot",
+           function(x, name=NULL, description=NULL) {
+             attributes(x) <- list(name=name, description=description)
+             x
+           },
+           envir=e)
     normalise_within <- function(...) {
       norm_within(as.data.frame(colData(context)), ...)}    
     assign("settings",
@@ -100,10 +118,20 @@ recode_within <- function(inner, ...) {
 }
 
 
-default_names <- function(obj, prefix="", offset=0) {
-  ifelse(names(obj)=="", paste0(prefix, seq_along(obj)+offset), names(obj))
+## default_names <- function(obj, prefix="", offset=0) {
+##   ifelse(names(obj)=="", paste0(prefix, seq_along(obj)+offset), names(obj))
+##   }
+
+default_namer <- function() {
+  offsets <- list() 
+  function(obj, prefix="") {
+    if (!prefix %in% names(offsets)) offsets[[prefix]] <- 0
+    out <- ifelse(names(obj)=="", paste0(prefix, seq_along(obj)+offsets[[prefix]]), names(obj))
+    offsets[[prefix]] <<- offsets[[prefix]] + length(obj)
+    out
   }
-  
+}
+
 ##' Expand an analysis specification into its corresponding subset list
 ##'
 ##' Generate a list of DESeq2 objects corresponding to the different
@@ -155,17 +183,12 @@ build_dds_list <- function(dds, spec) {
         d <- c()
         if (is_formula(y$design))
           d <- all.vars(update(y$design, NULL ~ .))
-        qc_form <- y$qc_formulae
-        if (!is.null(qc_form)) {
-          if (is_formula(qc_form))
-            d <- c(d, all.vars(qc_form))
-          else
-            d <- c(d, unlist(lapply(qc_form, all.vars)))
-        }
+        if ("profile_plots" %in% names(y))
+            d <- c(d, unlist(lapply(y$profile_plots, all.vars)))
         d
       })
     })
-  modelled_terms <-  unique(unlist(modelled_terms))
+  modelled_terms <-  setdiff(unique(unlist(modelled_terms)), ".")
   if (!"palette" %in% names(spec$settings)) {
     spec$settings$palette="Set1"
   }
@@ -179,16 +202,16 @@ build_dds_list <- function(dds, spec) {
   }
   metadata(colData(dds))$palette <- default_palette
   ddsList <- list()
+  default_names <- default_namer()
   names(spec$sample_sets) <- default_names(spec$sample_sets, prefix="D")
-  offset_c <- 0
-  offset_m <- 0
   for (dataset_i in seq_along(spec$sample_sets)) {
-    names(spec$sample_sets[[dataset_i]]$models) <- default_names(spec$sample_sets[[dataset_i]]$models, prefix="M", offset=offset_m)
-    offset_m <- offset_m + length(spec$sample_sets[[dataset_i]]$models)
+    names(spec$sample_sets[[dataset_i]]$models) <- default_names(spec$sample_sets[[dataset_i]]$models, prefix="M")
     for (model_i in seq_along(spec$sample_sets[[dataset_i]]$models)) {
       if ("comparisons" %in% names(spec$sample_sets[[dataset_i]]$models[[model_i]])) {
-        names(spec$sample_sets[[dataset_i]]$models[[model_i]]$comparisons) <- default_names(spec$sample_sets[[dataset_i]]$models[[model_i]]$comparisons, prefix="C", offset=offset_c)
-        offset_c <- offset_c + length(spec$sample_sets[[dataset_i]]$models[[model_i]]$comparisons)
+        names(spec$sample_sets[[dataset_i]]$models[[model_i]]$comparisons) <- default_names(spec$sample_sets[[dataset_i]]$models[[model_i]]$comparisons, prefix="C")
+      }
+      if ("profile_plots" %in% names(spec$sample_sets[[dataset_i]]$models[[model_i]])) {
+        names(spec$sample_sets[[dataset_i]]$models[[model_i]]$profile_plots) <- default_names(spec$sample_sets[[dataset_i]]$models[[model_i]]$profile_plots, prefix="P")
       }
     }
     dataset_spec <- spec$sample_sets[[dataset_i]]
@@ -231,13 +254,25 @@ build_dds_list <- function(dds, spec) {
           paste(all.vars(mdlList[[1]]$design), collapse=" + "),
           "~",
           0))
+      
     }
-    mdlList <- lapply(mdlList, function(mdl) {
-      if (is_formula(mdl$qc_formulae)) {
-        mdl$qc_formulae <- list(I(mdl$qc_formulae))
+    for (i in seq_along(mdlList)) {
+      if (!"qc_formulae" %in% names(mdlList[[i]])) {
+        # default to the set of models removing any terms that will preserve marginality
+        mdlList[[i]]$qc_formulae <- find_simpler_models(mdlList[[i]]$design, do_aes=FALSE, type="simplest")
+      } else {
+        if (is_formula(mdlList[[i]]$qc_formulae)) {
+          # We used to allow a singleton formula - wrap these in a list.
+          mdlList[[i]]$qc_formulae <- list(I(mdlList[[i]]$qc_formulae))
+        }
       }
-      mdl
-    })
+      if (!"profile_plots" %in% names(mdlList[[i]])) {
+        # default to the set of models removing any terms that will preserve marginality
+        mdlList[[i]]$profile_plots <- find_simpler_models(mdlList[[i]]$design, do_aes=TRUE, type="drop1")
+      } else {
+        mdlList[[i]]$profile_plots <- lapply(mdlList[[i]]$profile_plots, function(p) update(mdlList[[i]]$design, p))
+      }
+    }
     metadata(obj)$models <- mdlList
     if ("sample_swap" %in% names(dataset_spec)) {
       for (x1 in names(dataset_spec$sample_swap)) {
@@ -523,9 +558,10 @@ check_model <- function(dds) {
 ##' @return 
 ##' @author Gavin Kelly
 ##' @export
-mult_comp <- function(spec, ...) {
+mult_comp <- function(spec, name=NULL, description=NULL, ...) {
   obj <- list(spec=spec,...)
   class(obj) <- "post_hoc"
+  attributes(obj) <- c(attributes(obj), list(name=name, description=description))
   obj
 }
 
@@ -553,7 +589,12 @@ emcontrasts <- function(dds, spec, extra=NULL) {
   }
   
   mdl <- metadata(dds)$model
-  emfit <- do.call(emmeans::emmeans, c(list(object=mdl$lm, specs= spec),extra))
+  if ("var" %in% names(extra)) {
+    em_fn <- emmeans::emtrends
+  } else {
+    em_fn <- emmeans::emmeans
+  }
+  emfit <- do.call(em_fn, c(list(object=mdl$lm, specs= spec),extra))
   contr_frame <- as.data.frame(summary(emfit$contrasts))
   ind_est <- !is.na(contr_frame$estimate)
 
@@ -936,6 +977,7 @@ default_spec_settings <- function() {
 	top_n_variable = 500,     ## For PCA
 	showCategory   = 25,      ## For enrichment analyses
 	seed           = 1,       ## random seed gets set at start of script, just in case.
+        gene_clust     = 12,      ## When we need to chose clusters of genes, how many?
 	filterFun      = IHW::ihw,                 ## NULL for standard DESeq2 results, otherwise  functions
 	clustering_distance_rows    = "euclidean", ## for all feature-distances
 	clustering_distance_columns = "euclidean",  ## for sample-distances
@@ -985,3 +1027,37 @@ add_org_annotation <- function(dds, org, keytype="ENSEMBL", extra_mcols=list(ent
   dds
 }
 
+
+find_simpler_models <- function(fml, do_aes=FALSE, type=c("simplest", "drop1", "design")) {
+  type <- match.arg(type)
+  if (do_aes) {
+    vars <- all.vars(fml)
+    aess <- c("x", "colour", "shape", rep("group", max(length(vars)-3,0)))[seq_along(vars)]
+    is_group <- which(aess=="group")
+    if (length(is_group)>0) {
+      if (length(is_group)>1) {
+        group=paste0("interaction(",paste(vars[is_group], collapse=","),")")
+      } else {
+        group=vars[is_group]
+      }
+      vars <- c(vars[-is_group], group)
+      aess <- c(aess[-is_group], "group")
+    }
+    lhs <- paste0("aes(", paste0(aess, "=", vars, collapse=","), ")")
+  } else {
+    lhs <- "."
+  }
+  if (type=="simplest") {
+    new <- add.scope(~1, fml)
+    lapply(setNames(new, paste("just", new)),
+           function(x) update(fml, as.formula(paste(lhs, "~", x))))
+  } else if (type=="drop1") {
+    drop <- drop.scope(fml)
+    lapply(setNames(drop, paste("drop", drop)),
+           function(x) update(fml, as.formula(paste0(lhs, " ~ . -", x))))
+  } else if (type=="design") {
+    list(
+      'as designed' = update(fml, as.formula(paste(lhs, " ~ .")))
+    )
+  }
+}

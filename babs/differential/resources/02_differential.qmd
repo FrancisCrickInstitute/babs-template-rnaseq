@@ -108,6 +108,9 @@ set.seed(param$set("seed", postpone=TRUE))
 param$set("spec",  params$spec, "Using analysis plan '{}'.", postpone=TRUE)
 param$set("alignment", params$alignment, "Using alignment settings '{}'")
 
+dtag <- dmc_factory(ddsList, type="dataset")
+mtag <- dmc_factory(ddsList, type="model")
+
 ```
 
 # Datasets and Models
@@ -586,20 +589,14 @@ the largest cluster, and represents 1000 genes.
 ```{r}
 #| label: fig-differential-curve
 
+param$set("gene_clust")
 
-assemble_partialised <- function(obj, reduced, extra=NULL, resids=TRUE) {
-  terms <-intersect(
-    dimnames(obj$terms)[[3]],
-    c(labels(terms(reduced)), extra)
-  )
-  t(
-    rowSums(obj$terms[, , terms, drop=FALSE], na.rm=TRUE, dims=2) +
-      (if(resids) obj$resid else 0))
-}
 
 exists_profile_plot <- FALSE
 for (dataset_id in names(dds_model_comp)) {
+  dmc_heading(dds_model_comp, dataset=dataset_id, model=NULL, depth="##")
   for (model_id in names(dds_model_comp[[dataset_id]])) {
+    dmc_heading(dds_model_comp, dataset=dataset, model=mdl_name, depth="###")
     for (comp_id in names(dds_model_comp[[dataset_id]][[model_id]])) {
       this_dds <- dds_model_comp[[dataset_id]][[model_id]][[comp_id]]
       is_diff <- grepl("^.*\\*", mcols(this_dds)$results$class)
@@ -607,35 +604,40 @@ for (dataset_id in names(dds_model_comp)) {
             length(metadata(this_dds)$model)>0
           && any(is_diff)) {
         exists_profile_plot <- TRUE
+        k <- nclust(param$get("gene_clust"), universe=sum(is_diff))
         partials <- partialise.matrix(
           assay(this_dds[is_diff,], "vst"),
           as.data.frame(colData(this_dds)),
           fml=metadata(this_dds)$model$design)
         curves <- metadata(this_dds)$model$profile_plots
         for (i in seq_along(curves)) {  
-          mat <- assemble_partialised(partials, update(curves[[i]], NULL ~ .), resids=FALSE)
+          mat <- assemble_partialised(partials, update(curves[[i]], NULL ~ .), resids=TRUE)
           DEmat <- t(scale(t(mat)))
           hr <- hclust(as.dist(1-cor(t(DEmat), method="pearson")), method="complete")
-          hclustk <-  cutree(hr, k=12)
+          hclustk <-  cutree(hr, k=k)
           tbl <- table(hclustk)
           r <- paste0("|", rank(-tbl, ties="first"), "|=", tbl)
           hclustk[] <- r[hclustk]
           hclustk <- factor(hclustk, levels=names(sort(table(hclustk), decreasing=TRUE)))
           centres <- apply(DEmat, 2, function(samp) tapply(samp, hclustk, mean))
           clustered_df <- cbind(as.data.frame(t(centres)), as.data.frame(colData(this_dds)))
+          line_mat <- t(scale(t( assemble_partialised(partials, update(curves[[i]], NULL ~ .), resids=FALSE))))
+          line_centres <- apply(line_mat, 2, function(samp) tapply(samp, hclustk, mean))
+          line_df <- cbind(
+            as.data.frame(t(line_centres)),
+            as.data.frame(colData(this_dds)))
           
-          
-          pl <- ggplot(clustered_df %>% pivot_longer(cols=1:12),
+          pl <- ggplot(clustered_df %>% pivot_longer(cols=1:k),
                       eval(curves[[i]][[2]])
                       ) +
             facet_wrap(~name) +
             theme_bw() +
             geom_point(aes(y=value)) +
-            geom_line(aes(y=value))
+            geom_line(aes(y=value), data=line_df %>% pivot_longer(cols=1:k))
   
           do_plot(pl,
                   label=paste("02-curve", dataset_id, model_id, comp_id, i, sep="-"),
-                  caption=paste0(i, "-profile curves")
+                  caption=paste0("profile curves ", i, " for ", comp_id, " genes  of ", mtag(model_id), " in ", dtag(dataset_id))
                   )
           cat('\n\n---\n\n')
         }

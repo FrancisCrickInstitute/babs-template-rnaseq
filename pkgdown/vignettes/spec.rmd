@@ -76,7 +76,9 @@ omitting or retaining this sample. We can accomplish this easily:
 specification(
   sample_sets =list( 
     all = sample_set(
-      subset = TRUE
+      subset = TRUE,
+      name="All Samples",# an optional short name
+      description="All samples included in the analysis"# an optional longer description
     ),
     no_outlier=sample_set(
     subset = sample_id != "id_of_bad_sample"
@@ -117,13 +119,63 @@ specification(
 )
 ```
 
-The conditions on which we subset must be defined in the experiment
+It's possible for `sample_set`s to inherit subsets from the
+`specification` level.  We discuss [this concept later on]{#cascade#}, but a simple
+example should suffice to illustrate how we can refine a 'global' subset:
+
+```r
+specification(
+  subset = ! sample_id %in% c("bad1","bad2"), # get rid of two samples that failed qc
+  sample_sets =list( 
+    all_good = sample_set(
+      ... # No need for a subset here
+    ),
+    tumour=sample_set(
+      subset = condition == "tumour" # this will get 'AND'ed with the top-level `subset`
+    ),
+    normal=sample_set(
+      subset = condition == "normal" # as will this.
+    )
+
+  )
+)
+```
+
+The conditions on which we `subset` must be defined in the experiment
 table. It is possible to transform some of the predictors (columns of
-`colData`) at this stage, which offers an alternative way of
-subsetting as well, but we will (describe this)[later]. For now
-we'll look at the main analysis attribute of a sample set, namely the
-model we'll use to estimate the expression in the various experimental
-conditions those samples were taken from:
+`colData`) using the other main component of a `sample_set`, the
+`transform`:
+
+#### Transform
+
+Each specification can have a single `transform` which is a
+`dplyr::mutate` clause, but with no need for the initial data object:
+
+```
+specification(
+    transform=mutate(
+               treatement=relevel(factor(treatment), "control"),
+               patient_id=factor(patient_id),
+	       number_of_visits=table(patient_id)[as.character(patient_id)],
+	       .include=number_of_visits>1
+    ),...
+```
+
+Notice that we change/create various covariates within a single
+`mutate` - having multiple `transform`s is a mistake as only one will
+be applied.  As mentioned above, `subset` only operates on covariates
+prior to the transform being applied - if we want to utilise
+`transform`ed covariates in the subset, the special covariate
+`.include` should be generated in the `transform`, and the colData
+will be post-processed to only include samples for which that variable
+is `TRUE`.
+
+Also, each `sample_set` can have it's own `transform`. In this case,
+the individual `sample_set`'s version will take complete precedence:
+the global `transform` will not be applied at all to `sample_set`s
+with their own `transform`, and it will simply be used in
+`sample_set`s which don't have their own `transform`.
+
 
 ### Models
 
@@ -157,7 +209,9 @@ specification(
           design = ~treatment + batch
         ),
         powerful = model(
-          design = ~treatment
+          design = ~treatment,
+	  name = "Just Treatment",
+	  description = "Account for treatment, ignore batch - if there is a batch effect it'll increase the noise, though"
         )
       )
     )
@@ -206,6 +260,10 @@ will result in the `all` dataset having two models (the universal one
 from the top of the spec file, and a specific one), whereas the
 `batch` dataset will have only the universal one.
 
+There are other similar patterns for other parts of the spec file,
+that certain properties 'cascade' down to other parts of the hierarchy
+- see the [this section]{#cascade} for a list of behaviours.
+
 ### Comparisons
 
 DESeq2 has multiple ways of specifying a contrast. All of these are
@@ -226,7 +284,8 @@ specification(
             comp2 = c("treatment", "treat", "ctrl"),
             comp3 = list(c("treat_vs_ctrl"), c("vehicle_vs_ctrl"), listValues=c(1,-1))
             comp4 = c(1,0,-0.5,-0.5),
-			comp5 = ~batch
+            comp5 = ~batch,
+	    comp6 = comparison(c("treatment", "treat", "ctrl"), name="Treat-control", description="Treatment vs Control")
           )
         )
       )
@@ -251,9 +310,11 @@ represented, respectively:
 - A formula specifying the `reduced` term for carrying out Anova via
   a likelihood ratio test.
 
-You are referred to the DESeq2 reference manual for further details,
-but one advantage of our wrapper is that it allows a simple enumeration
-of complex comparisons using machinery from the `emmeans` package:
+You are referred to the DESeq2 reference manual for further
+details. They can also be wrapped in a `comparison` call, to add extra
+information about the comparison, that might get used in the report. But one
+advantage of our wrapper is that it allows a simple enumeration of
+complex comparisons using machinery from the `emmeans` package:
 
 #### Automatic comparison enumeration
 
@@ -329,6 +390,27 @@ When we don't have an interaction term in our model, this is
 everything we'd ever need, as for example the difference between
 'novel\_treatment' and 'control' is by construction (of the model
 formula) independent of which batch we're in.
+
+The _keywords_ are inherited from the [emmeans
+package](https://rvlenth.github.io/emmeans/articles/AQuickStart.html),
+so that is a good place for extra background material on their
+meaning.
+
+One thing to note is that `emmeans` has a different way of handling
+continuous covariates, so to specifiy a test of difference of slopes,
+it's necessary to request that functionality by providing a `var`
+argument to the `mult_comp` call, e.g.:
+
+```
+...
+#design= ~ Infection * time + Participant_in_infection:infection
+mult_comp(revpairwise ~ Infection, var="time")
+```
+
+is the correct formulation within the `mult_comp` framework to
+estimate the per-participant rate of change of expression over `time`,
+and then see if that differs between pairs of groups of patients that
+are distinguished by their `Infection` 	   .
 
 #### Interaction terms
 
@@ -496,14 +578,9 @@ columns in-line. It's a question of personal preference whether
 transformation specified in the spec file (which keeps an entirely
 faithful record of what is done).
 
-There's another use of the `transform` option - if it generates a
-covariate called `.include` this will be used to further subset the
-data so one can analyse a subset of the data based on a criterion
-derived from, but not explicitly present, in the experiment table.
-
 ### Other functionality
 
-#### QC Formulae
+#### Profile formulae
 
 In the exploratory plots, we present PC and dendodrograms. Primarily
 these are of the normalised counts without any further processing, but
@@ -523,19 +600,11 @@ fallacy, as the original dimension reduction is looking in the "wrong"
 direction. Recalculating the PCs having removed the nuisance effect is
 more valid.
 
-By default, in any given `sample_set`, the first model design will be
-captured and used as the basis for covariate adjustment prior to
-PC/Heatmap generation. And "partial residuals" for each term in the
-model are calculated.  So if the first model for a dataset had a
-design `~ treatment * time + batch`, we'd generate three PC plots: one
-where the time and batch effect had been removed, and then colouring
-by treatment; one coloured by time (having removed treatment and batch
-effects); and one coloured by batch (having removed the two
-experimental conditions).
-
-But we can be more general than this.  Say we wanted to look purely at
-the effect of solely removing 'batch' - this is available by setting a
-`qc_formulae` argument in the model
+By default, no additional plots are generated - this is a change from
+previous `qc_formulae` versious, because we were starting to see more
+complex designs where the default option (producing all colours x
+covariate plots) was becoming unmanageably verbose. Now it is
+necessary to add descriptions of the profiles to be plotted explicitly:
 
 ```
     all = sample_set(
@@ -543,78 +612,40 @@ the effect of solely removing 'batch' - this is available by setting a
       models = list(
         nested = model(
           design = ~treatment * time + batch,
-          qc_formulae= treatment + time ~ timepoint * time,
+          profile_plots = list(
+	    aes(x=time, colour=batch, shape=treatment)  ~ treatment + time + timepoint * time + batch,
+	    aes(x=time, colour=treatment)  ~ treatment + time + timepoint * time,
+	    aes(x=time, colour=treatment) ~ . - batch
+	  )
 	  ...
 ```
 
-Everything on the LHS is used, in turn,  as a "colouring" of the PCs
-that have been calculated on data that have been "reconstructed" using
-the terms on the RHS of the qc formula.  So this would
-give us two plots (one for each experimental condition) having removed
-the "nuisance" batch effect (as that is the only term from the design
-formula that is missing from the qc formula.)  The "reconstruction" is
-done based on the fitting of the `design` formula, so the qc formula
-will need to be a sub-model of the design (akin to DESeq2's LRT
-specification): each gene's predicted value (based on terms in the qc
-formula) is supplemented with the "residual error", to retain the
-sample-to-sample variability.
+Everything on the LHS is used as an aesthetic mapping for any given
+plot, and the model on the right says which covariates's effects are
+kept in the 'normalised' data: anything that is omitted is effectively
+normalised/regressed-out .
 
-We can have multiple formulae (hence the spelling!) 
+In the first element of the `profile_plots` list, the RHS of the
+formula is algebraically identical to the `design`, so no effects will
+be regressed out. But plots will be drawn so that time is on the
+horizontal axis, expression will be on the vertical axes - and samples
+will be coloured by batch, and shaped according to which treatment
+group they were in.
 
-```
-    all = sample_set(
-      subset = TRUE,
-      models = list(
-        nested = model(
-          design = ~treatment * time + batch,
-          qc_formulae= list(
-		    treatment + time ~ treatment * time,
-		    batch + treatment + time ~ treatment + time),
-	  ...
-```
+The second element will produce a different set of plots, this time
+we've regressed out (corrected-for) batch, so the PCA and heatmaps
+will be different from those on raw vst data. Note, for the
+two-dimensional PC plots, we need both the `x` and `y` aesthetics to
+represent the projection, so the `time` aspect of this data would not
+be represented in the visualisation: to get round this, we
+automatically generate a plot where we use the `colour` aesthetic to
+represent the overwritten `x`.
 
-The first one has just been described; the second one removes the
-effect of batch _and_ the time:treatment interaction. It produces
-three plots, colouring exactly the same PCA by batch, treatment and
-time in turn.  If we want to distinguish two covariates on the same
-plot, we can change the shape by adding an interaction on the LHS,
-e.g.
-
-```
-qc_formulae = treatment:batch + time:batch ~ ...
-```
-
-where the first term determines the colour aesthetic, and the second
-the shape aesthetic - each 'summand' separated by a `+` will result in
-a separate plot.
-   
-One final feature is that if we omit the `qc_formulae` entirely for
-all models in a dataset, then the design of the first model will be
-utilised - all its main effects will be captured, so a `design =
-~treatment * time + batch` has three first order terms, resulting in
-
-```
-qc_formulae= treatment + time + batch ~ 0
-```
-
-The `0` on the RHS is a special construct - it means when colouring by
-a covariate, that covariate's effect will automatically be added back
-in, so is equivalent to 
-
-```
-qc_formulae = list(
-treatment ~ treatment, 
-time ~ time,
-batch ~ batch
-)
-```
-
-which in turn is equivalent to the old "Focussed on" mechanism. If for
-some reason you want to visualise the effect of removing _all_
-covariates defined in the design, the a qc formula of e.g. `time ~ 1`
-will achieve that. If this PCA falls into clusters, then chosing a
-previously ignored column of sample metadata instead of `time` is a
-good way of exploring if important information has been ignored.
+The third example illustrates the standard use of the `.` placeholder
+in R formulae to represent the 'existing' model.  Here, the `.`
+represents the design, and the `-` is the standard Wilkinson notation
+to _remove_ an effect, so the third example is a different way of
+phrasing the second instance: regress out the effect of batch.
 
 #### Sample swaps
 
@@ -743,3 +774,18 @@ specification(
     )
 )
 ```
+
+### Cascading properties of a spec file {#cascade}
+
+To save repeating oneself, there are various aspects of a spec file
+that will propagate down the `specificiation > sample_sets > models >
+comparisons` hierarchy.  We list the expected behaviour of those:
+
+ - `models` can be set at the top `specification` level, and will get pre-pended to any sample-set specific models.
+ - `subset` can be set at the top `specification` level, and will get boolean-`AND`ed with  sample-set specific subsets.
+ - `transform` can be set at the top `specification` level, and will only be used when sample-set doesn't specify its own transform
+ - `drop_unsupported_combinations` can be set at the `specification` and/or `sample_set` level, and will only be used when a model doesn't specify this directly.
+ - `drop_incomplete` can be set at the `specification` and/or `sample_set` level, and will only be used when a model doesn't specify this directly.
+ - `profile_plots` can be set at the `specification` and/or `sample_set` level, and will be added to thos of any model-specific plot profiles
+
+These are intended to 'do what I mean' for the most typical situations.

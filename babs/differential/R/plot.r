@@ -175,10 +175,9 @@ residual_heatmap_transform <- function(mat, cdata, fml) {
 }
 
 
-separate_legend <- function(dds) {
-  in_this_dataset <- unique(unlist(lapply(metadata(dds)$models, function(x) all.vars(x$design))))
+separate_legend <- function(dds, vars=unique(unlist(lapply(metadata(dds)$models, function(x) all.vars(x$design))))) {
   lapply(
-    in_this_dataset,
+    vars,
     function(md_name) {
       md <- metadata(colData(dds))$palette$Heatmap[[md_name]]
       if (is.function(md)) {
@@ -189,4 +188,27 @@ separate_legend <- function(dds) {
       }
     }
   )
+}
+
+substitute_x_aes <- function(mapping) {
+  need_alt_x <- !( # need to represent x-aesthetic somewhere else if it's not already represented in shape or colour
+    all(all.vars(mapping$x) %in% all.vars(mapping$colour)) ||
+      all(all.vars(mapping$x) %in% all.vars(mapping$color)) ||
+      all(all.vars(mapping$x) %in% all.vars(mapping$shape))
+  )
+  if (need_alt_x) {
+    is_x <- which(names(mapping)=="x")
+    first_not_x <- seq_along(mapping)[-c(1,is_x)][1]
+    new_fml <- mapping
+    names(new_fml)[c(is_x, first_not_x)] <- names(mapping)[c(first_not_x,is_x)]
+    aes_list <- list(mapping, new_fml)
+  } else {
+    aes_list <- list(mapping)
+  }
+  aes_list
+}
+  
+aes_caption <- function(ae) {
+  ae <- ae[intersect(c("colour","shape"), names(ae))]
+  paste0(names(ae), as.character(ae), collapse=",")
 }

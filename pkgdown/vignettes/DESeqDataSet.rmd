@@ -1,0 +1,94 @@
+---
+title: Starting from a DESeqDataSet object
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Starting from a DESeqDataSet object}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+author: Gavin Kelly
+---
+
+Occasionally we may want to run just the differential part of the
+analysis for a pre-processed dataset that already exists as an R
+object. Here, we describe the easiest way to this, assuming we have a
+spec-file and either an rds or rda R object that contains the raw
+counts and metadata as a `DESeq2::DESeqDataSet` object.
+
+The objective is to create a folder containing the scripts and
+resources usually provided by the `differential` folder of the whole
+pipeline. Navigate to the directory in which you want to carry out the
+analysis: probably initially empty to avoid over-writing any previous
+preexisting content.  Then, in that directory, create a script (I call
+it `isolated.sh`) with the following contents:
+
+```{bash, eval=FALSE}
+# `label can be anything, but ideally reflects/distinguishes the way
+# the counts were arrived at (e.g. we typically use something like
+# label=GRCh38)
+label=preprocessed
+
+if [ -d ../docs ] || [ -d ../ingress ] || [ -d ../nfcore ]; then
+    echo "This directory has siblings that will confuse the 'isolation'"
+    exit -1
+fi
+
+if [ ! -d .git ]; then 
+    git init
+    git commit --allow-empty -m "Create empty repository"
+    echo "Created an empty git repo just for this directory"
+else
+    echo "There's an existing git repo. There's a possibility that the pipeline will add commits to it, so maybe starting in a fresh subdirectory if that worries you."
+fi
+
+
+tar -xzf /nemo/stp/babs/working/bioinformatics/templates/rnaseq.tar.gz --strip=2 babs/differential
+echo "Copied over the differential logic from the template"
+
+
+tar -xzf /nemo/stp/babs/working/bioinformatics/templates/rnaseq.tar.gz --strip=1 -C resources/make/ babs/{shared,secret}.mk
+echo "Copied over the shared logic from the template"
+
+mkdir -p extdata
+
+touch extdata/analyse.spec # or any other spec file
+echo "Please check the spec-file in the extdata/ folder"
+
+# the config file is the sentinel that informs the analysis of the
+# label, so there must be one *.config file:
+[ -f extdata/${label}.config ] || echo "org.db=org.Hs.eg.db" > extdata/${label}.config
+echo "Please check the extdata/${label}.config file, particularly the org.db setting."
+
+# Now we need to make up for the lack of counts in ../nfcore, which is the usual way of receiving the quantified results.
+# Instead, one of the following should be true
+found=false
+[ -f extdata/${label}.rda ] && echo "You have chosen to supply an rda file that contains at least one DESeqDataSet object (we'll use the 'first')" && found=true
+[ -f extdata/${label}.rds ] && echo "You have chosen to supply a DESeqDataSet in the form of an rds file" && found=true
+[ -f extdata/${label}.csv ] && echo "You have chosen to supply a csv containing the experiment table, which will have random counts assigned to 1000 arbitrary genes for simulation purposes" && found=true
+[ -d extdata/genes.results/${label}/ ] && echo "You have chosed to supply the genes.results files in the appropriate directory" && found=true
+
+[ ${found} = true ] || echo "You haven't supplied any of extdata/${label}.{rda,rds,csv} or extdata/genes.results/${label} - look inside the script you just ran to get some hints"
+
+
+
+# They're taken in that order - eg don't have an rda file if you want it to recognise the extdata/genes.results files.
+```
+
+
+Having created a script in your new empty folder, with these contents,
+make it executable. Take a look through the script to ensure you
+understand and agree with it's logic, modifying any options
+hightlighted in the comments, and then execute it - this will create a
+minimal set of files necessary to run the differential part of the
+analysis.
+
+Then into `extdata/` (which gets created by the script), you need to
+place a `*.spec` file.  Also in there, you’ll want to put an rda/rds
+object with your DESeq2DataSet object (needs to have to coldata etc
+set).  You’ll need to name that object file something like
+‘extdata/preprocessed.rd{a,s}’ – if you look at the script above you’ll see
+that ‘preprocessed’ is a default label, but you can customise that in
+the script.
+
+Once you’ve done that (got x.config, x.rda or x.rds and y.spec all in
+./extdata) a `make run` should do everything required.  It’s all a lot
+easier than comes across writing it down long-hand.

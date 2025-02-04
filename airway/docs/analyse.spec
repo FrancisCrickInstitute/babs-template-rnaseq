@@ -13,6 +13,11 @@ modifying effect (of treatment type on the response to line, or vice versa) will
 this behaviour will tend not to be selected.  There is no replication (ie no line x treatment combination has more than one sample,
 so we have to restrict our model to at most this complexity.",
                     design = ~ treatment + cellLine,
+		    profile_plots=list(
+			aes(x=cellLine, colour=treatment, group=treatment) ~ .,
+			aes(x=cellLine, colour=treatment, group=treatment) ~ . - treatment,
+			aes(x=cellLine, colour=treatment, group=treatment) ~ . - cellLine,			
+		    ),
                     comparisons = list(
                         mult_comp( revpairwise ~ treatment ),
                         mult_comp( revpairwise ~ cellLine )

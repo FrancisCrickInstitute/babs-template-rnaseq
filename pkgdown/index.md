@@ -29,4 +29,7 @@ documentation, and they'll be covered on this site:
   wanting to develop extra template functionality will want to start
   [here](articles/pipeline-infrastructure.html).
   
-
+- How to apply the methodology to an existing DESeqDataSet object, so
+  that we can use the functionality of a spec file with preprocessed
+  data more easily. [This documentation](articles/DESeqDataSet.html)
+  is work-in-progress.
