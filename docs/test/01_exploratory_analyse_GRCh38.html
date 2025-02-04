@@ -6,7 +6,6 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="author" content="Gavin Kelly">
 <meta name="description" content="Exploratory analysis of GRCh38-aligned data according to plan ‘analyse’">
 
 <title>Analysis results - Exploratory analysis GRCh38 analyse</title>
@@ -174,12 +173,27 @@ ul.task-list li input[type="checkbox"] {
   </ul></li>
   <li><a href="#dataset-d1---all-1" id="toc-dataset-d1---all-1" class="nav-link" data-scroll-target="#dataset-d1---all-1"><span class="header-section-number">5</span> Dataset D1 - All</a>
   <ul class="collapse">
-  <li><a href="#overall-heatmap-of-variable-genes-in-all" id="toc-overall-heatmap-of-variable-genes-in-all" class="nav-link" data-scroll-target="#overall-heatmap-of-variable-genes-in-all"><span class="header-section-number">5.1</span> Overall Heatmap of Variable Genes in All</a></li>
-  <li><a href="#focussed-heatmaps-1" id="toc-focussed-heatmaps-1" class="nav-link" data-scroll-target="#focussed-heatmaps-1"><span class="header-section-number">5.2</span> Focussed Heatmaps</a></li>
-  <li><a href="#principal-component-scatterplots-of-pcs-1-and-2-coloured-by-covariate" id="toc-principal-component-scatterplots-of-pcs-1-and-2-coloured-by-covariate" class="nav-link" data-scroll-target="#principal-component-scatterplots-of-pcs-1-and-2-coloured-by-covariate"><span class="header-section-number">5.3</span> Principal Component Scatterplots of PCs 1 and 2 coloured by covariate</a></li>
-  <li><a href="#focussed-principal-component-scatterplots-of-pcs-1-and-2-coloured-by-covariate" id="toc-focussed-principal-component-scatterplots-of-pcs-1-and-2-coloured-by-covariate" class="nav-link" data-scroll-target="#focussed-principal-component-scatterplots-of-pcs-1-and-2-coloured-by-covariate"><span class="header-section-number">5.4</span> Focussed Principal Component Scatterplots of PCs 1 and 2 coloured by covariate</a></li>
-  <li><a href="#pc-covariate-associations" id="toc-pc-covariate-associations" class="nav-link" data-scroll-target="#pc-covariate-associations"><span class="header-section-number">5.5</span> PC-Covariate Associations</a></li>
-  <li><a href="#partial-residuals-of-associated-pcs-1" id="toc-partial-residuals-of-associated-pcs-1" class="nav-link" data-scroll-target="#partial-residuals-of-associated-pcs-1"><span class="header-section-number">5.6</span> Partial Residuals of Associated PCs 1</a></li>
+  <li><a href="#model-m1---simple-1" id="toc-model-m1---simple-1" class="nav-link" data-scroll-target="#model-m1---simple-1"><span class="header-section-number">5.1</span> Model M1 - Simple</a>
+  <ul class="collapse">
+  <li><a href="#overall-heatmap-of-variable-genes-in-dataset-d1" id="toc-overall-heatmap-of-variable-genes-in-dataset-d1" class="nav-link" data-scroll-target="#overall-heatmap-of-variable-genes-in-dataset-d1"><span class="header-section-number">5.1.1</span> Overall Heatmap of Variable Genes in dataset ‘D1’</a></li>
+  <li><a href="#focussed-heatmaps-1" id="toc-focussed-heatmaps-1" class="nav-link" data-scroll-target="#focussed-heatmaps-1"><span class="header-section-number">5.1.2</span> Focussed Heatmaps</a></li>
+  <li><a href="#pc-covariate-associations" id="toc-pc-covariate-associations" class="nav-link" data-scroll-target="#pc-covariate-associations"><span class="header-section-number">5.1.3</span> PC-Covariate Associations</a></li>
+  <li><a href="#principal-component-scatterplots-of-pcs-1-and-2" id="toc-principal-component-scatterplots-of-pcs-1-and-2" class="nav-link" data-scroll-target="#principal-component-scatterplots-of-pcs-1-and-2"><span class="header-section-number">5.1.4</span> Principal Component Scatterplots of PCs 1 and 2</a></li>
+  <li><a href="#focussed-principal-component-scatterplots-of-pcs-1-and-2" id="toc-focussed-principal-component-scatterplots-of-pcs-1-and-2" class="nav-link" data-scroll-target="#focussed-principal-component-scatterplots-of-pcs-1-and-2"><span class="header-section-number">5.1.5</span> Focussed Principal Component Scatterplots of PCs 1 and 2</a></li>
+  <li><a href="#partial-residuals-of-associated-pcs" id="toc-partial-residuals-of-associated-pcs" class="nav-link" data-scroll-target="#partial-residuals-of-associated-pcs"><span class="header-section-number">5.1.6</span> Partial Residuals of Associated PCs</a></li>
+  </ul></li>
+  <li><a href="#model-m2---line-only-1" id="toc-model-m2---line-only-1" class="nav-link" data-scroll-target="#model-m2---line-only-1"><span class="header-section-number">5.2</span> Model M2 - Line-only</a>
+  <ul class="collapse">
+  <li><a href="#overall-heatmap-of-variable-genes-in-dataset-d1-1" id="toc-overall-heatmap-of-variable-genes-in-dataset-d1-1" class="nav-link" data-scroll-target="#overall-heatmap-of-variable-genes-in-dataset-d1-1"><span class="header-section-number">5.2.1</span> Overall Heatmap of Variable Genes in dataset ‘D1’</a></li>
+  <li><a href="#pc-covariate-associations-1" id="toc-pc-covariate-associations-1" class="nav-link" data-scroll-target="#pc-covariate-associations-1"><span class="header-section-number">5.2.2</span> PC-Covariate Associations</a></li>
+  <li><a href="#principal-component-scatterplots-of-pcs-1-and-2-1" id="toc-principal-component-scatterplots-of-pcs-1-and-2-1" class="nav-link" data-scroll-target="#principal-component-scatterplots-of-pcs-1-and-2-1"><span class="header-section-number">5.2.3</span> Principal Component Scatterplots of PCs 1 and 2</a></li>
+  </ul></li>
+  <li><a href="#model-m3---treatment-only-1" id="toc-model-m3---treatment-only-1" class="nav-link" data-scroll-target="#model-m3---treatment-only-1"><span class="header-section-number">5.3</span> Model M3 - Treatment-only</a>
+  <ul class="collapse">
+  <li><a href="#overall-heatmap-of-variable-genes-in-dataset-d1-2" id="toc-overall-heatmap-of-variable-genes-in-dataset-d1-2" class="nav-link" data-scroll-target="#overall-heatmap-of-variable-genes-in-dataset-d1-2"><span class="header-section-number">5.3.1</span> Overall Heatmap of Variable Genes in dataset ‘D1’</a></li>
+  <li><a href="#pc-covariate-associations-2" id="toc-pc-covariate-associations-2" class="nav-link" data-scroll-target="#pc-covariate-associations-2"><span class="header-section-number">5.3.2</span> PC-Covariate Associations</a></li>
+  <li><a href="#principal-component-scatterplots-of-pcs-1-and-2-2" id="toc-principal-component-scatterplots-of-pcs-1-and-2-2" class="nav-link" data-scroll-target="#principal-component-scatterplots-of-pcs-1-and-2-2"><span class="header-section-number">5.3.3</span> Principal Component Scatterplots of PCs 1 and 2</a></li>
+  </ul></li>
   </ul></li>
   <li><a href="#terms-of-use" id="toc-terms-of-use" class="nav-link" data-scroll-target="#terms-of-use"><span class="header-section-number">6</span> Terms Of Use</a></li>
   </ul>
@@ -204,23 +218,10 @@ ul.task-list li input[type="checkbox"] {
   </div>
 </div>
 
-<div class="quarto-title-meta-author">
-  <div class="quarto-title-meta-heading">Author</div>
-  <div class="quarto-title-meta-heading">Affiliation</div>
-  
-    <div class="quarto-title-meta-contents">
-    <p class="author">Gavin Kelly </p>
-  </div>
-    <div class="quarto-title-meta-contents">
-        <p class="affiliation">
-            BABS - Francis Crick Institute
-          </p>
-      </div>
-    </div>
 
 <div class="quarto-title-meta">
 
-      
+    
   
     
   </div>
@@ -674,6 +675,15 @@ ul.task-list li input[type="checkbox"] {
 #ydgabwknrs .gt_indent_5 {
   text-indent: 25px;
 }
+
+#ydgabwknrs .katex-display {
+  display: inline-flex !important;
+  margin-bottom: 0.75em !important;
+}
+
+#ydgabwknrs div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+  height: 0px !important;
+}
 </style>
 <table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false"><caption>Table&nbsp;1:  <p>Context</p> </caption>
   <thead>
@@ -690,7 +700,7 @@ ul.task-list li input[type="checkbox"] {
     <tr><td headers="Setting" class="gt_row gt_left">VERSION</td>
 <td headers="Value" class="gt_row gt_left">v9.9.9</td></tr>
     <tr><td headers="Setting" class="gt_row gt_left">TAG</td>
-<td headers="Value" class="gt_row gt_left">_v9.9.9-2-gd5f1192_altered</td></tr>
+<td headers="Value" class="gt_row gt_left">_v9.9.9-1-g7fb8dbe</td></tr>
     <tr><td headers="Setting" class="gt_row gt_left">staging_dir</td>
 <td headers="Value" class="gt_row gt_left">staging</td></tr>
     <tr><td headers="Setting" class="gt_row gt_left">file_col</td>
@@ -744,6 +754,8 @@ ul.task-list li input[type="checkbox"] {
 <td headers="Value" class="gt_row gt_left" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: left;" valign="middle" align="left">1</td></tr>
     <tr style="border-style: none;"><td headers="Option" class="gt_row gt_left" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: left;" valign="middle" align="left">filterFun</td>
 <td headers="Value" class="gt_row gt_left" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: left;" valign="middle" align="left">NULL</td></tr>
+    <tr style="border-style: none;"><td headers="Option" class="gt_row gt_left" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: left;" valign="middle" align="left">gene_clust</td>
+<td headers="Value" class="gt_row gt_left" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: left;" valign="middle" align="left">12</td></tr>
     <tr style="border-style: none;"><td headers="Option" class="gt_row gt_left" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: left;" valign="middle" align="left">clustering_distance_rows</td>
 <td headers="Value" class="gt_row gt_left" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: left;" valign="middle" align="left">"euclidean"</td></tr>
     <tr style="border-style: none;"><td headers="Option" class="gt_row gt_left" style="border-style: none; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; text-align: left;" valign="middle" align="left">clustering_distance_columns</td>
@@ -794,17 +806,17 @@ Setting analysis parameter
   <thead style="border-style: none;">
     <tr class="gt_col_headings gt_spanner_row" style="border-style: none; border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; border-bottom-style: hidden;">
       <th class="gt_center gt_columns_top_border gt_column_spanner_outer" rowspan="1" colspan="3" scope="colgroup" id="Metadata" style="border-style: none; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; padding-top: 0; padding-bottom: 0; padding-right: 4px; text-align: center; padding-left: 0;" bgcolor="#FFFFFF" align="center">
-        <span class="gt_column_spanner" style="border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; vertical-align: bottom; padding-top: 5px; padding-bottom: 5px; overflow-x: hidden; display: inline-block; width: 100%;">Metadata</span>
+        <div class="gt_column_spanner" style="border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; vertical-align: bottom; padding-top: 5px; padding-bottom: 5px; overflow-x: hidden; display: inline-block; width: 100%;">Metadata</div>
       </th>
       <th class="gt_center gt_columns_top_border gt_column_spanner_outer" rowspan="1" colspan="1" scope="col" id="D1" style="border-style: none; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; padding-top: 0; padding-bottom: 0; padding-left: 4px; text-align: center; padding-right: 0;" bgcolor="#FFFFFF" align="center">
-        <span class="gt_column_spanner" style="border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; vertical-align: bottom; padding-top: 5px; padding-bottom: 5px; overflow-x: hidden; display: inline-block; width: 100%;">D1</span>
+        <div class="gt_column_spanner" style="border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; vertical-align: bottom; padding-top: 5px; padding-bottom: 5px; overflow-x: hidden; display: inline-block; width: 100%;">D1</div>
       </th>
     </tr>
     <tr class="gt_col_headings" style="border-style: none; border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3;">
-      <th class="gt_col_heading gt_columns_bottom_border gt_center" rowspan="1" colspan="1" scope="col" id="ID" style="border-style: none; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: bottom; padding-top: 5px; padding-bottom: 6px; padding-left: 5px; padding-right: 5px; overflow-x: hidden; text-align: center;" bgcolor="#FFFFFF" valign="bottom" align="center">ID</th>
-      <th class="gt_col_heading gt_columns_bottom_border gt_center" rowspan="1" colspan="1" scope="col" id="cellLine" style="border-style: none; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: bottom; padding-top: 5px; padding-bottom: 6px; padding-left: 5px; padding-right: 5px; overflow-x: hidden; text-align: center;" bgcolor="#FFFFFF" valign="bottom" align="center">cellLine</th>
-      <th class="gt_col_heading gt_columns_bottom_border gt_center" rowspan="1" colspan="1" scope="col" id="treatment" style="border-style: none; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: bottom; padding-top: 5px; padding-bottom: 6px; padding-left: 5px; padding-right: 5px; overflow-x: hidden; text-align: center;" bgcolor="#FFFFFF" valign="bottom" align="center">treatment</th>
-      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1" scope="col" id="D1" style="border-style: none; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: bottom; padding-top: 5px; padding-bottom: 6px; padding-left: 5px; padding-right: 5px; overflow-x: hidden; text-align: left;" bgcolor="#FFFFFF" valign="bottom" align="left">D1</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_center" rowspan="1" colspan="1" scope="col" id="a1" style="border-style: none; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: bottom; padding-top: 5px; padding-bottom: 6px; padding-left: 5px; padding-right: 5px; overflow-x: hidden; text-align: center;" bgcolor="#FFFFFF" valign="bottom" align="center">ID</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_center" rowspan="1" colspan="1" scope="col" id="a2" style="border-style: none; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: bottom; padding-top: 5px; padding-bottom: 6px; padding-left: 5px; padding-right: 5px; overflow-x: hidden; text-align: center;" bgcolor="#FFFFFF" valign="bottom" align="center">cellLine</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_center" rowspan="1" colspan="1" scope="col" id="a3" style="border-style: none; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: bottom; padding-top: 5px; padding-bottom: 6px; padding-left: 5px; padding-right: 5px; overflow-x: hidden; text-align: center;" bgcolor="#FFFFFF" valign="bottom" align="center">treatment</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1" scope="col" id="a4" style="border-style: none; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: bottom; padding-top: 5px; padding-bottom: 6px; padding-left: 5px; padding-right: 5px; overflow-x: hidden; text-align: left;" bgcolor="#FFFFFF" valign="bottom" align="left">D1</th>
     </tr>
   </thead>
   <tbody class="gt_table_body" style="border-style: none; border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3;">
@@ -887,19 +899,19 @@ Setting analysis parameter
 </section>
 <section id="principal-component-scatterplots" class="level2" data-number="4.2">
 <h2 data-number="4.2" class="anchored" data-anchor-id="principal-component-scatterplots"><span class="header-section-number">4.2</span> Principal Component Scatterplots</h2>
-<p>The come a series of scatter plots of the first two Principal Components - a way of summarising all the genes down to just two ‘metagenes’ that attempt to encapsulate the variability across the samples in as faithful way as possible. Each plot (e.g. <a href="#fig-color-1">Figure&nbsp;8</a>) takes the PCs from the unadjusted data, and colours them by each of your covariates/treatments in turn.</p>
+<p>The come a series of scatter plots of the first two Principal Components - a way of summarising all the genes down to just two ‘metagenes’ that attempt to encapsulate the variability across the samples in as faithful way as possible. Each plot (e.g. <a href="#fig-color-1">Figure&nbsp;9</a>) takes the PCs from the unadjusted data, and colours them by each of your covariates/treatments in turn.</p>
 </section>
 <section id="focussed-principal-component-scatterplots" class="level2" data-number="4.3">
 <h2 data-number="4.3" class="anchored" data-anchor-id="focussed-principal-component-scatterplots"><span class="header-section-number">4.3</span> Focussed Principal Component Scatterplots</h2>
-<p>Principal components, just like clusters in the heatmaps, can be driven by a dominant effect that might mask other important effects. So again we have the flexibility to remove systematic effects before recalculating the PCs such as in <a href="#fig-focus-1">Figure&nbsp;10</a> . which regress out (‘normalise away’) the effect of a set of covariates. This ‘realigns’ the principal components. We then colour by one of the experimental factors that hasn’t been regressed out, hopefully allowing its effect to emerge, or to diagnose which is causing the clustering. Again, the default is to regress out everything other than the effect being used to colour the plot, but that can (or maybe has been - read the legends to double check!) be customised.</p>
+<p>Principal components, just like clusters in the heatmaps, can be driven by a dominant effect that might mask other important effects. So again we have the flexibility to remove systematic effects before recalculating the PCs such as in <a href="#fig-focus-1">Figure&nbsp;11</a> . which regress out (‘normalise away’) the effect of a set of covariates. This ‘realigns’ the principal components. We then colour by one of the experimental factors that hasn’t been regressed out, hopefully allowing its effect to emerge, or to diagnose which is causing the clustering. Again, the default is to regress out everything other than the effect being used to colour the plot, but that can (or maybe has been - read the legends to double check!) be customised.</p>
 </section>
 <section id="pc-covariate-assocation" class="level2" data-number="4.4">
 <h2 data-number="4.4" class="anchored" data-anchor-id="pc-covariate-assocation"><span class="header-section-number">4.4</span> PC-Covariate assocation</h2>
-<p>We then revert to the PCA picture that is unadjusted for any covariates. In <a href="#fig-covar-1">Figure&nbsp;12</a> the columns explore the lower-order principal components (which although not providing a universally strong signal transcriptome wide, might still detect biology that is affecting a smaller subset of genes, or a reasonably large set of genes to a lesser extent than happens in the higher-order PCS). The rows represent the experimental factors we have recorded, and the depth of colour of the cell records the degree of ‘association’ that factor has with the give PC (and grey says there was no statistically significant association.) This being an automated report, we’ve had to make various compromises so please don’t read too much into this chart: it primarily guides which other plots we should generate to look at how samples associate with each other.</p>
+<p>We then revert to the PCA picture that is unadjusted for any covariates. In <a href="#fig-covar-1">Figure&nbsp;8</a> the columns explore the lower-order principal components (which although not providing a universally strong signal transcriptome wide, might still detect biology that is affecting a smaller subset of genes, or a reasonably large set of genes to a lesser extent than happens in the higher-order PCS). The rows represent the experimental factors we have recorded, and the depth of colour of the cell records the degree of ‘association’ that factor has with the give PC (and grey says there was no statistically significant association.) This being an automated report, we’ve had to make various compromises so please don’t read too much into this chart: it primarily guides which other plots we should generate to look at how samples associate with each other.</p>
 </section>
 <section id="partial-residuals-of-pcas" class="level2" data-number="4.5">
 <h2 data-number="4.5" class="anchored" data-anchor-id="partial-residuals-of-pcas"><span class="header-section-number">4.5</span> Partial Residuals of PCAs</h2>
-<p>We use that information to derive the remaining plots such as <a href="#fig-covariate-1">Figure&nbsp;13</a>, where we these components in the context of the various experimental factors, producing ‘partial residual plots’ of two selected PCs, being selected by the criteria of: ‘best’ being the PC most strongly associated with the experimental factor; ‘first’ being the highest-order PC associated with the experimental factor; and then resorting to the first and second PCs in the case where we haven’t already generated two plots. ‘Partial residual plots’ are effectively plots of the PC against the experimental factor, where once again we have ‘regressed out’ the effect of all <em>other</em> experimental factors at play.</p>
+<p>We use that information to derive the remaining plots such as <a href="#fig-covariate-1">Figure&nbsp;17</a>, where we these components in the context of the various experimental factors, producing ‘partial residual plots’ of two selected PCs, being selected by the criteria of: ‘best’ being the PC most strongly associated with the experimental factor; ‘first’ being the highest-order PC associated with the experimental factor; and then resorting to the first and second PCs in the case where we haven’t already generated two plots. ‘Partial residual plots’ are effectively plots of the PC against the experimental factor, where once again we have ‘regressed out’ the effect of all <em>other</em> experimental factors at play.</p>
 <div class="callout callout-style-default callout-note callout-titled" title="Setting analysis parameter">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -924,119 +936,250 @@ Setting analysis parameter
 <section id="dataset-d1---all-1" class="level1" data-number="5">
 <h1 data-number="5"><span class="header-section-number">5</span> Dataset D1 - All</h1>
 <p>All samples included</p>
+<section id="model-m1---simple-1" class="level2" data-number="5.1">
+<h2 data-number="5.1" class="anchored" data-anchor-id="model-m1---simple-1"><span class="header-section-number">5.1</span> Model M1 - Simple</h2>
+<p>Including treatment and line, so that we can look at either one of those effects while accounting for any systematic changes in the other. But no interaction, so when there is a modifying effect (of treatment type on the response to line, or vice versa) will be unaccounted for and genes exhibiting this behaviour will tend not to be selected. There is no replication (ie no line x treatment combination has more than one sample, so we have to restrict our model to at most this complexity.</p>
 <div id="fig-legend-D1-1" class="quarto-figure quarto-figure-center anchored">
 <figure class="figure">
-<p><img src="01_exploratory_analyse_GRCh38/fig-001-legend-D1-1_v9.9.9-2-gd5f1192_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
-<figcaption class="figure-caption">Figure&nbsp;1: <a href="01_exploratory_analyse_GRCh38/fig-001-legend-D1-1_v9.9.9-2-gd5f1192_altered.pdf">Metadata colour-codings for All</a></figcaption>
+<p><img src="01_exploratory_analyse_GRCh38/fig-001-legend-D1-1_v9.9.9-1-g7fb8dbe.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;1: <a href="01_exploratory_analyse_GRCh38/fig-001-legend-D1-1_v9.9.9-1-g7fb8dbe.pdf">Metadata colour-codings for dataset ‘D1’</a></figcaption>
 </figure>
 </div>
-<section id="overall-heatmap-of-variable-genes-in-all" class="level2" data-number="5.1">
-<h2 data-number="5.1" class="anchored" data-anchor-id="overall-heatmap-of-variable-genes-in-all"><span class="header-section-number">5.1</span> Overall Heatmap of Variable Genes in All</h2>
+<section id="overall-heatmap-of-variable-genes-in-dataset-d1" class="level3" data-number="5.1.1">
+<h3 data-number="5.1.1" class="anchored" data-anchor-id="overall-heatmap-of-variable-genes-in-dataset-d1"><span class="header-section-number">5.1.1</span> Overall Heatmap of Variable Genes in dataset ‘D1’</h3>
 <div id="fig-Heatmap-1" class="quarto-figure quarto-figure-center anchored">
 <figure class="figure">
-<p><img src="01_exploratory_analyse_GRCh38/fig-002-Heatmap-1_v9.9.9-2-gd5f1192_altered.png" class="preview-image img-fluid figure-img" style="width:100.0%"></p>
-<figcaption class="figure-caption">Figure&nbsp;2: <a href="01_exploratory_analyse_GRCh38/fig-002-Heatmap-1_v9.9.9-2-gd5f1192_altered.pdf">Heatmap of variable genes, All</a></figcaption>
+<p><img src="01_exploratory_analyse_GRCh38/fig-002-Heatmap-1_v9.9.9-1-g7fb8dbe.png" class="preview-image img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;2: <a href="01_exploratory_analyse_GRCh38/fig-002-Heatmap-1_v9.9.9-1-g7fb8dbe.pdf">Heatmap of variable genes in dataset ‘D1’</a></figcaption>
 </figure>
 </div>
 <hr>
 <div id="fig-SuperV-Heatmap-1" class="quarto-figure quarto-figure-center anchored">
 <figure class="figure">
-<p><img src="01_exploratory_analyse_GRCh38/fig-003-SuperV-Heatmap-1_v9.9.9-2-gd5f1192_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
-<figcaption class="figure-caption">Figure&nbsp;3: <a href="01_exploratory_analyse_GRCh38/fig-003-SuperV-Heatmap-1_v9.9.9-2-gd5f1192_altered.pdf">Supervised Heatmap of variable genes, All</a></figcaption>
+<p><img src="01_exploratory_analyse_GRCh38/fig-003-SuperV-Heatmap-1_v9.9.9-1-g7fb8dbe.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;3: <a href="01_exploratory_analyse_GRCh38/fig-003-SuperV-Heatmap-1_v9.9.9-1-g7fb8dbe.pdf">Supervised Heatmap of variable genes in dataset ‘D1’</a></figcaption>
 </figure>
 </div>
 <hr>
 <div id="fig-sampDist-1" class="quarto-figure quarto-figure-center anchored">
 <figure class="figure">
-<p><img src="01_exploratory_analyse_GRCh38/fig-004-sampDist-1_v9.9.9-2-gd5f1192_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
-<figcaption class="figure-caption">Figure&nbsp;4: <a href="01_exploratory_analyse_GRCh38/fig-004-sampDist-1_v9.9.9-2-gd5f1192_altered.pdf">Heatmap of sample distances, All</a></figcaption>
+<p><img src="01_exploratory_analyse_GRCh38/fig-004-sampDist-1_v9.9.9-1-g7fb8dbe.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;4: <a href="01_exploratory_analyse_GRCh38/fig-004-sampDist-1_v9.9.9-1-g7fb8dbe.pdf">Heatmap of sample distances in dataset ‘D1’</a></figcaption>
 </figure>
 </div>
 <hr>
 </section>
-<section id="focussed-heatmaps-1" class="level2" data-number="5.2">
-<h2 data-number="5.2" class="anchored" data-anchor-id="focussed-heatmaps-1"><span class="header-section-number">5.2</span> Focussed Heatmaps</h2>
+<section id="focussed-heatmaps-1" class="level3" data-number="5.1.2">
+<h3 data-number="5.1.2" class="anchored" data-anchor-id="focussed-heatmaps-1"><span class="header-section-number">5.1.2</span> Focussed Heatmaps</h3>
 <div id="fig-Heatmap-correct-1" class="quarto-figure quarto-figure-center anchored">
 <figure class="figure">
-<p><img src="01_exploratory_analyse_GRCh38/fig-005-Heatmap-correct-1_v9.9.9-2-gd5f1192_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
-<figcaption class="figure-caption">Figure&nbsp;5: <a href="01_exploratory_analyse_GRCh38/fig-005-Heatmap-correct-1_v9.9.9-2-gd5f1192_altered.pdf">In All having removed treatment, cellLine</a></figcaption>
+<p><img src="01_exploratory_analyse_GRCh38/fig-005-Heatmap-correct-1_v9.9.9-1-g7fb8dbe.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;5: <a href="01_exploratory_analyse_GRCh38/fig-005-Heatmap-correct-1_v9.9.9-1-g7fb8dbe.pdf">In dataset ‘D1’ having removed nothing</a></figcaption>
 </figure>
 </div>
 <hr>
 <div id="fig-Heatmap-correct-2" class="quarto-figure quarto-figure-center anchored">
 <figure class="figure">
-<p><img src="01_exploratory_analyse_GRCh38/fig-006-Heatmap-correct-2_v9.9.9-2-gd5f1192_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
-<figcaption class="figure-caption">Figure&nbsp;6: <a href="01_exploratory_analyse_GRCh38/fig-006-Heatmap-correct-2_v9.9.9-2-gd5f1192_altered.pdf">Split on treatment in All having removed treatment, cellLine</a></figcaption>
+<p><img src="01_exploratory_analyse_GRCh38/fig-006-Heatmap-correct-2_v9.9.9-1-g7fb8dbe.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;6: <a href="01_exploratory_analyse_GRCh38/fig-006-Heatmap-correct-2_v9.9.9-1-g7fb8dbe.pdf">In dataset ‘D1’ having removed treatment</a></figcaption>
 </figure>
 </div>
 <hr>
 <div id="fig-Heatmap-correct-3" class="quarto-figure quarto-figure-center anchored">
 <figure class="figure">
-<p><img src="01_exploratory_analyse_GRCh38/fig-007-Heatmap-correct-3_v9.9.9-2-gd5f1192_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
-<figcaption class="figure-caption">Figure&nbsp;7: <a href="01_exploratory_analyse_GRCh38/fig-007-Heatmap-correct-3_v9.9.9-2-gd5f1192_altered.pdf">Split on cellLine in All having removed treatment, cellLine</a></figcaption>
+<p><img src="01_exploratory_analyse_GRCh38/fig-007-Heatmap-correct-3_v9.9.9-1-g7fb8dbe.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;7: <a href="01_exploratory_analyse_GRCh38/fig-007-Heatmap-correct-3_v9.9.9-1-g7fb8dbe.pdf">In dataset ‘D1’ having removed cellLine</a></figcaption>
 </figure>
 </div>
 <hr>
 </section>
-<section id="principal-component-scatterplots-of-pcs-1-and-2-coloured-by-covariate" class="level2" data-number="5.3">
-<h2 data-number="5.3" class="anchored" data-anchor-id="principal-component-scatterplots-of-pcs-1-and-2-coloured-by-covariate"><span class="header-section-number">5.3</span> Principal Component Scatterplots of PCs 1 and 2 coloured by covariate</h2>
+<section id="pc-covariate-associations" class="level3" data-number="5.1.3">
+<h3 data-number="5.1.3" class="anchored" data-anchor-id="pc-covariate-associations"><span class="header-section-number">5.1.3</span> PC-Covariate Associations</h3>
+<div id="fig-covar-1" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="01_exploratory_analyse_GRCh38/fig-008-covar-1_v9.9.9-1-g7fb8dbe.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;8: <a href="01_exploratory_analyse_GRCh38/fig-008-covar-1_v9.9.9-1-g7fb8dbe.pdf">Covariate association in dataset ‘D1’</a></figcaption>
+</figure>
+</div>
+</section>
+<section id="principal-component-scatterplots-of-pcs-1-and-2" class="level3" data-number="5.1.4">
+<h3 data-number="5.1.4" class="anchored" data-anchor-id="principal-component-scatterplots-of-pcs-1-and-2"><span class="header-section-number">5.1.4</span> Principal Component Scatterplots of PCs 1 and 2</h3>
 <div id="fig-color-1" class="quarto-figure quarto-figure-center anchored">
 <figure class="figure">
-<p><img src="01_exploratory_analyse_GRCh38/fig-008-color-1_v9.9.9-2-gd5f1192_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
-<figcaption class="figure-caption">Figure&nbsp;8: <a href="01_exploratory_analyse_GRCh38/fig-008-color-1_v9.9.9-2-gd5f1192_altered.pdf">Annotated by treatment in All</a></figcaption>
+<p><img src="01_exploratory_analyse_GRCh38/fig-009-color-1_v9.9.9-1-g7fb8dbe.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;9: <a href="01_exploratory_analyse_GRCh38/fig-009-color-1_v9.9.9-1-g7fb8dbe.pdf">Annotated by colour~treatment in dataset ‘D1’</a></figcaption>
 </figure>
 </div>
 <hr>
 <div id="fig-color-2" class="quarto-figure quarto-figure-center anchored">
 <figure class="figure">
-<p><img src="01_exploratory_analyse_GRCh38/fig-009-color-2_v9.9.9-2-gd5f1192_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
-<figcaption class="figure-caption">Figure&nbsp;9: <a href="01_exploratory_analyse_GRCh38/fig-009-color-2_v9.9.9-2-gd5f1192_altered.pdf">Annotated by cellLine in All</a></figcaption>
+<p><img src="01_exploratory_analyse_GRCh38/fig-010-color-2_v9.9.9-1-g7fb8dbe.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;10: <a href="01_exploratory_analyse_GRCh38/fig-010-color-2_v9.9.9-1-g7fb8dbe.pdf">Annotated by colour~cellLine in dataset ‘D1’</a></figcaption>
 </figure>
 </div>
 <hr>
 </section>
-<section id="focussed-principal-component-scatterplots-of-pcs-1-and-2-coloured-by-covariate" class="level2" data-number="5.4">
-<h2 data-number="5.4" class="anchored" data-anchor-id="focussed-principal-component-scatterplots-of-pcs-1-and-2-coloured-by-covariate"><span class="header-section-number">5.4</span> Focussed Principal Component Scatterplots of PCs 1 and 2 coloured by covariate</h2>
+<section id="focussed-principal-component-scatterplots-of-pcs-1-and-2" class="level3" data-number="5.1.5">
+<h3 data-number="5.1.5" class="anchored" data-anchor-id="focussed-principal-component-scatterplots-of-pcs-1-and-2"><span class="header-section-number">5.1.5</span> Focussed Principal Component Scatterplots of PCs 1 and 2</h3>
 <div id="fig-focus-1" class="quarto-figure quarto-figure-center anchored">
 <figure class="figure">
-<p><img src="01_exploratory_analyse_GRCh38/fig-010-focus-1_v9.9.9-2-gd5f1192_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
-<figcaption class="figure-caption">Figure&nbsp;10: <a href="01_exploratory_analyse_GRCh38/fig-010-focus-1_v9.9.9-2-gd5f1192_altered.pdf">Annotated by treatment in All having removed treatment, cellLine</a></figcaption>
+<p><img src="01_exploratory_analyse_GRCh38/fig-011-focus-1_v9.9.9-1-g7fb8dbe.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;11: <a href="01_exploratory_analyse_GRCh38/fig-011-focus-1_v9.9.9-1-g7fb8dbe.pdf">Annotated by colour~treatment in dataset ‘D1’ having removed nothing</a></figcaption>
 </figure>
 </div>
 <hr>
 <div id="fig-focus-2" class="quarto-figure quarto-figure-center anchored">
 <figure class="figure">
-<p><img src="01_exploratory_analyse_GRCh38/fig-011-focus-2_v9.9.9-2-gd5f1192_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
-<figcaption class="figure-caption">Figure&nbsp;11: <a href="01_exploratory_analyse_GRCh38/fig-011-focus-2_v9.9.9-2-gd5f1192_altered.pdf">Annotated by cellLine in All having removed treatment, cellLine</a></figcaption>
+<p><img src="01_exploratory_analyse_GRCh38/fig-012-focus-2_v9.9.9-1-g7fb8dbe.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;12: <a href="01_exploratory_analyse_GRCh38/fig-012-focus-2_v9.9.9-1-g7fb8dbe.pdf">Annotated by colour~cellLine in dataset ‘D1’ having removed nothing</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-focus-3" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="01_exploratory_analyse_GRCh38/fig-013-focus-3_v9.9.9-1-g7fb8dbe.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;13: <a href="01_exploratory_analyse_GRCh38/fig-013-focus-3_v9.9.9-1-g7fb8dbe.pdf">Annotated by colour~treatment in dataset ‘D1’ having removed treatment</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-focus-4" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="01_exploratory_analyse_GRCh38/fig-014-focus-4_v9.9.9-1-g7fb8dbe.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;14: <a href="01_exploratory_analyse_GRCh38/fig-014-focus-4_v9.9.9-1-g7fb8dbe.pdf">Annotated by colour~cellLine in dataset ‘D1’ having removed treatment</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-focus-5" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="01_exploratory_analyse_GRCh38/fig-015-focus-5_v9.9.9-1-g7fb8dbe.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;15: <a href="01_exploratory_analyse_GRCh38/fig-015-focus-5_v9.9.9-1-g7fb8dbe.pdf">Annotated by colour~treatment in dataset ‘D1’ having removed cellLine</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-focus-6" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="01_exploratory_analyse_GRCh38/fig-016-focus-6_v9.9.9-1-g7fb8dbe.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;16: <a href="01_exploratory_analyse_GRCh38/fig-016-focus-6_v9.9.9-1-g7fb8dbe.pdf">Annotated by colour~cellLine in dataset ‘D1’ having removed cellLine</a></figcaption>
 </figure>
 </div>
 <hr>
 </section>
-<section id="pc-covariate-associations" class="level2" data-number="5.5">
-<h2 data-number="5.5" class="anchored" data-anchor-id="pc-covariate-associations"><span class="header-section-number">5.5</span> PC-Covariate Associations</h2>
-<div id="fig-covar-1" class="quarto-figure quarto-figure-center anchored">
-<figure class="figure">
-<p><img src="01_exploratory_analyse_GRCh38/fig-012-covar-1_v9.9.9-2-gd5f1192_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
-<figcaption class="figure-caption">Figure&nbsp;12: <a href="01_exploratory_analyse_GRCh38/fig-012-covar-1_v9.9.9-2-gd5f1192_altered.pdf">Covariate association in All</a></figcaption>
-</figure>
-</div>
-</section>
-<section id="partial-residuals-of-associated-pcs-1" class="level2" data-number="5.6">
-<h2 data-number="5.6" class="anchored" data-anchor-id="partial-residuals-of-associated-pcs-1"><span class="header-section-number">5.6</span> Partial Residuals of Associated PCs 1</h2>
+<section id="partial-residuals-of-associated-pcs" class="level3" data-number="5.1.6">
+<h3 data-number="5.1.6" class="anchored" data-anchor-id="partial-residuals-of-associated-pcs"><span class="header-section-number">5.1.6</span> Partial Residuals of Associated PCs</h3>
 <div id="fig-covariate-1" class="quarto-figure quarto-figure-center anchored">
 <figure class="figure">
-<p><img src="01_exploratory_analyse_GRCh38/fig-013-covariate-1_v9.9.9-2-gd5f1192_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
-<figcaption class="figure-caption">Figure&nbsp;13: <a href="01_exploratory_analyse_GRCh38/fig-013-covariate-1_v9.9.9-2-gd5f1192_altered.pdf">Against treatment in All</a></figcaption>
+<p><img src="01_exploratory_analyse_GRCh38/fig-017-covariate-1_v9.9.9-1-g7fb8dbe.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;17: <a href="01_exploratory_analyse_GRCh38/fig-017-covariate-1_v9.9.9-1-g7fb8dbe.pdf">Annotated by colour~treatment in dataset ‘D1’ having removed nothing</a></figcaption>
 </figure>
 </div>
 <hr>
 <div id="fig-covariate-2" class="quarto-figure quarto-figure-center anchored">
 <figure class="figure">
-<p><img src="01_exploratory_analyse_GRCh38/fig-014-covariate-2_v9.9.9-2-gd5f1192_altered.png" class="img-fluid figure-img" style="width:100.0%"></p>
-<figcaption class="figure-caption">Figure&nbsp;14: <a href="01_exploratory_analyse_GRCh38/fig-014-covariate-2_v9.9.9-2-gd5f1192_altered.pdf">Against cellLine in All</a></figcaption>
+<p><img src="01_exploratory_analyse_GRCh38/fig-018-covariate-2_v9.9.9-1-g7fb8dbe.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;18: <a href="01_exploratory_analyse_GRCh38/fig-018-covariate-2_v9.9.9-1-g7fb8dbe.pdf">Annotated by colour~treatment in dataset ‘D1’ having removed treatment</a></figcaption>
 </figure>
 </div>
 <hr>
+<div id="fig-covariate-3" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="01_exploratory_analyse_GRCh38/fig-019-covariate-3_v9.9.9-1-g7fb8dbe.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;19: <a href="01_exploratory_analyse_GRCh38/fig-019-covariate-3_v9.9.9-1-g7fb8dbe.pdf">Annotated by colour~treatment in dataset ‘D1’ having removed cellLine</a></figcaption>
+</figure>
+</div>
+<hr>
+</section>
+</section>
+<section id="model-m2---line-only-1" class="level2" data-number="5.2">
+<h2 data-number="5.2" class="anchored" data-anchor-id="model-m2---line-only-1"><span class="header-section-number">5.2</span> Model M2 - Line-only</h2>
+<p>Just including a line effect, and totally ignoring treatment. So any systematic treatment effect will not be accounted for, and genes exhibiting a change due to treatment will tend not to be selected</p>
+<div id="fig-legend-D1-2" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="01_exploratory_analyse_GRCh38/fig-020-legend-D1-2_v9.9.9-1-g7fb8dbe.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;20: <a href="01_exploratory_analyse_GRCh38/fig-020-legend-D1-2_v9.9.9-1-g7fb8dbe.pdf">Metadata colour-codings for dataset ‘D1’</a></figcaption>
+</figure>
+</div>
+<section id="overall-heatmap-of-variable-genes-in-dataset-d1-1" class="level3" data-number="5.2.1">
+<h3 data-number="5.2.1" class="anchored" data-anchor-id="overall-heatmap-of-variable-genes-in-dataset-d1-1"><span class="header-section-number">5.2.1</span> Overall Heatmap of Variable Genes in dataset ‘D1’</h3>
+<div id="fig-Heatmap-2" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="01_exploratory_analyse_GRCh38/fig-021-Heatmap-2_v9.9.9-1-g7fb8dbe.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;21: <a href="01_exploratory_analyse_GRCh38/fig-021-Heatmap-2_v9.9.9-1-g7fb8dbe.pdf">Heatmap of variable genes in dataset ‘D1’</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-SuperV-Heatmap-2" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="01_exploratory_analyse_GRCh38/fig-022-SuperV-Heatmap-2_v9.9.9-1-g7fb8dbe.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;22: <a href="01_exploratory_analyse_GRCh38/fig-022-SuperV-Heatmap-2_v9.9.9-1-g7fb8dbe.pdf">Supervised Heatmap of variable genes in dataset ‘D1’</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-sampDist-2" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="01_exploratory_analyse_GRCh38/fig-023-sampDist-2_v9.9.9-1-g7fb8dbe.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;23: <a href="01_exploratory_analyse_GRCh38/fig-023-sampDist-2_v9.9.9-1-g7fb8dbe.pdf">Heatmap of sample distances in dataset ‘D1’</a></figcaption>
+</figure>
+</div>
+<hr>
+</section>
+<section id="pc-covariate-associations-1" class="level3" data-number="5.2.2">
+<h3 data-number="5.2.2" class="anchored" data-anchor-id="pc-covariate-associations-1"><span class="header-section-number">5.2.2</span> PC-Covariate Associations</h3>
+<div id="fig-covar-2" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="01_exploratory_analyse_GRCh38/fig-024-covar-2_v9.9.9-1-g7fb8dbe.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;24: <a href="01_exploratory_analyse_GRCh38/fig-024-covar-2_v9.9.9-1-g7fb8dbe.pdf">Covariate association in dataset ‘D1’</a></figcaption>
+</figure>
+</div>
+</section>
+<section id="principal-component-scatterplots-of-pcs-1-and-2-1" class="level3" data-number="5.2.3">
+<h3 data-number="5.2.3" class="anchored" data-anchor-id="principal-component-scatterplots-of-pcs-1-and-2-1"><span class="header-section-number">5.2.3</span> Principal Component Scatterplots of PCs 1 and 2</h3>
+</section>
+</section>
+<section id="model-m3---treatment-only-1" class="level2" data-number="5.3">
+<h2 data-number="5.3" class="anchored" data-anchor-id="model-m3---treatment-only-1"><span class="header-section-number">5.3</span> Model M3 - Treatment-only</h2>
+<p>Just including a treatment effect, and totally ignoring treatment. So any systematic differences between lines will not be accounted for, and genes exhibiting a dependencey on line will tend not to be selected</p>
+<div id="fig-legend-D1-3" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="01_exploratory_analyse_GRCh38/fig-025-legend-D1-3_v9.9.9-1-g7fb8dbe.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;25: <a href="01_exploratory_analyse_GRCh38/fig-025-legend-D1-3_v9.9.9-1-g7fb8dbe.pdf">Metadata colour-codings for dataset ‘D1’</a></figcaption>
+</figure>
+</div>
+<section id="overall-heatmap-of-variable-genes-in-dataset-d1-2" class="level3" data-number="5.3.1">
+<h3 data-number="5.3.1" class="anchored" data-anchor-id="overall-heatmap-of-variable-genes-in-dataset-d1-2"><span class="header-section-number">5.3.1</span> Overall Heatmap of Variable Genes in dataset ‘D1’</h3>
+<div id="fig-Heatmap-3" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="01_exploratory_analyse_GRCh38/fig-026-Heatmap-3_v9.9.9-1-g7fb8dbe.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;26: <a href="01_exploratory_analyse_GRCh38/fig-026-Heatmap-3_v9.9.9-1-g7fb8dbe.pdf">Heatmap of variable genes in dataset ‘D1’</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-SuperV-Heatmap-3" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="01_exploratory_analyse_GRCh38/fig-027-SuperV-Heatmap-3_v9.9.9-1-g7fb8dbe.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;27: <a href="01_exploratory_analyse_GRCh38/fig-027-SuperV-Heatmap-3_v9.9.9-1-g7fb8dbe.pdf">Supervised Heatmap of variable genes in dataset ‘D1’</a></figcaption>
+</figure>
+</div>
+<hr>
+<div id="fig-sampDist-3" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="01_exploratory_analyse_GRCh38/fig-028-sampDist-3_v9.9.9-1-g7fb8dbe.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;28: <a href="01_exploratory_analyse_GRCh38/fig-028-sampDist-3_v9.9.9-1-g7fb8dbe.pdf">Heatmap of sample distances in dataset ‘D1’</a></figcaption>
+</figure>
+</div>
+<hr>
+</section>
+<section id="pc-covariate-associations-2" class="level3" data-number="5.3.2">
+<h3 data-number="5.3.2" class="anchored" data-anchor-id="pc-covariate-associations-2"><span class="header-section-number">5.3.2</span> PC-Covariate Associations</h3>
+<div id="fig-covar-3" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
+<p><img src="01_exploratory_analyse_GRCh38/fig-029-covar-3_v9.9.9-1-g7fb8dbe.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption class="figure-caption">Figure&nbsp;29: <a href="01_exploratory_analyse_GRCh38/fig-029-covar-3_v9.9.9-1-g7fb8dbe.pdf">Covariate association in dataset ‘D1’</a></figcaption>
+</figure>
+</div>
+</section>
+<section id="principal-component-scatterplots-of-pcs-1-and-2-2" class="level3" data-number="5.3.3">
+<h3 data-number="5.3.3" class="anchored" data-anchor-id="principal-component-scatterplots-of-pcs-1-and-2-2"><span class="header-section-number">5.3.3</span> Principal Component Scatterplots of PCs 1 and 2</h3>
+</section>
 </section>
 </section>
 <section id="terms-of-use" class="level1" data-number="6">

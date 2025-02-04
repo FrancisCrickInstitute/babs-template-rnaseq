@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RNASeq Template</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.13.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.18.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -34,7 +34,8 @@
 <li class="active nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="../articles/pipeline-infrastructure.html">The Pipeline</a></li>
+<li><a class="dropdown-item" href="../articles/DESeqDataSet.html">Starting from a DESeqDataSet object</a></li>
+    <li><a class="dropdown-item" href="../articles/pipeline-infrastructure.html">The Pipeline</a></li>
     <li><a class="dropdown-item" href="../articles/spec.html">Spec-files for differential analysis</a></li>
   </ul>
 </li>
@@ -130,7 +131,9 @@ retaining this sample. We can accomplish this easily:</p>
 <code class="sourceCode R"><span><span class="fu">specification</span><span class="op">(</span></span>
 <span>  sample_sets <span class="op">=</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span> </span>
 <span>    all <span class="op">=</span> <span class="fu">sample_set</span><span class="op">(</span></span>
-<span>      subset <span class="op">=</span> <span class="cn">TRUE</span></span>
+<span>      subset <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>      name<span class="op">=</span><span class="st">"All Samples"</span>,<span class="co"># an optional short name</span></span>
+<span>      description<span class="op">=</span><span class="st">"All samples included in the analysis"</span><span class="co"># an optional longer description</span></span>
 <span>    <span class="op">)</span>,</span>
 <span>    no_outlier<span class="op">=</span><span class="fu">sample_set</span><span class="op">(</span></span>
 <span>    subset <span class="op">=</span> <span class="va">sample_id</span> <span class="op">!=</span> <span class="st">"id_of_bad_sample"</span></span>
@@ -167,13 +170,60 @@ cohorts, but we can have a third set that still combines them:</p>
 <span></span>
 <span>  <span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>The conditions on which we subset must be defined in the experiment
-table. It is possible to transform some of the predictors (columns of
-<code>colData</code>) at this stage, which offers an alternative way of
-subsetting as well, but we will (describe this)[later]. For now we’ll
-look at the main analysis attribute of a sample set, namely the model
-we’ll use to estimate the expression in the various experimental
-conditions those samples were taken from:</p>
+<p>It’s possible for <code>sample_set</code>s to inherit subsets from
+the <code>specification</code> level. We discuss [this concept later
+on]{#cascade#}, but a simple example should suffice to illustrate how we
+can refine a ‘global’ subset:</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">specification</span><span class="op">(</span></span>
+<span>  subset <span class="op">=</span> <span class="op">!</span> <span class="va">sample_id</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"bad1"</span>,<span class="st">"bad2"</span><span class="op">)</span>, <span class="co"># get rid of two samples that failed qc</span></span>
+<span>  sample_sets <span class="op">=</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span> </span>
+<span>    all_good <span class="op">=</span> <span class="fu">sample_set</span><span class="op">(</span></span>
+<span>      <span class="va">...</span> <span class="co"># No need for a subset here</span></span>
+<span>    <span class="op">)</span>,</span>
+<span>    tumour<span class="op">=</span><span class="fu">sample_set</span><span class="op">(</span></span>
+<span>      subset <span class="op">=</span> <span class="va">condition</span> <span class="op">==</span> <span class="st">"tumour"</span> <span class="co"># this will get 'AND'ed with the top-level `subset`</span></span>
+<span>    <span class="op">)</span>,</span>
+<span>    normal<span class="op">=</span><span class="fu">sample_set</span><span class="op">(</span></span>
+<span>      subset <span class="op">=</span> <span class="va">condition</span> <span class="op">==</span> <span class="st">"normal"</span> <span class="co"># as will this.</span></span>
+<span>    <span class="op">)</span></span>
+<span></span>
+<span>  <span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>The conditions on which we <code>subset</code> must be defined in the
+experiment table. It is possible to transform some of the predictors
+(columns of <code>colData</code>) using the other main component of a
+<code>sample_set</code>, the <code>transform</code>:</p>
+<div class="section level4">
+<h4 id="transform">Transform<a class="anchor" aria-label="anchor" href="#transform"></a>
+</h4>
+<p>Each specification can have a single <code>transform</code> which is
+a <code>dplyr::mutate</code> clause, but with no need for the initial
+data object:</p>
+<pre><code>specification(
+    transform=mutate(
+               treatement=relevel(factor(treatment), "control"),
+               patient_id=factor(patient_id),
+           number_of_visits=table(patient_id)[as.character(patient_id)],
+           .include=number_of_visits&gt;1
+    ),...</code></pre>
+<p>Notice that we change/create various covariates within a single
+<code>mutate</code> - having multiple <code>transform</code>s is a
+mistake as only one will be applied. As mentioned above,
+<code>subset</code> only operates on covariates prior to the transform
+being applied - if we want to utilise <code>transform</code>ed
+covariates in the subset, the special covariate <code>.include</code>
+should be generated in the <code>transform</code>, and the colData will
+be post-processed to only include samples for which that variable is
+<code>TRUE</code>.</p>
+<p>Also, each <code>sample_set</code> can have it’s own
+<code>transform</code>. In this case, the individual
+<code>sample_set</code>’s version will take complete precedence: the
+global <code>transform</code> will not be applied at all to
+<code>sample_set</code>s with their own <code>transform</code>, and it
+will simply be used in <code>sample_set</code>s which don’t have their
+own <code>transform</code>.</p>
+</div>
 </div>
 <div class="section level3">
 <h3 id="models">Models<a class="anchor" aria-label="anchor" href="#models"></a>
@@ -196,7 +246,7 @@ won’t want to use up degrees of freedom (ie power) estimating it, but if
 it’s substantial then we want to make our estimates more precise by
 accounting for it. So we allow, in any given sample_set, for there to be
 multiple models:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">specification</span><span class="op">(</span></span>
 <span>  sample_sets <span class="op">=</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span> </span>
 <span>    all <span class="op">=</span> <span class="fu">sample_set</span><span class="op">(</span></span>
@@ -206,7 +256,9 @@ multiple models:</p>
 <span>          design <span class="op">=</span> <span class="op">~</span><span class="va">treatment</span> <span class="op">+</span> <span class="va">batch</span></span>
 <span>        <span class="op">)</span>,</span>
 <span>        powerful <span class="op">=</span> <span class="fu">model</span><span class="op">(</span></span>
-<span>          design <span class="op">=</span> <span class="op">~</span><span class="va">treatment</span></span>
+<span>          design <span class="op">=</span> <span class="op">~</span><span class="va">treatment</span>,</span>
+<span>      name <span class="op">=</span> <span class="st">"Just Treatment"</span>,</span>
+<span>      description <span class="op">=</span> <span class="st">"Account for treatment, ignore batch - if there is a batch effect it'll increase the noise, though"</span></span>
 <span>        <span class="op">)</span></span>
 <span>      <span class="op">)</span></span>
 <span>    <span class="op">)</span></span>
@@ -219,6 +271,43 @@ object. Once we have a model, we are then in a position to test the
 significance of contrasts (e.g. individual log fold-changes between
 conditions) and terms in the model (e.g whether batch effect is
 necessary or not):</p>
+<div class="section level4">
+<h4 id="universal-models">Universal models<a class="anchor" aria-label="anchor" href="#universal-models"></a>
+</h4>
+<p>Sometimes all/some models should apply to all
+<code>sample_sets</code> in a spec file. To save typing, it’s possible
+to elevate the models to the top-level within a
+<code>specification</code>, so for example:</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="fu">specification</span>(</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>  <span class="at">models =</span> <span class="fu">list</span>(</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>          <span class="at">powerful =</span> <span class="fu">model</span>(</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>          <span class="at">design =</span> <span class="sc">~</span>treatment</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>        )</span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>  ),</span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>  <span class="at">sample_sets =</span><span class="fu">list</span>( </span>
+<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a>    <span class="at">all =</span> <span class="fu">sample_set</span>(</span>
+<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a>      <span class="at">subset =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a>      <span class="at">models =</span> <span class="fu">list</span>(</span>
+<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a>        <span class="at">accurate =</span> <span class="fu">model</span>(</span>
+<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a>          <span class="at">design =</span> <span class="sc">~</span>treatment <span class="sc">+</span> batch</span>
+<span id="cb8-13"><a href="#cb8-13" tabindex="-1"></a>        ),</span>
+<span id="cb8-14"><a href="#cb8-14" tabindex="-1"></a>      )</span>
+<span id="cb8-15"><a href="#cb8-15" tabindex="-1"></a>    ),</span>
+<span id="cb8-16"><a href="#cb8-16" tabindex="-1"></a>    <span class="at">batch1 =</span> <span class="fu">sample_set</span>(</span>
+<span id="cb8-17"><a href="#cb8-17" tabindex="-1"></a>      <span class="at">subset =</span> batch<span class="sc">==</span><span class="st">"B1"</span></span>
+<span id="cb8-18"><a href="#cb8-18" tabindex="-1"></a>      )</span>
+<span id="cb8-19"><a href="#cb8-19" tabindex="-1"></a>    )    </span>
+<span id="cb8-20"><a href="#cb8-20" tabindex="-1"></a>  )</span>
+<span id="cb8-21"><a href="#cb8-21" tabindex="-1"></a><span class="er">)</span></span></code></pre></div>
+<p>will result in the <code>all</code> dataset having two models (the
+universal one from the top of the spec file, and a specific one),
+whereas the <code>batch</code> dataset will have only the universal
+one.</p>
+<p>There are other similar patterns for other parts of the spec file,
+that certain properties ‘cascade’ down to other parts of the hierarchy -
+see the <span id="cascade">this section</span> for a list of
+behaviours.</p>
+</div>
 </div>
 <div class="section level3">
 <h3 id="comparisons">Comparisons<a class="anchor" aria-label="anchor" href="#comparisons"></a>
@@ -227,25 +316,26 @@ necessary or not):</p>
 supported, and again as ‘comparisons’ is plural, we can have a list of
 them, and have the pipeline loop through all of them for the parent
 model:</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="fu">specification</span>(</span>
-<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  <span class="at">sample_sets =</span><span class="fu">list</span>( </span>
-<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>    <span class="at">all =</span> <span class="fu">sample_set</span>(</span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>      <span class="at">subset =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>      <span class="at">models =</span> <span class="fu">list</span>(</span>
-<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>        <span class="at">accurate =</span> <span class="fu">model</span>(</span>
-<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>          <span class="at">design =</span> <span class="sc">~</span>treatment <span class="sc">+</span> batch,</span>
-<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>          <span class="at">comparisons =</span> <span class="fu">list</span>(</span>
-<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a>            <span class="at">comp1 =</span> <span class="st">"treat_vs_ctrl"</span>,</span>
-<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a>            <span class="at">comp2 =</span> <span class="fu">c</span>(<span class="st">"treatment"</span>, <span class="st">"treat"</span>, <span class="st">"ctrl"</span>),</span>
-<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a>            <span class="at">comp3 =</span> <span class="fu">list</span>(<span class="fu">c</span>(<span class="st">"treat_vs_ctrl"</span>), <span class="fu">c</span>(<span class="st">"vehicle_vs_ctrl"</span>), <span class="at">listValues=</span><span class="fu">c</span>(<span class="dv">1</span>,<span class="sc">-</span><span class="dv">1</span>))</span>
-<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a>            <span class="at">comp4 =</span> <span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">0</span>,<span class="sc">-</span><span class="fl">0.5</span>,<span class="sc">-</span><span class="fl">0.5</span>),</span>
-<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a>            <span class="at">comp5 =</span> <span class="sc">~</span>batch</span>
-<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a>          )</span>
-<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a>        )</span>
-<span id="cb6-16"><a href="#cb6-16" tabindex="-1"></a>      )</span>
-<span id="cb6-17"><a href="#cb6-17" tabindex="-1"></a>    )</span>
-<span id="cb6-18"><a href="#cb6-18" tabindex="-1"></a>  )</span>
-<span id="cb6-19"><a href="#cb6-19" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="fu">specification</span>(</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>  <span class="at">sample_sets =</span><span class="fu">list</span>( </span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>    <span class="at">all =</span> <span class="fu">sample_set</span>(</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>      <span class="at">subset =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>      <span class="at">models =</span> <span class="fu">list</span>(</span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>        <span class="at">accurate =</span> <span class="fu">model</span>(</span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a>          <span class="at">design =</span> <span class="sc">~</span>treatment <span class="sc">+</span> batch,</span>
+<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a>          <span class="at">comparisons =</span> <span class="fu">list</span>(</span>
+<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a>            <span class="at">comp1 =</span> <span class="st">"treat_vs_ctrl"</span>,</span>
+<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a>            <span class="at">comp2 =</span> <span class="fu">c</span>(<span class="st">"treatment"</span>, <span class="st">"treat"</span>, <span class="st">"ctrl"</span>),</span>
+<span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a>            <span class="at">comp3 =</span> <span class="fu">list</span>(<span class="fu">c</span>(<span class="st">"treat_vs_ctrl"</span>), <span class="fu">c</span>(<span class="st">"vehicle_vs_ctrl"</span>), <span class="at">listValues=</span><span class="fu">c</span>(<span class="dv">1</span>,<span class="sc">-</span><span class="dv">1</span>))</span>
+<span id="cb9-12"><a href="#cb9-12" tabindex="-1"></a>            <span class="at">comp4 =</span> <span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">0</span>,<span class="sc">-</span><span class="fl">0.5</span>,<span class="sc">-</span><span class="fl">0.5</span>),</span>
+<span id="cb9-13"><a href="#cb9-13" tabindex="-1"></a>            <span class="at">comp5 =</span> <span class="sc">~</span>batch,</span>
+<span id="cb9-14"><a href="#cb9-14" tabindex="-1"></a>        <span class="at">comp6 =</span> <span class="fu">comparison</span>(<span class="fu">c</span>(<span class="st">"treatment"</span>, <span class="st">"treat"</span>, <span class="st">"ctrl"</span>), <span class="at">name=</span><span class="st">"Treat-control"</span>, <span class="at">description=</span><span class="st">"Treatment vs Control"</span>)</span>
+<span id="cb9-15"><a href="#cb9-15" tabindex="-1"></a>          )</span>
+<span id="cb9-16"><a href="#cb9-16" tabindex="-1"></a>        )</span>
+<span id="cb9-17"><a href="#cb9-17" tabindex="-1"></a>      )</span>
+<span id="cb9-18"><a href="#cb9-18" tabindex="-1"></a>    )</span>
+<span id="cb9-19"><a href="#cb9-19" tabindex="-1"></a>  )</span>
+<span id="cb9-20"><a href="#cb9-20" tabindex="-1"></a>)</span></code></pre></div>
 <p>So all of the traditional ways of specifying a contrast are
 represented, respectively:</p>
 <ul>
@@ -258,9 +348,11 @@ denominator (with possible <code>listValues</code> set)</p></li>
 <li><p>A formula specifying the <code>reduced</code> term for carrying
 out Anova via a likelihood ratio test.</p></li>
 </ul>
-<p>You are referred to the DESeq2 reference manual for further details,
-but one advantage of our wrapper is that it allows a simple enumeration
-of complex comparisons using machinery from the <code>emmeans</code>
+<p>You are referred to the DESeq2 reference manual for further details.
+They can also be wrapped in a <code>comparison</code> call, to add extra
+information about the comparison, that might get used in the report. But
+one advantage of our wrapper is that it allows a simple enumeration of
+complex comparisons using machinery from the <code>emmeans</code>
 package:</p>
 <div class="section level4">
 <h4 id="automatic-comparison-enumeration">Automatic comparison enumeration<a class="anchor" aria-label="anchor" href="#automatic-comparison-enumeration"></a>
@@ -272,7 +364,7 @@ regimes, and a control, so treatment={<em>control</em>,
 <em>vehicle</em>, <em>standard</em>, <em>novel_treatment</em>}, and we
 wanted to compare everything to <em>control</em>, then we’d need to
 hand-write three comparisons. Instead we can now write</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">specification</span><span class="op">(</span></span>
 <span>  sample_sets <span class="op">=</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span> </span>
 <span>    all <span class="op">=</span> <span class="fu">sample_set</span><span class="op">(</span></span>
@@ -331,6 +423,21 @@ groups that have now been pooled.</p>
 everything we’d ever need, as for example the difference between
 ‘novel_treatment’ and ‘control’ is by construction (of the model
 formula) independent of which batch we’re in.</p>
+<p>The <em>keywords</em> are inherited from the <a href="https://rvlenth.github.io/emmeans/articles/AQuickStart.html" class="external-link">emmeans
+package</a>, so that is a good place for extra background material on
+their meaning.</p>
+<p>One thing to note is that <code>emmeans</code> has a different way of
+handling continuous covariates, so to specifiy a test of difference of
+slopes, it’s necessary to request that functionality by providing a
+<code>var</code> argument to the <code>mult_comp</code> call, e.g.:</p>
+<pre><code><span><span class="va">...</span></span>
+<span><span class="co">#design= ~ Infection * time + Participant_in_infection:infection</span></span>
+<span><span class="fu"><a href="../reference/mult_comp.html">mult_comp</a></span><span class="op">(</span><span class="va">revpairwise</span> <span class="op">~</span> <span class="va">Infection</span>, var<span class="op">=</span><span class="st">"time"</span><span class="op">)</span></span></code></pre>
+<p>is the correct formulation within the <code>mult_comp</code>
+framework to estimate the per-participant rate of change of expression
+over <code>time</code>, and then see if that differs between pairs of
+groups of patients that are distinguished by their
+<code>Infection</code> .</p>
 </div>
 <div class="section level4">
 <h4 id="interaction-terms">Interaction terms<a class="anchor" aria-label="anchor" href="#interaction-terms"></a>
@@ -348,22 +455,22 @@ genes are responding to treatment in the WT; which genes are
 differential between WT and KO in the untreated. These are all questions
 of the first type, and we can automatically generate their contrasts
 by:</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="fu">specification</span>(</span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>  <span class="at">sample_sets =</span><span class="fu">list</span>( </span>
-<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>    <span class="at">all =</span> <span class="fu">sample_set</span>(</span>
-<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>      <span class="at">subset =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>      <span class="at">models =</span> <span class="fu">list</span>(</span>
-<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>        <span class="at">accurate =</span> <span class="fu">model</span>(</span>
-<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>          <span class="at">design =</span> <span class="sc">~</span>treatment <span class="sc">*</span>  genotype,</span>
-<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a>          <span class="at">comparisons =</span> <span class="fu">list</span>(</span>
-<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a>            <span class="fu">mult_comp</span>(revpairwise <span class="sc">~</span> treatment <span class="sc">|</span> genotype)</span>
-<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a>            <span class="fu">mult_comp</span>(revpairwise <span class="sc">~</span> genotype  <span class="sc">|</span> treatment)</span>
-<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a>          )</span>
-<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a>        )</span>
-<span id="cb8-13"><a href="#cb8-13" tabindex="-1"></a>      )</span>
-<span id="cb8-14"><a href="#cb8-14" tabindex="-1"></a>    )</span>
-<span id="cb8-15"><a href="#cb8-15" tabindex="-1"></a>  )</span>
-<span id="cb8-16"><a href="#cb8-16" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="fu">specification</span>(</span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>  <span class="at">sample_sets =</span><span class="fu">list</span>( </span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>    <span class="at">all =</span> <span class="fu">sample_set</span>(</span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>      <span class="at">subset =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>      <span class="at">models =</span> <span class="fu">list</span>(</span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>        <span class="at">accurate =</span> <span class="fu">model</span>(</span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>          <span class="at">design =</span> <span class="sc">~</span>treatment <span class="sc">*</span>  genotype,</span>
+<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>          <span class="at">comparisons =</span> <span class="fu">list</span>(</span>
+<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a>            <span class="fu">mult_comp</span>(revpairwise <span class="sc">~</span> treatment <span class="sc">|</span> genotype)</span>
+<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a>            <span class="fu">mult_comp</span>(revpairwise <span class="sc">~</span> genotype  <span class="sc">|</span> treatment)</span>
+<span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a>          )</span>
+<span id="cb12-12"><a href="#cb12-12" tabindex="-1"></a>        )</span>
+<span id="cb12-13"><a href="#cb12-13" tabindex="-1"></a>      )</span>
+<span id="cb12-14"><a href="#cb12-14" tabindex="-1"></a>    )</span>
+<span id="cb12-15"><a href="#cb12-15" tabindex="-1"></a>  )</span>
+<span id="cb12-16"><a href="#cb12-16" tabindex="-1"></a>)</span></code></pre></div>
 <p>so the <code>|</code> symbol is to be read as “stratified by” (or
 “conditioned on”). The first <code>mult_comp</code> is stratifying the
 genotype, and will generate the pairwise comparisons within treatment,
@@ -372,7 +479,7 @@ For each treatment, find the genes that are ‘markers of genotype’ within
 that treatment group.</p>
 <p>The second type of question, where we want to investigate a
 ‘difference of differences’, is achieved by the following grammar:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/mult_comp.html">mult_comp</a></span><span class="op">(</span><span class="va">revpairwise</span><span class="op">+</span><span class="va">revpairwise</span> <span class="op">~</span> <span class="va">treatment</span> <span class="op">+</span> <span class="va">genotype</span>, interaction<span class="op">=</span><span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
 <p>The terms on the right hand side of the formula enumerate the
 predictors we’re concerned in (there’s no need to have their interaction
@@ -449,7 +556,7 @@ important that there be only <strong>one</strong>
 <code>transform=mutate</code> component per sample_set (if you want to
 introduce/transform multiple derived covariates, then separate them by
 commas <em>within</em> the <code>mutate</code> expression:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">specification</span><span class="op">(</span></span>
 <span>  sample_sets <span class="op">=</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span> </span>
 <span>    all <span class="op">=</span> <span class="fu">sample_set</span><span class="op">(</span></span>
@@ -482,17 +589,12 @@ preference whether ‘mistakes’ in the original experiment table should be
 fixed at source (which allows the scientist to review changes manually),
 or via a transformation specified in the spec file (which keeps an
 entirely faithful record of what is done).</p>
-<p>There’s another use of the <code>transform</code> option - if it
-generates a covariate called <code>.include</code> this will be used to
-further subset the data so one can analyse a subset of the data based on
-a criterion derived from, but not explicitly present, in the experiment
-table.</p>
 </div>
 <div class="section level3">
 <h3 id="other-functionality">Other functionality<a class="anchor" aria-label="anchor" href="#other-functionality"></a>
 </h3>
 <div class="section level4">
-<h4 id="qc-formulae">QC Formulae<a class="anchor" aria-label="anchor" href="#qc-formulae"></a>
+<h4 id="profile-formulae">Profile formulae<a class="anchor" aria-label="anchor" href="#profile-formulae"></a>
 </h4>
 <p>In the exploratory plots, we present PC and dendodrograms. Primarily
 these are of the normalised counts without any further processing, but
@@ -510,76 +612,47 @@ timepoint is more “important” than treatment. That is a fallacy, as the
 original dimension reduction is looking in the “wrong” direction.
 Recalculating the PCs having removed the nuisance effect is more
 valid.</p>
-<p>By default, in any given <code>sample_set</code>, the first model
-design will be captured and used as the basis for covariate adjustment
-prior to PC/Heatmap generation. And “partial residuals” for each term in
-the model are calculated. So if the first model for a dataset had a
-design <code>~ treatment * time + batch</code>, we’d generate three PC
-plots: one where the time and batch effect had been removed, and then
-colouring by treatment; one coloured by time (having removed treatment
-and batch effects); and one coloured by batch (having removed the two
-experimental conditions).</p>
-<p>But we can be more general than this. Say we wanted to look purely at
-the effect of solely removing ‘batch’ - this is available by setting a
-<code>qc_formulae</code> argument in the model</p>
+<p>By default, no additional plots are generated - this is a change from
+previous <code>qc_formulae</code> versious, because we were starting to
+see more complex designs where the default option (producing all colours
+x covariate plots) was becoming unmanageably verbose. Now it is
+necessary to add descriptions of the profiles to be plotted
+explicitly:</p>
 <pre><code>    all = sample_set(
       subset = TRUE,
       models = list(
         nested = model(
           design = ~treatment * time + batch,
-          qc_formulae= treatment + time ~ timepoint * time,
+          profile_plots = list(
+        aes(x=time, colour=batch, shape=treatment)  ~ treatment + time + timepoint * time + batch,
+        aes(x=time, colour=treatment)  ~ treatment + time + timepoint * time,
+        aes(x=time, colour=treatment) ~ . - batch
+      )
       ...</code></pre>
-<p>Everything on the LHS is used, in turn, as a “colouring” of the PCs
-that have been calculated on data that have been “reconstructed” using
-the terms on the RHS of the qc formula. So this would give us two plots
-(one for each experimental condition) having removed the “nuisance”
-batch effect (as that is the only term from the design formula that is
-missing from the qc formula.) The “reconstruction” is done based on the
-fitting of the <code>design</code> formula, so the qc formula will need
-to be a sub-model of the design (akin to DESeq2’s LRT specification):
-each gene’s predicted value (based on terms in the qc formula) is
-supplemented with the “residual error”, to retain the sample-to-sample
-variability.</p>
-<p>We can have multiple formulae (hence the spelling!)</p>
-<pre><code>    all = sample_set(
-      subset = TRUE,
-      models = list(
-        nested = model(
-          design = ~treatment * time + batch,
-          qc_formulae= list(
-            treatment + time ~ treatment * time,
-            batch + treatment + time ~ treatment + time),
-      ...</code></pre>
-<p>The first one has just been described; the second one removes the
-effect of batch <em>and</em> the time:treatment interaction. It produces
-three plots, colouring exactly the same PCA by batch, treatment and time
-in turn. If we want to distinguish two covariates on the same plot, we
-can change the shape by adding an interaction on the LHS, e.g.</p>
-<pre><code><span><span class="va">qc_formulae</span> <span class="op">=</span> <span class="va">treatment</span><span class="op">:</span><span class="va">batch</span> <span class="op">+</span> <span class="va">time</span><span class="op">:</span><span class="va">batch</span> <span class="op">~</span> <span class="va">...</span></span></code></pre>
-<p>where the first term determines the colour aesthetic, and the second
-the shape aesthetic - each ‘summand’ separated by a <code>+</code> will
-result in a separate plot.</p>
-<p>One final feature is that if we omit the <code>qc_formulae</code>
-entirely for all models in a dataset, then the design of the first model
-will be utilised - all its main effects will be captured, so a
-<code>design = ~treatment * time + batch</code> has three first order
-terms, resulting in</p>
-<pre><code><span><span class="va">qc_formulae</span><span class="op">=</span> <span class="va">treatment</span> <span class="op">+</span> <span class="va">time</span> <span class="op">+</span> <span class="va">batch</span> <span class="op">~</span> <span class="fl">0</span></span></code></pre>
-<p>The <code>0</code> on the RHS is a special construct - it means when
-colouring by a covariate, that covariate’s effect will automatically be
-added back in, so is equivalent to</p>
-<pre><code><span><span class="va">qc_formulae</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span><span class="va">treatment</span> <span class="op">~</span> <span class="va">treatment</span>, </span>
-<span><span class="va">time</span> <span class="op">~</span> <span class="va">time</span>,</span>
-<span><span class="va">batch</span> <span class="op">~</span> <span class="va">batch</span></span>
-<span><span class="op">)</span></span></code></pre>
-<p>which in turn is equivalent to the old “Focussed on” mechanism. If
-for some reason you want to visualise the effect of removing
-<em>all</em> covariates defined in the design, the a qc formula of
-e.g. <code>time ~ 1</code> will achieve that. If this PCA falls into
-clusters, then chosing a previously ignored column of sample metadata
-instead of <code>time</code> is a good way of exploring if important
-information has been ignored.</p>
+<p>Everything on the LHS is used as an aesthetic mapping for any given
+plot, and the model on the right says which covariates’s effects are
+kept in the ‘normalised’ data: anything that is omitted is effectively
+normalised/regressed-out .</p>
+<p>In the first element of the <code>profile_plots</code> list, the RHS
+of the formula is algebraically identical to the <code>design</code>, so
+no effects will be regressed out. But plots will be drawn so that time
+is on the horizontal axis, expression will be on the vertical axes - and
+samples will be coloured by batch, and shaped according to which
+treatment group they were in.</p>
+<p>The second element will produce a different set of plots, this time
+we’ve regressed out (corrected-for) batch, so the PCA and heatmaps will
+be different from those on raw vst data. Note, for the two-dimensional
+PC plots, we need both the <code>x</code> and <code>y</code> aesthetics
+to represent the projection, so the <code>time</code> aspect of this
+data would not be represented in the visualisation: to get round this,
+we automatically generate a plot where we use the <code>colour</code>
+aesthetic to represent the overwritten <code>x</code>.</p>
+<p>The third example illustrates the standard use of the <code>.</code>
+placeholder in R formulae to represent the ‘existing’ model. Here, the
+<code>.</code> represents the design, and the <code>-</code> is the
+standard Wilkinson notation to <em>remove</em> an effect, so the third
+example is a different way of phrasing the second instance: regress out
+the effect of batch.</p>
 </div>
 <div class="section level4">
 <h4 id="sample-swaps">Sample swaps<a class="anchor" aria-label="anchor" href="#sample-swaps"></a>
@@ -684,6 +757,41 @@ option:</p>
 <span>    <span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 </div>
+<div class="section level3">
+<h3 id="cascade">Cascading properties of a spec file<a class="anchor" aria-label="anchor" href="#cascade"></a>
+</h3>
+<p>To save repeating oneself, there are various aspects of a spec file
+that will propagate down the
+<code>specificiation &gt; sample_sets &gt; models &gt; comparisons</code>
+hierarchy. We list the expected behaviour of those:</p>
+<ul>
+<li>
+<code>models</code> can be set at the top <code>specification</code>
+level, and will get pre-pended to any sample-set specific models.</li>
+<li>
+<code>subset</code> can be set at the top <code>specification</code>
+level, and will get boolean-<code>AND</code>ed with sample-set specific
+subsets.</li>
+<li>
+<code>transform</code> can be set at the top
+<code>specification</code> level, and will only be used when sample-set
+doesn’t specify its own transform</li>
+<li>
+<code>drop_unsupported_combinations</code> can be set at the
+<code>specification</code> and/or <code>sample_set</code> level, and
+will only be used when a model doesn’t specify this directly.</li>
+<li>
+<code>drop_incomplete</code> can be set at the
+<code>specification</code> and/or <code>sample_set</code> level, and
+will only be used when a model doesn’t specify this directly.</li>
+<li>
+<code>profile_plots</code> can be set at the
+<code>specification</code> and/or <code>sample_set</code> level, and
+will be added to thos of any model-specific plot profiles</li>
+</ul>
+<p>These are intended to ‘do what I mean’ for the most typical
+situations.</p>
+</div>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>
@@ -696,7 +804,7 @@ option:</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.1.</p>
 </div>
 
     </footer>
