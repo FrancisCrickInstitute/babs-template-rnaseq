@@ -977,7 +977,7 @@ default_spec_settings <- function() {
 	top_n_variable = 500,     ## For PCA
 	showCategory   = 25,      ## For enrichment analyses
 	seed           = 1,       ## random seed gets set at start of script, just in case.
-        gene_clust     = 12,      ## When we need to chose clusters of genes, how many?
+        gene_clust     = bluster::HclustParam(),   ## When we need to chose clusters of genes, how many?
 	filterFun      = IHW::ihw,                 ## NULL for standard DESeq2 results, otherwise  functions
 	clustering_distance_rows    = "euclidean", ## for all feature-distances
 	clustering_distance_columns = "euclidean",  ## for sample-distances

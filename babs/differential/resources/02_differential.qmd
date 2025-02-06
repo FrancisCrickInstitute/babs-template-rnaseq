@@ -604,39 +604,38 @@ for (dataset_id in names(dds_model_comp)) {
             length(metadata(this_dds)$model)>0
           && any(is_diff)) {
         exists_profile_plot <- TRUE
-        k <- nclust(param$get("gene_clust"), universe=sum(is_diff))
         partials <- partialise.matrix(
           assay(this_dds[is_diff,], "vst"),
           as.data.frame(colData(this_dds)),
           fml=metadata(this_dds)$model$design)
         curves <- metadata(this_dds)$model$profile_plots
         for (i in seq_along(curves)) {  
-          mat <- assemble_partialised(partials, update(curves[[i]], NULL ~ .), resids=TRUE)
-          DEmat <- t(scale(t(mat)))
-          hr <- hclust(as.dist(1-cor(t(DEmat), method="pearson")), method="complete")
-          hclustk <-  cutree(hr, k=k)
-          tbl <- table(hclustk)
-          r <- paste0("|", rank(-tbl, ties="first"), "|=", tbl)
-          hclustk[] <- r[hclustk]
-          hclustk <- factor(hclustk, levels=names(sort(table(hclustk), decreasing=TRUE)))
-          centres <- apply(DEmat, 2, function(samp) tapply(samp, hclustk, mean))
-          clustered_df <- cbind(as.data.frame(t(centres)), as.data.frame(colData(this_dds)))
-          line_mat <- t(scale(t( assemble_partialised(partials, update(curves[[i]], NULL ~ .), resids=FALSE))))
-          line_centres <- apply(line_mat, 2, function(samp) tapply(samp, hclustk, mean))
-          line_df <- cbind(
-            as.data.frame(t(line_centres)),
-            as.data.frame(colData(this_dds)))
-          
-          pl <- ggplot(clustered_df %>% pivot_longer(cols=1:k),
-                      eval(curves[[i]][[2]])
-                      ) +
-            facet_wrap(~name) +
+          mat <- t(scale(t(
+            assemble_partialised(partials, update(curves[[i]], NULL ~ .), resids=TRUE)
+          )))
+          gene_clust <- bluster::clusterRows(mat, param$get("gene_clust"), full=TRUE)
+          group_mat <- t(scale(t(
+            assemble_partialised(partials, update(curves[[i]], NULL ~ .), resids=FALSE)
+          )))
+          cc <- cluster_calc(mat, clusterID=gene_clust$clusters, group_mat=group_mat)
+          centroid_df <- cbind(cc$centroid, as.data.frame(colData(this_dds))) %>%
+            pivot_longer(cols=any_of(names(cc$centroid)), names_to="babs.name", values_to="babs.value") %>%
+            mutate(babs.name=factor(babs.name, levels=names(cc$centroid)))
+
+          pl <- ggplot(centroid_df ,
+                      eval(curves[[i]][[2]])) +
+            facet_wrap(~ babs.name) +
             theme_bw() +
-            geom_point(aes(y=value)) +
-            geom_line(aes(y=value), data=line_df %>% pivot_longer(cols=1:k))
-  
+            geom_point(aes(y= babs.value)) +
+            labs(y="Expression")
+          if ("group" %in% names(curves[[i]][[2]])) {
+            group_df <- cbind(cc$group_centroid, colDat[model_vars$all])  %>%
+              pivot_longer(cols=any_of(model_vars$all), names_to="babs.name", values_to="babs.value") %>%
+              mutate(babs.name=factor(babs.name, levels=names(cc$centroid)))
+            pl <- pl+geom_line(data=group_df, aes(y=babs.value))
+          }
           do_plot(pl,
-                  label=paste("02-curve", dataset_id, model_id, comp_id, i, sep="-"),
+                  label= "diffClustProfile",
                   caption=paste0("profile curves ", i, " for ", comp_id, " genes  of ", mtag(model_id), " in ", dtag(dataset_id))
                   )
           cat('\n\n---\n\n')

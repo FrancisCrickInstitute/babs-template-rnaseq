@@ -212,3 +212,17 @@ aes_caption <- function(ae) {
   ae <- ae[intersect(c("colour","shape"), names(ae))]
   paste0(names(ae), as.character(ae), collapse=",")
 }
+
+
+cluster_calc <- function(mat, clusterID, group_mat=NULL) {
+  tbl <- table(clusterID)
+  levels(clusterID) <- paste0("|", rank(-tbl, ties="first"), "|=", tbl) # change the labels
+  clusterID <- factor(clusterID, levels=levels(clusterID)[rev(order(tbl))])
+  centres <- apply(mat, 2, function(samp) tapply(samp, clusterID, mean))
+  out <- list(centroid=as.data.frame(t(centres)))
+  if (!is.null(group_mat)) {
+    group_centres <- apply(group_mat, 2, function(samp) tapply(samp, clusterID, mean))
+    out$group_centroid_ <-  as.data.frame(t(group_centres))
+  }
+  out       
+}

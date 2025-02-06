@@ -40,6 +40,12 @@ targz=$(TEMPLATE_DIR)/archive/$(setting_Type)-$(version).tar.gz
 genericgz=$(TEMPLATE_DIR)/archive/generic-$(version).tar.gz
 endif
 
+working-copy=/nemo/stp/babs/working/kellyg/projects/github/FrancisCrickInstitute/templates/rnaseq/babs
+rsync-up:
+	rsync -av --exclude=".~*/" --existing $(diff_dir)/resources $(working-copy)/differential/resources
+	rsync -av --exclude=".~*/" --existing $(diff_dir)/R $(working-copy)/differential/R
+
+
 get-pipeline: update-pipeline
 	true
 

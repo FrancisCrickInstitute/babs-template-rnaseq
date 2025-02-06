@@ -383,6 +383,7 @@ play.
 param$set("top_n_variable", postpone=TRUE)
 param$set("clustering_distance_rows", postpone=TRUE)
 param$set("clustering_distance_columns", postpone=TRUE)
+param$set("gene_clust", postpone=TRUE)
 param$set("pc_x", 1, postpone=TRUE)
 param$set("pc_y", 2)
 first <- TRUE
@@ -404,6 +405,8 @@ for (dataset_id in names(ddsList)) {
                    unique(unlist(lapply(plot_formulae, all.vars)))
                    ))
     )
+    do_focus <- length(plot_formulae)>0
+
     if (sum(mdls)>1) {
       dmc_heading(ddsList, dataset=dataset_id, model=model_id, depth="##")
     }
@@ -422,11 +425,12 @@ for (dataset_id in names(ddsList)) {
     plotDat <- plotDat - rowMeans(plotDat)
     colDat <- as.data.frame(colData(this_dds))
     colnames(plotDat) <- rownames(colDat)
+    gene_clust <- bluster::clusterRows(plotDat, param$get("gene_clust"), full=TRUE)
     pl <- ComplexHeatmap::Heatmap(
       plotDat, name = "Mean Centred", 
       column_title = "Samples", row_title = "Genes", col = sym_colour(plotDat), 
       clustering_distance_columns = param$get("clustering_distance_columns"), 
-      clustering_distance_rows = param$get("clustering_distance_rows"), 
+      cluster_rows = gene_clust$objects$hclust,
       heatmap_legend_param = list(direction = "horizontal"), 
       top_annotation = ComplexHeatmap::HeatmapAnnotation(
         df = colDat[model_vars$all], 
@@ -437,6 +441,7 @@ for (dataset_id in names(ddsList)) {
             label= "Heatmap",
             caption=paste("Heatmap of variable genes in", dtag(dataset_id)),
             preview=first)
+
     first <- FALSE
     cat("\n\n---\n\n")
 
@@ -446,7 +451,7 @@ for (dataset_id in names(ddsList)) {
       column_title = "Samples", row_title = "Genes", col = sym_colour(plotDat), 
       cluster_columns = FALSE,
       column_order=do.call(order, colDat[model_vars$all]),
-      clustering_distance_rows = param$get("clustering_distance_rows"),
+      cluster_rows = gene_clust$objects$hclust,
       heatmap_legend_param = list(direction = "horizontal"),
       top_annotation = ComplexHeatmap::HeatmapAnnotation(
         df = colDat[,model_vars$all],
@@ -484,9 +489,29 @@ for (dataset_id in names(ddsList)) {
             caption=paste("Heatmap of sample distances in", dtag(dataset_id)))
     cat("\n\n---\n\n")
 
+    if (do_focus) {
+      cat(var_heading("Raw Cluster Profiles",   depth=2 + (sum(mdls)>1)))
+      for (profile in plot_formulae[1]) {
+        cc <- cluster_calc(plotDat, clusterID=gene_clust$clusters)
+        centroid_df <- cbind(cc$centroid, colDat[model_vars$all])  %>%
+          pivot_longer(cols=-any_of(model_vars$all), names_to="babs.name", values_to="babs.value") %>%
+          mutate(babs.name=factor(babs.name, levels=names(cc$centroid)))
+        pl <- ggplot(centroid_df,
+                    eval(profile[[2]])) +
+          facet_wrap(~ babs.name) +
+          theme_bw() +
+          geom_point(aes(y= babs.value)) +
+          labs(y="Expression")
+        if ("group" %in% names(profile[[2]])) {
+          pl <- pl+geom_line(aes(y=babs.value))
+        }
+        do_plot(pl,
+                label= "clustProfile",
+                caption=paste("Cluster profile in", dtag(dataset_id)))
+      }}
+    
     is_vary <- sapply(colDat[model_vars$all], function(v) length(unique(v)) != 1)
-    do_focus <- length(model_vars$all) > 1 && length(plot_formulae)>0
-
+    
     if (do_focus) {
       design(this_dds) <- design
       partials <- partialise(this_dds)
@@ -499,6 +524,7 @@ for (dataset_id in names(ddsList)) {
             sep=", ", collapse=", ")
           if (length(removed)==0 || removed=="") removed <- "nothing"
           part_res <- assemble_partialised(partials, update(fml, NULL ~ .))
+          group_mat <- assemble_partialised(partials, update(fml, NULL ~ .), resids=FALSE)
           if (is.na(split)) {
             my_caption <- paste("In",  dtag(dataset_id), "having removed", removed)
           } else {
@@ -506,13 +532,15 @@ for (dataset_id in names(ddsList)) {
           }
           top <- order(apply(part_res, 1, sd), decreasing = TRUE)[1:min(nrow(part_res),param$get("top_n_variable"))]
           plotDat <- part_res[top, ]
+          group_mat <- group_mat[top,]
+          gene_clust <- bluster::clusterRows(plotDat, param$get("gene_clust"), full=TRUE)
           colnames(plotDat) <- rownames(colDat)
           pl <- ComplexHeatmap::Heatmap(
             plotDat, name = "Residual", 
             column_title = "Samples", row_title = "Genes", col = sym_colour(plotDat),
             column_split = if (is.na(split)) NULL else colDat[all.vars(split)],
             clustering_distance_columns = param$get("clustering_distance_columns"), 
-            clustering_distance_rows = param$get("clustering_distance_rows"), 
+            cluster_rows = gene_clust$objects$hclust,
             heatmap_legend_param = list(direction = "horizontal"), 
             top_annotation = ComplexHeatmap::HeatmapAnnotation(
               df = colDat[model_vars$all], 
@@ -524,6 +552,25 @@ for (dataset_id in names(ddsList)) {
                   caption=my_caption
                   )
           cat("\n\n---\n\n")
+          cc <- cluster_calc(plotDat, clusterID=gene_clust$clusters, group_mat=group_mat)
+          centroid_df <- cbind(cc$centroid, colDat[model_vars$all]) %>%
+            pivot_longer(cols=any_of(names(cc$centroid)), names_to="babs.name", values_to="babs.value") %>%
+            mutate(babs.name=factor(babs.name, levels=names(cc$centroid)))
+          pl <- ggplot(centroid_df ,
+                      eval(profile[[2]])) +
+            facet_wrap(~ babs.name) +
+            theme_bw() +
+            geom_point(aes(y= babs.value)) +
+            labs(y="Expression")
+          if ("group" %in% names(profile[[2]])) {
+            group_df <- cbind(cc$group_centroid, colDat[model_vars$all])  %>%
+              pivot_longer(cols=any_of(names(cc$centroid)), names_to="babs.name", values_to="babs.value") %>%
+              mutate(babs.name=factor(babs.name, levels=names(cc$centroid)))
+            pl <- pl+geom_line(data=group_df, aes(y=babs.value))
+          }
+        do_plot(pl,
+                label= "clustProfile",
+                caption=paste("Cluster profile in", dtag(dataset_id), "having removed", removed))
         } # next split
       }   # next formula
     }
