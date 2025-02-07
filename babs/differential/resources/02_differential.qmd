@@ -596,7 +596,7 @@ exists_profile_plot <- FALSE
 for (dataset_id in names(dds_model_comp)) {
   dmc_heading(dds_model_comp, dataset=dataset_id, model=NULL, depth="##")
   for (model_id in names(dds_model_comp[[dataset_id]])) {
-    dmc_heading(dds_model_comp, dataset=dataset, model=model_id, depth="###")
+    dmc_heading(dds_model_comp, dataset=dataset_id, model=model_id, depth="###")
     for (comp_id in names(dds_model_comp[[dataset_id]][[model_id]])) {
       this_dds <- dds_model_comp[[dataset_id]][[model_id]][[comp_id]]
       is_diff <- grepl("^.*\\*", mcols(this_dds)$results$class)
@@ -614,6 +614,10 @@ for (dataset_id in names(dds_model_comp)) {
           mat <- t(scale(t(
             assemble_partialised(partials, update(curves[[i]], NULL ~ .), resids=TRUE)
           )))
+          removed <- paste(
+            translate_terms(dropped_terms(partials, update(curves[[i]], NULL ~ .)),this_dds),
+            sep=", ", collapse=", ")
+
           gene_clust <- bluster::clusterRows(mat, param$get("gene_clust"), full=TRUE)
           group_mat <- t(scale(t(
             assemble_partialised(partials, update(curves[[i]], NULL ~ .), resids=FALSE)
@@ -635,9 +639,12 @@ for (dataset_id in names(dds_model_comp)) {
               mutate(babs.name=factor(babs.name, levels=names(cc$centroid)))
             pl <- pl+geom_line(data=group_df, aes(y=babs.value))
           }
+          if ("ScaleDiscrete" %in% class(layer_scales(pl)$x)) {
+            pl <- pl + scale_x_discrete(guide=guide_axis(n.dodge=2))
+          }
           do_plot(pl,
                   label= "diffClustProfile",
-                  caption=paste0("profile curves ", i, " for ", comp_id, " genes  of ", mtag(model_id), " in ", dtag(dataset_id))
+                  caption=paste0("Cluster profile for ", comp_id, " genes  of ", mtag(model_id), " in ", dtag(dataset_id), " having removed effect of ", removed)
                   )
           cat('\n\n---\n\n')
         }

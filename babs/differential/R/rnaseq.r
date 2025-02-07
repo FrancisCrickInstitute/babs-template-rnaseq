@@ -173,6 +173,7 @@ build_dds_list <- function(dds, spec) {
   spec <- trickle_down(field="drop_incomplete", to="models")
   spec <- trickle_down(field="varNames", to="sample_sets", merge_fn=modifyList, default=list())
   spec <- trickle_down(field="varDescriptions", to="sample_sets", merge_fn=modifyList, default=list())
+  spec <- trickle_down(field="termNames", to="sample_sets", merge_fn=modifyList, default=list())
   spec <- trickle_down(field="profile_plots", to="models", merge_fn=modifyList, default=list())
   
   modelled_terms <- lapply(
@@ -236,6 +237,11 @@ build_dds_list <- function(dds, spec) {
     }
     obj <- obj[,ind]
     colData(obj) <- droplevels(colData(obj))
+    if ("termNames" %in% names(dataset_spec)) {
+      metadata(obj)$termNames <- dataset_spec$termNames
+    } else {
+      metadata(obj)$termNames <- list()
+    }
     if ("varNames" %in% dataset_spec) {
       varNames <- sapply(names(colData(dds)), identity)
       varNames[names(dataset_spec$varNames)] <- unlist(dataset_spec$varNames)
@@ -1060,4 +1066,11 @@ find_simpler_models <- function(fml, do_aes=FALSE, type=c("simplest", "drop1", "
       'as designed' = update(fml, as.formula(paste(lhs, " ~ .")))
     )
   }
+}
+
+translate_terms <- function(txt, obj) {
+  tr_list <- metadata(obj)$termNames
+  ind <- txt %in% names(tr_list)
+  txt[ind] <- unlist(tr_list[txt[ind]])
+  txt
 }
