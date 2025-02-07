@@ -494,7 +494,7 @@ for (dataset_id in names(ddsList)) {
       for (profile in plot_formulae[1]) {
         cc <- cluster_calc(plotDat, clusterID=gene_clust$clusters)
         centroid_df <- cbind(cc$centroid, colDat[model_vars$all])  %>%
-          pivot_longer(cols=-any_of(model_vars$all), names_to="babs.name", values_to="babs.value") %>%
+          pivot_longer(cols=any_of(names(cc$centroid)), names_to="babs.name", values_to="babs.value") %>%
           mutate(babs.name=factor(babs.name, levels=names(cc$centroid)))
         pl <- ggplot(centroid_df,
                     eval(profile[[2]])) +
@@ -504,6 +504,9 @@ for (dataset_id in names(ddsList)) {
           labs(y="Expression")
         if ("group" %in% names(profile[[2]])) {
           pl <- pl+geom_line(aes(y=babs.value))
+        }
+        if ("ScaleDiscrete" %in% class(layer_scales(pl)$x)) {
+          pl <- pl + scale_x_discrete(guide=guide_axis(n.dodge=2))
         }
         do_plot(pl,
                 label= "clustProfile",
@@ -520,15 +523,15 @@ for (dataset_id in names(ddsList)) {
         splitters <- c(NA, fml[[2]]$column_split)#NA denotes 'no split'.
         for (split in splitters) {
           removed <- paste(
-            dropped_terms(partials, update(fml, NULL ~ .)),
+            translate_terms(dropped_terms(partials, update(fml, NULL ~ .)), this_dds),
             sep=", ", collapse=", ")
           if (length(removed)==0 || removed=="") removed <- "nothing"
           part_res <- assemble_partialised(partials, update(fml, NULL ~ .))
           group_mat <- assemble_partialised(partials, update(fml, NULL ~ .), resids=FALSE)
           if (is.na(split)) {
-            my_caption <- paste("In",  dtag(dataset_id), "having removed", removed)
+            my_caption <- paste("In",  dtag(dataset_id), "having removed effect of", removed)
           } else {
-            my_caption <- paste("Split on", paste(all.vars(split), collapse=":"), "in",  dtag(dataset_id), "having removed", removed) # TODO
+            my_caption <- paste("Split on", paste(all.vars(split), collapse=":"), "in",  dtag(dataset_id), "having removed effect of", removed) # TODO
           }
           top <- order(apply(part_res, 1, sd), decreasing = TRUE)[1:min(nrow(part_res),param$get("top_n_variable"))]
           plotDat <- part_res[top, ]
@@ -568,6 +571,9 @@ for (dataset_id in names(ddsList)) {
               mutate(babs.name=factor(babs.name, levels=names(cc$centroid)))
             pl <- pl+geom_line(data=group_df, aes(y=babs.value))
           }
+          if ("ScaleDiscrete" %in% class(layer_scales(pl)$x)) {
+            pl <- pl + scale_x_discrete(guide=guide_axis(n.dodge=2))
+          }          
         do_plot(pl,
                 label= "clustProfile",
                 caption=paste("Cluster profile in", dtag(dataset_id), "having removed", removed))
@@ -705,12 +711,12 @@ for (dataset_id in names(ddsList)) {
             pl <- pl + geom_text_repel(aes(label = sample))
           }
           removed <- paste(
-            dropped_terms(partials, update(fml, NULL ~ .)),
+            translate_terms(dropped_terms(partials, update(fml, NULL ~ .)),this_dds),
             sep=", ", collapse=", ")          
           if (length(removed)==0 || removed=="") removed <- "nothing"
           do_plot(pl,
                   label="focus",
-                  caption=paste("Annotated by", aes_caption(eval(this_aes)), "in", dtag(dataset_id), "having removed", removed)
+                  caption=paste("Annotated by", aes_caption(eval(this_aes)), "in", dtag(dataset_id), "having removed effect of", removed)
                   )
           cat("\n\n---\n\n")
         } # Repeat if need to annotate by an overwritten 'x'
@@ -741,13 +747,16 @@ for (dataset_id in names(ddsList)) {
         long_dat <- pivot_longer(wide_dat, cols=all_of(hits), names_to="PC")
         pl <- ggplot(long_dat, modifyList(eval(fml[[2]]), aes(y=value))) + geom_point() + facet_wrap(~PC)
         if ("group" %in% names(fml[[2]])) pl <- pl+geom_line()
+        if ("ScaleDiscrete" %in% class(layer_scales(pl)$x)) {
+          pl <- pl + scale_x_discrete(guide=guide_axis(n.dodge=2))
+        }
         removed <- paste(
-          dropped_terms(partials, update(fml, NULL ~ .)),
+          translate_terms(dropped_terms(partials, update(fml, NULL ~ .)),this_dds),
           sep=", ", collapse=", ")
         if (length(removed)==0 || removed=="") removed <- "nothing"
         do_plot(pl,
                 label= "covariate",
-                caption=paste("Annotated by",aes_caption(eval(fml[[2]])), "in", dtag(dataset_id), "having removed", removed) 
+                caption=paste("Annotated by",aes_caption(eval(fml[[2]])), "in", dtag(dataset_id), "having removed effect of", removed) 
                 )
         cat("\n\n---\n\n")
       }

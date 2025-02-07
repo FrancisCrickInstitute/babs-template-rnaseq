@@ -596,7 +596,7 @@ exists_profile_plot <- FALSE
 for (dataset_id in names(dds_model_comp)) {
   dmc_heading(dds_model_comp, dataset=dataset_id, model=NULL, depth="##")
   for (model_id in names(dds_model_comp[[dataset_id]])) {
-    dmc_heading(dds_model_comp, dataset=dataset, model=mdl_name, depth="###")
+    dmc_heading(dds_model_comp, dataset=dataset, model=model_id, depth="###")
     for (comp_id in names(dds_model_comp[[dataset_id]][[model_id]])) {
       this_dds <- dds_model_comp[[dataset_id]][[model_id]][[comp_id]]
       is_diff <- grepl("^.*\\*", mcols(this_dds)$results$class)
@@ -609,7 +609,8 @@ for (dataset_id in names(dds_model_comp)) {
           as.data.frame(colData(this_dds)),
           fml=metadata(this_dds)$model$design)
         curves <- metadata(this_dds)$model$profile_plots
-        for (i in seq_along(curves)) {  
+        for (i in seq_along(curves)) {
+          cdata_df <- as.data.frame(colData(this_dds)[, all.vars(curves[[i]]), drop=FALSE])
           mat <- t(scale(t(
             assemble_partialised(partials, update(curves[[i]], NULL ~ .), resids=TRUE)
           )))
@@ -618,7 +619,7 @@ for (dataset_id in names(dds_model_comp)) {
             assemble_partialised(partials, update(curves[[i]], NULL ~ .), resids=FALSE)
           )))
           cc <- cluster_calc(mat, clusterID=gene_clust$clusters, group_mat=group_mat)
-          centroid_df <- cbind(cc$centroid, as.data.frame(colData(this_dds))) %>%
+          centroid_df <- cbind(cc$centroid, cdata_df) %>%
             pivot_longer(cols=any_of(names(cc$centroid)), names_to="babs.name", values_to="babs.value") %>%
             mutate(babs.name=factor(babs.name, levels=names(cc$centroid)))
 
@@ -629,8 +630,8 @@ for (dataset_id in names(dds_model_comp)) {
             geom_point(aes(y= babs.value)) +
             labs(y="Expression")
           if ("group" %in% names(curves[[i]][[2]])) {
-            group_df <- cbind(cc$group_centroid, colDat[model_vars$all])  %>%
-              pivot_longer(cols=any_of(model_vars$all), names_to="babs.name", values_to="babs.value") %>%
+            group_df <- cbind(cc$group_centroid, cdata_df)  %>%
+              pivot_longer(cols=any_of(names(cc$centroid)), names_to="babs.name", values_to="babs.value") %>%
               mutate(babs.name=factor(babs.name, levels=names(cc$centroid)))
             pl <- pl+geom_line(data=group_df, aes(y=babs.value))
           }
