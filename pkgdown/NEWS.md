@@ -1,3 +1,9 @@
+# Version 0.18.1
+## Major Changes
+Add the profile plots to the exploratory page
+Add termNames functionality
+## Minor Changes
+ Add name-dodging
 # Version 0.18.0
 ## Major Changes
  - Move to the new launchers
