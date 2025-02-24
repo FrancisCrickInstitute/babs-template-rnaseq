@@ -420,3 +420,16 @@ nclust <- function(npclust, universe=1) {
     npclust
   }
 }
+
+rmod <- function(x, base, out=integer()) {
+  if (x<base) {
+    c(x, out)
+  } else {
+    rmod(x %/% base, base, out=c(x %% base, out))
+  }
+}
+
+itoABC <- function(i) {
+  paste0(LETTERS[rmod(i-1,26)+1], collapse="")
+}
+  

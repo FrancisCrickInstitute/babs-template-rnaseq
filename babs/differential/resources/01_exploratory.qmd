@@ -228,7 +228,10 @@ table1(dds, ddsList) %>%
 
 
 for (assay in c("counts", "norm", "vst")) {
-  write_assay(ddsList, assay=assay, path=params$res_dir, suffix=paste0("_",params$alignment, "_", params$spec))
+  write_assay(ddsList,
+              assay=assay,
+              path=file.path(params$res_dir, tools::file_path_sans_ext(basename(params$script))),
+              tag=params$tag)
 }
 
 save(ddsList,

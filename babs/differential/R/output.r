@@ -11,7 +11,7 @@
 ##' @return A list of file paths to the excel files
 ##' @author Gavin Kelly
 ##' @export
-write_assay <- function(ddsList, assay="vst", path="results", suffix="", formula=NULL, terms_to_remove=NULL) {
+write_assay <- function(ddsList, assay="vst", path="results", tag="", formula=NULL, terms_to_remove=NULL) {
   out <- list()
   for (i in names(ddsList)) {
     if (!is.null(formula)) {
@@ -29,7 +29,8 @@ write_assay <- function(ddsList, assay="vst", path="results", suffix="", formula
     spacer_frame <- as.data.frame(mcols(ddsList[[i]]))[rep(1, ncol(head_frame)),]
     spacer_frame[] <- ""
     row.names(spacer_frame) <- colnames(head_frame)
-    fname <- file.path(path, paste0(assay, suffix,"_", i, ".txt"))
+    fname <- file.path(path, paste0(assay, "_", i, tag, ".txt"))
+    dir.create(dirname(fname), recursive=TRUE)
     out[[i]] <- fname
     write.table(cbind(spacer_frame, t(head_frame)), file=fname, quote=FALSE, sep="\t", col.names=NA)
     write.table(content_frame, file=fname,
@@ -50,7 +51,7 @@ write_assay <- function(ddsList, assay="vst", path="results", suffix="", formula
 ##' @return A list of file paths to the excel files
 ##' @author Gavin Kelly
 #' @export
-write_results <- function(ddsList, param, dir=".", assays=NULL) {
+write_results <- function(ddsList, param, dir=".", tag="", assays=NULL) {
   si <- session_info()
   crick_colours <-list(
     primary=list(red="#e3001a",yellow="#ffe608",blue="#4066aa",green="#7ab51d",purple="#bb90bd"),
@@ -148,7 +149,8 @@ write_results <- function(ddsList, param, dir=".", assays=NULL) {
                                  value = unlist(si$platform),
                                  stringsAsFactors = FALSE),
               headerStyle=hs2)
-    out[[dataset]] <- file.path(dir, paste0("differential_", param$get("alignment"), "_", param$get("spec"), "_",dataset, ".xlsx"))
+    out[[dataset]] <- file.path(dir, paste0("differential_", dataset, tag, ".xlsx"))
+    dir.create(dirname(out[[dataset]]), recursive=TRUE)
     (saveWorkbook(wb, out[[dataset]], overwrite=TRUE))
   }
   out
@@ -285,6 +287,45 @@ export_biologic <- function(result_object, path) {
 
 name_sanitizer <- function(str) {  gsub("[^a-zA-Z0-9\\._]", "_", str) }
 
+table_tracker <- function(params) {
+  tbl_n <- 0
+  script <- tools::file_path_sans_ext(basename(params$script))
+  labels <- list()
+  tag <- params$TAG
+  function(tbl, label, caption) {
+    if (isTRUE(getOption('knitr.in.progress'))) {
+      tbl_n <<- tbl_n + 1
+      if (! label %in% names(labels)) {
+        labels[[label]] <<- 0
+      }
+      labels[[label]] <<- labels[[label]]+1
+      label <- paste0(gsub("[^[:alnum:]]+", "-", label), "-", labels[[label]])
+      tbl_child <- knitr::knit_expand(
+        text=r"(```{r}
+#| label: tbl-{{lbl}}
+#| tbl-cap: "{{caption}}"
+#| output: asis
+dir.create(dirname(file.path("{{resdir}}","{{fname}}")), recursive=TRUE)
+write.csv(as.data.frame(tbl), file=file.path("{{resdir}}","{{fname}}"),col.names = NA)
+cat('\n\n::: {.column-margin}\n',fontawesome::fa('file-csv'),'[{{caption}}]({{fname}})\n:::\n\n')
+tbl
+```)",
+lbl=label,
+caption=caption,
+resdir=params$res_dir,
+fname=file.path(script, sprintf("tbl-%0.3i-%s%s.csv", tbl_n, label, tag))
+)
+      cat(knitr::knit_child(
+        text=tbl_child,
+        quiet=TRUE,
+        envir=environment()),
+        sep='\n'
+        )
+    } else {
+      head(as.data.frame(tbl))
+    }
+  }
+}
 
 ##' Generate captioned table
 ##'
@@ -299,32 +340,32 @@ name_sanitizer <- function(str) {  gsub("[^a-zA-Z0-9\\._]", "_", str) }
 ##' @param cap_fn The function that will be called on the caption text
 ##' @return 
 ##' @author Gavin Kelly
-do_tbl <- function(tbl, label, caption, path) {
-  if (isTRUE(getOption('knitr.in.progress'))) {
-    tbl_child <- knitr::knit_expand(
-      text=r"(```{r}
-#| label: tbl-{{lbl}}
-#| tbl-cap: {{caption}}
-#| output: asis
+## do_tbl <- function(tbl, label, caption, path) {
+##   if (isTRUE(getOption('knitr.in.progress'))) {
+##     tbl_child <- knitr::knit_expand(
+##       text=r"(```{r}
+## #| label: tbl-{{lbl}}
+## #| tbl-cap: {{caption}}
+## #| output: asis
 
-fname <-  knitr::fig_path(".csv")
-dir.create(dirname(file.path(path, fname)), showWarning=FALSE, recursive=TRUE)
-write.csv(as.data.frame(tbl), file=file.path(path,fname), col.names = NA)
-cat('\n\n::: {.column-margin}\n',fontawesome::fa('file-csv'),'[{{caption}}](', fname, ')\n:::\n\n')
-tbl
-```)",
-      lbl=gsub("[^[:alnum:]]+", "-",label)
-)
-    cat(knitr::knit_child(
-      text=tbl_child,
-      quiet=TRUE,
-      envir=environment()),
-      sep='\n'
-      )
-  } else {
-    head(as.data.frame(tbl))
-  }
-}
+## fname <-  knitr::fig_path(".csv")
+## dir.create(dirname(file.path(path, fname)), showWarning=FALSE, recursive=TRUE)
+## write.csv(as.data.frame(tbl), file=file.path(path,fname), col.names = NA)
+## cat('\n\n::: {.column-margin}\n',fontawesome::fa('file-csv'),'[{{caption}}](', fname, ')\n:::\n\n')
+## tbl
+## ```)",
+##       lbl=gsub("[^[:alnum:]]+", "-",label)
+## )
+##     cat(knitr::knit_child(
+##       text=tbl_child,
+##       quiet=TRUE,
+##       envir=environment()),
+##       sep='\n'
+##       )
+##   } else {
+##     head(as.data.frame(tbl))
+##   }
+## }
 
 
 compress_dmc <-function(dmc) {

@@ -56,7 +56,6 @@ source("R/helpers.r", local = knitr::knit_global())
 source("R/enrichment.r", local = knitr::knit_global())
 
 
-tbl_label <- counter()
 
 set.seed(1)
 
@@ -64,6 +63,7 @@ if (!isTRUE(getOption('knitr.in.progress'))) {
   params <- load_params(choose_staging("03_enrichment"))
 }
 do_plot <- plot_tracker(params)
+do_tbl <- table_tracker(params)
 
 
 knitr::opts_chunk$set(
@@ -101,7 +101,7 @@ param$set("alignment", params$alignment, "Using alignment settings '{}'")
 data(list=paste0(params$spec, "_x_", params$alignment))
 dds_model_comp <-  decompress_dmc(dds_model_comp)
 
-if  (metadata(dds)$symbol_source== "row.names") {
+if  ("symbol_source" %in% names(metadata(dds)) && metadata(dds)$symbol_source== "row.names") {
   cat('\n\n::: {.callout-warning title="No annotation"}\nSkipping enrichment analysis as we could not find an R package with the required organism transcript mappings.\n:::\n\n')
   knitr::knit_exit()
 }
@@ -349,7 +349,7 @@ for (approach in names(approach_res_list)) {
       ) +
       theme(legend.position="bottom", legend.box = "horizontal")
     do_plot(pl,
-            label="functional",
+            label=approach,
             caption=capt,
             height_mult=nlevels(df$ID)/30,
             min_height=9
@@ -370,9 +370,8 @@ for (approach in names(approach_res_list)) {
     tab_header(title=capt) %>%
     opt_interactive()
     do_tbl(tbl,
-           label=tbl_label("functional"),
-           caption=capt,
-           path=params$staging_dir)
+           label=approach,
+           caption=capt)
   }
 }
 

@@ -55,11 +55,10 @@ source("R/partial.r", local = knitr::knit_global())
 source("R/output.r", local = knitr::knit_global())
 source("R/helpers.r", local = knitr::knit_global())
 
-tbl_label <- counter()
 set.seed(1)
 
 if (!isTRUE(getOption('knitr.in.progress'))) {
-  params <- load_params(choose_staging("02_differential"))
+  params <- load_params(choose_staging("differential"))
 }
 
 do_plot <- plot_tracker(params)
@@ -203,7 +202,11 @@ local({
 })
 
 
-xl_files <- write_results(dds_model_comp, param, dir=params$res_dir)
+xl_files <- write_results(dds_model_comp,
+                         param,
+                         dir=file.path(params$res_dir, tools::file_path_sans_ext(basename(params$script))),
+                         tag=params$tag
+                         )
 iwalk(xl_files,
      ~cat("\n\n<a class=\"download-excel btn btn-primary\" href=\"", sub(paste0("^", params$res_dir, "/?"), "", .x), "\"> Open Spreadsheet '", .y,"'</a>", sep="")
      )
@@ -421,7 +424,7 @@ for (dataset in names(dds_model_comp)) {
       ind <- order(res$shrunkLFC)[c(1:5, nrow(res)-(0:4))]
       pl <- pl+ggrepel::geom_text_repel(size=4, data=res[ind,])
       do_plot(pl,
-              label="02-MA",
+              label="MA",
               caption=paste0("MA plot of differential genes ", sub(".*\\t", "", comp_name)),
               preview=first
               )
@@ -453,7 +456,7 @@ for (dataset in names(dds_model_comp)) {
     nice_legends,
     ncol=ceiling(sqrt(length(nice_legends)))))
   do_plot(pl,
-          label= "02-legend-a",
+          label= "legend-a",
           caption=paste("Metadata colour-codings for",
                         metadata(ddsList[[dataset]])$dmc$dataset_name %||% metadata(ddsList[[dataset]])$dmc$dataset
                         ))
@@ -538,7 +541,7 @@ for (dataset in names(dds_model_comp)) {
         row_names_gp = gpar(fontsize = 6),
         show_row_names = nrow(tidied_data$mat)<100)
       do_plot(pl,
-              label="02-Heatmap",
+              label="Heatmap",
               caption=paste0("Heatmap on ", name, "-differential genes. White for ", baseline_str),
               height_mult=nrow(tidied_data$mat)/30,
               max_height=15, min_height=5)
@@ -561,7 +564,7 @@ for (dataset in names(dds_model_comp)) {
             row_names_gp = gpar(fontsize = 6),
             show_row_names = nrow(tidied_data$mat)<100)
           do_plot(pl,
-                  label="02-focussed",
+                  label="focussed",
                   caption=paste0("Heatmap on differential genes ", name, ", ", term_name, "-focussed")
                   )
           cat('\n\n---\n\n')
