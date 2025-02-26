@@ -174,7 +174,7 @@ build_dds_list <- function(dds, spec) {
   spec <- trickle_down(field="varNames", to="sample_sets", merge_fn=modifyList, default=list())
   spec <- trickle_down(field="varDescriptions", to="sample_sets", merge_fn=modifyList, default=list())
   spec <- trickle_down(field="termNames", to="sample_sets", merge_fn=modifyList, default=list())
-  spec <- trickle_down(field="profile_plots", to="models", merge_fn=modifyList, default=list())
+  spec <- trickle_down(field="profile_plots", to="models", merge_fn=modifyList)
   
   modelled_terms <- lapply(
     spec$sample_sets,
@@ -272,7 +272,7 @@ build_dds_list <- function(dds, spec) {
           mdlList[[i]]$qc_formulae <- list(I(mdlList[[i]]$qc_formulae))
         }
       }
-      if (!"profile_plots" %in% names(mdlList[[i]])) {
+      if (!"profile_plots" %in% names(mdlList[[i]]) || length(mdlList[[i]]$profile_plots==0)) {
         # default to the set of models removing any terms that will preserve marginality
         mdlList[[i]]$profile_plots <- find_simpler_models(mdlList[[i]]$design, do_aes=TRUE, type="drop1")
       } else {
