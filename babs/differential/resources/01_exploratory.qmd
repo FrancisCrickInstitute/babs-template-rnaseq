@@ -227,11 +227,12 @@ table1(dds, ddsList) %>%
   as_raw_html()
 
 
+assay_files <- list()
 for (assay in c("counts", "norm", "vst")) {
-  write_assay(ddsList,
-              assay=assay,
-              path=file.path(params$res_dir, tools::file_path_sans_ext(basename(params$script))),
-              tag=params$tag)
+  fname <- write_assay(ddsList,
+                       assay=assay,
+                       p=params)
+  assay_files[[assay]] <- attr(fname, "link")
 }
 
 save(ddsList,
@@ -390,6 +391,8 @@ param$set("gene_clust", postpone=TRUE)
 param$set("pc_x", 1, postpone=TRUE)
 param$set("pc_y", 2)
 first <- TRUE
+all_clusters <- list()
+cluster_ind <- counter(post_fn=to_letter)
 
 for (dataset_id in names(ddsList)) {
   this_dds <- ddsList[[dataset_id]]
@@ -429,6 +432,8 @@ for (dataset_id in names(ddsList)) {
     colDat <- as.data.frame(colData(this_dds))
     colnames(plotDat) <- rownames(colDat)
     gene_clust <- bluster::clusterRows(plotDat, param$get("gene_clust"), full=TRUE)
+    this_clust <- cluster_ind()
+    levels(gene_clust$clusters) <- paste0(this_clust, levels(gene_clust$clusters))
     pl <- ComplexHeatmap::Heatmap(
       plotDat, name = "Mean Centred", 
       column_title = "Samples", row_title = "Genes", col = sym_colour(plotDat), 
@@ -511,9 +516,15 @@ for (dataset_id in names(ddsList)) {
         if ("ScaleDiscrete" %in% class(layer_scales(pl)$x)) {
           pl <- pl + scale_x_discrete(guide=guide_axis(n.dodge=2))
         }
+        capt <- paste("Cluster profile in", dtag(dataset_id))
         do_plot(pl,
                 label= "clustProfile",
-                caption=paste("Cluster profile in", dtag(dataset_id)))
+                caption=capt)
+        all_clusters[[this_clust]] <- list(
+          id=gene_clust$clusters,
+          description=capt
+        )
+
       }}
     
     is_vary <- sapply(colDat[model_vars$all], function(v) length(unique(v)) != 1)
@@ -540,6 +551,8 @@ for (dataset_id in names(ddsList)) {
           plotDat <- part_res[top, ]
           group_mat <- group_mat[top,]
           gene_clust <- bluster::clusterRows(plotDat, param$get("gene_clust"), full=TRUE)
+          this_clust <- cluster_ind()
+          levels(gene_clust$clusters) <- paste0(this_clust, levels(gene_clust$clusters))
           colnames(plotDat) <- rownames(colDat)
           pl <- ComplexHeatmap::Heatmap(
             plotDat, name = "Residual", 
@@ -576,10 +589,16 @@ for (dataset_id in names(ddsList)) {
           }
           if ("ScaleDiscrete" %in% class(layer_scales(pl)$x)) {
             pl <- pl + scale_x_discrete(guide=guide_axis(n.dodge=2))
-          }          
-        do_plot(pl,
-                label= "clustProfile",
-                caption=paste("Cluster profile in", dtag(dataset_id), "having removed", removed))
+          }
+          capt <- paste("Cluster profile in", dtag(dataset_id), "having removed", removed)
+          do_plot(pl,
+                  label= "clustProfile",
+                  caption=capt)
+          all_clusters[[this_clust]] <- list(
+            id=gene_clust$clusters,
+            description=capt
+          )
+          
         } # next split
       }   # next formula
     }
@@ -855,6 +874,28 @@ for (dataset_id in names(ddsList)) {
 
 ```
 
+# Downloads
+
+
+```{r}
+#| label: downloads
+
+iwalk(assay_files,
+     ~cat("\n\n<a class=\"download-excel btn btn-primary\" href=\"", attr(.x, "link"), "\">", ifelse(.y=="counts", "raw", .y) ," count matrix</a>", sep="")
+     )
+
+fname <- write_clusters(all_clusters,
+                       mcols(ddsList[[1]]),
+                       p=params,
+                       prefix="exploratory-clusters")
+
+
+cat('\n\n<a class="download-excel btn btn-primary" href="',
+    attr(fname,"link"),
+    '">Gene-Cluster mappings</a>', sep="")
+     
+
+```
 
 
 # Terms Of Use

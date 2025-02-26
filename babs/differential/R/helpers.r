@@ -103,15 +103,15 @@ ParamList <- R6::R6Class("ParamList",
                         )
                         )
 
-counter <- function() {
+counter <- function(post_fn=identity) {
   inds <- list()
-  function(label) {
+  function(label=".global") {
     if (label %in% names(inds)) {
       inds[[label]] <<- inds[[label]] + 1
     } else {
       inds[[label]] <<- 1
     }
-    paste0(label, "-", inds[[label]])
+    post_fn(inds[[label]])
   }
 }
 
@@ -421,15 +421,3 @@ nclust <- function(npclust, universe=1) {
   }
 }
 
-rmod <- function(x, base, out=integer()) {
-  if (x<base) {
-    c(x, out)
-  } else {
-    rmod(x %/% base, base, out=c(x %% base, out))
-  }
-}
-
-itoABC <- function(i) {
-  paste0(LETTERS[rmod(i-1,26)+1], collapse="")
-}
-  

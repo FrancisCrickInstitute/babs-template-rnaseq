@@ -55,7 +55,6 @@ source("R/partial.r", local = knitr::knit_global())
 source("R/output.r", local = knitr::knit_global())
 source("R/helpers.r", local = knitr::knit_global())
 
-tbl_label <- counter()
 set.seed(1)
 
 if (!isTRUE(getOption('knitr.in.progress'))) {

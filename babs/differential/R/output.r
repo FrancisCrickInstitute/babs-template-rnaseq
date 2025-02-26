@@ -1,3 +1,10 @@
+p2filename <- function(p, prefix, suffix) {
+  section <- basename(file.path(tools::file_path_sans_ext(p$script)))
+  fname <- file.path(p$res_dir, section,  sprintf("%s%s.%s", prefix, p$TAG, suffix))
+  attr(fname, "link") <- file.path(section, sprintf("%s%s.%s", prefix, p$TAG, suffix))
+  fname
+}
+
 ##' Text file of assay data
 ##'
 ##' Write all sample data, with the colData as a header
@@ -11,7 +18,7 @@
 ##' @return A list of file paths to the excel files
 ##' @author Gavin Kelly
 ##' @export
-write_assay <- function(ddsList, assay="vst", path="results", tag="", formula=NULL, terms_to_remove=NULL) {
+write_assay <- function(ddsList, assay="vst", p,  formula=NULL, terms_to_remove=NULL) {
   out <- list()
   for (i in names(ddsList)) {
     if (!is.null(formula)) {
@@ -29,7 +36,7 @@ write_assay <- function(ddsList, assay="vst", path="results", tag="", formula=NU
     spacer_frame <- as.data.frame(mcols(ddsList[[i]]))[rep(1, ncol(head_frame)),]
     spacer_frame[] <- ""
     row.names(spacer_frame) <- colnames(head_frame)
-    fname <- file.path(path, paste0(assay, "_", i, tag, ".txt"))
+    fname <- p2filename(p, paste0(assay, "_", i), "txt")
     dir.create(dirname(fname), recursive=TRUE)
     out[[i]] <- fname
     write.table(cbind(spacer_frame, t(head_frame)), file=fname, quote=FALSE, sep="\t", col.names=NA)
@@ -39,6 +46,40 @@ write_assay <- function(ddsList, assay="vst", path="results", tag="", formula=NU
   out
 }
 
+write_clusters <- function(clust, mcols, p, prefix="clusters") {
+  wb <- openxlsx::createWorkbook(title="Differential Analysis",
+                                creator="BABS")
+  descrip <- data.frame(
+    grouping=names(clust),
+    description=sapply(clust, "[[", "description")
+  )
+  sn <- "Description"
+  addWorksheet(wb, sn)
+  writeData(wb, sn, descrip, rowNames=FALSE, colNames=TRUE)
+
+  frames <- lapply(
+    names(clust),
+    function(x) setNames(
+      data.frame(as.character(clust[[x]]$id), names(clust[[x]]$id)),
+      c(x, "ID")
+    ))
+  if (length(frames)==1) {
+    df <- frames[[1]]
+  } else {
+    df <- Reduce(function(x,y) merge(x, y, by="ID", all=TRUE), frames)
+  }
+  meta <- as.data.frame(mcols[setdiff(names(mcols), "PCA")])
+  df <- merge(meta, df,  by.x=0, by.y="ID")
+  names(df)[names(df)=="Row.names"] <- "ID"
+  sn <- "Clusterings"
+  addWorksheet(wb, sn)
+  writeData(wb, sn, df, rowNames=FALSE, colNames=TRUE)
+
+  fname <- p2filename(p, prefix=prefix,"xlsx")
+  dir.create(dirname(fname), recursive=TRUE)
+  (saveWorkbook(wb, fname, overwrite=TRUE))
+  fname
+}
 
 ##' Xlsx reporting of results
 ##'
@@ -51,7 +92,7 @@ write_assay <- function(ddsList, assay="vst", path="results", tag="", formula=NU
 ##' @return A list of file paths to the excel files
 ##' @author Gavin Kelly
 #' @export
-write_results <- function(ddsList, param, dir=".", tag="", assays=NULL) {
+write_results <- function(ddsList, param, params, assays=NULL) {
   si <- session_info()
   crick_colours <-list(
     primary=list(red="#e3001a",yellow="#ffe608",blue="#4066aa",green="#7ab51d",purple="#bb90bd"),
@@ -149,7 +190,7 @@ write_results <- function(ddsList, param, dir=".", tag="", assays=NULL) {
                                  value = unlist(si$platform),
                                  stringsAsFactors = FALSE),
               headerStyle=hs2)
-    out[[dataset]] <- file.path(dir, paste0("differential_", dataset, tag, ".xlsx"))
+    out[[dataset]] <- p2filename(params, prefix=paste0("differential_", dataset), suffix="xlsx")
     dir.create(dirname(out[[dataset]]), recursive=TRUE)
     (saveWorkbook(wb, out[[dataset]], overwrite=TRUE))
   }
@@ -287,37 +328,31 @@ export_biologic <- function(result_object, path) {
 
 name_sanitizer <- function(str) {  gsub("[^a-zA-Z0-9\\._]", "_", str) }
 
-table_tracker <- function(params) {
-  tbl_n <- 0
-  script <- tools::file_path_sans_ext(basename(params$script))
-  labels <- list()
-  tag <- params$TAG
+table_tracker <- function(p) {
+  get_tally <- counter() # keeps track of individual labels and running tally of all tables
   function(tbl, label, caption) {
     if (isTRUE(getOption('knitr.in.progress'))) {
-      tbl_n <<- tbl_n + 1
-      if (! label %in% names(labels)) {
-        labels[[label]] <<- 0
-      }
-      labels[[label]] <<- labels[[label]]+1
-      label <- paste0(gsub("[^[:alnum:]]+", "-", label), "-", labels[[label]])
+      label <- paste0(gsub("[^[:alnum:]]+", "-", label), "-", get_tally(label))
+      fname <- p2filename(p, sprintf("tbl-%0.3i-%s", get_tally(), label), "csv")
       tbl_child <- knitr::knit_expand(
         text=r"(```{r}
 #| label: tbl-{{lbl}}
-#| tbl-cap: "{{caption}}"
 #| output: asis
-dir.create(dirname(file.path("{{resdir}}","{{fname}}")), recursive=TRUE)
-write.csv(as.data.frame(tbl), file=file.path("{{resdir}}","{{fname}}"),col.names = NA)
-cat('\n\n::: {.column-margin}\n',fontawesome::fa('file-csv'),'[{{caption}}]({{fname}})\n:::\n\n')
+dir.create(dirname(file.path("{{fname}}")), recursive=TRUE)
+write.csv(as.data.frame(tbl), file=file.path("{{fname}}"),col.names = NA)
+cat('\n\n::: {.column-margin}\n',fontawesome::fa('file-csv'),'[{{caption}}]({{link}})\n:::\n\n')
 tbl
 ```)",
 lbl=label,
 caption=caption,
-resdir=params$res_dir,
-fname=file.path(script, sprintf("tbl-%0.3i-%s%s.csv", tbl_n, label, tag))
+resdir=path,
+link=attr(fname,"link"),
+fname=fname
 )
       cat(knitr::knit_child(
         text=tbl_child,
         quiet=TRUE,
+        options=list(tbl.cap=caption),
         envir=environment()),
         sep='\n'
         )
@@ -326,6 +361,8 @@ fname=file.path(script, sprintf("tbl-%0.3i-%s%s.csv", tbl_n, label, tag))
     }
   }
 }
+#| tbl-cap: "{{caption}}"
+
 
 ##' Generate captioned table
 ##'

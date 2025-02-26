@@ -62,6 +62,7 @@ set.seed(1)
 if (!isTRUE(getOption('knitr.in.progress'))) {
   params <- load_params(choose_staging("03_enrichment"))
 }
+
 do_plot <- plot_tracker(params)
 do_tbl <- table_tracker(params)
 

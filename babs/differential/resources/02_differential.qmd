@@ -204,11 +204,10 @@ local({
 
 xl_files <- write_results(dds_model_comp,
                          param,
-                         dir=file.path(params$res_dir, tools::file_path_sans_ext(basename(params$script))),
-                         tag=params$tag
+                         params
                          )
 iwalk(xl_files,
-     ~cat("\n\n<a class=\"download-excel btn btn-primary\" href=\"", sub(paste0("^", params$res_dir, "/?"), "", .x), "\"> Open Spreadsheet '", .y,"'</a>", sep="")
+     ~cat("\n\n<a class=\"download-excel btn btn-primary\" href=\"", attr(.x, "link"), "\"> Open Spreadsheet '", .y,"'</a>", sep="")
      )
 
 #write_all_results(dds_model_comp, dir=params$res_dir)
@@ -596,6 +595,9 @@ param$set("gene_clust")
 
 
 exists_profile_plot <- FALSE
+all_clusters <- list()
+cluster_ind <- counter(post_fn=to_letter)
+
 for (dataset_id in names(dds_model_comp)) {
   dmc_heading(dds_model_comp, dataset=dataset_id, model=NULL, depth="##")
   for (model_id in names(dds_model_comp[[dataset_id]])) {
@@ -620,8 +622,10 @@ for (dataset_id in names(dds_model_comp)) {
           removed <- paste(
             translate_terms(dropped_terms(partials, update(curves[[i]], NULL ~ .)),this_dds),
             sep=", ", collapse=", ")
-
+          if (length(removed)==0 || removed=="") removed <- "nothing"
           gene_clust <- bluster::clusterRows(mat, param$get("gene_clust"), full=TRUE)
+          this_clust <- cluster_ind()
+          levels(gene_clust$clusters) <- paste0(this_clust, levels(gene_clust$clusters))
           group_mat <- t(scale(t(
             assemble_partialised(partials, update(curves[[i]], NULL ~ .), resids=FALSE)
           )))
@@ -645,10 +649,15 @@ for (dataset_id in names(dds_model_comp)) {
           if ("ScaleDiscrete" %in% class(layer_scales(pl)$x)) {
             pl <- pl + scale_x_discrete(guide=guide_axis(n.dodge=2))
           }
+          capt <- paste0("Cluster profile for ", comp_id, " genes  of ", mtag(model_id), " in ", dtag(dataset_id), " having removed effect of ", removed)
           do_plot(pl,
                   label= "diffClustProfile",
-                  caption=paste0("Cluster profile for ", comp_id, " genes  of ", mtag(model_id), " in ", dtag(dataset_id), " having removed effect of ", removed)
+                  caption=capt
                   )
+          all_clusters[[this_clust]] <- list(
+            id=gene_clust$clusters,
+            description=capt
+          )
           cat('\n\n---\n\n')
         }
       }
@@ -671,6 +680,30 @@ if (!exists_profile_plot) {
   ##   geom_line()
 
 ```
+
+
+# Downloads
+
+
+```{r}
+#| label: downloads
+
+iwalk(xl_files,
+     ~cat("\n\n<a class=\"download-excel btn btn-primary\" href=\"", attr(.x, "link"), "\"> Differential genes for '", .y,"'</a>", sep="")
+     )
+
+fname <- write_clusters(all_clusters,
+                          mcols(ddsList[[1]]),
+                          p=params,
+                          prefix="differential-clusters")
+
+cat('\n\n<a class="download-excel btn btn-primary" href="',
+    attr(fname,"link"),
+    '">Gene-Cluster mappings</a>', sep="")
+
+
+```
+
 
 # Terms Of Use
 

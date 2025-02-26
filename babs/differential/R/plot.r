@@ -89,11 +89,9 @@ rename_with_tag <- function(params) {
 ##' @param cap_fn The function that will be called on the caption text
 ##' @return 
 ##' @author Gavin Kelly
-plot_tracker <- function(params) {
-  fig_n <- 0
-  script <- tools::file_path_sans_ext(basename(params$script))
-  labels <- list()
-  tag <- params$TAG
+plot_tracker <- function(p) {
+  script <- tools::file_path_sans_ext(basename(p$script))
+  get_tally <- counter() # keeps track of individual labels and running tally of all plots
   function(pl, label, caption, height_mult=NA, min_height=0, max_height=Inf, preview=FALSE) {
     if ("Heatmap" %in% class(pl)) {
       fn <- function() {
@@ -108,14 +106,10 @@ plot_tracker <- function(params) {
         print(pl)
       }
     }
+    fig_n <- get_tally()
     if (isTRUE(getOption('knitr.in.progress'))) {
       height_opt <- ""
-      fig_n <<- fig_n + 1
-      if (! label %in% names(labels)) {
-        labels[[label]] <<- 0
-      }
-      labels[[label]] <<- labels[[label]]+1
-      label <- paste0(gsub("[^[:alnum:]]+", "-", label), "-", labels[[label]])
+      label <- paste0(gsub("[^[:alnum:]]+", "-", label), "-", get_tally(label))
       if (!is.na(height_mult)) {
         height_opt <- paste0("#| fig.height: ", max(min(knitr::opts_chunk$get("fig.height") * height_mult,max_height), min_height))
       }
@@ -131,7 +125,7 @@ height=height_opt,
 script=script,
 fprefix=sprintf("%0.3i",fig_n)
 )
-      link <- paste0("fig-", sprintf("%0.3i",fig_n), "-", label, tag, ".pdf")
+      link <- paste0("fig-", sprintf("%0.3i",fig_n), "-", label, p$TAG, ".pdf")
       out <- knitr::knit_child(
         text=fig_child,
         options=list(fig.cap=paste0("[", caption, "](", script, "/", link,")")),
@@ -216,7 +210,7 @@ aes_caption <- function(ae) {
 
 cluster_calc <- function(mat, clusterID, group_mat=NULL) {
   tbl <- table(clusterID)
-  levels(clusterID) <- paste0("|", rank(-tbl, ties="first"), "|=", tbl) # change the labels
+  levels(clusterID) <- paste0("|", sub("[0-9]+", "", names(tbl)[1]), rank(-tbl, ties="first"), "|=", tbl) # change the labels
   clusterID <- factor(clusterID, levels=levels(clusterID)[rev(order(tbl))])
   centres <- apply(mat, 2, function(samp) tapply(samp, clusterID, mean))
   out <- list(centroid=as.data.frame(t(centres)))
