@@ -4,4 +4,4 @@
 /pkgdown export-ignore
 /readme.md export-ignore
 /.gitattributes export-ignore
-/babs/.pipeline-version export-subst
+.pipeline-version export-subst

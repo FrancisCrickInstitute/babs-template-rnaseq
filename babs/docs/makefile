@@ -77,10 +77,3 @@ endif
 clean:
 	rm -f report.err report.log
 
-# Originally, shared.mk comes from the parent directory. Copy it here
-# if necessary and applicable:
-ifneq ($(wildcard ../shared.mk),)
-shared.mk: ../shared.mk
-	cp $< $@
-	$(or $(GIT),git) add readme.md
-endif

@@ -120,11 +120,4 @@ build-clean:  ## Remove files only needed for re-`run`ning. Downstream steps wil
 clean-complete: clean-build ## Complete reset. Donwstream steps will no `build` (and perhaps might not even run even if they've already been built.)
 	rm -rf results/$(alignments)
 
-# Originally, shared.mk comes from the parent directory. Copy it here
-# if necessary and applicable:
-ifneq ($(wildcard ../shared.mk),)
-shared.mk: ../shared.mk
-	cp $< $@
-endif
-
 

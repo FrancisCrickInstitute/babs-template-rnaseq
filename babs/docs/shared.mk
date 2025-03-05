@@ -1,3 +1,4 @@
+.DEFAULT_GOAL=help
 ################################################################
 ## Things here are typically shared across all phases of the
 ## analysis. There's originally one gold-reference copy of this file
@@ -392,23 +393,22 @@ renv/activate.R: $(wildcard resources/renv/activate.R)
 ################################################################
 ## Generate secrets
 ################################################################
-# Originally, secret.mk should come from the project directory.  If
-# it's still there, make sure it's up-to-date and then copy it
-# here. If a secret.mk file can't be found anywhere, create a dummy
-# one out of a template.
+# If a secret.mk file can't be found anywhere, create a dummy
+# one out of a template. If there's a .babs file, ensure changes in that
+# are reflected in the secrets file.
 
-$(SELF_DIR)secret.mk: $(firstword $(wildcard $(PROJECT_HOME)/secret.mk $(PROJECT_HOME)/babs/secret.mk $(SELF_DIR)not-secret.mk) xxx) $(wildcard $(PROJECT_HOME)/.babs)
-	@if [ ! "$<" == xxx ]; then \
-	  cp $< $@ ;\
-	  if [ -n "$(wildcard $(PROJECT_HOME)/.babs)" ]; then \
-	    sed  -i '/^setting_/d' $@ ;\
-	    sed -r -n 's/^(\s*)(.*)\s*:\s*(.*$$)/setting_\2=\3/p' $(wildcard $(PROJECT_HOME)/.babs) >> $@ ;\
-	  fi ;\
-	else \
-	  echo "Unable to find a 'secret.mk' file" ;\
-	  exit ;\
+
+$(SELF_DIR)secret.mk: $(wildcard $(PROJECT_HOME)/.babs)
+	if [ ! -f "$@" ]; then \
+	echo "SINGULARITY_ROOT=\#where .sif's are stored" > $@ ;\
+	echo "RENV_PATHS_ROOT=\#local renv cache" >> $@ ;\
+	echo "RENV_PATHS_PREFIX=\#your chosen prefix (e.g.'rocker') to keep the pipeline somewhat isolated" >> $@ ;\
+	echo "SCRATCH_DIR=\#working space for large disposable files" >> $@ ;\
+	echo "NXF_SINGULARITY_CACHEDIR=\#Nextflow cache" >> $@ ;\
+	echo "Created a dummy copy of $@, please edit it" ;\
 	fi
-	@if [ "$<" = "$(SELF_DIR)not-secret.mk" ]; then \
-	    echo "Created a blank '$@' file - please customise it so that the pipeline will run on your system" ;\
-	    exit ;\
+	if [ -n "$<" ]; then \
+	  sed  -i '/^setting_/d' $@ ;\
+	  sed -r -n 's/^(\s*)(.*)\s*:\s*(.*$$)/setting_\2=\3/p' $< >> $@ ;\
 	fi
+

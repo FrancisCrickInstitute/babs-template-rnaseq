@@ -35,40 +35,36 @@ airway/fastq: airway/ena.txt
 airway/nfcore.tar.gz: | test ## Cache the nfcore results for future speed
 	cd test/babs/nfcore &&\
 	make run &&\
-	tar -czf docs-ingress.tar.gz ../docs ../ingress &&\
-	tar -czf  ../../../$@ samplesheet_GRCh38.csv samplesheet.csv GRCh38.config results/GRCh38/multiqc results/GRCh38/star_rsem/*.genes.results results/GRCh38/multi-qc results/GRCh38/star_rsem/rsem.merged.gene_counts.tsv results/GRCh38/merged.gene_counts.tsv docs-ingress.tar.gz &&\
-	rm -f docs-ingress.tar.gz
+	tar -czf  ../../../$@ samplesheet_GRCh38.csv samplesheet.csv GRCh38.config results/GRCh38/multiqc results/GRCh38/star_rsem/*.genes.results results/GRCh38/multi-qc results/GRCh38/star_rsem/rsem.merged.gene_counts.tsv results/GRCh38/merged.gene_counts.tsv
 
 
 test: airway/fastq ## Generate a test folder setup for the airway data
 	mkdir -p $@/babs
 	touch $@/.babs
-	rsync -av  babs/. $@/babs/. --exclude '.~' --exclude 'docs'
+	rsync -av  babs/. $@/babs/. --exclude '.~'
 	( cd $@ && git init )
 	( cd $@/babs && \
 	ln -s ../../airway/fastq fastq && \
 	cp -r ../../airway/docs . && \
 	if [ -n "$(aligner)" ]; then echo "aligner=$(aligner)" >> docs/GRCh38.config; fi && \
-	cp    ../../babs/docs/makefile ../../babs/docs/readme.md ../../babs/docs/.gitignore docs/ && \
 	git commit --allow-empty -m "Restart git repo for testing" && \
 	git tag v9.9.9 )
+	cd $@/babs/ingress && make run
 
 .PHONY: test-ff-nfcore test-differential
 test-ff-nfcore: test/babs/nfcore/results ## Fast-forward to before the differential analysis, by using a cached run of nfcore
 
 test-differential: test/babs/nfcore/results
-	( cd test/babs/differential; make run )
+	cd test/babs/differential; make run
 	cp test/babs/differential/data/counts_GRCh38.rda airway/preprocessed.rda
 
 test/babs/nfcore/results:  test | airway/nfcore.tar.gz
-	( cd test/babs/ingress && make run )
-	( cd test/babs/nfcore && tar  -xzf ../../../airway/nfcore.tar.gz )
-	( cd test/babs && tar -xzf nfcore/docs-ingress.tar.gz && rm -f nfcore/docs-ingress.tar.gz)
+	cd test/babs/nfcore && tar  -xzf ../../../airway/nfcore.tar.gz && make -t run && find results -exec touch {} \;
+
 
 test/isolated-analysis: ## Provide an example of what an isolated differential analysis folder looks like.
 	rm -rf $@
 	cp -r babs/differential $@
-	cp babs/shared.mk babs/secret.mk $@/resources/make/
 	mkdir $@/extdata
 	cp test/babs/docs/analyse.spec $@/extdata
 	cp airway/preprocessed.rda $@/extdata/

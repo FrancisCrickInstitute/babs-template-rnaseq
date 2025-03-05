@@ -153,7 +153,7 @@ renv.lock: resources/_dependencies.R $(wildcard resources/renv/renv.lock) .Rprof
 	  $(R) -e 'library(renv); init(bioconductor=TRUE); snapshot()' ;\
 	fi
 	$(GIT) add renv.lock renv .Rprofile $(source_dir)
-	$(GIT) add $(wildcard ../shared.mk ../makefile ../.gitignore ../readme.md ../.gitignore ../.pipeline-version)
+	$(GIT) add $(wildcard ../makefile ../.gitignore ../readme.md ../.gitignore .pipeline-version)
 	$(GIT) add $(wildcard makefile R .Rbuildignore .gitignore)
 	$(GIT) commit -m 'Renv initialised by pipeline\n\n' || echo "No initialisation files need commiting" $(call log,renv,-a) 
 
@@ -292,11 +292,4 @@ clean-geo:  ## Remove the GEO files from scratch
 
 MAKEFLAGS += --no-builtin-rules
 
-# Originally, shared.mk comes from the parent directory. Copy it here
-# if necessary and applicable:
-ifneq ($(wildcard ../shared.mk),)
-resources/make/shared.mk: ../shared.mk
-	@cp $< $@
-	$(or $(GIT),git) add $(wildcard $@ pre.renv.lock resources/make/project.mk R renv $(source_dir) .Rprofile .Rbuildignore)
-endif
 

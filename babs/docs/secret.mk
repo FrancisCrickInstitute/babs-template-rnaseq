@@ -53,8 +53,7 @@ update-pipeline: ## Update the pipeline
 	if [ -f "$(targz)" ]; then \
 	  $(GIT) stash -m "Stashing state prior to pipeline update" &&\
 	  tar -xzf $(targz) -C $(PROJECT_HOME) && \
-	  cat $(PROJECT_HOME)/babs/.pipeline-version && \
-	  rm -f $(PROJECT_HOME)/babs/*/.pipeline-version;\
+	  cat $(PROJECT_HOME)/babs/docs/.pipeline-version;\
 	else \
 	  if [ -d "$(subst .tar.gz,,$(targz))" ]; then \
 	    $(GIT) stash -m "Stashing state prior to pipeline update" &&\
@@ -70,15 +69,13 @@ update-module: ## Update the specific module you're currently using.
 	  if [ -f "$(targz)" ]; then \
 	    $(GIT) stash -m "Stashing state prior to pipeline update" &&\
 	    tar -xzf $(targz) babs/$(module) --strip-components=2  && \
-	    tar -xzf $(targz) -C ./$(wildcard resources/make/) babs/shared.mk babs/secret.mk --strip-components=1  && \
-	    tar -xzf $(targz) babs/.pipeline-version --strip-components=1  && \
 	    cat .pipeline-version; \
 	  else \
-	    if [ -d "$(subst .tar.gz,,$(targz))" ]; then \
+	    if [ -d "$(subst .tar.gz,,$(targz))" ] && [ -n "$(setting_Type)" ]; then \
 	      $(GIT) stash -m "Stashing state prior to pipeline update" &&\
 	      rsync -avzp $(subst .tar.gz,,$(targz))/babs/$(module)  . ;\
 	    else \
-	      echo "$(setting_Type) $(version) does not exist" ;\
+	      echo "Template '$(setting_Type)' version '$(version)' does not exist" ;\
 	    fi \
 	  fi \
 	else \

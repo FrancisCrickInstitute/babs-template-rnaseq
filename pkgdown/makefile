@@ -65,7 +65,7 @@ publish:
 	git switch -
 	git stash pop || true
 
-shared.mk: ../babs/shared.mk
+shared.mk: ../babs/docs/shared.mk
 	cp $< $@
 
 .Rprofile: ../babs/differential/resources/renv/Rprofile renv/activate.R

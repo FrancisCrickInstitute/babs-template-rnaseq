@@ -52,7 +52,6 @@ $(differential)/extdata/metadata.csv: ../$(experiment_table).csv | $(differentia
 
 $(differential):
 	tar -xzf $(targz) babs/differential --strip-components=1
-	tar -xzf $(targz) babs/shared.mk babs/secret.mk babs/.pipeline-version -C .. --strip-components=1
 	sed -i '/$(r_tx)/a $(r_offset)' $(differential)/resources/00_init.qmd
 	rm -rf .git
 	git init
