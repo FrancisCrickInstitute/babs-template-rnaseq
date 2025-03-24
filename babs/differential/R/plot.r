@@ -193,9 +193,15 @@ substitute_x_aes <- function(mapping) {
   if (need_alt_x) {
     is_x <- which(names(mapping)=="x")
     first_not_x <- seq_along(mapping)[-c(1,is_x)][1]
-    new_fml <- mapping
-    names(new_fml)[c(is_x, first_not_x)] <- names(mapping)[c(first_not_x,is_x)]
-    aes_list <- list(mapping, new_fml)
+    if (is.na(first_not_x)) {
+      new_fml <- mapping
+      mapping$colour <- mapping$x
+      aes_list <- list(mapping)
+    } else {
+      new_fml <- mapping
+      names(new_fml)[c(is_x, first_not_x)] <- names(mapping)[c(first_not_x,is_x)]
+      aes_list <- list(mapping, new_fml)
+    }
   } else {
     aes_list <- list(mapping)
   }
