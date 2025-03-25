@@ -751,6 +751,7 @@ for (dataset_id in names(ddsList)) {
       cat(var_heading("Partial Residuals of Associated PCs ", depth=2 + (sum(mdls)>1)))
       pc_partials <- partialise.matrix(t(pc), colDat, design)
       for (fml in plot_formulae) {
+        if (length(all.vars(fml[[3]]))==0) next
         mat <- assemble_partialised(pc_partials, update(fml, NULL ~ .))
         pc_hits <- data.frame(covar=all.vars(fml[[3]]), strongest=NA_character_, first=NA_character_, row.names=all.vars(fml[[3]]))
         for (covar in all.vars(fml[[3]])) {
