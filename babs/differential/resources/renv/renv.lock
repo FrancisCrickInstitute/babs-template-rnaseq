@@ -454,17 +454,6 @@
       ],
       "Hash": "8d6e9f4dce69aec9c588c27ae79be08e"
     },
-    "KernSmooth": {
-      "Package": "KernSmooth",
-      "Version": "2.23-22",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Requirements": [
-        "R",
-        "stats"
-      ],
-      "Hash": "2fecebc3047322fa5930f74fae5de70f"
-    },
     "MASS": {
       "Package": "MASS",
       "Version": "7.3-60",
@@ -960,18 +949,6 @@
       ],
       "Hash": "fca0d5ffad6380f13cad4d7855107aef"
     },
-    "boot": {
-      "Package": "boot",
-      "Version": "1.3-28.1",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Requirements": [
-        "R",
-        "graphics",
-        "stats"
-      ],
-      "Hash": "9a052fbcbe97a98ceb18dbfd30ebd96e"
-    },
     "brew": {
       "Package": "brew",
       "Version": "1.0-8",
@@ -1080,19 +1057,6 @@
         "utils"
       ],
       "Hash": "bf366c80e2b55a5383b4af8fa2a10b74"
-    },
-    "class": {
-      "Package": "class",
-      "Version": "7.3-22",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Requirements": [
-        "MASS",
-        "R",
-        "stats",
-        "utils"
-      ],
-      "Hash": "f91f6b29f38b8c280f2b9477787d4bb2"
     },
     "cli": {
       "Package": "cli",
@@ -1695,19 +1659,6 @@
         "utils"
       ],
       "Hash": "618609b42c9406731ead03adf5379850"
-    },
-    "foreign": {
-      "Package": "foreign",
-      "Version": "0.8-85",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Requirements": [
-        "R",
-        "methods",
-        "stats",
-        "utils"
-      ],
-      "Hash": "26a24dde1722321b78f10d3bf42538d6"
     },
     "formatR": {
       "Package": "formatR",
@@ -2735,18 +2686,6 @@
       ],
       "Hash": "8d1938040a05566f4f7a14af4feadd6b"
     },
-    "nnet": {
-      "Package": "nnet",
-      "Version": "7.3-19",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Requirements": [
-        "R",
-        "stats",
-        "utils"
-      ],
-      "Hash": "2c797b46eea7fb58ede195bc0b1f1138"
-    },
     "numDeriv": {
       "Package": "numDeriv",
       "Version": "2016.8-1.1",
@@ -3342,19 +3281,6 @@
       ],
       "Hash": "7b153c746193b143c14baa072bae4e27"
     },
-    "rpart": {
-      "Package": "rpart",
-      "Version": "4.1.21",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Requirements": [
-        "R",
-        "grDevices",
-        "graphics",
-        "stats"
-      ],
-      "Hash": "d5bc1a16e01e50e08581f0c362d3955d"
-    },
     "rprojroot": {
       "Package": "rprojroot",
       "Version": "2.0.3",
@@ -3599,19 +3525,6 @@
       ],
       "Hash": "5f5a7629f956619d519205ec475fe647"
     },
-    "spatial": {
-      "Package": "spatial",
-      "Version": "7.3-17",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Requirements": [
-        "R",
-        "graphics",
-        "stats",
-        "utils"
-      ],
-      "Hash": "1229a01b4ec059e9f2396724f2ec9010"
-    },
     "statmod": {
       "Package": "statmod",
       "Version": "1.5.0",
@@ -3653,22 +3566,6 @@
         "vctrs"
       ],
       "Hash": "671a4d384ae9d32fc47a14e98bfa3dc8"
-    },
-    "survival": {
-      "Package": "survival",
-      "Version": "3.5-7",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Requirements": [
-        "Matrix",
-        "R",
-        "graphics",
-        "methods",
-        "splines",
-        "stats",
-        "utils"
-      ],
-      "Hash": "b8e943d262c3da0b0febd3e04517c197"
     },
     "sys": {
       "Package": "sys",
