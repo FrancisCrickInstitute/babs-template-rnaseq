@@ -145,7 +145,7 @@ extdata/R.bib: renv.lock
 
 renv.lock: resources/_dependencies.R $(wildcard resources/renv/renv.lock) .Rprofile renv/activate.R | $(log_dir)
 	if [ -f resources/renv/renv.lock ] ; then \
-	  $(GIT) mv resources/renv/renv.lock renv.lock || mv resources/renv/renv.lock renv.lock;\
+	  $(GIT) mv resources/renv/renv.lock renv.lock 2>/dev/null || mv resources/renv/renv.lock renv.lock;\
 	  $(R) -e 'library(renv); restore()' ;\
 	  $(R) -e 'library(renv); install(); snapshot()' ;\
 	else \

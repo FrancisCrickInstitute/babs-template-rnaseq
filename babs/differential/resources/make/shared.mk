@@ -41,8 +41,8 @@ staging_dir=staging
 RESULTS_DIR = results
 ## Convenient shortcut for immediate quarto output
 staged_results=$(staging_dir)/$(RESULTS_DIR)/$(VERSION)
-## Where to store scripts necessary to launch rstudio
-rstudio-launch-dir=.rstudio-launch
+## Where to store scripts necessary to launch rstudio/shiny/jupyter etc
+launch_dir=.babs-launchers
 
 # csv file names (excluding ext)
 log_dir=logs
@@ -182,6 +182,8 @@ endif
 ## prevailing system executables.
 ################################################################
 
+excluded-targets += Dockerfile install_all.sh
+
 CONTAIN=false#An internal flag
 BIND_DIR = $(shell $(GIT) rev-parse --show-toplevel || echo $(CURDIR))
 
@@ -202,11 +204,14 @@ $(CONTAINER_IMAGE):
 	$(makeg_rwx) $(CONTAINER_IMAGE)
 CONTAIN=true
 
+.PHONY: overlay
+overlay:  ## Create an overlay for singularity, for additional tools.  e.g. `make overlay CONTAINER_OVERLAY=X` will run the resources/shell/overlay_X.sh 
 # Persistent overlays - can put include a union filesystem with the underlying image, for e.g extra binaries.
 ifdef CONTAINER_OVERLAY
 
 CONTAINER_VARS=env SINGULARITYENV_PREPEND_PATH=/singularity-bin:/singularity-bin/bin
-$(BABS_SINGULARITY_OVERLAYS)/$(IMAGE)/$(IMAGE_TAG)/$(CONTAINER_OVERLAY): resources/shell/overlay_$(basename $(CONTAINER_OVERLAY)).sh Renviron.site
+overlay: $(CONTAINER_OVERLAY_PATH)
+$(CONTAINER_OVERLAY_PATH): | resources/shell/overlay_$(basename $(CONTAINER_OVERLAY)).sh Renviron.site
 	mkdir -p $(BABS_SINGULARITY_OVERLAYS)/$(IMAGE)/$(IMAGE_TAG)
 	$(CONTAINER) overlay create --sparse --size $(or $(CONTAINER_OVERLAY_SIZE),1024) --create-dir /singularity-bin $(CONTAINER_OVERLAY_PATH)
 	[ ! -f "$<" ] || $(CONTAINER) $(CONTAINER_OPTIONS) $(CONTAINER_IMAGE) /bin/bash $<
@@ -231,13 +236,13 @@ CONTAINER_FLAGS=run \
 --mount type=bind,source="/tmp",target="/tmp" \
 --mount type=bind,source="$(CURDIR)/Renviron.site",target="/usr/local/lib/R/etc/Renviron.site" \
 --workdir="$(CURDIR)" $(IMAGE):$(IMAGE_TAG)
-	mkdir -p $(dir $(CONTAINER_IMAGE))
-	touch $(CONTAINER_IMAGE)
 CONTAINER_SHELL = $(CONTAINER) $(patsubst run,exec -it,$(CONTAINER_FLAGS_INTERACTIVE)) $(CONTAINER_IMAGE) /bin/bash
 CONTAIN=true
 $(CONTAINER_IMAGE): 
 	$(CONTAINER) pull docker://$(IMAGE):$(IMAGE_TAG)
+	mkdir -p $(dir $(CONTAINER_IMAGE))
 	echo "Proxy for docker image" > $@
+
 
 else ifeq ($(EXECUTOR),shell)
   $(info " Not using containerisation so results are not necessarily reproducible")
@@ -249,9 +254,14 @@ else
   $(error "# Don't recognise '$(EXECUTOR)' as an executor")
 endif
 
+Dockerfile: resources/docker/Dockerfile install_all.sh ## Create a Dockerfile corresponding to the image in use.
+	< $< $(call envsubst,RVERSION BIOCONDUCTOR_VERSION VERSION) > $@
+install_all.sh: resources/shell/overlay_*.sh
+	cat $^ > $@
+
 ifeq ($(CONTAIN),true)
 Renviron.site: | $(CONTAINER_IMAGE)
-optionalRenviron=Renviron.site $(CONTAINER_OVERLAY_PATH)
+optionalRenviron=Renviron.site  $(CONTAINER_OVERLAY_PATH)
 containerPrefix=$(CONTAINER) $(CONTAINER_OPTIONS) --env MAKEFLAGS="$(MAKEFLAGS)" $(CONTAINER_IMAGE)
 else
 optionalRenviron=
@@ -295,85 +305,41 @@ log=2>&1 | tee $2 $(log_dir)/$1.log
 # Alternative definition, which supresses stdout
 #log=$(subst -a,>)$(log_dir)/$1.log 2>&1
 
+# Templating a text file - replace instances of ${A} with the value of variable A
+# $(call envsubst,A B) produces A='$(A)' B='$(B)' envsubst '$$A $$B'
+# In shell, this transfers out the values of variables A and B, then calls envsubst on a file provided by stdin which  replaces instances in that file  of '$A' with its value...
+envsubst = $(foreach v,$(1),$v='$($(v))' )envsubst '$(foreach v,$(1),$${$v})'
+
 ################################################################
 ## Recipes for calling R/Rstudio
 ##
 ################################################################
-excluded-targets += R R-local R-$(RVERSION)
+excluded-targets += R R-local R-$(RVERSION) .Rprofile
 
 .PHONY: R R-local R-$(RVERSION)
 
-R R-$(RVERSION) rstudio rstudio-slurm: $(optionalRenviron)
+R R-$(RVERSION) : $(optionalRenviron)
 
-Renviron.site:  $(CONTAINER_IMAGE)
-	echo "RENV_PATHS_PREFIX=$(RENV_PATHS_PREFIX)" > $@
+Renviron.site:
+	$(CONTAINER) exec --bind $(CURDIR) $(CONTAINER_IMAGE) cp /usr/local/lib/R/etc/Renviron.site $(CURDIR)/$@
+	echo "RENV_PATHS_PREFIX=$(RENV_PATHS_PREFIX)" >> $@
 	echo "RENV_PATHS_ROOT=$(RENV_PATHS_ROOT)" >> $@
 	echo "RENV_PATHS_LIBRARY=renv/library" >> $@
 
-rstudio-binds=--bind ./run:/run,./database.conf:/etc/rstudio/database.conf,$\
-./rsession.sh:/etc/rstudio/rsession.sh,./var/lib/rstudio-server:/var/lib/rstudio-server,$\
-./rsession.conf:/etc/rstudio/rsession.conf,./R:$$HOME/.config/R,./rstudio:$$HOME/.config/rstudio,$\
-/etc/ssl/certs/ca-bundle.crt,$$HOME/.ssh,/sys/fs/cgroup
+R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses). Can take a CONTAINER_OVERLAY argument (see 'overlay')
 
-rstudio-envs=--env RSTUDIO_SESSION_TIMEOUT=0,USER=$$(id -un),PASSWORD=$$PASSWORD
-
-define doInContainer
-#!/usr/bin/env bash
-image='$(CONTAINER_IMAGE)'
-
-pwd=$$(realpath .)
-project_root=$$(git rev-parse --show-toplevel || echo $${pwd})
-bn=$$(basename $$0)
-if [[ "$$bn" =~ ^my-.* ]]; then
-    e1=$${bn#my-}
-    extra=$$(eval echo $${BABS_SINGULARITY_INTERACTIVE_EXTRAS})
-    cmd=$${BABS_CMD:-$${e1%-*}}
-else
-    cmd=$${BABS_CMD:-$${bn%-*}}
-    extra=""
-fi
-
-if [[ -f Renviron.site ]]; then
-    renvironBind=,$${pwd}/Renviron.site:/usr/local/lib/R/etc/Renviron.site
-else
-    renvironBind=""
-fi
-
-export PASSWORD=$$(openssl rand -base64 15)
-export caller="$(CONTAINER) $(CONTAINER_OPTIONS) $(rstudio-binds) $(rstudio-envs) $${extra} $${image}"
-
-
-if [ "$$cmd" == rstudio ]; then
-    cd $(rstudio-launch-dir)
-    source rstudio.sh
-elif [ "$cmd" == shiny ]; then
-    export caller="$(CONTAINER) $(CONTAINER_OPTIONS) $${extra} $${image}"
-    cd .rstudio-launch
-    source shiny.sh
-elif [ "$$cmd" == ondemand ]; then
-    cd $(rstudio-launch-dir)
-    rm -f server.log
-    export hname=$$(hostname)
-    sbatch rstudio.sh
-    echo "Waiting for submission to be accepted. Further instructions will appear here, or if the queue is busy you can safely cancel (Ctrl+C) this local process and instead monitor $(rstudio-launch-dir)/server.log"
-    tail -f --retry server.log 2>/dev/null | sed '/scancel -f/ q' 
-elif [ "$$cmd" == shell ]; then
-    $(CONTAINER) $(CONTAINER_SHELL_OPTIONS) $${extra} $${image} 
-else
-    $(CONTAINER) $(CONTAINER_OPTIONS) $${extra} $${image} $${cmd} $$@
-fi
-
-endef
-export doInContainer
-
-R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses)
-
-R-$(RVERSION): 
-	@echo "$${doInContainer}" | sed -e 's#--pwd $(CURDIR)#--pwd $${pwd}#' -e 's#--bind $(BIND_DIR)#--bind $${project_root}#'  -e 's#,$(CURDIR)/Renviron.site:/usr/local/lib/R/etc/Renviron.site#$${renvironBind}#' > $@
+R-$(RVERSION): resources/shell/R-local
+	< $< $(call envsubst,CONTAINER_IMAGE CONTAINER_OVERLAY_PATH CONTAINER CONTAINER_OPTIONS CONTAINER_SHELL_OPTIONS launch_dir) | \
+	sed \
+ -e 's#--pwd $(CURDIR)#--pwd $${pwd}#' \
+ -e 's#--bind $(BIND_DIR)#--bind $${project_root}#'  \
+ -e 's#,$(CURDIR)/Renviron.site:/usr/local/lib/R/etc/Renviron.site#$${renvironBind}#' \
+ -e 's#--overlay $(CONTAINER_OVERLAY_PATH)#$${overlay:+--overlay $${overlay}}#' > $@
 	@$(make_rwx) $@
-	mkdir -p $(rstudio-launch-dir)/
-	cp resources/shell/rstudio-launch.sh $(rstudio-launch-dir)/rstudio.sh
-	cp resources/shell/rstudio-launch.sh $(rstudio-launch-dir)/shiny.sh
+	mkdir -p $(launch_dir)/
+	cp resources/shell/rstudio-launch.sh $(launch_dir)/rstudio.sh
+	cp resources/shell/shiny-launch.sh $(launch_dir)/shiny.sh
+	cp resources/shell/jupyter-launch.sh $(launch_dir)/jupyter.sh
 
 
 R:
@@ -381,13 +347,13 @@ R:
 	@$(CONTAINER) $(CONTAINER_OPTIONS) $(shell echo $${BABS_SINGULARITY_INTERACTIVE_EXTRAS}) $(CONTAINER_IMAGE) R
 
 
-.Rprofile: $(wildcard resources/renv/Rprofile)
+.Rprofile: $(wildcard resources/renv/Rprofile) | renv/activate.R
 	mkdir -p renv
-	[ ! -f "$<" ] || $(GIT) mv $< $@ || mv $< $@
+	[ ! -f "$<" ] || $(GIT) mv $< $@ 2>/dev/null || mv $< $@
 
 renv/activate.R: $(wildcard resources/renv/activate.R)
 	mkdir -p renv
-	[ ! -f "$<" ] || $(GIT) mv $< $@ || mv $< $@
+	[ ! -f "$<" ] || $(GIT) mv $< $@ 2>/dev/null || mv $< $@
 
 
 ################################################################
@@ -396,7 +362,6 @@ renv/activate.R: $(wildcard resources/renv/activate.R)
 # If a secret.mk file can't be found anywhere, create a dummy
 # one out of a template. If there's a .babs file, ensure changes in that
 # are reflected in the secrets file.
-
 
 $(SELF_DIR)secret.mk: $(wildcard $(PROJECT_HOME)/.babs)
 	if [ ! -f "$@" ]; then \
@@ -411,4 +376,3 @@ $(SELF_DIR)secret.mk: $(wildcard $(PROJECT_HOME)/.babs)
 	  sed  -i '/^setting_/d' $@ ;\
 	  sed -r -n 's/^(\s*)(.*)\s*:\s*(.*$$)/setting_\2=\3/p' $< >> $@ ;\
 	fi
-

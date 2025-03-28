@@ -3,11 +3,11 @@
 #SBATCH --job-name=shiny
 #SBATCH --ntasks=1
 
-while
-  PORT=$(shuf -n 1 -i 49152-65535)
-  netstat -atun | grep -q "$PORT"
-do
-  continue
+seed=0
+while :; do
+    PORT=$(shuf -n 1 -i 49152-65535 --random-source=<(echo "{PWD}${seed}" | openssl dgst -sha256))
+    ss -atun sport ":$PORT" | grep -q ":$PORT" || break
+    ((seed++))
 done
 
 ## Produce the informative message
@@ -41,4 +41,8 @@ curl -s -H "Title: Shiny server ready" -H "Tag:information_source"  https://ntfy
 END
 fi
 
-eval ${caller} "R  -e \"shiny::runApp(host='0.0.0.0',port=${PORT})\""
+if [ -z "$@" ]; then 
+    eval ${caller} "R  -e \"shiny::runApp(host='0.0.0.0',port=${PORT})\""
+else
+    eval ${caller} "R  -e \"shiny::runApp(appDir='$1', host='0.0.0.0',port=${PORT})\""
+fi

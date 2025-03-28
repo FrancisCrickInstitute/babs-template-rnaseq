@@ -29,7 +29,7 @@ exec /usr/lib/rstudio-server/bin/rsession "\${@}"
 END
 
 cat > rsession.conf <<END
-session-default-working-dir=${PWD}/..
+session-default-working-dir=$(realpath ..)
 END
 
 cat > rstudio/rstudio-prefs.json <<EOF
@@ -44,11 +44,11 @@ chmod +x ./rsession.sh
 # Alternative to setting session-timeout-minutes=0 in /etc/rstudio/rsession.conf
 # https://github.com/rstudio/rstudio/blob/v1.4.1106/src/cpp/server/ServerSessionManager.cpp#L126
 
-while
-  PORT=$(shuf -n 1 -i 49152-65535)
-  netstat -atun | grep -q "$PORT"
-do
-  continue
+seed=0
+while :; do
+    PORT=$(shuf -n 1 -i 49152-65535 --random-source=<(echo "{PWD}${seed}" | openssl dgst -sha256))
+    ss -atun sport ":$PORT" | grep -q ":$PORT" || break
+    ((seed++))
 done
 
 

@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+pwd=$(realpath .)
+image='${CONTAINER_IMAGE}'
+project_root=$(git rev-parse --show-toplevel || echo ${pwd})
+overlay=${CONTAINER_OVERLAY_PATH}
+
+basename=$(basename $0)
+cmd=${BABS_CMD:-${basename%-*}}
+
+
+if [[ -f Renviron.site ]]; then
+    renvironBind=,${pwd}/Renviron.site:/usr/local/lib/R/etc/Renviron.site
+else
+    renvironBind=""
+fi
+
+if [[ -n "${SINGULARITY_BIND}" ]]; then
+    echo "Warning: Extra directories being bound to the container: ${SINGULARITY_BIND}. This might affect reproducibility." 1>&2
+fi
+
+if compgen -v | grep SINGULARITYENV 1>&2; then
+  echo "Warning: The above environment variables are used in the container. Remove the corresponding SINGULARITYENV_* variable if you don't want the following values to be used."
+  for var in $(compgen -v | grep SINGULARITYENV); do
+    echo "${var#SINGULARITYENV_}=${!var}" 1>&2
+  done
+fi
+
+
+export PASSWORD=$(openssl rand -base64 15)
+rstudio_binds="--bind ./run:/run,./database.conf:/etc/rstudio/database.conf,\
+./rsession.sh:/etc/rstudio/rsession.sh,./var/lib/rstudio-server:/var/lib/rstudio-server,\
+./rsession.conf:/etc/rstudio/rsession.conf,./R:$HOME/.config/R,./rstudio:$HOME/.config/rstudio,\
+/etc/ssl/certs/ca-bundle.crt,$HOME/.ssh,/sys/fs/cgroup"
+
+export caller="${CONTAINER} ${CONTAINER_OPTIONS} ${rstudio_binds} --env RSTUDIO_SESSION_TIMEOUT=0,USER=$(id -un),PASSWORD=$PASSWORD ${image}"
+
+
+if [ "$cmd" == rstudio ]; then
+    cd ${launch_dir}
+    source rstudio.sh
+elif [ "$cmd" == shiny ]; then
+    export caller="${CONTAINER} ${CONTAINER_OPTIONS} ${image}"
+    cd ${launch_dir}
+    source shiny.sh
+elif [ "$cmd" == jupyter ]; then
+    export caller="${CONTAINER} ${CONTAINER_OPTIONS} ${image}"
+    cd ${launch_dir}
+    source jupyter.sh
+elif [ "$cmd" == ondemand ]; then
+    cd ${launch_dir}
+    rm -f server.log
+    export hname=$(hostname)
+    sbatch rstudio.sh
+    echo "Waiting for submission to be accepted. Further instructions will appear here, or if the queue is busy you can safely cancel (Ctrl+C) this local process and instead monitor ${launch_dir}/server.log"
+    tail -f --retry server.log 2>/dev/null | sed '/scancel -f/ q' 
+elif [ "$cmd" == shell ]; then
+    ${CONTAINER} ${CONTAINER_SHELL_OPTIONS} ${image} 
+else
+    ${CONTAINER} ${CONTAINER_OPTIONS} ${image} ${cmd} $@
+fi
+

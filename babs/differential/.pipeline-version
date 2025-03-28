@@ -1,1 +1,0 @@
-$Format:PIPELINE_VERSION=%(describe:tags)%n%n#Last commit: %h by %aN at %cd$

@@ -1,7 +1,8 @@
 .DEFAULT_GOAL=help
 
 template_dir := /nemo/stp/babs/working/bioinformatics/templates
-
+#generic_dir := $(template_dir)/template-generic
+generic_dir := /nemo/stp/babs/working/kellyg/projects/github/FrancisCrickInstitute/templates/template-generic
 type = rnaseq
 
 ifndef version
@@ -23,6 +24,19 @@ endif
 	mv $(type)-$(version).tar.gz $(template_dir)/archive/$(type)-$(version).tar.gz
 
 
+.PHONY: infrastructure
+launchers=$(patsubst $(generic_dir)/%,babs/differential/%,$(wildcard $(generic_dir)/resources/shell/*-launch.sh $(generic_dir)/resources/shell/R-local))
+shared=$(patsubst %,babs/%/shared.mk,docs ingress nfcore) pkgdown/shared.mk
+
+infrastructure: $(launchers) $(shared)
+
+$(launchers) : babs/differential/% : $(generic_dir)/%
+	cp $< $@
+$(shared) : babs/differential/resources/make/shared.mk
+	ln -f $< $@
+babs/differential/resources/make/shared.mk: $(wildcard $(generic_dir)/template/resources/make/shared-rnaseq.mk)
+	cp $< $@
+
 
 $(template_dir)/archive $(template_dir)/$(type):
 	mkdir -p $@
@@ -38,7 +52,7 @@ airway/nfcore.tar.gz: | test ## Cache the nfcore results for future speed
 	tar -czf  ../../../$@ samplesheet_GRCh38.csv samplesheet.csv GRCh38.config results/GRCh38/multiqc results/GRCh38/star_rsem/*.genes.results results/GRCh38/multi-qc results/GRCh38/star_rsem/rsem.merged.gene_counts.tsv results/GRCh38/merged.gene_counts.tsv
 
 
-test: airway/fastq ## Generate a test folder setup for the airway data
+test: airway/fastq infrastructure ## Generate a test folder setup for the airway data
 	mkdir -p $@/babs
 	touch $@/.babs
 	rsync -av  babs/. $@/babs/. --exclude '.~'
