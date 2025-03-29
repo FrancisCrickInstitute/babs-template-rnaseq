@@ -1,3 +1,15 @@
+# Version 0.20.0
+## Major Changes
+ - Rationalise the counter/table/plot tracking system
+ - Refactor so shared+secret are in all modules
+ - Tidy up unneeded packages from renv.lock
+ - Switch to generic launchers
+## Minor Changes
+ - Make the do_tbl conform to the do_plot approach
+ - Fix skipping default profile_plot
+ - Fix bug in aesthetic overrides when there's only one aesthetic
+ - Fix another edge-case for partials with uni-variable models
+ - Move to the generic launcher capability
 # Version 0.18.1
 ## Major Changes
 Add the profile plots to the exploratory page
