@@ -1,14 +1,4 @@
 #!/usr/bin/env bash
-#SBATCH --output=shiny.log
-#SBATCH --job-name=shiny
-#SBATCH --ntasks=1
-
-seed=0
-while :; do
-    PORT=$(shuf -n 1 -i 49152-65535 --random-source=<(echo "{PWD}${seed}" | openssl dgst -sha256))
-    ss -atun sport ":$PORT" | grep -q ":$PORT" || break
-    ((seed++))
-done
 
 ## Produce the informative message
 me=$(id -un)
@@ -16,21 +6,19 @@ if [ -z "${SLURM_JOB_ID}" ]; then
   echo "Point your web browser to http://$(hostname).$(dnsdomainname):${PORT}"
 else
 cat 1>&2 <<END
-SSH tunnel from your workstation (ie not ${hname}) using the following command:
+Create an SSH tunnel from your workstation (ie _not_ something at $(dnsdomainname)) using the following command:
 ssh -A -N -L 3838:$(hostname).$(dnsdomainname):${PORT} ${me}@${hname}.$(dnsdomainname)
+(or another login node on $(dnsdomainname) instead of ${hname})
 and point your web browser to http://localhost:3838
 END
 fi
 
-cat 1>&2 <<END
-When done using using the app, terminate the job:
-END
 if [ -z "${SLURM_JOB_ID}" ]; then
-echo "Quit (Ctrl+C) this process"
+echo "When done using using the app, quit (Ctrl+C) this process"
 else
 cat 1>&2 <<END
-Issue the following command on the login node:
-      scancel -f ${SLURM_JOB_ID}
+When done using using the app, issue the following command on the login node:
+  scancel -f ${SLURM_JOB_ID}
 END
 fi
 

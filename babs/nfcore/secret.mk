@@ -13,6 +13,9 @@ RENV_PATHS_PREFIX=$(subst /,-,$(IMAGE))
 SCRATCH_DIR=/flask/scratch/babs/$(USER)/projects/$(or $(setting_Hash),$(word 9,$(subst /, ,$(CURDIR))))
 # Nextflow cache:
 NXF_SINGULARITY_CACHEDIR=/flask/apps/containers/all-singularity-images/
+# Path to where singularity overlay files are put and retrieved from
+BABS_SINGULARITY_OVERLAYS=/nemo/stp/babs/working/bioinformatics/software/singularity/overlays
+
 
 ## BABS-specific stuff
 

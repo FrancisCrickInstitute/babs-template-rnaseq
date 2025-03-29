@@ -1,15 +1,24 @@
 #!/usr/bin/env bash
-pwd=$(realpath .)
+#SBATCH --ntasks=1
+#SBATCH --output=slurm-%x.out
+
 image='${CONTAINER_IMAGE}'
-project_root=$(git rev-parse --show-toplevel || echo ${pwd})
 overlay=${CONTAINER_OVERLAY_PATH}
 
-basename=$(basename $0)
+if [ -z "${SLURM_JOB_ID}" ]; then
+    basename=$(basename $0)
+    NUM_THREADS=2
+else
+    basename=$(basename $(scontrol show job $SLURM_JOB_ID | awk -F= '/Command=/{print $2}'))
+    NUM_THREADS=${SLURM_JOB_CPUS_PER_NODE}
+    hname=babs002
+fi
+
+
 cmd=${BABS_CMD:-${basename%-*}}
 
-
 if [[ -f Renviron.site ]]; then
-    renvironBind=,${pwd}/Renviron.site:/usr/local/lib/R/etc/Renviron.site
+    renvironBind=,$$(realpath .)/Renviron.site:/usr/local/lib/R/etc/Renviron.site
 else
     renvironBind=""
 fi
@@ -17,7 +26,6 @@ fi
 if [[ -n "${SINGULARITY_BIND}" ]]; then
     echo "Warning: Extra directories being bound to the container: ${SINGULARITY_BIND}. This might affect reproducibility." 1>&2
 fi
-
 if compgen -v | grep SINGULARITYENV 1>&2; then
   echo "Warning: The above environment variables are used in the container. Remove the corresponding SINGULARITYENV_* variable if you don't want the following values to be used."
   for var in $(compgen -v | grep SINGULARITYENV); do
@@ -26,36 +34,37 @@ if compgen -v | grep SINGULARITYENV 1>&2; then
 fi
 
 
-export PASSWORD=$(openssl rand -base64 15)
-rstudio_binds="--bind ./run:/run,./database.conf:/etc/rstudio/database.conf,\
-./rsession.sh:/etc/rstudio/rsession.sh,./var/lib/rstudio-server:/var/lib/rstudio-server,\
-./rsession.conf:/etc/rstudio/rsession.conf,./R:$HOME/.config/R,./rstudio:$HOME/.config/rstudio,\
-/etc/ssl/certs/ca-bundle.crt,$HOME/.ssh,/sys/fs/cgroup"
+PASSWORD=$(openssl rand -base64 15)
 
-export caller="${CONTAINER} ${CONTAINER_OPTIONS} ${rstudio_binds} --env RSTUDIO_SESSION_TIMEOUT=0,USER=$(id -un),PASSWORD=$PASSWORD ${image}"
+export caller="${CONTAINER} ${CONTAINER_OPTIONS} ${image}"
+
+seed=0
+while :; do
+    PORT=$(shuf -n 1 -i 49152-65535 --random-source=<(echo "${PWD}${seed}" | openssl dgst -sha256 | cut -d ' ' -f2 ))
+    ss -atun sport ":$PORT" | grep -q ":$PORT" || break
+    ((seed++))
+done
 
 
 if [ "$cmd" == rstudio ]; then
-    cd ${launch_dir}
+    export SINGULARITYENV_RSTUDIO_SESSION_TIMEOUT=0
+    export SINGULARITYENV_USER=$(id -un)
+    export SINGULARITYENV_PASSWORD=$PASSWORD
+    export SINGULARITY_BIND="./run:/run,./database.conf:/etc/rstudio/database.conf,\
+./rsession.sh:/etc/rstudio/rsession.sh,./var/lib/rstudio-server:/var/lib/rstudio-server,\
+./rsession.conf:/etc/rstudio/rsession.conf,./R:$HOME/.config/R,./rstudio:$HOME/.config/rstudio,\
+/etc/ssl/certs/ca-bundle.crt,$HOME/.ssh,/sys/fs/cgroup"
+    cd .babs-launchers
     source rstudio.sh
 elif [ "$cmd" == shiny ]; then
-    export caller="${CONTAINER} ${CONTAINER_OPTIONS} ${image}"
-    cd ${launch_dir}
+    cd .babs-launchers
     source shiny.sh
 elif [ "$cmd" == jupyter ]; then
-    export caller="${CONTAINER} ${CONTAINER_OPTIONS} ${image}"
-    cd ${launch_dir}
+    cd .babs-launchers
     source jupyter.sh
-elif [ "$cmd" == ondemand ]; then
-    cd ${launch_dir}
-    rm -f server.log
-    export hname=$(hostname)
-    sbatch rstudio.sh
-    echo "Waiting for submission to be accepted. Further instructions will appear here, or if the queue is busy you can safely cancel (Ctrl+C) this local process and instead monitor ${launch_dir}/server.log"
-    tail -f --retry server.log 2>/dev/null | sed '/scancel -f/ q' 
 elif [ "$cmd" == shell ]; then
-    ${CONTAINER} ${CONTAINER_SHELL_OPTIONS} ${image} 
+    eval "${caller/exec/shell}"
 else
-    ${CONTAINER} ${CONTAINER_OPTIONS} ${image} ${cmd} $@
+    eval "${caller} ${cmd} $@"
 fi
 

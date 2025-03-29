@@ -69,7 +69,8 @@ make_rwx = setfacl -m u::rwx
 makeg_rwx = setfacl -m g::rwx
 
 # Environment Variables
-BIOCPARALLEL_WORKER_NUMBER=2
+NUM_THREADS=$${NUM_THREADS:-2}
+
 
 ################################################################
 # Git-derived variables
@@ -78,6 +79,7 @@ PROJECT_HOME:=$(shell $(GIT) rev-parse --show-toplevel 2>/dev/null || echo $(dir
 TAG = _$(shell $(GIT) describe --tags --dirty=_altered --always --long 2>/dev/null || echo "uncontrolled")# e.g. v1.0.2-2-ace1729a
 VERSION := $(shell $(GIT) describe --tags --abbrev=0 2>/dev/null || echo "vX.Y.Z")#e.g. v1.0.2
 git-ignore=touch .gitignore && grep -qxF '$(1)' .gitignore || echo '$(1)' >> .gitignore
+
 
 
 include $(SELF_DIR)secret.mk
@@ -162,6 +164,7 @@ define slurm
 #SBATCH --job-name=$(notdir $(CURDIR))
 #SBATCH --output=slurm-%x-%A_%a.out
 export MAKEFLAGS="$(MAKEFLAGS)"
+NUM_THREADS=$${SLURM_JOB_CPUS_PER_NODE}
 $(containerPrefix) make $@ SUBMIT=false EXECUTOR=make $(send_notification)
 endef
 
@@ -185,19 +188,19 @@ endif
 excluded-targets += Dockerfile install_all.sh
 
 CONTAIN=false#An internal flag
-BIND_DIR = $(shell $(GIT) rev-parse --show-toplevel || echo $(CURDIR))
-
+BIND_DIR = $$(git rev-parse --show-toplevel 2>/dev/null || echo $$(realpath .))
 EXECUTOR?=singularity
 
 ifeq ($(EXECUTOR),singularity)
 #Sometimes we want to do e.g. env SINGULARITYENV_APPEND_PATH=/stuff - that's what CONTAINER_VARS is for
 CONTAINER= $(call ml,Singularity/$(SINGULARITY_VERSION)); $(CONTAINER_VARS) singularity
 CONTAINER_IMAGE=$(SINGULARITY_ROOT)/$(IMAGE)_$(IMAGE_TAG).sif
-CONTAINER_BIND=--bind $(BIND_DIR),/tmp,$(RENV_PATHS_ROOT),$(CURDIR)/Renviron.site:/usr/local/lib/R/etc/Renviron.site
-CONTAINER_ENV=--env SQLITE_TMPDIR=/tmp,BIOCPARALLEL_WORKER_NUMBER=$(BIOCPARALLEL_WORKER_NUMBER),GITHUB_PAT=$${GITHUB_PAT}
+renvironBind=,Renviron.site:/usr/local/lib/R/etc/Renviron.site
+CONTAINER_BIND=--bind $(BIND_DIR),/tmp,$(RENV_PATHS_ROOT)$(renvironBind)
+CONTAINER_ENV=--env SQLITE_TMPDIR=/tmp,BIOCPARALLEL_WORKER_NUMBER=$(NUM_THREADS),GITHUB_PAT=$${GITHUB_PAT},OMP_NUM_THREADS=${NUM_THREADS},OPENBLAS_NUM_THREADS=${NUM_THREADS}
 CONTAINER_OVERLAY_PATH=$(and $(CONTAINER_OVERLAY),$(BABS_SINGULARITY_OVERLAYS)/$(IMAGE)/$(IMAGE_TAG)/$(CONTAINER_OVERLAY).img)
-CONTAINER_OPTIONS= exec $(CONTAINER_BIND) --pwd $(CURDIR) --containall --cleanenv $(and $(CONTAINER_OVERLAY),--overlay $(CONTAINER_OVERLAY_PATH)) $(CONTAINER_ENV)
-CONTAINER_SHELL_OPTIONS = $(patsubst exec,shell,$(CONTAINER_OPTIONS))
+CONTAINER_OVERLAY_OPT=$(and $(CONTAINER_OVERLAY), --overlay $(CONTAINER_OVERLAY_PATH))
+CONTAINER_OPTIONS= exec $(CONTAINER_BIND) --pwd $$(realpath .) --containall --cleanenv $(CONTAINER_OVERLAY_OPT) $(CONTAINER_ENV)
 $(CONTAINER_IMAGE): 
 	cd $(dir $(CONTAINER_IMAGE)) ;\
 	$(CONTAINER) pull docker://$(IMAGE):$(IMAGE_TAG)
@@ -261,7 +264,7 @@ install_all.sh: resources/shell/overlay_*.sh
 
 ifeq ($(CONTAIN),true)
 Renviron.site: | $(CONTAINER_IMAGE)
-optionalRenviron=Renviron.site  $(CONTAINER_OVERLAY_PATH)
+optionalRenviron=Renviron.site $(CONTAINER_OVERLAY_PATH)
 containerPrefix=$(CONTAINER) $(CONTAINER_OPTIONS) --env MAKEFLAGS="$(MAKEFLAGS)" $(CONTAINER_IMAGE)
 else
 optionalRenviron=
@@ -328,19 +331,15 @@ Renviron.site:
 
 R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses). Can take a CONTAINER_OVERLAY argument (see 'overlay')
 
+R-$(RVERSION): CONTAINER_OVERLAY_OPT=$${overlay:+--overlay $${overlay}}
+R-$(RVERSION): renvironBind=$${renvironBind}
 R-$(RVERSION): resources/shell/R-local
-	< $< $(call envsubst,CONTAINER_IMAGE CONTAINER_OVERLAY_PATH CONTAINER CONTAINER_OPTIONS CONTAINER_SHELL_OPTIONS launch_dir) | \
-	sed \
- -e 's#--pwd $(CURDIR)#--pwd $${pwd}#' \
- -e 's#--bind $(BIND_DIR)#--bind $${project_root}#'  \
- -e 's#,$(CURDIR)/Renviron.site:/usr/local/lib/R/etc/Renviron.site#$${renvironBind}#' \
- -e 's#--overlay $(CONTAINER_OVERLAY_PATH)#$${overlay:+--overlay $${overlay}}#' > $@
+	< $< $(call envsubst,CONTAINER_IMAGE CONTAINER_OVERLAY_PATH CONTAINER CONTAINER_OPTIONS) > $@
 	@$(make_rwx) $@
 	mkdir -p $(launch_dir)/
 	cp resources/shell/rstudio-launch.sh $(launch_dir)/rstudio.sh
 	cp resources/shell/shiny-launch.sh $(launch_dir)/shiny.sh
 	cp resources/shell/jupyter-launch.sh $(launch_dir)/jupyter.sh
-
 
 R:
 	@echo "Starting R $(RVERSION) in container $(CONTAINER_IMAGE) with extra options $${BABS_SINGULARITY_INTERACTIVE_EXTRAS} ..."
