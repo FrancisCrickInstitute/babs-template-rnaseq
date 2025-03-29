@@ -54,7 +54,6 @@ $(wrapped-targets): $(optionalRenviron)
 endif
 
 publish:
-	git stash
 	git switch gh-pages || git switch --orphan gh-pages
 	rm -rf ../docs
 	mv docs ../
@@ -63,7 +62,6 @@ publish:
 	git push origin gh-pages
 	mv ../docs .
 	git switch -
-	git stash pop || true
 
 shared.mk: ../babs/docs/shared.mk
 	cp $< $@
