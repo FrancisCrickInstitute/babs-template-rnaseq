@@ -44,10 +44,6 @@ fi
 tar -xzf /nemo/stp/babs/working/bioinformatics/templates/rnaseq.tar.gz --strip=2 babs/differential
 echo "Copied over the differential logic from the template"
 
-
-tar -xzf /nemo/stp/babs/working/bioinformatics/templates/rnaseq.tar.gz --strip=1 -C resources/make/ babs/{shared,secret}.mk
-echo "Copied over the shared logic from the template"
-
 mkdir -p extdata
 
 touch extdata/analyse.spec # or any other spec file
