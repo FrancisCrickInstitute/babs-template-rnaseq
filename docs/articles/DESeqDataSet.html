@@ -8,8 +8,8 @@
 <title>Starting from a DESeqDataSet object • RNASeq Template</title>
 <script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
-<script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.4.2/css/all.min.css" rel="stylesheet">
-<link href="../deps/font-awesome-6.4.2/css/v4-shims.min.css" rel="stylesheet">
+<script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Starting from a DESeqDataSet object">
 </head>
 <body>
@@ -104,33 +104,29 @@ previous preexisting content. Then, in that directory, create a script
 <span id="cb1-20"><a href="#cb1-20" tabindex="-1"></a><span class="fu">tar</span> <span class="at">-xzf</span> /nemo/stp/babs/working/bioinformatics/templates/rnaseq.tar.gz <span class="at">--strip</span><span class="op">=</span>2 babs/differential</span>
 <span id="cb1-21"><a href="#cb1-21" tabindex="-1"></a><span class="bu">echo</span> <span class="st">"Copied over the differential logic from the template"</span></span>
 <span id="cb1-22"><a href="#cb1-22" tabindex="-1"></a></span>
-<span id="cb1-23"><a href="#cb1-23" tabindex="-1"></a></span>
-<span id="cb1-24"><a href="#cb1-24" tabindex="-1"></a><span class="fu">tar</span> <span class="at">-xzf</span> /nemo/stp/babs/working/bioinformatics/templates/rnaseq.tar.gz <span class="at">--strip</span><span class="op">=</span>1 <span class="at">-C</span> resources/make/ babs/<span class="dt">{shared</span><span class="op">,</span><span class="dt">secret}</span>.mk</span>
-<span id="cb1-25"><a href="#cb1-25" tabindex="-1"></a><span class="bu">echo</span> <span class="st">"Copied over the shared logic from the template"</span></span>
-<span id="cb1-26"><a href="#cb1-26" tabindex="-1"></a></span>
-<span id="cb1-27"><a href="#cb1-27" tabindex="-1"></a><span class="fu">mkdir</span> <span class="at">-p</span> extdata</span>
-<span id="cb1-28"><a href="#cb1-28" tabindex="-1"></a></span>
-<span id="cb1-29"><a href="#cb1-29" tabindex="-1"></a><span class="fu">touch</span> extdata/analyse.spec <span class="co"># or any other spec file</span></span>
-<span id="cb1-30"><a href="#cb1-30" tabindex="-1"></a><span class="bu">echo</span> <span class="st">"Please check the spec-file in the extdata/ folder"</span></span>
-<span id="cb1-31"><a href="#cb1-31" tabindex="-1"></a></span>
-<span id="cb1-32"><a href="#cb1-32" tabindex="-1"></a><span class="co"># the config file is the sentinel that informs the analysis of the</span></span>
-<span id="cb1-33"><a href="#cb1-33" tabindex="-1"></a><span class="co"># label, so there must be one *.config file:</span></span>
-<span id="cb1-34"><a href="#cb1-34" tabindex="-1"></a><span class="bu">[</span> <span class="ot">-f</span> extdata/<span class="va">${label}</span>.config <span class="bu">]</span> <span class="kw">||</span> <span class="bu">echo</span> <span class="st">"org.db=org.Hs.eg.db"</span> <span class="op">&gt;</span> extdata/<span class="va">${label}</span>.config</span>
-<span id="cb1-35"><a href="#cb1-35" tabindex="-1"></a><span class="bu">echo</span> <span class="st">"Please check the extdata/</span><span class="va">${label}</span><span class="st">.config file, particularly the org.db setting."</span></span>
-<span id="cb1-36"><a href="#cb1-36" tabindex="-1"></a></span>
-<span id="cb1-37"><a href="#cb1-37" tabindex="-1"></a><span class="co"># Now we need to make up for the lack of counts in ../nfcore, which is the usual way of receiving the quantified results.</span></span>
-<span id="cb1-38"><a href="#cb1-38" tabindex="-1"></a><span class="co"># Instead, one of the following should be true</span></span>
-<span id="cb1-39"><a href="#cb1-39" tabindex="-1"></a><span class="va">found</span><span class="op">=</span>false</span>
-<span id="cb1-40"><a href="#cb1-40" tabindex="-1"></a><span class="bu">[</span> <span class="ot">-f</span> extdata/<span class="va">${label}</span>.rda <span class="bu">]</span> <span class="kw">&amp;&amp;</span> <span class="bu">echo</span> <span class="st">"You have chosen to supply an rda file that contains at least one DESeqDataSet object (we'll use the 'first')"</span> <span class="kw">&amp;&amp;</span> <span class="va">found</span><span class="op">=</span>true</span>
-<span id="cb1-41"><a href="#cb1-41" tabindex="-1"></a><span class="bu">[</span> <span class="ot">-f</span> extdata/<span class="va">${label}</span>.rds <span class="bu">]</span> <span class="kw">&amp;&amp;</span> <span class="bu">echo</span> <span class="st">"You have chosen to supply a DESeqDataSet in the form of an rds file"</span> <span class="kw">&amp;&amp;</span> <span class="va">found</span><span class="op">=</span>true</span>
-<span id="cb1-42"><a href="#cb1-42" tabindex="-1"></a><span class="bu">[</span> <span class="ot">-f</span> extdata/<span class="va">${label}</span>.csv <span class="bu">]</span> <span class="kw">&amp;&amp;</span> <span class="bu">echo</span> <span class="st">"You have chosen to supply a csv containing the experiment table, which will have random counts assigned to 1000 arbitrary genes for simulation purposes"</span> <span class="kw">&amp;&amp;</span> <span class="va">found</span><span class="op">=</span>true</span>
-<span id="cb1-43"><a href="#cb1-43" tabindex="-1"></a><span class="bu">[</span> <span class="ot">-d</span> extdata/genes.results/<span class="va">${label}</span>/ <span class="bu">]</span> <span class="kw">&amp;&amp;</span> <span class="bu">echo</span> <span class="st">"You have chosed to supply the genes.results files in the appropriate directory"</span> <span class="kw">&amp;&amp;</span> <span class="va">found</span><span class="op">=</span>true</span>
+<span id="cb1-23"><a href="#cb1-23" tabindex="-1"></a><span class="fu">mkdir</span> <span class="at">-p</span> extdata</span>
+<span id="cb1-24"><a href="#cb1-24" tabindex="-1"></a></span>
+<span id="cb1-25"><a href="#cb1-25" tabindex="-1"></a><span class="fu">touch</span> extdata/analyse.spec <span class="co"># or any other spec file</span></span>
+<span id="cb1-26"><a href="#cb1-26" tabindex="-1"></a><span class="bu">echo</span> <span class="st">"Please check the spec-file in the extdata/ folder"</span></span>
+<span id="cb1-27"><a href="#cb1-27" tabindex="-1"></a></span>
+<span id="cb1-28"><a href="#cb1-28" tabindex="-1"></a><span class="co"># the config file is the sentinel that informs the analysis of the</span></span>
+<span id="cb1-29"><a href="#cb1-29" tabindex="-1"></a><span class="co"># label, so there must be one *.config file:</span></span>
+<span id="cb1-30"><a href="#cb1-30" tabindex="-1"></a><span class="bu">[</span> <span class="ot">-f</span> extdata/<span class="va">${label}</span>.config <span class="bu">]</span> <span class="kw">||</span> <span class="bu">echo</span> <span class="st">"org.db=org.Hs.eg.db"</span> <span class="op">&gt;</span> extdata/<span class="va">${label}</span>.config</span>
+<span id="cb1-31"><a href="#cb1-31" tabindex="-1"></a><span class="bu">echo</span> <span class="st">"Please check the extdata/</span><span class="va">${label}</span><span class="st">.config file, particularly the org.db setting."</span></span>
+<span id="cb1-32"><a href="#cb1-32" tabindex="-1"></a></span>
+<span id="cb1-33"><a href="#cb1-33" tabindex="-1"></a><span class="co"># Now we need to make up for the lack of counts in ../nfcore, which is the usual way of receiving the quantified results.</span></span>
+<span id="cb1-34"><a href="#cb1-34" tabindex="-1"></a><span class="co"># Instead, one of the following should be true</span></span>
+<span id="cb1-35"><a href="#cb1-35" tabindex="-1"></a><span class="va">found</span><span class="op">=</span>false</span>
+<span id="cb1-36"><a href="#cb1-36" tabindex="-1"></a><span class="bu">[</span> <span class="ot">-f</span> extdata/<span class="va">${label}</span>.rda <span class="bu">]</span> <span class="kw">&amp;&amp;</span> <span class="bu">echo</span> <span class="st">"You have chosen to supply an rda file that contains at least one DESeqDataSet object (we'll use the 'first')"</span> <span class="kw">&amp;&amp;</span> <span class="va">found</span><span class="op">=</span>true</span>
+<span id="cb1-37"><a href="#cb1-37" tabindex="-1"></a><span class="bu">[</span> <span class="ot">-f</span> extdata/<span class="va">${label}</span>.rds <span class="bu">]</span> <span class="kw">&amp;&amp;</span> <span class="bu">echo</span> <span class="st">"You have chosen to supply a DESeqDataSet in the form of an rds file"</span> <span class="kw">&amp;&amp;</span> <span class="va">found</span><span class="op">=</span>true</span>
+<span id="cb1-38"><a href="#cb1-38" tabindex="-1"></a><span class="bu">[</span> <span class="ot">-f</span> extdata/<span class="va">${label}</span>.csv <span class="bu">]</span> <span class="kw">&amp;&amp;</span> <span class="bu">echo</span> <span class="st">"You have chosen to supply a csv containing the experiment table, which will have random counts assigned to 1000 arbitrary genes for simulation purposes"</span> <span class="kw">&amp;&amp;</span> <span class="va">found</span><span class="op">=</span>true</span>
+<span id="cb1-39"><a href="#cb1-39" tabindex="-1"></a><span class="bu">[</span> <span class="ot">-d</span> extdata/genes.results/<span class="va">${label}</span>/ <span class="bu">]</span> <span class="kw">&amp;&amp;</span> <span class="bu">echo</span> <span class="st">"You have chosed to supply the genes.results files in the appropriate directory"</span> <span class="kw">&amp;&amp;</span> <span class="va">found</span><span class="op">=</span>true</span>
+<span id="cb1-40"><a href="#cb1-40" tabindex="-1"></a></span>
+<span id="cb1-41"><a href="#cb1-41" tabindex="-1"></a><span class="bu">[</span> <span class="va">${found}</span> <span class="ot">=</span> true <span class="bu">]</span> <span class="kw">||</span> <span class="bu">echo</span> <span class="st">"You haven't supplied any of extdata/</span><span class="va">${label}</span><span class="st">.{rda,rds,csv} or extdata/genes.results/</span><span class="va">${label}</span><span class="st"> - look inside the script you just ran to get some hints"</span></span>
+<span id="cb1-42"><a href="#cb1-42" tabindex="-1"></a></span>
+<span id="cb1-43"><a href="#cb1-43" tabindex="-1"></a></span>
 <span id="cb1-44"><a href="#cb1-44" tabindex="-1"></a></span>
-<span id="cb1-45"><a href="#cb1-45" tabindex="-1"></a><span class="bu">[</span> <span class="va">${found}</span> <span class="ot">=</span> true <span class="bu">]</span> <span class="kw">||</span> <span class="bu">echo</span> <span class="st">"You haven't supplied any of extdata/</span><span class="va">${label}</span><span class="st">.{rda,rds,csv} or extdata/genes.results/</span><span class="va">${label}</span><span class="st"> - look inside the script you just ran to get some hints"</span></span>
-<span id="cb1-46"><a href="#cb1-46" tabindex="-1"></a></span>
-<span id="cb1-47"><a href="#cb1-47" tabindex="-1"></a></span>
-<span id="cb1-48"><a href="#cb1-48" tabindex="-1"></a></span>
-<span id="cb1-49"><a href="#cb1-49" tabindex="-1"></a><span class="co"># They're taken in that order - eg don't have an rda file if you want it to recognise the extdata/genes.results files.</span></span></code></pre></div>
+<span id="cb1-45"><a href="#cb1-45" tabindex="-1"></a><span class="co"># They're taken in that order - eg don't have an rda file if you want it to recognise the extdata/genes.results files.</span></span></code></pre></div>
 <p>Having created a script in your new empty folder, with these
 contents, make it executable. Take a look through the script to ensure
 you understand and agree with it’s logic, modifying any options
