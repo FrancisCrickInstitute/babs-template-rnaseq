@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RNASeq Template</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.18.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.20.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -41,10 +41,19 @@
     </div>
 
     <div class="section level2">
-<h2 class="pkg-version" data-toc-text="0.18.0" id="version-0180">Version 0.18.0<a class="anchor" aria-label="anchor" href="#version-0180"></a></h2>
+<h2 class="pkg-version" data-toc-text="0.20.0" id="version-0200">Version 0.20.0<a class="anchor" aria-label="anchor" href="#version-0200"></a></h2>
 <div class="section level3">
-<h3 id="major-changes-0-18-0">Major Changes<a class="anchor" aria-label="anchor" href="#major-changes-0-18-0"></a></h3>
-<ul><li>Move to the new launchers</li>
+<h3 id="major-changes-0-20-0">Major Changes<a class="anchor" aria-label="anchor" href="#major-changes-0-20-0"></a></h3>
+<ul><li>Rationalise the counter/table/plot tracking system</li>
+<li>Refactor so shared+secret are in all modules</li>
+<li>Tidy up unneeded packages from renv.lock</li>
+<li>Switch to generic launchers ## Minor Changes</li>
+<li>Make the do_tbl conform to the do_plot approach</li>
+<li>Fix skipping default profile_plot</li>
+<li>Fix bug in aesthetic overrides when there’s only one aesthetic</li>
+<li>Fix another edge-case for partials with uni-variable models</li>
+<li>Move to the generic launcher capability # Version 0.18.1 ## Major Changes Add the profile plots to the exploratory page Add termNames functionality ## Minor Changes Add name-dodging # Version 0.18.0 ## Major Changes</li>
+<li>Move to the new launchers</li>
 <li>Add ability to cascade spec features down the spec &gt; dataset &gt; model &gt; comparison hierarchy</li>
 <li>Add profile-plots to the differential results</li>
 <li>Add ability to run ‘differential’ entirely isolated ## Minor Changes</li>

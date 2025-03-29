@@ -1,8 +1,0 @@
-"","Comparison","ID","Description","setSize","enrichmentScore","NES","pvalue","p.adjust","qvalue","rank","leading_edge","effect"
-"1","C4.Untreated - Dexamethasone","GO:0004867","serine-type endopeptidase inhibitor activity","72","-0.7360300","-1.838168","7.513291e-05","0.017746394","0.017272661","1509","tags=24%, list=7%, signal=22%","-1.838168"
-"2","C4.Untreated - Dexamethasone","GO:0005125","cytokine activity","167","0.6018685","1.828994","5.944215e-06","0.003510059","0.003416359","1162","tags=14%, list=6%, signal=14%","1.828994"
-"3","C4.Untreated - Dexamethasone","GO:0030414","peptidase inhibitor activity","125","-0.6421766","-1.731972","9.319541e-05","0.018343963","0.017854278","1833","tags=19%, list=9%, signal=18%","-1.731972"
-"4","C4.Untreated - Dexamethasone","GO:0030545","signaling receptor regulator activity","400","0.4949887","1.653729","1.411167e-06","0.001666588","0.001622099","1285","tags=14%, list=6%, signal=13%","1.653729"
-"5","C4.Untreated - Dexamethasone","GO:0030546","signaling receptor activator activity","373","0.4851733","1.602449","9.161551e-06","0.003606597","0.003510321","1347","tags=14%, list=6%, signal=13%","1.602449"
-"6","C4.Untreated - Dexamethasone","GO:0048018","receptor ligand activity","368","0.4814043","1.590318","2.372815e-05","0.007005736","0.006818720","1465","tags=14%, list=7%, signal=13%","1.590318"
-"7","C4.Untreated - Dexamethasone","GO:0050660","flavin adenine dinucleotide binding","86","-0.6816502","-1.765474","2.111637e-04","0.035626329","0.034675299","1302","tags=24%, list=6%, signal=23%","-1.765474"
