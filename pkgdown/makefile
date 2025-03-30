@@ -44,14 +44,13 @@ $(wrapped-targets): $(optionalRenviron)
 endif
 
 publish:
-	git switch gh-pages || git switch --orphan gh-pages
-	rm -rf ../docs
-	mv docs ../
-	git add ../docs
-	git commit -m "Updating docs to those of $(VERSION)"
-	git push origin gh-pages
-	mv ../docs .
-	git switch -
+	tmpdir=$$(mktemp -d) ;\
+	git worktree add $$tmpdir gh-pages ;\
+	rsync -a --delete docs/ $$tmpdir/docs/ ;\
+	(cd $$tmpdir ;\
+	git commit -a -m "Updating docs to those of $(VERSION)" ;\
+	git push origin gh-pages) ;\
+	git worktree remove $$tmpdir
 
 
 ################################################################

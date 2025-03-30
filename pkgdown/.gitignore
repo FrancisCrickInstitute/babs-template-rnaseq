@@ -11,4 +11,5 @@ NAMESPACE
 secret.mk
 .Rbuildignore
 .not-secret.mk
-
+.Rprofile
+/resources
