@@ -18,7 +18,7 @@ fi
 cmd=${BABS_CMD:-${basename%-*}}
 
 if [[ -f Renviron.site ]]; then
-    renvironBind=,$$(realpath .)/Renviron.site:/usr/local/lib/R/etc/Renviron.site
+    renvironBind=,$(realpath .)/Renviron.site:/usr/local/lib/R/etc/Renviron.site
 else
     renvironBind=""
 fi

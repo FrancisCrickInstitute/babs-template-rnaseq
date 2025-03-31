@@ -342,8 +342,8 @@ R-$(RVERSION): resources/shell/R-local
 	cp resources/shell/jupyter-launch.sh $(launch_dir)/jupyter.sh
 
 R:
-	@echo "Starting R $(RVERSION) in container $(CONTAINER_IMAGE) with extra options $${BABS_SINGULARITY_INTERACTIVE_EXTRAS} ..."
-	@$(CONTAINER) $(CONTAINER_OPTIONS) $(shell echo $${BABS_SINGULARITY_INTERACTIVE_EXTRAS}) $(CONTAINER_IMAGE) R
+	@echo "Starting R $(RVERSION) in container $(CONTAINER_IMAGE) ..."
+	@$(CONTAINER) $(CONTAINER_OPTIONS) $(CONTAINER_IMAGE) R
 
 
 .Rprofile: $(wildcard resources/renv/Rprofile) | renv/activate.R
