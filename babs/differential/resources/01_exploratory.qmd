@@ -115,7 +115,7 @@ in a table identified with an info icon.
 
 data.frame(
   Option=names(specs$settings),
-  Value=sapply(specs$settings, deparse)
+  Value=sapply(specs$settings, deparse, width.cutoff=500)
 ) %>%
   gt() %>%
   as_raw_html()

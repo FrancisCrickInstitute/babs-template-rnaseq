@@ -29,7 +29,10 @@ norm_within <- function(df, grp, denominator, numerator, adj=0.01) {
 
 load_specs <- function(file="", context) {
   if (file.exists(file.path("extdata",file))) {
-    e <- as.environment(as.data.frame(colData(context)))
+    df <- as.data.frame(colData(context))
+    e <- as.environment(df)
+    isVarying <- which((sapply(df, function(v) length(unique(v))) %% nrow(df)) > 1)
+    assign("Guess", names(df)[isVarying][1], envir=e)
     list_ok <- function(...) rlang::dots_list(..., .ignore_empty="all")
     parent.env(e) <- environment()
     assign("list", list_ok, envir=e)
@@ -291,6 +294,14 @@ build_dds_list <- function(dds, spec) {
     }
     tr <- dataset_spec$transform
     mc <- mcols(colData(obj))
+    if ("stringsAsFactors" %in% names(spec$settings) && spec$settings$stringsAsFactors) {
+      for (i in names(colData(obj))) {
+        x <- colData(obj)[[i]]
+        if (is.character(x) && length(unique(x)) %% length(x) > 1) {
+          colData(obj)[[i]] <- as.factor(x)
+        } 
+      }
+    }
     if (!is.null(tr)) {
       .mu <- purrr::partial(mutate, .data=as.data.frame(colData(obj)))
       tr[[1]] <- .mu
@@ -986,6 +997,7 @@ default_spec_settings <- function() {
         gene_clust     = bluster::HclustParam(),   ## When we need to chose clusters of genes, how many?
 	filterFun      = IHW::ihw,                 ## NULL for standard DESeq2 results, otherwise  functions
 	clustering_distance_rows    = "euclidean", ## for all feature-distances
+        stringsAsFactors = FALSE,
 	clustering_distance_columns = "euclidean",  ## for sample-distances
 	baseline_heuristic = "min",  ## For the "white" colour in differential heatmaps
 	LRT_effect = "default"  ## For the "white" colour in differential heatmaps

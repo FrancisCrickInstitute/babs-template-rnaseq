@@ -203,7 +203,7 @@ CONTAINER_OVERLAY_OPT=$(and $(CONTAINER_OVERLAY), --overlay $(CONTAINER_OVERLAY_
 CONTAINER_OPTIONS= exec $(CONTAINER_BIND) --pwd $$(realpath .) --containall --cleanenv $(CONTAINER_OVERLAY_OPT) $(CONTAINER_ENV)
 $(CONTAINER_IMAGE): 
 	cd $(dir $(CONTAINER_IMAGE)) ;\
-	$(CONTAINER) pull docker://$(IMAGE):$(IMAGE_TAG)
+	$(CONTAINER) pull docker://$(IMAGE)$(colon)$(IMAGE_TAG)
 	$(makeg_rwx) $(CONTAINER_IMAGE)
 CONTAIN=true
 
@@ -232,17 +232,25 @@ resources/singularity/$(notdir $(CONTAINER_OVERLAY))).def: resources/shell/overl
 endif
 
 else ifeq ($(EXECUTOR),docker)
+IMAGE_TAG=$(BIOCONDUCTOR_VERSION)-R-$(RVERSION)
 CONTAINER=docker
-CONTAINER_IMAGE=$(IMAGE)_$(IMAGE_TAG)
-CONTAINER_FLAGS=run \
+CONTAINER_IMAGE=$(IMAGE)$(colon)$(IMAGE_TAG)
+renvironBind=--mount type=bind,source="$(CURDIR)/Renviron.site",target="/usr/local/lib/R/etc/Renviron.site"
+CONTAINER_OPTIONS=run \
 --mount type=bind,source="$(BIND_DIR)",target="$(BIND_DIR)" \
 --mount type=bind,source="/tmp",target="/tmp" \
---mount type=bind,source="$(CURDIR)/Renviron.site",target="/usr/local/lib/R/etc/Renviron.site" \
---workdir="$(CURDIR)" $(IMAGE):$(IMAGE_TAG)
+--mount type=bind,source="$(RENV_PATHS_ROOT)",target="$(RENV_PATHS_ROOT)" \
+$(renvironBind) \
+--env SQLITE_TMPDIR=/tmp \
+--env BIOCPARALLEL_WORKER_NUMBER=$(NUM_THREADS) \
+--env GITHUB_PAT=$${GITHUB_PAT} \
+--env OMP_NUM_THREADS=${NUM_THREADS} \
+--env OPENBLAS_NUM_THREADS=${NUM_THREADS} \
+--workdir="$$(realpath .)"
 CONTAINER_SHELL = $(CONTAINER) $(patsubst run,exec -it,$(CONTAINER_FLAGS_INTERACTIVE)) $(CONTAINER_IMAGE) /bin/bash
 CONTAIN=true
 $(CONTAINER_IMAGE): 
-	$(CONTAINER) pull docker://$(IMAGE):$(IMAGE_TAG)
+	$(CONTAINER) pull docker://$(IMAGE):$(IMAGE_TAG) || echo "Couldn't pull docker://$(IMAGE):$(IMAGE_TAG). Continuing, but make sure it's present at run time."
 	mkdir -p $(dir $(CONTAINER_IMAGE))
 	echo "Proxy for docker image" > $@
 
@@ -280,6 +288,7 @@ def-file:   ## with CONTAINER_OVERLAY=name, creates a container definition file 
 excluded-targets += help clean maintainer-clean print-%
 
 comma:= ,
+colon:= :
 space:= $() $()
 empty:= $()
 define newline
@@ -329,18 +338,16 @@ Renviron.site:
 	echo "RENV_PATHS_ROOT=$(RENV_PATHS_ROOT)" >> $@
 	echo "RENV_PATHS_LIBRARY=renv/library" >> $@
 
-R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses). Can take a CONTAINER_OVERLAY argument (see 'overlay')
+R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses). Can take a CONTAINER_OVERLAY argument (see 'overlay'). Also EXECUTOR=docker means the launchers will use docker rather than singularity
 
 R-$(RVERSION): CONTAINER_OVERLAY_OPT=$${overlay:+--overlay $${overlay}}
-R-$(RVERSION): renvironBind=$${renvironBind}
-R-$(RVERSION): resources/shell/R-local
+R-$(RVERSION): renvironBind=$${renvironBind}#So that the bind will be picked up at runtime
+R-$(RVERSION): BIND_DIR=$${wd}#Again, pick up local runtime setting
+R-$(RVERSION): resources/shell/R-$(EXECUTOR)
 	< $< $(call envsubst,CONTAINER_IMAGE CONTAINER_OVERLAY_PATH CONTAINER CONTAINER_OPTIONS) > $@
 	@$(make_rwx) $@
 	mkdir -p $(launch_dir)/
-	cp resources/shell/rstudio-launch.sh $(launch_dir)/rstudio.sh
-	cp resources/shell/shiny-launch.sh $(launch_dir)/shiny.sh
-	cp resources/shell/jupyter-launch.sh $(launch_dir)/jupyter.sh
-
+	for i in rstudio shiny jupyter; do cp resources/shell/$${i}-$(EXECUTOR).sh $(launch_dir)/$${i}.sh || echo "$${i}-$(EXECUTOR).sh doesn't yet exist"; done
 R:
 	@echo "Starting R $(RVERSION) in container $(CONTAINER_IMAGE) ..."
 	@$(CONTAINER) $(CONTAINER_OPTIONS) $(CONTAINER_IMAGE) R
@@ -375,3 +382,9 @@ $(SELF_DIR)secret.mk: $(wildcard $(PROJECT_HOME)/.babs)
 	  sed  -i '/^setting_/d' $@ ;\
 	  sed -r -n 's/^(\s*)(.*)\s*:\s*(.*$$)/setting_\2=\3/p' $< >> $@ ;\
 	fi
+
+excluded-targets += isolated.sh
+isolated.sh: resources/shell/isolated.sh ## Create a script that helps you ensure an isolated analysis has the necessary prerequisites
+	cp $< $@
+	echo "Inspect the script 'isolated.sh' to see how it is going to create the prerequisites."
+	echo 'You can then keep running it until you are satisfied you have a config file, a specfile, and the assay data'

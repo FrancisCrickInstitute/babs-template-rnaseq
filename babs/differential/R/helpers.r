@@ -13,6 +13,7 @@ ParamList <- R6::R6Class("ParamList",
                                             seed="A random seed of {} is used to ensure reproduciblity",
                                             filterFun="{if (is.null(filterFun)) 'Default' else deparse(filterFun)} independent filtering",
                                             gene_clust="{if (is.null(gene_clust)) 'Default' else deparse(gene_clust)}",
+                                            showStringsAsFactors="If {} is TRUE, convert strings to factors in the experiment table",
                                             baseMeanMin="Discard transcripts with few average counts per sample than {}",
                                             baseline_heuristic="Use the '{}' heuristic to centre the colour-scale",
                                             LRT_effect="Use the '{}' summary of an LRT 'effect size'"
