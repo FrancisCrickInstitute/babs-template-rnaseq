@@ -61,11 +61,19 @@ organism <- list(org=alignments$org.db)
 preprocessed <- file.path("extdata", paste0(params$alignment, ".rda"))
 if (file.exists(preprocessed)) {
   objNames <- load(preprocessed)
-  isdds <- sapply(objNames, function(x) class(get(x))=="DESeqDataSet")
-  if (!any(isdds)) stop(preprocessed, " does not contain any DESeqDataSet objects")
-  if (length(which(isdds))>1) warning(preprocessed, " contains many DESeqDataSet objects, only using ", objnames[isdds][1])
-  dds <- get(objNames[isdds][1])
-  dds <- add_org_annotation(dds, organism$org)
+  is_ok <- sapply(objNames, function(x) class(get(x))=="DESeqDataSet")
+  if (any(is_ok)) {
+    if (length(which(is_ok))>1) warning(preprocessed, " contains many DESeqDataSet objects, only using ", objnames[is_ok][1])
+    dds <- get(objNames[is_ok][1])
+    dds <- add_org_annotation(dds, organism$org)
+  } else {
+    is_ok <- sapply(objNames, function(x) is(get(x),"SummarizedExperiment"))
+    if (!any(is_ok)) {
+      stop(preprocessed, " does not contain any DESeqDataSet or SummarizedExperiment  objects")
+    }
+    if (length(which(is_ok))>1) warning(preprocessed, " contains many SummarizedExperiment objects, only using ", objnames[is_ok][1])
+    dds <- get(objNames[is_ok][1])
+  }
   save(dds, file=file.path("data",paste0("counts_", params$alignment, ".rda")))
   saveRDS(dds, file=file.path("data",paste0("counts_", params$alignment, ".rds")))
   knitr::knit_exit()
@@ -73,7 +81,14 @@ if (file.exists(preprocessed)) {
 
 preprocessed <- file.path("extdata", paste0(params$alignment, ".rds"))
 if (file.exists(preprocessed)) {
-  dds <- add_org_annotation(readRDS(preprocessed), organism$org)
+  obj <- readRDS(preprocessed)
+  if (is(obj, "DESeqDataSet")) {
+    dds <- add_org_annotation(obj, organism$org)
+  } else if (is(obj("SummarizedExperiment"))) {
+    dds <- obj
+  } else {
+    stop("rds object is neither DESeqDataSet nor SummarizedExperiment")
+  }
   save(dds, file=file.path("data",paste0("counts_", params$alignment, ".rda")))
   saveRDS(dds, file=file.path("data",paste0("counts_", params$alignment, ".rds")))
   knitr::knit_exit()
