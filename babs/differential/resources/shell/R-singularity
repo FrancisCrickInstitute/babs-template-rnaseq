@@ -3,7 +3,6 @@
 #SBATCH --output=slurm-%x.out
 
 image='${CONTAINER_IMAGE}'
-overlay=${CONTAINER_OVERLAY_PATH}
 
 wd=$(git rev-parse --show-toplevel 2>/dev/null || echo $(realpath .))
 
@@ -19,8 +18,8 @@ cmd=${BABS_CMD:-${basename%-*}}
 
 
 
-if [[ -f Renviron.site ]]; then
-    renvironBind=,$(realpath .)/Renviron.site:/usr/local/lib/R/etc/Renviron.site
+if [[ -f Renviron-${RVERSION} ]]; then
+    renvironBind=,$(realpath .)/Renviron-${RVERSION}:/usr/local/lib/R/etc/Renviron.site
 else
     renvironBind=""
 fi

@@ -55,10 +55,20 @@ SELF_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 ################################################################
 SINGULARITY_VERSION=3.11.3
 NEXTFLOW_VERSION=23.10.0
-RVERSION=4.3.2
-BIOCONDUCTOR_VERSION=3.18
-IMAGE=bioconductor/bioconductor_docker
-IMAGE_TAG=$(BIOCONDUCTOR_VERSION)-R-$(RVERSION)
+RVERSION=4.5.0
+BIOCONDUCTOR_VERSION=RELEASE_3_21
+OUR_VERSION=v0.8.0
+
+################################################################
+# Singularity Images
+################################################################
+
+IMAGE_NAME=bioconductor_docker
+IMAGE_REG=$(if $(OUR_VERSION),ghcr,docker).io/
+IMAGE_REPO=$(if $(OUR_VERSION),franciscrickinstitute/babs-template-rnaseq,bioconductor)
+IMAGE_TAG=$(BIOCONDUCTOR_VERSION)-R-$(RVERSION)$(and $(OUR_VERSION),-$(OUR_VERSION))
+IMAGE=$(IMAGE_REPO)/$(IMAGE_NAME)
+
 R=R
 QUARTO=quarto
 GIT=git
@@ -78,6 +88,7 @@ NUM_THREADS=$${NUM_THREADS:-2}
 PROJECT_HOME:=$(shell $(GIT) rev-parse --show-toplevel 2>/dev/null || echo $(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 TAG = _$(shell $(GIT) describe --tags --dirty=_altered --always --long 2>/dev/null || echo "uncontrolled")# e.g. v1.0.2-2-ace1729a
 VERSION := $(shell $(GIT) describe --tags --abbrev=0 2>/dev/null || echo "vX.Y.Z")#e.g. v1.0.2
+DELTA-VERSION=$(shell git describe --tags --abbrev=0 $$(git log --format="%H" -n 1 -- $(1)))#For when we want a version that doesn't increment on changes irrelevant to path given by first arg
 git-ignore=touch .gitignore && grep -qxF '$(1)' .gitignore || echo '$(1)' >> .gitignore
 
 
@@ -195,47 +206,21 @@ ifeq ($(EXECUTOR),singularity)
 #Sometimes we want to do e.g. env SINGULARITYENV_APPEND_PATH=/stuff - that's what CONTAINER_VARS is for
 CONTAINER= $(call ml,Singularity/$(SINGULARITY_VERSION)); $(CONTAINER_VARS) singularity
 CONTAINER_IMAGE=$(SINGULARITY_ROOT)/$(IMAGE)_$(IMAGE_TAG).sif
-renvironBind=,Renviron.site:/usr/local/lib/R/etc/Renviron.site
+renvironBind=,Renviron-$(RVERSION):/usr/local/lib/R/etc/Renviron.site
 CONTAINER_BIND=--bind $(BIND_DIR),/tmp,$(RENV_PATHS_ROOT)$(renvironBind)
 CONTAINER_ENV=--env SQLITE_TMPDIR=/tmp,BIOCPARALLEL_WORKER_NUMBER=$(NUM_THREADS),GITHUB_PAT=$${GITHUB_PAT},OMP_NUM_THREADS=${NUM_THREADS},OPENBLAS_NUM_THREADS=${NUM_THREADS}
-CONTAINER_OVERLAY_PATH=$(and $(CONTAINER_OVERLAY),$(BABS_SINGULARITY_OVERLAYS)/$(IMAGE)/$(IMAGE_TAG)/$(CONTAINER_OVERLAY).img)
-CONTAINER_OVERLAY_OPT=$(and $(CONTAINER_OVERLAY), --overlay $(CONTAINER_OVERLAY_PATH))
-CONTAINER_OPTIONS= exec $(CONTAINER_BIND) --pwd $$(realpath .) --containall --cleanenv $(CONTAINER_OVERLAY_OPT) $(CONTAINER_ENV)
+CONTAINER_OPTIONS= exec $(CONTAINER_BIND) --pwd $$(realpath .) --containall --cleanenv $(CONTAINER_ENV)
 $(CONTAINER_IMAGE): 
 	cd $(dir $(CONTAINER_IMAGE)) ;\
-	$(CONTAINER) pull docker://$(IMAGE)$(colon)$(IMAGE_TAG)
+	$(CONTAINER) pull docker://$(IMAGE_REG)$(IMAGE)$(colon)$(IMAGE_TAG)
 	$(makeg_rwx) $(CONTAINER_IMAGE)
 CONTAIN=true
 
-.PHONY: overlay
-overlay:  ## Create an overlay for singularity, for additional tools.  e.g. `make overlay CONTAINER_OVERLAY=X` will run the resources/shell/overlay_X.sh 
-# Persistent overlays - can put include a union filesystem with the underlying image, for e.g extra binaries.
-ifdef CONTAINER_OVERLAY
-
-CONTAINER_VARS=env SINGULARITYENV_PREPEND_PATH=/singularity-bin:/singularity-bin/bin
-overlay: $(CONTAINER_OVERLAY_PATH)
-$(CONTAINER_OVERLAY_PATH): | resources/shell/overlay_$(basename $(CONTAINER_OVERLAY)).sh Renviron.site
-	mkdir -p $(BABS_SINGULARITY_OVERLAYS)/$(IMAGE)/$(IMAGE_TAG)
-	$(CONTAINER) overlay create --sparse --size $(or $(CONTAINER_OVERLAY_SIZE),1024) --create-dir /singularity-bin $(CONTAINER_OVERLAY_PATH)
-	[ ! -f "$<" ] || $(CONTAINER) $(CONTAINER_OPTIONS) $(CONTAINER_IMAGE) /bin/bash $<
-
-.PHONY: def-file
-def-file: resources/singularity/$(notdir $(CONTAINER_OVERLAY))).def
-resources/singularity/$(notdir $(CONTAINER_OVERLAY))).def: resources/shell/overlay_$(basename $(notdir $(CONTAINER_OVERLAY))).sh
-	echo "Bootstrap: docker" > $@
-	echo "From: $(IMAGE):$(IMAGE_TAG)" >> $@
-	echo "%files" >> $@
-	echo "resources/shell/overlay_$(basename $(notdir $(CONTAINER_OVERLAY))).sh  /tmp/install.sh"
-	echo "%post" >> $@
-	echo "source /tmp/install.sh" >> $@
-	echo "rm -f /tmp/install.sh" >> $@
-endif
 
 else ifeq ($(EXECUTOR),docker)
-IMAGE_TAG=$(BIOCONDUCTOR_VERSION)-R-$(RVERSION)
 CONTAINER=docker
 CONTAINER_IMAGE=$(IMAGE)$(colon)$(IMAGE_TAG)
-renvironBind=--mount type=bind,source="$(CURDIR)/Renviron.site",target="/usr/local/lib/R/etc/Renviron.site"
+renvironBind=--mount type=bind,source="$(CURDIR)/Renviron-$(RVERSION)",target="/usr/local/lib/R/etc/Renviron.site"
 CONTAINER_OPTIONS=run \
 --mount type=bind,source="$(BIND_DIR)",target="$(BIND_DIR)" \
 --mount type=bind,source="/tmp",target="/tmp" \
@@ -250,7 +235,7 @@ $(renvironBind) \
 CONTAINER_SHELL = $(CONTAINER) $(patsubst run,exec -it,$(CONTAINER_FLAGS_INTERACTIVE)) $(CONTAINER_IMAGE) /bin/bash
 CONTAIN=true
 $(CONTAINER_IMAGE): 
-	$(CONTAINER) pull docker://$(IMAGE):$(IMAGE_TAG) || echo "Couldn't pull docker://$(IMAGE):$(IMAGE_TAG). Continuing, but make sure it's present at run time."
+	$(CONTAINER) pull docker://$(IMAGE_REG)$(IMAGE):$(IMAGE_TAG) || echo "Couldn't pull docker://$(IMAGE):$(IMAGE_TAG). Continuing, but make sure it's present at run time."
 	mkdir -p $(dir $(CONTAINER_IMAGE))
 	echo "Proxy for docker image" > $@
 
@@ -265,21 +250,28 @@ else
   $(error "# Don't recognise '$(EXECUTOR)' as an executor")
 endif
 
-Dockerfile: resources/docker/Dockerfile install_all.sh ## Create a Dockerfile corresponding to the image in use.
-	< $< $(call envsubst,RVERSION BIOCONDUCTOR_VERSION VERSION) > $@
-install_all.sh: resources/shell/overlay_*.sh
-	cat $^ > $@
+# 
+docker/Dockerfile: OUR_VERSION=$(call DELTA-VERSION,resources/docker)
+docker/Dockerfile: resources/docker/Dockerfile docker/install_all.sh## Create a Dockerfile corresponding to the image in use.
+	< $< $(call envsubst,RVERSION BIOCONDUCTOR_VERSION OUR_VERSION IMAGE_REPO) > $@
+docker/install_all.sh: $(wildcard resources/docker/install_*.sh) docker/build.sh
+	cat resources/docker/install_*.sh > $@
+docker/build.sh:
+	mkdir -p docker
+	echo "docker build -t $(IMAGE_NAME) ." > $@
+	echo "docker tag  $(IMAGE_NAME) $(IMAGE_REG)$(IMAGE):$(IMAGE_TAG)" >> $@
+	echo "docker push $(IMAGE_REG)$(IMAGE):$(IMAGE_TAG)" >> $@
+
 
 ifeq ($(CONTAIN),true)
-Renviron.site: | $(CONTAINER_IMAGE)
-optionalRenviron=Renviron.site $(CONTAINER_OVERLAY_PATH)
+Renviron-$(RVERSION): | $(CONTAINER_IMAGE)
+optionalRenviron=Renviron-$(RVERSION)
 containerPrefix=$(CONTAINER) $(CONTAINER_OPTIONS) --env MAKEFLAGS="$(MAKEFLAGS)" $(CONTAINER_IMAGE)
 else
 optionalRenviron=
 containerPrefix=
 endif
 
-def-file:   ## with CONTAINER_OVERLAY=name, creates a container definition file that will include the overlay
 
 ################################################################
 #Standard makefile hacks
@@ -332,22 +324,22 @@ excluded-targets += R R-local R-$(RVERSION) .Rprofile
 
 R R-$(RVERSION) : $(optionalRenviron)
 
-Renviron.site:
+Renviron-$(RVERSION):
 	$(CONTAINER) exec --bind $(CURDIR) $(CONTAINER_IMAGE) cp /usr/local/lib/R/etc/Renviron.site $(CURDIR)/$@
 	echo "RENV_PATHS_PREFIX=$(RENV_PATHS_PREFIX)" >> $@
 	echo "RENV_PATHS_ROOT=$(RENV_PATHS_ROOT)" >> $@
 	echo "RENV_PATHS_LIBRARY=renv/library" >> $@
 
-R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses). Can take a CONTAINER_OVERLAY argument (see 'overlay'). Also EXECUTOR=docker means the launchers will use docker rather than singularity
+R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses).  Also EXECUTOR=docker means the launchers will use docker rather than singularity
 
-R-$(RVERSION): CONTAINER_OVERLAY_OPT=$${overlay:+--overlay $${overlay}}
 R-$(RVERSION): renvironBind=$${renvironBind}#So that the bind will be picked up at runtime
 R-$(RVERSION): BIND_DIR=$${wd}#Again, pick up local runtime setting
 R-$(RVERSION): resources/shell/R-$(EXECUTOR)
-	< $< $(call envsubst,CONTAINER_IMAGE CONTAINER_OVERLAY_PATH CONTAINER CONTAINER_OPTIONS) > $@
+	< $< $(call envsubst,CONTAINER_IMAGE CONTAINER CONTAINER_OPTIONS RVERSION) > $@
 	@$(make_rwx) $@
 	mkdir -p $(launch_dir)/
 	for i in rstudio shiny jupyter; do cp resources/shell/$${i}-$(EXECUTOR).sh $(launch_dir)/$${i}.sh || echo "$${i}-$(EXECUTOR).sh doesn't yet exist"; done
+
 R:
 	@echo "Starting R $(RVERSION) in container $(CONTAINER_IMAGE) ..."
 	@$(CONTAINER) $(CONTAINER_OPTIONS) $(CONTAINER_IMAGE) R

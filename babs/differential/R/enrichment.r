@@ -14,7 +14,8 @@ functional_api <- function (dds, method, source,  ...) {
   res <- mcols(dds)$results
   ind <- grepl("\\*", res$class)
   if (method!="OR") ind=T
-  res <- mcols(dds)$results[ind & !is.na(res$entrez),]
+  res <- res[ind & !is.na(res$entrez),]
+  res <- res[!duplicated(res$entrez),]
   genes <- setNames(res$shrunkLFC, res$entrez)
   genes <- sort(genes, decreasing=TRUE)
   if (length(genes) < 1) return(NULL)

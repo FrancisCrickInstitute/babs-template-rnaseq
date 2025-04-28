@@ -1,6 +1,6 @@
-import { parse, stringify } from "https://deno.land/std/encoding/yaml.ts";
-import { parse as flag} from "https://deno.land/std/flags/mod.ts";
-import { createExtractor, Format, Parser } from "https://deno.land/std/encoding/front_matter/mod.ts";
+import { parse, stringify } from "stdlib/yaml";
+import { parse as flag} from "stdlib/flags";
+import { extractYaml }  from "stdlib/front_matter";
 
 const flags = flag(Deno.args, {
     string: ["template", "staging", "repo", "sections", "alignments", "specfiles"]
@@ -8,7 +8,6 @@ const flags = flag(Deno.args, {
 
 const quarto = parse(Deno.readTextFileSync(flags.template));
 const qmdre = new RegExp(".qmd$");
-const extractYAML = createExtractor({ [Format.YAML]: parse as Parser });
 const qmds = Array.from(Deno.readDirSync(flags.staging))
     .filter( f => qmdre.test(f.name))
     .sort((a,b) => a.name.localeCompare(b.name));
@@ -60,7 +59,7 @@ if (alignments.length==1) {
 
 
 function qmd2nav(fname, flags, suffix) {
-    let { attrs, body, frontMatter } = extractYAML(Deno.readTextFileSync(flags.staging + "/" + fname));
+    let { attrs } = extractYaml(Deno.readTextFileSync(flags.staging + "/" + fname));
     return({href: fname, text: counter() + " " + attrs.params.section + suffix});
 }
 

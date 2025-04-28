@@ -1,5 +1,5 @@
-import { parse, stringify } from "https://deno.land/std/encoding/yaml.ts";
-import { parse as flag} from "https://deno.land/std/flags/mod.ts";
+import { parse, stringify } from "stdlib/yaml";
+import { parse as flag} from "stdlib/flags";
 
 const flags = flag(Deno.args, {string: [
     "script", "target", "fixed", "generated", "alignment", "spec", "author"

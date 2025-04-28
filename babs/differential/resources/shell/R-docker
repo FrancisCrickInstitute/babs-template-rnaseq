@@ -10,8 +10,8 @@ cmd=${BABS_CMD:-${basename%-*}}
 
 wd=$(git rev-parse --show-toplevel 2>/dev/null || echo $(realpath .))
 
-if [[ -f Renviron.site ]]; then
-    renvironBind=" --mount type=bind,source=$(realpath .)/Renviron.site,target=/usr/local/lib/R/etc/Renviron.site "
+if [[ -f Renviron-${RVERSION} ]]; then
+    renvironBind=" --mount type=bind,source=$(realpath .)/Renviron-${RVERSION},target=/usr/local/lib/R/etc/Renviron.site "
 else
     renvironBind=""
 fi

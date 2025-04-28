@@ -262,17 +262,16 @@ approach_df <- cross_join(
   dds_df)
 
 # Apply the functional approach to the dds
-approach_df <- rowwise(approach_df) %>%
-  mutate(
-    approach_res=list(do.call(
-      functional_api,
-      modifyList(
-        approach_params,
-        list(dds=dds, post_process=NULL)) # don't pass post_process to the api
-    )
-    )) %>%
-  filter(!is.null(approach_res) && nrow(approach_res)!=0) %>%
-  ungroup()
+approach_df$approach_res <- 
+  mapply(
+    function(x,y) do.call(functional_api, modifyList(x, list(dds=y, post_process=NULL))),
+    approach_df$approach_params,
+    approach_df$dds
+)
+
+approach_df <- approach_df[!sapply(approach_df$approach_res, is.null),]
+approach_df <- approach_df[sapply(approach_df$approach_res, nrow)!=0,]
+
 
 # Gather results into common functional approaches, a list of
 # dataframes where each element corresponds to an approach, which
