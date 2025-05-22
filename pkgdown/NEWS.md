@@ -1,3 +1,13 @@
+# Version 0.22.0
+## Major Changes
+ - Add ability to take on summarizedexperiments
+ - Update 'differential heatmap baseline' method so that it uses
+   emmeans modifications to work directly with constituent factors and
+   their levels
+## Minor Changes
+ - Provide isolation script and example spec file
+ - Refresh the launchers
+ - Update to R4.5.0 and new launcher
 # Version 0.20.0
 ## Major Changes
  - Rationalise the counter/table/plot tracking system

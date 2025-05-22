@@ -39,6 +39,7 @@ library(ggrepel)         # General Vis.
 library(RColorBrewer)
 library(ComplexHeatmap)
 library(gt)
+library(emmeans)
 library(DESeq2)          # Assay-specific
 library(PoiClaClu)
 library(rtracklayer)
@@ -58,7 +59,15 @@ source("R/helpers.r", local = knitr::knit_global())
 set.seed(1)
 
 if (!isTRUE(getOption('knitr.in.progress'))) {
-  params <- load_params(choose_staging("differential"))
+  params <- load_params(choose_staging("02_differential"))
+}
+
+align_params <- get_align_params(params$alignment)
+rowNoun <- align_params$rowNoun %||% "gene"
+RowNoun <- stringr::str_to_title(rowNoun)
+if ("missing" %in% names(align_params)) {
+  attr(rowNoun, "readout") <- "missingness"
+  attr(RowNoun, "readout") <- "Missingness"
 }
 
 do_plot <- plot_tracker(params)
@@ -72,7 +81,6 @@ knitr::opts_chunk$set(
 )
 
 
-link2path <- function(lname) {  file.path(knitr::opts_knit$get("output.dir"),lname) }
 
 ```
 
@@ -112,40 +120,9 @@ mtag <- dmc_factory(ddsList, type="model")
 
 ```
 
-# Datasets and Models
+# Find differential `{r} rowNoun`s
 
-As in the exploratory analysis, we may examine the samples in different combinations, and leave out
-certain samples.  In the above table, the columns under the 'In
-Subset' group indicate these combinations are listed, and the
-samples' inclusions are indicated.
-
-Each of those combinations may be analysed in
-potentially several ways, as formulated here:
-
-
-```{r}
-#| label: formulae
-
-for (dataset in names(ddsList)) {
-  met <- metadata(ddsList[[dataset]])
-  dmc_heading(ddsList, dataset=dataset, model=NULL, depth="##")
-  mdls <- lapply(met$models, function(x) x$design)
-  mdls <- mdls[sapply(met$models, function(x) "comparisons" %in% names(x))]
-  for (mdl in names(mdls)) {
-    dmc_heading(ddsList, dataset=dataset, model=mdl, depth="##")
-    cat("`",
-        Reduce(paste, sub("~", "Expression ~ ", deparse(mdls[[mdl]]))),
-        "`\n\n"
-        )
-  }
-}
-
-```
-
-
-# Find differential genes
-
- We use DESeq2 [@pkg_DESeq2] to find differential genes using the
+ We use DESeq2 [@pkg_DESeq2] to find differential `{r} rowNoun`s using the
 negative binomial distribution to model counts, with IHW [@IHW2016]
 for multiple-testing correction with greater power than
 Benjamini-Hochberg, and ashr [@pkg_ashr] for effect-size shrinkage
@@ -158,7 +135,6 @@ to ensure reported fold-changes are more robust.
 param$set("alpha", postpone=TRUE)
 param$set("lfcThreshold", postpone=TRUE)
 param$set("filterFun", postpone=TRUE)
-param$set("baseline_heuristic", postpone=TRUE)
 param$set("LRT_effect")
 
 rds_name <- file.path("data", paste0(basename(params$spec),"_x_", params$alignment, ".rds"))
@@ -171,6 +147,8 @@ if (interactive() && file.exists(rds_name)) {
 
 
 ## For each dataset, fit all its models
+for (i in sub("\\.emmc$", "", ls("package:emmeans", pattern="*.emmc")))
+  assign(paste0("my_", i,".emmc"), negate_emmc(paste0(i, ".emmc")))
 dds_model_comp <- lapply(
   ddsList,
   function(dds) fit_models(
@@ -223,20 +201,20 @@ within which the different models, and their null hypotheses, are
 enumerated.
 
 In the 'Significant' column we tally the number of significant
-genes (for pairwise comparisons, separated into up or down, where
-A-B being labelled up means expression is higher in A; for omnibus
+`{r} rowNoun`s (for pairwise comparisons, separated into up or down, where
+A-B being labelled up means `{r} noun_to_readout(rowNoun)` is higher in A; for omnibus
 comparisons, a broad categorisation of the most extreme groups, as
-described above.) We also tally the total number of genes
+described above.) We also tally the total number of `{r} rowNoun`s
 exhibiting that behaviour (ie not necessarily statistically
 signficant) - these might not always add up to the same value, as
-there is an independent filter of low-signal genes whose effect
+there is an independent filter of low-signal `{r} rowNoun`s whose effect
 varies from comparison to comparison.
 
 Our naming convention for a comparison often looks like `A-B|M` -
 again, because this is an semi-automated report, this mightn't be
 optimal, but the rationale is `A-B` refers to the two experimental
 conditions being compared (a 'upward' fold change will be reported
-if the expression is higher in `A` than it is in `B`). The `|M` part
+if the `{r} noun_to_readout(rowNoun)` is higher in `A` than it is in `B`). The `|M` part
 refers to the fact that we may have looked at that `A-B` comparison
 conditional upon some other variable (which in this example takes the
 value `M`):  anything before the `|` symbol identifies the
@@ -249,7 +227,7 @@ solid peak on the left, and then make a reasonable plateau across
 higher p-values: gross deviations from this can indicate an absence of
 differential behaviour (lack of left-peak) or a model
 mis-specification that might need investigating. The blue tracks
-indicate p-values corresponding to very lowly expressed genes, which
+indicate p-values corresponding to `{r} rowNoun`s with very low `{r} noun_to_readout(rowNoun)`, which
 would typically struggle to provide evidence of differential
 behaviour, and so show an example of what a 'bad' pink trace might
 look like.
@@ -311,7 +289,7 @@ for (dataset in names(summaries)) {
       "  style = cell_fill(color = '#bee2e9'),",
       "  locations = cells_row_groups()",
       ") %>% ",
-      "tab_header(title=\"Genelist summary\", subtitle=dataset)",
+      paste0("tab_header(title=\"",RowNoun,"List summary\", subtitle=dataset)"),
       "```",
       "",
       ""
@@ -357,15 +335,46 @@ for (dataset in names(summaries)) {
 }
 ```
 
-# Scatterplot of differential genes
+# Datasets and Models
 
-Here we plot the fold-change across all genes on the vertical axis,
-against their overall expression on the horizontal. Statistically
-significant genes are highlighted in colour, and we attempt to
-auto-label as many gene symbols as might be legible.
+As in the exploratory analysis, we may examine the samples in different combinations, and leave out
+certain samples.  In the above table, the columns under the 'In
+Subset' group indicate these combinations are listed, and the
+samples' inclusions are indicated.
+
+Each of those combinations may be analysed in
+potentially several ways, as formulated here:
+
+
+```{r}
+#| label: formulae
+
+for (dataset in names(ddsList)) {
+  met <- metadata(ddsList[[dataset]])
+  dmc_heading(ddsList, dataset=dataset, model=NULL, depth="##")
+  mdls <- lapply(met$models, function(x) x$design)
+  mdls <- mdls[sapply(met$models, function(x) "comparisons" %in% names(x))]
+  for (mdl in names(mdls)) {
+    dmc_heading(ddsList, dataset=dataset, model=mdl, depth="##")
+    cat("`",
+        Reduce(paste, sub("~", paste0(noun_to_readout(RowNoun)," ~ "), deparse(mdls[[mdl]]))),
+        "`\n\n"
+        )
+  }
+}
+
+```
+
+
+# Scatterplot of differential `{r} rowNoun`s
+
+Here we plot the fold-change across all `{r} rowNoun`s on the vertical axis,
+against their overall `{r} noun_to_readout(rowNoun)` on the horizontal. Statistically
+significant `{r} rowNoun`s are highlighted in colour, and we attempt to
+auto-label as many `{r} rowNoun` symbols as might be legible.
 
 The fold-changes are regularised ('shrunk') to reflect their
-reliability: genes with large variability between replicates are
+reliability: `{r} rowNoun`s with large variability between replicates are
 moved towards the horizontal axis, to de-emphasise them and to
 provide a more reliable prediction of behaviour in future
 replications.
@@ -424,7 +433,7 @@ for (dataset in names(dds_model_comp)) {
       pl <- pl+ggrepel::geom_text_repel(size=4, data=res[ind,])
       do_plot(pl,
               label="MA",
-              caption=paste0("MA plot of differential genes ", sub(".*\\t", "", comp_name)),
+              caption=paste0("MA plot of differential ",rowNoun,"s ", sub(".*\\t", "", comp_name)),
               preview=first
               )
       first <- FALSE
@@ -438,7 +447,7 @@ for (dataset in names(dds_model_comp)) {
 
 # Differential Heatmaps
 
-Here we present heatmaps of the differential genelists.  Note
+Here we present heatmaps of the differential `{r} RowNoun`Lists.  Note
 that these will, by definition, divide the samples along lines
 of the experimental groups, so should be interpreted differently
 from the QC heatmaps which were blind to the experimental design.
@@ -476,42 +485,16 @@ for (dataset in names(dds_model_comp)) {
       } else {
         mmat <- model.matrix(mdl$design, colData(this_comp))
       }
-      if ("spec" %in% names(attributes(comp))) {
-        var_roles <- emmeans:::.parse.by.formula(attr(comp, "spec"))
-        var_roles$all <- c(var_roles$by, var_roles$rhs, setdiff(all.vars(fml), unlist(var_roles)))
-        most_decreasing <- which.min(metadata(this_comp)$comparison %*% MASS::ginv(mmat))
-        if (param$get("baseline_heuristic", mdl)=="min") {
-          weights <- apply(mmat, 1, function(x) all(x==mmat[most_decreasing,]))
-          weights <- weights/sum(weights)
-        } else if (param$get("baseline_heuristic", mdl)=="negative") {
-          weights <- metadata(this_comp)$comparison %*% MASS::ginv(mmat)
-          minw <- min(weights)
-          w_ind <- weights < -sqrt(.Machine$double.eps)
-          weights[!w_ind] <- 0
-          weights[w_ind] <- 1
-          weights <- t(weights)/sum(weights)
-        } else {
-          weights <- rep(1/nrow(mmat), times=nrow(mmat))
-            }
-      } else if (is_formula(comp)) {
-        most_decreasing <- which.max(MASS::ginv(mmat)[1,])
-        weights <- apply(mmat, 1, function(x) all(x==mmat[most_decreasing,]))
-        weights <- weights/sum(weights)
-        var_roles <- list(lhs="", rhs=all.vars(fml), by=NULL, all=all.vars(fml))
+      var_roles <- list(all.vars(fml))
+      if ("baseline_contrast" %in% names(attributes(metadata(this_comp)$comparison))) {
+        var_roles <- c(emmeans:::.parse.by.formula(attr(comp, "spec"))[c("by", "rhs")], var_roles)
+        weights <- as.vector(attr(metadata(this_comp)$comparison, "baseline_contrast") %*% MASS::ginv(mmat))
+        baseline_str <- paste("baseline", noun_to_readout(rowNoun))
       } else {
-        var_roles <- list(lhs="", rhs=all.vars(fml), by=NULL, all=all.vars(fml))
-        most_decreasing <- which.min(retrieve_contrast(this_comp) %*% MASS::ginv(mmat))
-        weights <- apply(mmat, 1, function(x) all(x==mmat[most_decreasing,]))
-        weights <- weights/sum(weights)
+        weights <- rep(1/nrow(mmat), times=nrow(mmat))
+        baseline_str <- paste("average", noun_to_readout(rowNoun))
       }
-      baseline_list <- as.data.frame(colData(this_comp)[most_decreasing, var_roles$all])
-      baseline_str <- switch(
-        param$get("baseline_heuristic"),
-        min=paste(names(baseline_list), unlist(baseline_list), sep="=", collapse=","),
-        negative="baseline condition",
-        "gene-average"
-      )
-      tidied_data <- tidy_significant_dds(this_comp, mcols(this_comp)$results, var_roles, weights=weights)
+      tidied_data <- tidy_significant_dds(this_comp, mcols(this_comp)$results, unique(unlist(var_roles)), weights=weights)
       pdat <- tidied_data$pdat
       pdat[sapply(pdat, is.character)] <- lapply(pdat[sapply(pdat, is.character)], 
                                                 as.factor)
@@ -541,13 +524,13 @@ for (dataset in names(dds_model_comp)) {
         show_row_names = nrow(tidied_data$mat)<100)
       do_plot(pl,
               label="Heatmap",
-              caption=paste0("Heatmap on ", name, "-differential genes. White for ", baseline_str),
+              caption=paste0("Heatmap on ", name, "-differential ",rowNoun,"s. White for ", baseline_str),
               height_mult=nrow(tidied_data$mat)/30,
               max_height=15, min_height=5)
       cat('\n\n---\n\n')
       if (do_residual_transform <- FALSE) {#length(all.vars(fml))>1) {
         part_resid <- partialise(tidied_data$mat, pdat, fml)
-        term_names <- intersect(dimnames(part_resid$terms)[[3]], var_roles$rhs)
+        term_names <- intersect(dimnames(part_resid$terms)[[3]], var_roles$rhs %||% unique(unlist(var_roles)))
         for (term_name in term_names) {
           tdat <- t(part_resid$terms[,,term_name, drop=TRUE]) +part_resid$const + t(part_resid$resid)
           pl <- ComplexHeatmap::Heatmap(
@@ -564,7 +547,7 @@ for (dataset in names(dds_model_comp)) {
             show_row_names = nrow(tidied_data$mat)<100)
           do_plot(pl,
                   label="focussed",
-                  caption=paste0("Heatmap on differential genes ", name, ", ", term_name, "-focussed")
+                  caption=paste0("Heatmap on differential ",rowNoun,"s ", name, ", ", term_name, "-focussed")
                   )
           cat('\n\n---\n\n')
         }
@@ -578,14 +561,14 @@ for (dataset in names(dds_model_comp)) {
 
 # Differential Profiles
 
-We can also plot summaries of clusters of differential genes. Here we
-split expression data of the differential genes into twelve clusters,
+We can also plot summaries of clusters of differential `{r} rowNoun`s. Here we
+split `{r} noun_to_readout(rowNoun)` data of the differential `{r} rowNoun`s into twelve clusters,
 having first removed the participant-to-participant variability, and
-stochastic noise. We aggregate expression within each cluster, and
+stochastic noise. We aggregate `{r} noun_to_readout(rowNoun)` within each cluster, and
 then plot the profiles per cluster - the clusters are ordered in
-decreasing number of constituent genes, and their cardinality is
+decreasing number of constituent `{r} rowNoun`s, and their cardinality is
 encoded into the name of the cluster, e.g. `|1|=1000` means this is
-the largest cluster, and represents 1000 genes.
+the largest cluster, and represents 1000 `{r} rowNoun`s.
 
 
 ```{r}
@@ -605,67 +588,74 @@ for (dataset_id in names(dds_model_comp)) {
     for (comp_id in names(dds_model_comp[[dataset_id]][[model_id]])) {
       this_dds <- dds_model_comp[[dataset_id]][[model_id]][[comp_id]]
       is_diff <- grepl("^.*\\*", mcols(this_dds)$results$class)
-      if ("profile_plots" %in% names(metadata(this_dds)$model) &&
-            length(metadata(this_dds)$model)>0
-          && any(is_diff)) {
-        exists_profile_plot <- TRUE
-        partials <- partialise.matrix(
-          assay(this_dds[is_diff,], "vst"),
-          as.data.frame(colData(this_dds)),
-          fml=metadata(this_dds)$model$design)
-        curves <- metadata(this_dds)$model$profile_plots
-        for (i in seq_along(curves)) {
-          cdata_df <- as.data.frame(colData(this_dds)[, all.vars(curves[[i]]), drop=FALSE])
-          mat <- t(scale(t(
-            assemble_partialised(partials, update(curves[[i]], NULL ~ .), resids=TRUE)
-          )))
-          removed <- paste(
-            translate_terms(dropped_terms(partials, update(curves[[i]], NULL ~ .)),this_dds),
-            sep=", ", collapse=", ")
-          if (length(removed)==0 || removed=="") removed <- "nothing"
-          gene_clust <- bluster::clusterRows(mat, param$get("gene_clust"), full=TRUE)
-          this_clust <- cluster_ind()
-          levels(gene_clust$clusters) <- paste0(this_clust, levels(gene_clust$clusters))
-          group_mat <- t(scale(t(
-            assemble_partialised(partials, update(curves[[i]], NULL ~ .), resids=FALSE)
-          )))
-          cc <- cluster_calc(mat, clusterID=gene_clust$clusters, group_mat=group_mat)
-          centroid_df <- cbind(cc$centroid, cdata_df) %>%
-            pivot_longer(cols=any_of(names(cc$centroid)), names_to="babs.name", values_to="babs.value") %>%
-            mutate(babs.name=factor(babs.name, levels=names(cc$centroid)))
-
-          pl <- ggplot(centroid_df ,
-                      eval(curves[[i]][[2]])) +
-            facet_wrap(~ babs.name) +
-            theme_bw() +
-            geom_point(aes(y= babs.value)) +
-            labs(y="Expression")
-          if ("group" %in% names(curves[[i]][[2]])) {
-            group_df <- cbind(cc$group_centroid, cdata_df)  %>%
-              pivot_longer(cols=any_of(names(cc$centroid)), names_to="babs.name", values_to="babs.value") %>%
-              mutate(babs.name=factor(babs.name, levels=names(cc$centroid)))
-            pl <- pl+geom_line(data=group_df, aes(y=babs.value))
-          }
-          if ("ScaleDiscrete" %in% class(layer_scales(pl)$x)) {
-            pl <- pl + scale_x_discrete(guide=guide_axis(n.dodge=2))
-          }
-          capt <- paste0("Cluster profile for ", comp_id, " genes  of ", mtag(model_id), " in ", dtag(dataset_id), " having removed effect of ", removed)
-          do_plot(pl,
-                  label= "diffClustProfile",
-                  caption=capt
-                  )
-          all_clusters[[this_clust]] <- list(
-            id=gene_clust$clusters,
-            description=capt
-          )
-          cat('\n\n---\n\n')
+      plot_formulae <- section_chooser(metadata(this_dds)$model, "differential_profile_plots", "profile_plots")
+      if (is_null(plot_formulae) || !any(is_diff)) next
+      exists_profile_plot <- TRUE
+      partials <- partialise.matrix(
+        assay(this_dds[is_diff,], "vst"),
+        as.data.frame(colData(this_dds)),
+        fml=metadata(this_dds)$model$design)
+      for (plot_fml in plot_formulae) {
+        cdata_df <- as.data.frame(colData(this_dds)[, all.vars(plot_fml), drop=FALSE])
+        mat <- t(scale(t(
+          assemble_partialised(partials, update(plot_fml, NULL ~ .), resids=TRUE)
+        )))
+        removed <- paste(
+          translate_terms(dropped_terms(partials, update(plot_fml, NULL ~ .)),this_dds),
+          sep=", ", collapse=", ")
+        if (length(removed)==0 || removed=="") removed <- "nothing"
+        hc <- param$get("gene_clust")
+        if ("cut.params" %in% slotNames(hc) && "k" %in% names(slot(hc, "cut.params")) && slot(hc, "cut.params")$k >= nrow(mat)) {
+          slot(hc, "cut.params") <- modifyList(slot(hc, "cut.params"), list(k=ceiling(nrow(mat)/3)))
         }
+        if (nrow(mat)>1) {
+          gene_clust <- bluster::clusterRows(mat, hc, full=TRUE)
+        } else {
+          gene_clust <- list(
+            clusters=setNames(factor(1), row.names(mat))
+          )
+        }
+        this_clust <- cluster_ind()
+        levels(gene_clust$clusters) <- paste0(this_clust, levels(gene_clust$clusters))
+        cc <- cluster_calc(mat, clusterID=gene_clust$clusters)
+        centroid_df <- cbind(cc, cdata_df) %>%
+          pivot_longer(cols=any_of(names(cc)), names_to="babs.name", values_to="babs.value") %>%
+          mutate(babs.name=factor(babs.name, levels=names(cc)))
+        pl <- ggplot(centroid_df ,
+                    eval(plot_fml[[2]])) +
+          facet_wrap(~ babs.name) +
+          theme_bw() +
+          geom_point(aes(y= babs.value)) +
+          labs(y=noun_to_readout(RowNoun))
+        if ("group" %in% names(plot_fml[[2]])) {
+          group_mat <- t(scale(t(
+            assemble_partialised(partials, update(plot_fml, NULL ~ .), resids=FALSE)
+          )))
+          group_cc <- cluster_calc(group_mat, clusterID=gene_clust$clusters)
+          group_df <- cbind(group_cc, cdata_df)  %>%
+            pivot_longer(cols=any_of(names(group_cc)), names_to="babs.name", values_to="babs.value") %>%
+            mutate(babs.name=factor(babs.name, levels=names(group_cc)))
+          pl <- pl+geom_line(data=group_df, aes(y=babs.value))
+        }
+        if ("ScaleDiscrete" %in% class(layer_scales(pl)$x)) {
+          pl <- pl + scale_x_discrete(guide=guide_axis(n.dodge=2))
+        }
+        capt <- paste0("Cluster profile for ", comp_id, " ",rowNoun,"s  of ", mtag(model_id), " in ", dtag(dataset_id), " having removed effect of ", removed)
+        do_plot(pl,
+                label= "diffClustProfile",
+                caption=capt
+                )
+        all_clusters[[this_clust]] <- list(
+          id=gene_clust$clusters,
+          description=capt
+        )
+        cat('\n\n---\n\n')
       }
     }
   }
 }
 if (!exists_profile_plot) {
-  cat('\n\nNo profiles were generated, either because none were specified, or those that were corresponded to comparisons with no statistically significant differential genes.\n\n')
+  cat('\n\nNo profiles were generated, either because none were specified, or those that were corresponded to comparisons with no statistically significant differential ',rowNoun,'s.\n\n', sep="")
 }
 
       
@@ -689,7 +679,7 @@ if (!exists_profile_plot) {
 #| label: downloads
 
 iwalk(xl_files,
-     ~cat("\n\n<a class=\"download-excel btn btn-primary\" href=\"", attr(.x, "link"), "\"> Differential genes for '", .y,"'</a>", sep="")
+     ~cat("\n\n<a class=\"download-excel btn btn-primary\" href=\"", attr(.x, "link"), "\"> Differential ",rowNoun," for '", .y,"'</a>", sep="")
      )
 
 fname <- write_clusters(all_clusters,
@@ -699,7 +689,7 @@ fname <- write_clusters(all_clusters,
 
 cat('\n\n<a class="download-excel btn btn-primary" href="',
     attr(fname,"link"),
-    '">Gene-Cluster mappings</a>', sep="")
+    '">',RowNoun,'-Cluster mappings</a>', sep="")
 
 
 ```

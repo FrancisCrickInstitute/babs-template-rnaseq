@@ -18,17 +18,19 @@ p2filename <- function(p, prefix, suffix) {
 ##' @return A list of file paths to the excel files
 ##' @author Gavin Kelly
 ##' @export
-write_assay <- function(ddsList, assay="vst", p,  formula=NULL, terms_to_remove=NULL) {
+write_assay <- function(ddsList, aname="vst", p,  formula=NULL, terms_to_remove=NULL) {
   out <- list()
   for (i in names(ddsList)) {
-    if (!is.null(formula)) {
-      part_resid <- partialise(ddsList[[i]], assay=assay)
-      x <- x - t(apply(part_resid$terms[,,terms_to_keep, drop=FALSE], 1:2,sum))
-    } else if (assay=="norm") {
-      part <- partialise(ddsList[[i]])
+    if (aname %in% assayNames(ddsList[[i]])) {
+      x <- assay(ddsList[[i]], aname)
+    } else if (aname=="norm") {
       x <- counts(ddsList[[i]], norm=TRUE)
     } else {
-      x <- assay(ddsList[[i]], assay)
+      next
+    }
+    if (!is.null(formula)) {
+      part_resid <- partialise(x)
+      x <- x - t(apply(part_resid$terms[,,terms_to_keep, drop=FALSE], 1:2,sum))
     }
     content_frame <- cbind(mcols(ddsList[[i]]),x)
     head_frame <- as.data.frame(colData(ddsList[[i]]))
@@ -36,7 +38,7 @@ write_assay <- function(ddsList, assay="vst", p,  formula=NULL, terms_to_remove=
     spacer_frame <- as.data.frame(mcols(ddsList[[i]]))[rep(1, ncol(head_frame)),]
     spacer_frame[] <- ""
     row.names(spacer_frame) <- colnames(head_frame)
-    fname <- p2filename(p, paste0(assay, "_", i), "txt")
+    fname <- p2filename(p, paste0(aname, "_", i), "txt")
     dir.create(dirname(fname), recursive=TRUE)
     out[[i]] <- fname
     write.table(cbind(spacer_frame, t(head_frame)), file=fname, quote=FALSE, sep="\t", col.names=NA)

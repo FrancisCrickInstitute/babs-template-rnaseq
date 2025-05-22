@@ -184,22 +184,36 @@ separate_legend <- function(dds, vars=unique(unlist(lapply(metadata(dds)$models,
   )
 }
 
-substitute_x_aes <- function(mapping) {
-  need_alt_x <- !( # need to represent x-aesthetic somewhere else if it's not already represented in shape or colour
+substitute_x_aes <- function(mapping, excludes=c("", "group","column_split")) {
+  # x aesthetic about to be used to represent e.g. PC1 so may need to
+  # remap what was being represented by x to another
+  # aesthetic. There's an implicit hierarchy of importance of
+  # aesthetics, typically x > colour > shape > size > ...
+  # But we'll use whatever lexical order they're in the aes.
+  need_alt_x <- !(
+    # need to represent x-aesthetic somewhere else if it's not already
+    # represented in shape or colour
     all(all.vars(mapping$x) %in% all.vars(mapping$colour)) ||
       all(all.vars(mapping$x) %in% all.vars(mapping$color)) ||
       all(all.vars(mapping$x) %in% all.vars(mapping$shape))
   )
   if (need_alt_x) {
-    is_x <- which(names(mapping)=="x")
-    first_not_x <- seq_along(mapping)[-c(1,is_x)][1]
-    if (is.na(first_not_x)) {
+    is_aes <- !names(mapping) %in% excludes # the first component is the function itself, we may also have some pseudo-aesthetics  - the rest are the aesthetics
+    is_x <- which(names(mapping)[is_aes]=="x")
+    first_not_x <- seq_along(mapping[is_aes])[-is_x][1]
+    if (is.na(first_not_x)) { # There's no aes other than x, so use colour for what was x
       new_fml <- mapping
       mapping$colour <- mapping$x
       aes_list <- list(mapping)
     } else {
       new_fml <- mapping
-      names(new_fml)[c(is_x, first_not_x)] <- names(mapping)[c(first_not_x,is_x)]
+      #      names(new_fml)[c(is_x, first_not_x)] <- names(mapping)[c(first_not_x,is_x)]
+      if (is_x == sum(is_aes)) { # x is the last aes, so swap with penultimate - it's a more important aesthetic, but the least bad case
+        names(new_fml)[is_aes][c(is_x, is_x-1)] <- names(new_fml)[is_aes][c(is_x-1, is_x)]
+      } else { # x is a middling aes: each term moves down an aesthetic level - the final one gets assigned 'x' but that will be overwritten and so lost.
+        names(new_fml)[is_aes] <- names(mapping)[is_aes][c(seq(sum(is_aes))[-is_x], is_x)]
+      }
+      ## Use both the old and new mappings - only way to guarantee everything represented somehow
       aes_list <- list(mapping, new_fml)
     }
   } else {
@@ -210,19 +224,14 @@ substitute_x_aes <- function(mapping) {
   
 aes_caption <- function(ae) {
   ae <- ae[intersect(c("colour","shape"), names(ae))]
-  paste0(names(ae), as.character(ae), collapse=",")
+  paste0(names(ae), "\\", as.character(ae), collapse=",")
 }
 
 
-cluster_calc <- function(mat, clusterID, group_mat=NULL) {
+cluster_calc <- function(mat, clusterID) {
   tbl <- table(clusterID)
   levels(clusterID) <- paste0("|", sub("[0-9]+", "", names(tbl)[1]), rank(-tbl, ties="first"), "|=", tbl) # change the labels
   clusterID <- factor(clusterID, levels=levels(clusterID)[rev(order(tbl))])
   centres <- apply(mat, 2, function(samp) tapply(samp, clusterID, mean))
-  out <- list(centroid=as.data.frame(t(centres)))
-  if (!is.null(group_mat)) {
-    group_centres <- apply(group_mat, 2, function(samp) tapply(samp, clusterID, mean))
-    out$group_centroid_ <-  as.data.frame(t(group_centres))
-  }
-  out       
+  as.data.frame(t(centres))
 }

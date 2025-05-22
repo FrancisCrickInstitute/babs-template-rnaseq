@@ -73,6 +73,19 @@ partialise.DESeqDataSet <- function(obj, assay="vst") {
   )
 }
 
+partialise.SummarizedExperiment <- function(obj, assay="vst") {
+  if (assay %in% assayNames(obj)) {
+    mat <- assay(obj, assay)
+  } else {
+    mat <-assay(vst(obj, nsub=min(1000, nrow(obj))))
+  }
+  partialise.matrix(
+    obj=mat,
+    cdata=as.data.frame(colData(obj)),
+    fml=design(obj)
+  )
+}
+
 ##' Compare a partialised object with the terms in a reduced model
 ##'
 ##' Report the terms that were in the original model used to

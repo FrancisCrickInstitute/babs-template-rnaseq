@@ -68,6 +68,7 @@ IMAGE_REG=$(if $(OUR_VERSION),ghcr,docker).io/
 IMAGE_REPO=$(if $(OUR_VERSION),franciscrickinstitute/babs-template-rnaseq,bioconductor)
 IMAGE_TAG=$(BIOCONDUCTOR_VERSION)-R-$(RVERSION)$(and $(OUR_VERSION),-$(OUR_VERSION))
 IMAGE=$(IMAGE_REPO)/$(IMAGE_NAME)
+export SINGULARITYENV_RENV_PATHS_PREFIX=$(subst /,-,$(IMAGE))
 
 R=R
 QUARTO=quarto
@@ -205,9 +206,8 @@ EXECUTOR?=singularity
 ifeq ($(EXECUTOR),singularity)
 #Sometimes we want to do e.g. env SINGULARITYENV_APPEND_PATH=/stuff - that's what CONTAINER_VARS is for
 CONTAINER= $(call ml,Singularity/$(SINGULARITY_VERSION)); $(CONTAINER_VARS) singularity
-CONTAINER_IMAGE=$(SINGULARITY_ROOT)/$(IMAGE)_$(IMAGE_TAG).sif
-renvironBind=,Renviron-$(RVERSION):/usr/local/lib/R/etc/Renviron.site
-CONTAINER_BIND=--bind $(BIND_DIR),/tmp,$(RENV_PATHS_ROOT)$(renvironBind)
+CONTAINER_IMAGE=$(or $(SINGULARITY_ROOT),.)/$(IMAGE)_$(IMAGE_TAG).sif
+CONTAINER_BIND=--bind $(BIND_DIR),/tmp$(and $(SINGULARITYENV_RENV_PATHS_ROOT),$(comma)$(SINGULARITYENV_RENV_PATHS_ROOT))
 CONTAINER_ENV=--env SQLITE_TMPDIR=/tmp,BIOCPARALLEL_WORKER_NUMBER=$(NUM_THREADS),GITHUB_PAT=$${GITHUB_PAT},OMP_NUM_THREADS=${NUM_THREADS},OPENBLAS_NUM_THREADS=${NUM_THREADS}
 CONTAINER_OPTIONS= exec $(CONTAINER_BIND) --pwd $$(realpath .) --containall --cleanenv $(CONTAINER_ENV)
 $(CONTAINER_IMAGE): 
@@ -220,12 +220,10 @@ CONTAIN=true
 else ifeq ($(EXECUTOR),docker)
 CONTAINER=docker
 CONTAINER_IMAGE=$(IMAGE)$(colon)$(IMAGE_TAG)
-renvironBind=--mount type=bind,source="$(CURDIR)/Renviron-$(RVERSION)",target="/usr/local/lib/R/etc/Renviron.site"
 CONTAINER_OPTIONS=run \
 --mount type=bind,source="$(BIND_DIR)",target="$(BIND_DIR)" \
 --mount type=bind,source="/tmp",target="/tmp" \
---mount type=bind,source="$(RENV_PATHS_ROOT)",target="$(RENV_PATHS_ROOT)" \
-$(renvironBind) \
+$(if $(SINGULARITYENV_RENV_PATHS_ROOT),--mount type=bind,source="$(SINGULARITYENV_RENV_PATHS_ROOT)",target="$(SINGULARITYENV_RENV_PATHS_ROOT)" --env RENV_PATHS_ROOT=$(SINGULARITYENV_RENV_PATHS_ROOT))\
 --env SQLITE_TMPDIR=/tmp \
 --env BIOCPARALLEL_WORKER_NUMBER=$(NUM_THREADS) \
 --env GITHUB_PAT=$${GITHUB_PAT} \
@@ -264,11 +262,10 @@ docker/build.sh:
 
 
 ifeq ($(CONTAIN),true)
-Renviron-$(RVERSION): | $(CONTAINER_IMAGE)
-optionalRenviron=Renviron-$(RVERSION)
+optionalContainer=$(CONTAINER_IMAGE)
 containerPrefix=$(CONTAINER) $(CONTAINER_OPTIONS) --env MAKEFLAGS="$(MAKEFLAGS)" $(CONTAINER_IMAGE)
 else
-optionalRenviron=
+optionalContainer=
 containerPrefix=
 endif
 
@@ -322,20 +319,12 @@ excluded-targets += R R-local R-$(RVERSION) .Rprofile
 
 .PHONY: R R-local R-$(RVERSION)
 
-R R-$(RVERSION) : $(optionalRenviron)
-
-Renviron-$(RVERSION):
-	$(CONTAINER) exec --bind $(CURDIR) $(CONTAINER_IMAGE) cp /usr/local/lib/R/etc/Renviron.site $(CURDIR)/$@
-	echo "RENV_PATHS_PREFIX=$(RENV_PATHS_PREFIX)" >> $@
-	echo "RENV_PATHS_ROOT=$(RENV_PATHS_ROOT)" >> $@
-	echo "RENV_PATHS_LIBRARY=renv/library" >> $@
 
 R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses).  Also EXECUTOR=docker means the launchers will use docker rather than singularity
 
-R-$(RVERSION): renvironBind=$${renvironBind}#So that the bind will be picked up at runtime
 R-$(RVERSION): BIND_DIR=$${wd}#Again, pick up local runtime setting
 R-$(RVERSION): resources/shell/R-$(EXECUTOR)
-	< $< $(call envsubst,CONTAINER_IMAGE CONTAINER CONTAINER_OPTIONS RVERSION) > $@
+	< $< $(call envsubst,CONTAINER_IMAGE CONTAINER CONTAINER_OPTIONS RVERSION SINGULARITYENV_RENV_PATHS_PREFIX) > $@
 	@$(make_rwx) $@
 	mkdir -p $(launch_dir)/
 	for i in rstudio shiny jupyter; do cp resources/shell/$${i}-$(EXECUTOR).sh $(launch_dir)/$${i}.sh || echo "$${i}-$(EXECUTOR).sh doesn't yet exist"; done
@@ -363,11 +352,8 @@ renv/activate.R: $(wildcard resources/renv/activate.R)
 
 $(SELF_DIR)secret.mk: $(wildcard $(PROJECT_HOME)/.babs)
 	if [ ! -f "$@" ]; then \
-	echo "SINGULARITY_ROOT=\#where .sif's are stored" > $@ ;\
-	echo "RENV_PATHS_ROOT=\#local renv cache" >> $@ ;\
-	echo "RENV_PATHS_PREFIX=\#your chosen prefix (e.g.'rocker') to keep the pipeline somewhat isolated" >> $@ ;\
-	echo "SCRATCH_DIR=\#working space for large disposable files" >> $@ ;\
-	echo "NXF_SINGULARITY_CACHEDIR=\#Nextflow cache" >> $@ ;\
+	echo "SINGULARITY_ROOT=.\#where .sif's are stored" > $@ ;\
+	echo "SCRATCH_DIR=/tmp#Somewhere for transient, possibly large, files" >> $@ ;\
 	echo "Created a dummy copy of $@, please edit it" ;\
 	fi
 	if [ -n "$<" ]; then \
@@ -375,8 +361,4 @@ $(SELF_DIR)secret.mk: $(wildcard $(PROJECT_HOME)/.babs)
 	  sed -r -n 's/^(\s*)(.*)\s*:\s*(.*$$)/setting_\2=\3/p' $< >> $@ ;\
 	fi
 
-excluded-targets += isolated.sh
-isolated.sh: resources/shell/isolated.sh ## Create a script that helps you ensure an isolated analysis has the necessary prerequisites
-	cp $< $@
-	echo "Inspect the script 'isolated.sh' to see how it is going to create the prerequisites."
-	echo 'You can then keep running it until you are satisfied you have a config file, a specfile, and the assay data'
+excluded-targets += check-isolated

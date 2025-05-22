@@ -78,11 +78,12 @@ test/babs/nfcore/results:  test | airway/nfcore.tar.gz
 
 test/isolated-analysis: ## Provide an example of what an isolated differential analysis folder looks like.
 	rm -rf $@
-	cp -r babs/differential $@
-	mkdir $@/extdata
-	cp test/babs/docs/analyse.spec $@/extdata
+	mkdir -p $@/extdata
+	cp -r babs/differential/. $@
+	cp airway/docs/analyse.spec $@/extdata
 	cp airway/preprocessed.rda $@/extdata/
-	grep org.db airway/docs/GRCh38.config > $@/extdata/preprocessed.config 
+	sed 's/^/preprocessed./' airway/docs/GRCh38.config | grep org.db > $@/extdata/preprocessed.config
+	(cd $@ && make check-isolated)
 
 .PHONY: pkgdown
 pkgdown: 

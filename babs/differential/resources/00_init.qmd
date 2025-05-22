@@ -11,14 +11,16 @@ format:
     fontsize: 1.1em
     linestretch: 1.7
 code-fold: true
-echo: false
+execute:
+  output: asis
+  echo: false
 code-summary: "Show the code"
 params:
   section: Initialisation
 ---
 
 ```{r}
-#| label: load1
+#| label: setup
 #| output: false
 #| warning: false
 #| error: false
@@ -34,32 +36,32 @@ source("R/markdown.r", local = knitr::knit_global())
 source("R/rnaseq.r", local = knitr::knit_global())
 source("R/helpers.r", local = knitr::knit_global())
 source("R/output.r", local = knitr::knit_global())
-
 ```
 
 
 ```{r}
-#| label: load2
+#| label: settings
+list2df <- function(lst) data.frame(Setting=names(lst), Value=unlist(lst))
 
 if (!isTRUE(getOption('knitr.in.progress'))) {
   params <- load_params(choose_staging("00_init"))
 } else {
-  gt(data.frame(Setting=names(params),
-                Value=unlist(params)))
+  gt(list2df(params))
 }
 
-alignments <- strsplit(sub(paste0("^", params$alignment, "\\."),
-                          "",
-                          readLines(paste0(file.path("extdata", params$alignment), ".config"))), "=")
-names(alignments) <- sapply(alignments, "[", 1)
-alignments <- lapply(alignments, function(x) paste(x[-1], collapse="="))
+align_params <- get_align_params(params$alignment)
+
+organism <- list(org=align_params$org.db)
+```
 
 
-organism <- list(org=alignments$org.db)
+```{r}
+#| label: rda
 
-
-preprocessed <- file.path("extdata", paste0(params$alignment, ".rda"))
+preprocessed <- file.path("extdata", align_params$rda %||%  paste0(params$alignment, ".rda"))
 if (file.exists(preprocessed)) {
+  cat("\n\n## Loading data from a pre-generated 'rda' binary object\n\n")
+  print(gt(list2df(c('Data-source Type'="Binary RDA", File=preprocessed, align_params))))
   objNames <- load(preprocessed)
   is_ok <- sapply(objNames, function(x) class(get(x))=="DESeqDataSet")
   if (any(is_ok)) {
@@ -78,9 +80,16 @@ if (file.exists(preprocessed)) {
   saveRDS(dds, file=file.path("data",paste0("counts_", params$alignment, ".rds")))
   knitr::knit_exit()
 }
+```
 
-preprocessed <- file.path("extdata", paste0(params$alignment, ".rds"))
+
+```{r}
+#| label: rds
+
+preprocessed <- file.path("extdata", align_params$rds %||% paste0(params$alignment, ".rds"))
 if (file.exists(preprocessed)) {
+  cat("\n\n## Loading data from a pre-generated 'rds' binary object\n\n")
+  print(gt(list2df(c('Data-source Type'="Binary RDS", File=preprocessed, align_params))))
   obj <- readRDS(preprocessed)
   if (is(obj, "DESeqDataSet")) {
     dds <- add_org_annotation(obj, organism$org)
@@ -93,48 +102,24 @@ if (file.exists(preprocessed)) {
   saveRDS(dds, file=file.path("data",paste0("counts_", params$alignment, ".rds")))
   knitr::knit_exit()
 }
-
-to_simulate <- file.path("extdata", paste0(params$alignment, ".csv"))
-if (file.exists(to_simulate)) {
-  df <- read.csv(to_simulate)
-  
-  dds <- DESeqDataSetFromMatrix(
-    countData=matrix(
-      rnbinom(nrow(df) * 1000, size=100, prob=0.5),
-      1000,
-      nrow(df)),
-    colData=df,
-    design=~1,
-    )
-  if (all(table(df[[1]])==1)) {
-    colnames(dds) <- as.character(df[[1]])
-  } else {
-    colnames(dds) <- as.character(1:ncol(ds))
-  }
-  dds <- add_org_annotation(dds, organism$org)
-  save(dds, file=file.path("data",paste0("counts_", params$alignment, ".rda")))
-  saveRDS(dds, file=file.path("data",paste0("counts_", params$alignment, ".rds")))
-  knitr::knit_exit()
-}
-
 ```
 
-
 ```{r}
-#| label: load3
+#| label: metadata
 
-
+## If neither of above, we need a metadata file
 if (grepl("\\.csv$", params$metadata)) {
   sample_sheet <- read.csv(params$metadata, header=TRUE, check.names=FALSE)
 } else {
   sample_sheet <- readxl::read_excel(params$metadata, sheet=1)
 }
-file_col <- params$file_col[params$file_col %in% names(sample_sheet)][1]
-if (is.na(file_col)) {
+potential_label <- sapply(sample_sheet, function(x) length(unique(x))==nrow(sample_sheet) & !is.numeric(x))
+file_col <- c(params$file_col[params$file_col %in% names(sample_sheet)], names(sample_sheet)[potential_label])[1]
+if (is.na(file_col %||% NA)) {
   stop("Metadata has none of: ", paste(params$file_col, collapse=", "))
 }
 
-potential_label <- sapply(sample_sheet, function(x) length(unique(x)))==nrow(sample_sheet)
+
 name_col <- c(
   params$name_col[params$name_col %in% names(sample_sheet)],
   setdiff(names(sample_sheet)[potential_label], file_col),
@@ -145,25 +130,106 @@ name_col <- c(
 sample_sheet[sapply(sample_sheet, is.character)] <- lapply(
   sample_sheet[sapply(sample_sheet, is.character)], 
   as.factor)
+```
 
+
+```{r}
+#| label: simulate
+
+
+## If ID column empty - simulate the data
+if (all(is.na(sample_sheet[[file_col]]))) {
+  cat("\n\n## Simulating random data for samples in the design table\n\n")
+  print(gt(list2df(c(
+    'Data-source Type'="Random Simulation",
+    'Basis of simulation'=params$metadata,
+    'Column of names'=name_col,
+    align_params))))
+
+  dds <- DESeqDataSetFromMatrix(
+    countData=matrix(
+      rnbinom(nrow(sample_sheet) * 1000, size=100, prob=0.5),
+      1000,
+      nrow(sample_sheet)),
+    colData=sample_sheet,
+    design=~1,
+    )
+  colnames(dds) <- as.character(dds[[name_col]])
+  dds <- add_org_annotation(dds, organism$org)
+  save(dds, file=file.path("data",paste0("counts_", params$alignment, ".rda")))
+  saveRDS(dds, file=file.path("data",paste0("counts_", params$alignment, ".rds")))
+  knitr::knit_exit()
+}
+```
+
+
+```{r}
+#| label: csv
+
+## If a csv file, use sample_sheet to distinguish assay columns from roweData columns
+missing <- "missing" %in% names(align_params)
+
+if (missing) {
+  csv <- file.path("extdata", paste0(align_params$missing, ".csv"))
+} else {
+  csv <- file.path("extdata", paste0(align_params$csv %||% params$alignment, ".csv"))
+}
+if (file.exists(csv)) {
+  cat("\n\n## Using a CSV text file of assay data\n\n")
+  cat("We will create a SummarizedExperiment object and analyse it with limma, rather than DESeq2.\n\n")
+  df <- read.csv(csv, check.names=FALSE)
+  mat <- as.matrix(df[,as.character(sample_sheet[[file_col]])])
+  if (missing) {
+    mat[] <- ifelse(is.na(mat),1,0)
+    cat("This is a 'missingness' analysis - we're converting any missing values to '1', the rest to '0'.\n\n")
+  }
+  print(gt(list2df(c(
+    'Data-source Type'=paste0("Text data", ifelse(missing," binarised", "")),
+    'Source file'=csv,
+    align_params))))
+  dds <- SummarizedExperiment(assays=SimpleList(raw=mat),
+                             colData=sample_sheet[as.character(sample_sheet[[file_col]]) %in% colnames(mat),]
+                             )
+  mcols(dds) <- df[setdiff(names(df), colnames(mat))]
+  mcols(dds)$symbol <- mcols(dds)[[align_params$symbolColumn %||% 1]]
+  colnames(dds) <- as.character(dds[[name_col]])
+  row.names(dds) <- rowData(dds)[[1]]
+  save(dds, file=file.path("data",paste0("counts_", params$alignment, ".rda")))
+  saveRDS(dds, file=file.path("data",paste0("counts_", params$alignment, ".rds")))
+  knitr::knit_exit()
+}
+```
+
+
+```{r}
+#| label: tximport
+
+
+## Else do tximport
+cat("\n\n## Using Nextflow output\n\n")
 tx2gene <- file.path(params$counts, "star_salmon/salmon_tx2gene.tsv")
 if (file.exists(tx2gene)) {
   tx_path <- file.path(
     params$counts,
     "star_salmon",
-    sample_sheet[[file_col]], "quant.sf"
+    as.character(sample_sheet[[file_col]]), "quant.sf"
     )
     tx_args <- list(type="salmon", tx2gene=read.table(tx2gene))
 } else {
   tx_path <-   file.path(
     params$counts,
     paste0(as.character(sample_sheet[[file_col]]), ".genes.results")
-  )
-tx_args <- list(type="rsem")
-}  
+  )  
+  tx_args <- list(type="rsem")
+}
 
 
 not_here <- !file.exists(tx_path)
+print(gt(list2df(c(
+  'Data-source Type' = paste("Nextflow", tx_args$type),
+  'Source file'= paste0(ifelse(not_here, "!!", ""),tx_path),
+  align_params))))
+
 names(tx_path) <- as.character(sample_sheet[[file_col]])
 
 if (any(not_here)) {
@@ -183,14 +249,10 @@ txi$length[txi$length==0] <- 1
 
 dds <- DESeqDataSetFromTximport(txi, sample_sheet, ~ 1) # ok to have fixed trivial design - it'll get swapped out
 metadata(mcols(dds))$init <- onames
+
 ind <- rowSums(counts(dds)!=0) > 0
 dds <- dds[ind,]
-
 txi[c("abundance", "counts", "length")] <- map(txi[c("abundance", "counts", "length")], ~ .[ind,])
-
-alignments <- strsplit(sub(paste0("^", params$alignment, "\\."), "", readLines(paste0(file.path("extdata", params$alignment), ".config"))), "=")
-names(alignments) <- sapply(alignments, "[", 1)
-alignments <- lapply(alignments, function(x) paste(x[-1], collapse="="))
 
 dds <- add_org_annotation(dds, organism$org)
 
@@ -204,8 +266,6 @@ trim_names <- function(names) {
 
 colnames(dds) <- trim_names(colnames(dds))
 
-
 save(dds, file=file.path("data",paste0("counts_", params$alignment, ".rda")))
 saveRDS(dds, file=file.path("data",paste0("counts_", params$alignment, ".rds")))
 ```
-

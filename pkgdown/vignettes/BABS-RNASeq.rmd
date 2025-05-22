@@ -225,7 +225,7 @@ prerequisites - if you experience problems, please move any of the
 folders `docs`/`ingress`/`nfcore` so that they're not next to the
 `differential` folder.
 
-### Complete Isolation Starting from a DESeqDataSet
+### Complete Isolation Starting from pre-processed
 
 There is a [separate vignette](DESeqDataSet.html) on how to get a subset of
 the pipeline that starts from a single DESeqDataSet object alongside a

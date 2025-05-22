@@ -62,6 +62,14 @@ if (!isTRUE(getOption('knitr.in.progress'))) {
   params <- load_params(choose_staging("01_exploratory"))
 }
 
+align_params <- get_align_params(params$alignment)
+rowNoun <- align_params$rowNoun %||% "gene"
+RowNoun <- stringr::str_to_title(rowNoun)
+if ("missing" %in% names(align_params)) {
+  attr(rowNoun, "readout") <- "missingness"
+  attr(RowNoun, "readout") <- "Missingness"
+}
+
 do_plot <- plot_tracker(params)
 
 knitr::opts_chunk$set(
@@ -72,7 +80,6 @@ knitr::opts_chunk$set(
   results='asis'
 )
 
-link2path <- function(lname) {  file.path(knitr::opts_knit$get("output.dir"),lname) }
 
 ```
 
@@ -93,6 +100,8 @@ if (isTRUE(getOption('knitr.in.progress'))) {
 #| label: read-expl
 
 data(list=paste0("counts_", params$alignment))
+is_des <- inherits(dds, "DESeqDataSet")
+
 
 if (!is.null(metadata(dds)$organism$org)) {
   library(metadata(dds)$organism$org, character.only=TRUE)
@@ -100,8 +109,6 @@ if (!is.null(metadata(dds)$organism$org)) {
 
 specs   <- load_specs(file=paste0(params$spec, ".spec"), context=dds)
 param <- ParamList$new(defaults=specs$settings)
-
-
 ```
 
 We also have the following defaults set.  Whenever they are used
@@ -115,7 +122,7 @@ in a table identified with an info icon.
 
 data.frame(
   Option=names(specs$settings),
-  Value=sapply(specs$settings, deparse, width.cutoff=500)
+  Value=sapply(specs$settings, function(s) attr(s, "deparse") %||% s %||% "NULL")
 ) %>%
   gt() %>%
   as_raw_html()
@@ -139,37 +146,60 @@ mtag <- dmc_factory(ddsList, type="model")
 
 
 #Which features are zero across all samples in all datasets
-all_zero <- Reduce(f=`&`,
-                  x=lapply(ddsList, function(x) apply(counts(x)==0,1, all)),
-                  init=TRUE)
-ddsList <- lapply(ddsList, function(dds) dds[!all_zero,])
+if (is_des) {
+  all_zero <- Reduce(f=`&`,
+                    x=lapply(ddsList, function(x) apply(counts(x)==0,1, all)),
+                    init=TRUE)
+  ddsList <- lapply(ddsList, function(dds) dds[!all_zero,])
+
+
 
 
 ## Calculate size factors, separately for each sample-set
-ddsList <- mapply(
-  function(samp, dds) {
-    if ("controlGenes" %in% names(samp)) {
-      controlGenes <- eval(samp$controlGenes, transform(rowData(dds), ID=row.names(dds)))
-      dds <- estimateSizeFactors(dds, controlGenes=controlGenes)
-    } else {
-      dds <- estimateSizeFactors(dds)
+  ddsList <- mapply(
+    function(samp, dds) {
+      if ("controlGenes" %in% names(samp)) {
+        controlGenes <- eval(samp$controlGenes, transform(rowData(dds), ID=row.names(dds)))
+        dds <- estimateSizeFactors(dds, controlGenes=controlGenes)
+      } else {
+        dds <- estimateSizeFactors(dds)
+      }
+      if ("subsetGenes" %in% names(samp)) {
+        dds <- dds[eval(samp$subsetGenes, transform(rowData(dds), ID=row.names(dds))),]
+      }
+      return(dds)
+    },
+    specs$sample_sets,
+    ddsList,
+    SIMPLIFY=FALSE
+  )
+  
+  
+  if (param$get("baseMeanMin")>0) {
+    ddsList <- lapply(ddsList,
+                     function(x) x[rowMeans(counts(x, normalized=TRUE)) >= param$get("baseMeanMin"),]
+                     )
+  }
+} else {
+  param$set("impute")
+  param$set("normalise")
+  ddsList <- lapply(ddsList, function(dds) {
+    assay(dds)[is.nan(assay(dds))] <- NA
+    assayNames(dds)[1] <- noun_to_readout(rowNoun)
+    rowData(dds)$nna <- apply(is.na(assay(dds)), 1, sum)
+    if (param$get("normalise")=="vsn") {
+      fit <- vsn::vsnMatrix(assay(dds))
+      assay(dds, "vsn") <- vsn::predict(fit, assay(dds))
+      assays(dds) <- assays(dds)[c("vsn", setdiff(assayNames(dds), "vsn"))]
     }
-    if ("subsetGenes" %in% names(samp)) {
-      dds <- dds[eval(samp$subsetGenes, transform(rowData(dds), ID=row.names(dds))),]
+    if (length(param$get("impute")) > 0) {
+      assay(dds, "imputed") <- MSnbase::exprs(do.call(MSnbase::impute, modifyList(param$get("impute"), list(object=as(dds, "MSnSet")))))
+      assays(dds) <- assays(dds)[c("imputed", setdiff(assayNames(dds), "imputed"))]
     }
-    return(dds)
-  },
-  specs$sample_sets,
-  ddsList,
-  SIMPLIFY=FALSE
-)
-
-
-if (param$get("baseMeanMin")>0) {
-  ddsList <- lapply(ddsList,
-                   function(x) x[rowMeans(counts(x, normalized=TRUE)) >= param$get("baseMeanMin"),]
-                   )
+    dds
+  })
 }
+
 ddsList <- lapply(ddsList, function(x) add_dim_reduct(x))
 
 
@@ -228,11 +258,14 @@ table1(dds, ddsList) %>%
 
 
 assay_files <- list()
-for (assay in c("counts", "norm", "vst")) {
+anames <- unique(unlist(lapply(ddsList, assayNames)))
+if (is_des) anames <- c(anames, "norm")
+anames <- intersect(anames, c("counts", "vst", "norm", "vsn", "imputed"))
+for (aname in anames) {
   fname <- write_assay(ddsList,
-                       assay=assay,
+                       aname=aname,
                        p=params)
-  assay_files[[assay]] <- attr(fname, "link")
+  assay_files[[aname]] <- lapply(fname, attr, "link")
 }
 
 save(ddsList,
@@ -263,7 +296,7 @@ for (dataset in names(ddsList)) {
   for (mdl in names(mdls)) {
     dmc_heading(ddsList, dataset=dataset, model=mdl, depth="###", numbered=FALSE)
     cat("`",
-        Reduce(paste, sub("~", "Expression ~ ", deparse(mdls[[mdl]]))),
+        Reduce(paste, sub("~", paste0(noun_to_readout(RowNoun)," ~ "), deparse(mdls[[mdl]]))),
         "`\n\n"
         )
   }
@@ -278,12 +311,12 @@ for (dataset in names(ddsList)) {
 
 These visualisations are carried out blind to the experimental
 design. For the heatmap @fig-Heatmap-1, we select a subset of
-genes removing the (assumed uninformative) genes with flat expression
+`{r} rowNoun`s removing the (assumed uninformative) `{r} rowNoun`s with flat `{r} noun_to_readout(rowNoun)`
 levels across the whole sample set. We'd expect samples from the same
 experimental group to cluster together, in the sense that they are on
 the same branch of the tree. But this is a transcriptome-wide picture,
-and even if the clustering is not perfect, there will still be genes
-that are consistent with the expected expression profiles, and they
+and even if the clustering is not perfect, there will still be `{r} rowNoun`s
+that are consistent with the expected `{r} noun_to_readout(rowNoun)` profiles, and they
 will be revealed in the differential analysis.
 
 In case that heatmap doesn't cluster exactly according to the
@@ -300,8 +333,8 @@ The third heatmap @fig-sampDist-1 focuses on the pairwise
 similarity of samples, using a slightly different metric than the
 first, to emphasise that there's not one way of calculating how
 similar two samples are, transcriptome-wide.  The colours in the
-previous heatmaps are a gene's expression in a sample, relative to its
-average expression. In this heatmap, colour represents the similarity
+previous heatmaps are a `{r} rowNoun`'s `{r} noun_to_readout(rowNoun)` in a sample, relative to its
+average `{r} noun_to_readout(rowNoun)`. In this heatmap, colour represents the similarity
 of each pair of samples.
 
 ### Focussed Heatmaps
@@ -328,8 +361,8 @@ genotype x treatment composite)
 ## Principal Component Scatterplots
 
 The come a series of scatter plots of the first two
-Principal Components - a way of summarising all the genes down to just
-two 'metagenes' that attempt to encapsulate the variability across the
+Principal Components - a way of summarising all the `{r} rowNoun`s down to just
+two 'meta`{r} rowNoun`s' that attempt to encapsulate the variability across the
 samples in as faithful way as possible. Each plot
 (e.g. @fig-color-1) takes the PCs from the unadjusted data,
 and colours them by each of your covariates/treatments in turn. 
@@ -355,7 +388,7 @@ We then revert to the PCA picture that is unadjusted for any
 covariates. In @fig-covar-1 the columns explore the lower-order principal
 components (which although not providing a universally strong signal
 transcriptome wide, might still detect biology that is affecting a
-smaller subset of genes, or a reasonably large set of genes to a
+smaller subset of `{r} rowNoun`s, or a reasonably large set of `{r} rowNoun`s to a
 lesser extent than happens in the higher-order PCS). The rows
 represent the experimental factors we have recorded, and the depth of
 colour of the cell records the degree of 'association' that factor has
@@ -400,9 +433,10 @@ for (dataset_id in names(ddsList)) {
   # Only produce visualisations for models with a qc formula
   # (if none supplied in the spec file, the first model will get one corresponding to its design formula)
   dmc_heading(ddsList, dataset=dataset_id, model=NULL, depth="#")
-  mdls <- sapply(metadata(this_dds)$models, function(mdl) "profile_plots" %in% names(mdl) )
+  mdls <- sapply(metadata(this_dds)$models,
+                function(mdl) !is_null(section_chooser(mdl, "exploratory_profile_plots", "profile_plots")))
   for (model_id in names(mdls[mdls])) {
-    plot_formulae <- metadata(this_dds)$models[[model_id]]$profile_plots
+    plot_formulae <- section_chooser(metadata(this_dds)$models[[model_id]], "exploratory_profile_plots", "profile_plots")
     design <- metadata(this_dds)$models[[model_id]]$design
     model_vars <- list(
       design=all.vars(design),
@@ -426,17 +460,22 @@ for (dataset_id in names(ddsList)) {
             label= paste0("legend-", dataset_id),
             caption=paste("Metadata colour-codings for", dtag(dataset_id))
             )
-    cat(var_heading("Overall Heatmap of Variable Genes in ", dtag(dataset_id),  depth=2 + (sum(mdls)>1)))
+    cat(var_heading(paste0("Overall Heatmap of variable ", rowNoun, "s in ", dtag(dataset_id)),  depth=2 + (sum(mdls)>1)))
     plotDat <- var_stab[top, ]
-    plotDat <- plotDat - rowMeans(plotDat)
+    if (param$get("clustering_distance_columns") != "binary") {
+      plotDat <- plotDat - rowMeans(plotDat)
+      title <- "Mean Centred"
+    } else {
+      title <- "Binary Status"
+    }
     colDat <- as.data.frame(colData(this_dds))
     colnames(plotDat) <- rownames(colDat)
     gene_clust <- bluster::clusterRows(plotDat, param$get("gene_clust"), full=TRUE)
     this_clust <- cluster_ind()
     levels(gene_clust$clusters) <- paste0(this_clust, levels(gene_clust$clusters))
     pl <- ComplexHeatmap::Heatmap(
-      plotDat, name = "Mean Centred", 
-      column_title = "Samples", row_title = "Genes", col = sym_colour(plotDat), 
+      plotDat, name = title,
+      column_title = "Samples", row_title = paste0(RowNoun,"s"), col = sym_colour(plotDat), 
       clustering_distance_columns = param$get("clustering_distance_columns"), 
       cluster_rows = gene_clust$objects$hclust,
       heatmap_legend_param = list(direction = "horizontal"), 
@@ -447,7 +486,7 @@ for (dataset_id in names(ddsList)) {
       show_row_names = FALSE, show_column_names = TRUE)
     do_plot(pl,
             label= "Heatmap",
-            caption=paste("Heatmap of variable genes in", dtag(dataset_id)),
+            caption=paste0("Heatmap of variable ", rowNoun,"s in ", dtag(dataset_id)),
             preview=first)
 
     first <- FALSE
@@ -455,8 +494,8 @@ for (dataset_id in names(ddsList)) {
 
 
     pl <- ComplexHeatmap::Heatmap(
-      plotDat, name = "Mean Centred",
-      column_title = "Samples", row_title = "Genes", col = sym_colour(plotDat), 
+      plotDat, name = title,
+      column_title = "Samples", row_title = paste0(RowNoun,"s"), col = sym_colour(plotDat), 
       cluster_columns = FALSE,
       column_order=do.call(order, colDat[model_vars$all]),
       cluster_rows = gene_clust$objects$hclust,
@@ -468,50 +507,53 @@ for (dataset_id in names(ddsList)) {
       show_row_names = FALSE, show_column_names = TRUE)
     do_plot(pl,
             label= "SuperV-Heatmap",
-            caption=paste("Supervised Heatmap of variable genes in", dtag(dataset_id)))
+            caption=paste0("Supervised Heatmap of variable ",rowNoun,"s in ", dtag(dataset_id)))
     cat("\n\n---\n\n")
 
-    poisd <- PoiClaClu::PoissonDistance(t(counts(this_dds, normalized = TRUE)))
-    samplePoisDistMatrix <- as.matrix(poisd$dd)
-    if (length(model_vars$all) > 1) {
-      rownames(samplePoisDistMatrix) <- Reduce(
-        function(...) paste(..., sep = "_"), colDat[model_vars$all])
-    } else {
-      rownames(samplePoisDistMatrix) <- colDat[[model_vars$all]]
-    }
+    if (is_des) {
+      poisd <- PoiClaClu::PoissonDistance(t(counts(this_dds, normalized = TRUE)))
+      samplePoisDistMatrix <- as.matrix(poisd$dd)
+      if (length(model_vars$all) > 1) {
+        rownames(samplePoisDistMatrix) <- Reduce(
+          function(...) paste(..., sep = "_"), colDat[model_vars$all])
+      } else {
+        rownames(samplePoisDistMatrix) <- colDat[[model_vars$all]]
+      }
       colnames(samplePoisDistMatrix) <- row.names(colDat)
-    pl <- ComplexHeatmap::Heatmap(
-      samplePoisDistMatrix,
-      col = circlize::colorRamp2(
-        c(0,  max(samplePoisDistMatrix)),
-        colors = c("white", "red")), 
-      name = "Poisson Distance", clustering_distance_rows = function(x) {poisd$dd},
-      clustering_distance_columns = function(x) { poisd$dd},
-      heatmap_legend_param = list(direction = "horizontal"), 
-      top_annotation = ComplexHeatmap::HeatmapAnnotation(
-        df = colDat[model_vars$all], 
-        col = metadata(colData(this_dds))$palette$Heatmap[model_vars$all],
-        show_legend=FALSE))
-    do_plot(pl,
-            label= "sampDist",
-            caption=paste("Heatmap of sample distances in", dtag(dataset_id)))
-    cat("\n\n---\n\n")
-
+      pl <- ComplexHeatmap::Heatmap(
+        samplePoisDistMatrix,
+        col = circlize::colorRamp2(
+          c(0,  max(samplePoisDistMatrix)),
+          colors = c("white", "red")), 
+        name = "Poisson Distance", clustering_distance_rows = function(x) {poisd$dd},
+        clustering_distance_columns = function(x) { poisd$dd},
+        heatmap_legend_param = list(direction = "horizontal"), 
+        top_annotation = ComplexHeatmap::HeatmapAnnotation(
+          df = colDat[model_vars$all], 
+          col = metadata(colData(this_dds))$palette$Heatmap[model_vars$all],
+          show_legend=FALSE))
+      do_plot(pl,
+              label= "sampDist",
+              caption=paste("Heatmap of sample distances in", dtag(dataset_id)))
+      cat("\n\n---\n\n")
+    }
     if (do_focus) {
       cat(var_heading("Raw Cluster Profiles",   depth=2 + (sum(mdls)>1)))
-      for (profile in plot_formulae[1]) {
+      for (plot_fml in plot_formulae[1]) {
         cc <- cluster_calc(plotDat, clusterID=gene_clust$clusters)
-        centroid_df <- cbind(cc$centroid, colDat[model_vars$all])  %>%
-          pivot_longer(cols=any_of(names(cc$centroid)), names_to="babs.name", values_to="babs.value") %>%
-          mutate(babs.name=factor(babs.name, levels=names(cc$centroid)))
+        centroid_df <- cbind(cc, colDat[model_vars$all])  %>%
+          pivot_longer(cols=any_of(names(cc)), names_to="babs.name", values_to="babs.value") %>%
+          mutate(babs.name=factor(babs.name, levels=names(cc)))
         pl <- ggplot(centroid_df,
-                    eval(profile[[2]])) +
+                    eval(plot_fml[[2]])) +
           facet_wrap(~ babs.name) +
           theme_bw() +
           geom_point(aes(y= babs.value)) +
-          labs(y="Expression")
-        if ("group" %in% names(profile[[2]])) {
-          pl <- pl+geom_line(aes(y=babs.value))
+          labs(y=noun_to_readout(RowNoun))
+        if ("group" %in% names(plot_fml[[2]])) {
+          pl <- pl+geom_line(aes(y=babs.value),
+                            stat="summary",
+                            fun=mean)
         }
         if ("ScaleDiscrete" %in% class(layer_scales(pl)$x)) {
           pl <- pl + scale_x_discrete(guide=guide_axis(n.dodge=2))
@@ -533,15 +575,14 @@ for (dataset_id in names(ddsList)) {
       design(this_dds) <- design
       partials <- partialise(this_dds)
       cat(var_heading("Focussed Heatmaps",   depth=2 + (sum(mdls)>1)))
-      for (fml in plot_formulae) {
-        splitters <- c(NA, fml[[2]]$column_split)#NA denotes 'no split'.
+      for (plot_fml in plot_formulae) {
+        splitters <- c(NA, plot_fml[[2]]$column_split)#NA denotes 'no split'.
         for (split in splitters) {
           removed <- paste(
-            translate_terms(dropped_terms(partials, update(fml, NULL ~ .)), this_dds),
+            translate_terms(dropped_terms(partials, update(plot_fml, NULL ~ .)), this_dds),
             sep=", ", collapse=", ")
           if (length(removed)==0 || removed=="") removed <- "nothing"
-          part_res <- assemble_partialised(partials, update(fml, NULL ~ .))
-          group_mat <- assemble_partialised(partials, update(fml, NULL ~ .), resids=FALSE)
+          part_res <- assemble_partialised(partials, update(plot_fml, NULL ~ .))
           if (is.na(split)) {
             my_caption <- paste("In",  dtag(dataset_id), "having removed effect of", removed)
           } else {
@@ -549,14 +590,13 @@ for (dataset_id in names(ddsList)) {
           }
           top <- order(apply(part_res, 1, sd), decreasing = TRUE)[1:min(nrow(part_res),param$get("top_n_variable"))]
           plotDat <- part_res[top, ]
-          group_mat <- group_mat[top,]
           gene_clust <- bluster::clusterRows(plotDat, param$get("gene_clust"), full=TRUE)
           this_clust <- cluster_ind()
           levels(gene_clust$clusters) <- paste0(this_clust, levels(gene_clust$clusters))
           colnames(plotDat) <- rownames(colDat)
           pl <- ComplexHeatmap::Heatmap(
             plotDat, name = "Residual", 
-            column_title = "Samples", row_title = "Genes", col = sym_colour(plotDat),
+            column_title = "Samples", row_title = paste0(RowNoun,"s"), col = sym_colour(plotDat),
             column_split = if (is.na(split)) NULL else colDat[all.vars(split)],
             clustering_distance_columns = param$get("clustering_distance_columns"), 
             cluster_rows = gene_clust$objects$hclust,
@@ -571,21 +611,30 @@ for (dataset_id in names(ddsList)) {
                   caption=my_caption
                   )
           cat("\n\n---\n\n")
-          cc <- cluster_calc(plotDat, clusterID=gene_clust$clusters, group_mat=group_mat)
-          centroid_df <- cbind(cc$centroid, colDat[model_vars$all]) %>%
-            pivot_longer(cols=any_of(names(cc$centroid)), names_to="babs.name", values_to="babs.value") %>%
-            mutate(babs.name=factor(babs.name, levels=names(cc$centroid)))
+          cc <- cluster_calc(plotDat, clusterID=gene_clust$clusters)
+          centroid_df <- cbind(cc, colDat[model_vars$all]) %>%
+            pivot_longer(cols=any_of(names(cc)), names_to="babs.name", values_to="babs.value") %>%
+            mutate(babs.name=factor(babs.name, levels=names(cc)))
           pl <- ggplot(centroid_df ,
-                      eval(profile[[2]])) +
+                      eval(plot_fml[[2]])) +
             facet_wrap(~ babs.name) +
             theme_bw() +
             geom_point(aes(y= babs.value)) +
-            labs(y="Expression")
-          if ("group" %in% names(profile[[2]])) {
-            group_df <- cbind(cc$group_centroid, colDat[model_vars$all])  %>%
-              pivot_longer(cols=any_of(names(cc$centroid)), names_to="babs.name", values_to="babs.value") %>%
-              mutate(babs.name=factor(babs.name, levels=names(cc$centroid)))
-            pl <- pl+geom_line(data=group_df, aes(y=babs.value))
+            labs(y=noun_to_readout(RowNoun))
+          if ("group" %in% names(plot_fml[[2]])) {
+            group_mat <- assemble_partialised(partials, update(plot_fml, NULL ~ .), resids=FALSE)[top,]
+            group_cc <- cluster_calc(group_mat, clusterID=gene_clust$clusters)
+            group_df <- cbind(group_cc, colDat[model_vars$all])  %>%
+              pivot_longer(cols=any_of(names(group_cc)), names_to="babs.name", values_to="babs.value") %>%
+              mutate(babs.name=factor(babs.name, levels=names(group_cc)))
+            pl <- pl +
+              geom_line(aes(y=babs.value), linewidth=0.25,
+                            stat="summary",
+                            fun=mean) +
+              geom_line(data=group_df, aes(y=babs.value),
+                            stat="summary",
+                            fun=mean)
+
           }
           if ("ScaleDiscrete" %in% class(layer_scales(pl)$x)) {
             pl <- pl + scale_x_discrete(guide=guide_axis(n.dodge=2))
@@ -594,6 +643,7 @@ for (dataset_id in names(ddsList)) {
           do_plot(pl,
                   label= "clustProfile",
                   caption=capt)
+          cat("\n\n---\n\n")
           all_clusters[[this_clust]] <- list(
             id=gene_clust$clusters,
             description=capt
@@ -605,66 +655,42 @@ for (dataset_id in names(ddsList)) {
 
     ################################################################
     
-    cat(var_heading("PC-Covariate Associations", depth=2 + (sum(mdls)>1)))
+    cat(var_heading("Principal Component Plots",
+                    depth=2 + (sum(mdls)>1)))
+
     pc <- as.matrix(colData(this_dds)$.PCA)
     pc_frame <- expand.grid(sample = rownames(colDat), PC = 1:ncol(pc))
     pc_frame$coord <- as.vector(pc)
     pc_frame <- cbind(pc_frame, colDat)
-    fitFrame <- colDat
-    yvar <- make.unique(c(colnames(fitFrame), "y", sep = ""))[ncol(fitFrame) + 1]
-    fml <- update(design, 
-                 paste(yvar, "~ ."))
-    covar_x_pc <- expand.grid(
-      Covariate = attr(terms(fml), "term.labels"),
-      PC = 1:ncol(pc))
-    covar_x_pc$Assoc <- NA
-    npc <- ncol(pc)
-    fit_selected <- list()
-    for (ipc in 1:npc) {
-      fitFrame[[yvar]] <- pc[, ipc]
-      fit1 <- lm(fml, data = fitFrame)
-      ind_complete <- intersect(row.names(fitFrame), names(residuals(fit1)))
-      if (length(ind_complete) < nrow(fitFrame)) {
-        fit1 <- lm(fml, data = fitFrame[ind_complete,])
-      }
-      fit_selected[[ipc]] <- MASS::stepAIC(fit1, trace = 0)
-      ind <- attr(terms(fit_selected[[ipc]]), "term.labels")
-      if (length(ind)) {
-        fit0 <- as.data.frame(anova(fit_selected[[ipc]]))
-        rss <- fit0[ind, "Sum Sq"]/sum(fit0[, "Sum Sq"])
-        covar_x_pc$Assoc[covar_x_pc$PC == ipc][match(ind,  covar_x_pc$Covariate[covar_x_pc$PC == ipc])] <- rss
-      }
-    }
-    covar_x_pc$wrap <- (covar_x_pc$PC - 1)%/%20
-    covar_x_pc$wrap <- paste0("PCs ", covar_x_pc$wrap * 20 + 
-                                        1, "-", min((covar_x_pc$wrap + 1) * 20, npc))
-    covar_x_pc$PC <- sprintf("%02d", covar_x_pc$PC)
-    pl <- ggplot(covar_x_pc, aes(x = PC, y = Covariate, fill = Assoc)) + 
+    covar_x_pc <- mat_x_terms(pc, design, colDat)
+    covar_x_pc$wrap <- paste("PCs",covar_x_pc$wrap)
+    covar_x_pc$Assoc[covar_x_pc$pvalue>0.05] <- NA
+    pl <- ggplot(covar_x_pc, aes(x = column, y = Covariate, fill = Assoc)) + 
       geom_raster() +
       facet_wrap(~wrap, scales = "free_x",ncol = 1) +
       scale_fill_gradient2(low = "#4575b4",mid = "grey90", high = "#d73027") +
       theme_bw() + 
-      theme(aspect.ratio = length(unique(covar_x_pc$Covariate))/min(20, npc))
+      theme(aspect.ratio = length(unique(covar_x_pc$Covariate))/min(20, ncol(pc)))
     do_plot(pl,
             label="covar",
             caption=paste("Covariate association in", dtag(dataset_id))
             )
+    cat("\n\n---\n\n")
 
     ################################################################
     
-    cat(var_heading("Principal Component Scatterplots of PCs ", param$get("pc_x"), " and ", param$get("pc_y"), 
-                    depth=2 + (sum(mdls)>1)))
     do_labels <- nrow(colDat) < 10
 
     percentVar <- metadata(colData(this_dds)$.PCA)$percentVar
     done_aes <- list()
-    for (fml in plot_formulae) {
-      if (as.character(fml)[2] %in% done_aes) {
+    for (plot_fml in plot_formulae) {
+      if (length(all.vars(plot_fml[[3]]))==0) next
+      if (as.character(plot_fml)[2] %in% done_aes) {
         next
       } else {
-        done_aes <- c(done_aes, as.character(fml)[2])
+        done_aes <- c(done_aes, as.character(plot_fml)[2])
       }
-      aes_list <- substitute_x_aes(fml[[2]])
+      aes_list <- substitute_x_aes(plot_fml[[2]])
       for (this_aes in aes_list) {
         ## For PCA plots, we do an unregressed PCA, but using the aes from the plot_formulae
         pc.df <- cbind(colDat,
@@ -696,17 +722,37 @@ for (dataset_id in names(ddsList)) {
                 )
         cat("\n\n---\n\n")
       } # Repeat if need to annotate by an overwritten 'x'
+
+      #### 1D PC plots
+      cat(var_heading("Associated PCs against covariates", depth=3 + (sum(mdls)>1)))
+      long_dat <- extract_hits(covar_x_pc, plot_fml)
+      pl <- ggplot(long_dat, modifyList(eval(plot_fml[[2]]), aes(y=value))) +
+        geom_point() +
+        facet_wrap(~PC)
+      if ("group" %in% names(plot_fml[[2]])){
+        pl <- pl+geom_line(stat="summary",
+                           fun=mean)
+      }
+      if ("ScaleDiscrete" %in% class(layer_scales(pl)$x)) {
+        pl <- pl + scale_x_discrete(guide=guide_axis(n.dodge=2))
+      }
+      do_plot(pl,
+              label= "onepc",
+              caption=paste("Annotated by",aes_caption(eval(plot_fml[[2]])), "in", dtag(dataset_id))
+              )
+      cat("\n\n---\n\n")
     } # next formula
+
 
     ################################################################
     
     if (do_focus) {
-      cat(var_heading("Focussed Principal Component Scatterplots of PCs ", param$get("pc_x"), " and ", param$get("pc_y"),
+      cat(var_heading("Focussed Principal Component Plots",
                       depth=2 + (sum(mdls)>1)))
-      for (fml in plot_formulae) {
-        aes_list <- substitute_x_aes(fml[[2]])
+      for (plot_fml in plot_formulae) {
+        aes_list <- substitute_x_aes(plot_fml[[2]])
         my_pc <- prcomp(
-          t(assemble_partialised(partials, update(fml, NULL ~ .))),
+          t(assemble_partialised(partials, update(plot_fml, NULL ~ .))),
           scale = FALSE)
         my_percent <- round(100 * my_pc$sdev^2/sum(my_pc$sdev^2))
         pc.df <- cbind(colDat,
@@ -733,7 +779,7 @@ for (dataset_id in names(ddsList)) {
             pl <- pl + geom_text_repel(aes(label = sample))
           }
           removed <- paste(
-            translate_terms(dropped_terms(partials, update(fml, NULL ~ .)),this_dds),
+            translate_terms(dropped_terms(partials, update(plot_fml, NULL ~ .)),this_dds),
             sep=", ", collapse=", ")          
           if (length(removed)==0 || removed=="") removed <- "nothing"
           do_plot(pl,
@@ -743,130 +789,42 @@ for (dataset_id in names(ddsList)) {
           cat("\n\n---\n\n")
         } # Repeat if need to annotate by an overwritten 'x'
       } # Next formula
-    }
-    
-    ################################################################
-    
-    if (do_focus) {
-      cat(var_heading("Partial Residuals of Associated PCs ", depth=2 + (sum(mdls)>1)))
-      pc_partials <- partialise.matrix(t(pc), colDat, design)
-      for (fml in plot_formulae) {
-        if (length(all.vars(fml[[3]]))==0) next
-        mat <- assemble_partialised(pc_partials, update(fml, NULL ~ .))
-        pc_hits <- data.frame(covar=all.vars(fml[[3]]), strongest=NA_character_, first=NA_character_, row.names=all.vars(fml[[3]]))
-        for (covar in all.vars(fml[[3]])) {
-          this_covar <- subset(covar_x_pc,
-                              Covariate == covar & 
-                                !is.na(Assoc) & PC != PC[nrow(covar_x_pc)])
-          if (nrow(this_covar) == 0) 
-            next
-          pc_hits[covar, "first"] <- as.character(this_covar$PC[1])
-          this_covar <- this_covar[order(this_covar$Assoc, 
-                                        decreasing = TRUE), ]
-          pc_hits[covar, "strongest"] <- as.character(this_covar$PC[1])
-        }
-        hits <- paste0("PC", sort(unique(as.integer(c(pc_hits$strongest, pc_hits$first)))))
-        wide_dat <- cbind(colDat[model_vars$all], t(mat)[,hits,drop=FALSE])
-        long_dat <- pivot_longer(wide_dat, cols=all_of(hits), names_to="PC")
-        pl <- ggplot(long_dat, modifyList(eval(fml[[2]]), aes(y=value))) + geom_point() + facet_wrap(~PC)
-        if ("group" %in% names(fml[[2]])) pl <- pl+geom_line()
+
+      cat(var_heading("Partial Residuals of Associated PCs against covariates", depth=3 + (sum(mdls)>1)))
+
+      pc <- as.matrix(colData(this_dds)$.PCA)
+
+
+      #      pc_partials <- partialise.matrix(t(pc), colDat, design)
+      for (plot_fml in plot_formulae) {
+        if (length(all.vars(plot_fml[[3]]))==0) next
+        pc_partial <- prcomp(
+          t(assemble_partialised(partials, update(plot_fml, NULL ~ .))),
+          scale = FALSE)$x
+        covar_x_partial <- mat_x_terms(pc_partial, design, colDat)
+        covar_x_partial$wrap <- paste("PCs",covar_x_partial$wrap)
+        covar_x_partial$Assoc[covar_x_partial$pvalue>0.05] <- NA
+        long_dat <- extract_hits(covar_x_partial, plot_fml)
+
+        pl <- ggplot(long_dat, modifyList(eval(plot_fml[[2]]), aes(y=value))) + geom_point() + facet_wrap(~PC)
+        if ("group" %in% names(plot_fml[[2]])) pl <- pl+geom_line(
+          stat="summary",
+          fun=mean)
         if ("ScaleDiscrete" %in% class(layer_scales(pl)$x)) {
           pl <- pl + scale_x_discrete(guide=guide_axis(n.dodge=2))
         }
         removed <- paste(
-          translate_terms(dropped_terms(partials, update(fml, NULL ~ .)),this_dds),
+          translate_terms(dropped_terms(partials, update(plot_fml, NULL ~ .)),this_dds),
           sep=", ", collapse=", ")
         if (length(removed)==0 || removed=="") removed <- "nothing"
         do_plot(pl,
                 label= "covariate",
-                caption=paste("Annotated by",aes_caption(eval(fml[[2]])), "in", dtag(dataset_id), "having removed effect of", removed) 
+                caption=paste("Annotated by",aes_caption(eval(plot_fml[[2]])), "in", dtag(dataset_id), "having removed effect of", removed) 
                 )
         cat("\n\n---\n\n")
       }
     }
     
-    ## factors_1 <- attr(terms(fit1), "factors")
-    ## many_levels <- sapply(colDat, function(x) length(unique(x)))
-    ## for (covar in unique(covar_x_pc$Covariate)) {
-    ##   this_covar <- subset(covar_x_pc,
-    ##                       Covariate == covar & 
-    ##                         !is.na(Assoc) & PC != PC[nrow(covar_x_pc)])
-    ##   if (nrow(this_covar) == 0) 
-    ##     next
-    ##   pc_first <- as.integer(as.character(this_covar$PC[1]))
-    ##   this_covar <- this_covar[order(this_covar$Assoc, 
-    ##                                 decreasing = TRUE), ]
-    ##     pc_strong <- as.integer(as.character(this_covar$PC[1]))
-    ##     pc.df <- subset(pc_frame, PC %in% c(pc_first, pc_strong))
-    ##     pc.df$label <- as.character(pc.df$PC)
-    ##     pc.df$label[pc.df$PC == pc_first] <- paste0(pc.df$label[pc.df$PC == 
-    ##                                                             pc_first], "+First")
-    ##     pc.df$label[pc.df$PC == pc_strong] <- paste0(pc.df$label[pc.df$PC == 
-    ##                                                              pc_strong], "+Best")
-    ##     pc.df$label <- paste0(pc.df$label, " (", percentVar[pc.df$PC], 
-    ##                          "%)")
-    ##     inter_vars <- rownames(factors_1)[factors_1[, covar] !=  0]
-    ##     inter_vars <- inter_vars[order(many_levels[inter_vars], decreasing = TRUE)]
-    ##     pc.df$X <- colDat[, inter_vars[1]]
-    ##     for (ipc in unique(c(pc_first, pc_strong))) {
-    ##       pc.df$coord[pc.df$PC == ipc] <- part.resid(fit_selected[[ipc]])[, covar]
-    ##     }
-    ##     if (length(inter_vars) > 1) {
-    ##       pc.df$col <- colDat[, inter_vars[2]]
-    ##       if (length(inter_vars) == 2) {
-    ##         pl <- ggplot(pc.df, aes(x = X, y = coord, colour = col, group = col)) +
-    ##           stat_summary(fun = mean,geom = "line") +
-    ##           labs(x = inter_vars[1], y = "Residual",
-    ##                colour = paste(inter_vars[-1], collapse = "x")) + theme_bw()
-    ##         if (is.numeric(pc.df$col)) {
-    ##           pal_col <- metadata(colData(this_dds))$palette$ggplot[[inter_vars[2]]]
-    ##           pl <- pl + scale_colour_gradient(low = pal_col[1], high = pal_col[2])
-    ##         }
-    ##         else {
-    ##           pl <- pl + scale_colour_manual(values = metadata(colData(this_dds))$palette$ggplot[[inter_vars[2]]])
-    ##         }
-    ##       }
-    ##       else {
-    ##         pc.df$grp <- Reduce(interaction, colDat[, inter_vars[-1]])
-    ##         pl <- ggplot(pc.df, aes(x = X, y = coord, colour = col,  group = grp)) +
-    ##           stat_summary(fun = mean, geom = "line") +
-    ##           labs(x = inter_vars[1], y="Residual",
-    ##                colour = paste(inter_vars[-1], collapse = "x")) +
-    ##           theme_bw()
-    ##         if (is.numeric(pc.df$col)) {
-    ##           pal_col <- metadata(colData(this_dds))$palette$ggplot[[inter_vars[2]]]
-    ##           pl <- pl + scale_colour_gradient(low = pal_col[1], high = pal_col[2])
-    ##         }
-    ##         else {
-    ##           pl <- pl + scale_colour_manual(values = metadata(colData(this_dds))$palette$ggplot[[inter_vars[2]]])
-    ##         }
-    ##       }
-    ##     }
-    ##     else {
-    ##       pl <- ggplot(pc.df, aes(x = X, y = coord, colour = X, group = 1)) +
-    ##         stat_summary(fun = mean, geom = "line", colour = "black") +
-    ##         labs( x = inter_vars[1], y="Residual", colour = covar) +
-    ##         theme_bw()
-    ##       if (is.numeric(pc.df$X)) {
-    ##         pal_col <- metadata(colData(this_dds))$palette$ggplot[[inter_vars[1]]]
-    ##         pl <- pl + scale_colour_gradient(low = pal_col[1], high = pal_col[2])
-    ##       }
-    ##       else {
-    ##         pl <- pl + scale_colour_manual(values = metadata(colData(this_dds))$palette$ggplot[[inter_vars[1]]])
-    ##       }
-    ##     }
-    ##     pl <- pl + geom_point(size = 2) +
-    ##       facet_wrap(~label, scales = "free_y")
-    ##     if (do_labels) {
-    ##       pl <- pl + geom_text_repel(aes(label = sample))
-    ##     }
-    ##     do_plot(pl,
-    ##             label= "covariate",
-    ##             caption=paste("Against", covar, "in", dtag(dataset_id))
-    ##             )
-    ##     cat("\n\n---\n\n")
-    ##   }
-    ## #}
   }
 }
 
@@ -881,9 +839,11 @@ for (dataset_id in names(ddsList)) {
 ```{r}
 #| label: downloads
 
-iwalk(assay_files,
-     ~cat("\n\n<a class=\"download-excel btn btn-primary\" href=\"", attr(.x, "link"), "\">", ifelse(.y=="counts", "raw", .y) ," count matrix</a>", sep="")
-     )
+for (i in names(assay_files)) {
+  for (j in names(assay_files[[i]])) {
+    cat("\n\n<a class=\"download-excel btn btn-primary\" href=\"", assay_files[[i]][[j]], "\">", i, " matrix for ", j, "</a>", sep="")
+  }
+}
 
 fname <- write_clusters(all_clusters,
                        mcols(ddsList[[1]]),
@@ -893,7 +853,7 @@ fname <- write_clusters(all_clusters,
 
 cat('\n\n<a class="download-excel btn btn-primary" href="',
     attr(fname,"link"),
-    '">Gene-Cluster mappings</a>', sep="")
+    '">', RowNoun,'-Cluster mappings</a>', sep="")
      
 
 ```

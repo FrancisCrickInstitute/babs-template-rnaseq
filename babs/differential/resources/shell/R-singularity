@@ -3,6 +3,7 @@
 #SBATCH --output=slurm-%x.out
 
 image='${CONTAINER_IMAGE}'
+export SINGULARITYENV_RENV_PATHS_PREFIX='${SINGULARITYENV_RENV_PATHS_PREFIX}'
 
 wd=$(git rev-parse --show-toplevel 2>/dev/null || echo $(realpath .))
 
@@ -16,13 +17,6 @@ else
 fi
 cmd=${BABS_CMD:-${basename%-*}}
 
-
-
-if [[ -f Renviron-${RVERSION} ]]; then
-    renvironBind=,$(realpath .)/Renviron-${RVERSION}:/usr/local/lib/R/etc/Renviron.site
-else
-    renvironBind=""
-fi
 
 if [[ -n "${SINGULARITY_BIND}" ]]; then
     echo "Warning: Extra directories being bound to the container: ${SINGULARITY_BIND}. This might affect reproducibility." 1>&2
