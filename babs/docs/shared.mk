@@ -352,7 +352,7 @@ renv/activate.R: $(wildcard resources/renv/activate.R)
 
 $(SELF_DIR)secret.mk: $(wildcard $(PROJECT_HOME)/.babs)
 	if [ ! -f "$@" ]; then \
-	echo "SINGULARITY_ROOT=.\#where .sif's are stored" > $@ ;\
+	echo "SINGULARITY_ROOT=.#where .sif's are stored" > $@ ;\
 	echo "SCRATCH_DIR=/tmp#Somewhere for transient, possibly large, files" >> $@ ;\
 	echo "Created a dummy copy of $@, please edit it" ;\
 	fi

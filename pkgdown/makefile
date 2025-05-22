@@ -2,10 +2,8 @@
 #Custom settings so that shared.mk thinks that this folder is a subdirectory of '../babs'
 staging_dir=.
 
-include resources/make/shared.mk
-
-resources/make/shared.mk:
-	ln -sfn ../babs/differential/resources resources
+include ../babs/docs/shared.mk
+include ../babs/docs/secret.mk
 
 .PHONY: site
 
@@ -18,11 +16,11 @@ ifeq ($(SUBMIT),false)
 site: renv.lock ## Create pkgdown site in ./docs
 	rm -rf R
 	cp -lr ../babs/differential/R .
+	rm R/example-spec.r
 	mkdir -p pkgdown/assets
 	if [ -d ../test/babs/differential/results/latest ]; then \
 	  cp -lr ../test/babs/differential/results/latest pkgdown/assets/test ;\
 	fi
-	sed  -i 's/^Version:.*/Version: $(patsubst v%,%,$(VERSION))/' DESCRIPTION
 	sed -i 's,/blob/[^/]*/babs/,/blob/$(shell git rev-parse --abbrev-ref HEAD)/babs/,' _pkgdown.yml
 	rm -rf docs
 	$(R) -e 'roxygen2::roxygenise(); pkgdown::build_site()'
@@ -39,7 +37,7 @@ else
 ## To be submitted.  The 'slurm' variable (in 'shared.mk') has the sbatch options, and a possibly
 ## containerised call to make
 
-$(wrapped-targets): $(optionalRenviron)
+$(wrapped-targets): $(optionalContainer)
 	echo "$$slurm" | sbatch 
 endif
 

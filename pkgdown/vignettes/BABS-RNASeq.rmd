@@ -66,7 +66,9 @@ to get the pipeline.
 
 The pipeline expects the following prerequisites in the `babs/docs`
 folder. Most of them should have been prepared during the design
-discussions.
+discussions. (There is also a way of running just the statistical part
+of the pipeline [described here](isolated.html) starting from the
+quantified raw counts/abundances.)
 
 ### experiment_table.csv
 
@@ -132,6 +134,11 @@ aligner=star_salmon
 ```
 
 in the config will suffice.
+
+There are [extra options](isolated.html#config-file) if you are
+joining the pipeline at the statistical stage (where we only need the
+`org.db` line, the other three only being used by the nfcore parts of
+the pipeline.)
 
 
 ### samplesheet.csv
@@ -227,9 +234,10 @@ folders `docs`/`ingress`/`nfcore` so that they're not next to the
 
 ### Complete Isolation Starting from pre-processed
 
-There is a [separate vignette](DESeqDataSet.html) on how to get a subset of
-the pipeline that starts from a single DESeqDataSet object alongside a
-spec-file, and produces the reports from there.
+There is a [separate vignette](isolated.html) on how to get a subset
+of the pipeline that starts from a single DESeqDataSet object (or
+SummarizedExpression or CSV file) alongside a spec-file, and produces
+the reports from there.
 
 
 ### Differential analysis

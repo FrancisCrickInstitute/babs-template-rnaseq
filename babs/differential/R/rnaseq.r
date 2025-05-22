@@ -416,7 +416,8 @@ add_dim_reduct  <-  function(dds, n=Inf, family="norm", batch=~1, do_vst=inherit
   dds
 }
 
-
+#' @importFrom DESeq2 design
+#' @importFrom DESeq2 "design<-"
 setMethod("design", "SummarizedExperiment", function(object) {
   metadata(object)$design
 })

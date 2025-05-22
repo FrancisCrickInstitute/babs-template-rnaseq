@@ -210,7 +210,7 @@ results_apply <- function(object, dataset, model, comparison, fn, depth="compari
 #' @param dataset The name of the dataset you want to restrict the traversal to - optional, and if omitted all datasets will be traversed.
 #' @param model The name of the model you want to restrict the traversal to - optional, and if omitted all models will be traversed.
 #' @param comparison The name of the comparison you want to restrict the traversal to - optional, and if omitted all comparisons will be traversed.
-#' @return 
+#' @return A nested list of 'results' objects
 #' @author Gavin Kelly
 #' @export
 extract_results <- function(object, dataset, model, comparison ) {
@@ -229,7 +229,7 @@ extract_model <- function(object, dataset) {
 #' @param dataset The name of the dataset you want to extract the assay from  - optional, and if omitted all datasets will be reported.
 #' @param object The list of results returned by get_result
 #' @param assay The name of the assay you want to extract from each dataset
-#' @return 
+#' @return A nested list of assays
 #' @author Gavin Kelly
 #' @export
 extract_assay <- function(object,dataset,  assay) {
@@ -341,7 +341,7 @@ dmc2frame <- function(dmc) {
 ##' into one big summary table
 ##' @title rbind nested lists of data-frames
 ##' @param x the list of summaries
-##' @param levels
+##' @param levels The vector of names of the levels of the hierarchy that will be used in the data-frame
 ##' @return The big table
 ##' @author Gavin Kelly
 ##' @export
@@ -363,32 +363,6 @@ rbind_summary <- function(x, levels=c("Dataset", "Design", "Comparison")) {
 }
 
 
-## classify_terms <- function(fml) {
-##   has_random <- any(c("|", "||") %in% all.names(fml))
-##   if (!has_random) {
-##     return(list(fixed=all.vars(fml),groups=list() ))
-##   }
-##   rterms <- lme4:::barnames(lme4::findbars(fml))
-##   rterms <- sub(":.*", "", rterms)
-##   fvars <- setdiff(all.vars(lme4::subbars(fml)), rterms)
-##   list(fixed=fvars, groups=rterms)
-## }
-##' .. content for \description{} (no empty lines) ..
-##'
-##' .. content for \details{} ..
-##' @title 
-##' @param fml 
-##' @return 
-##' @author Gavin Kelly
-classify_terms <- function(fml) {
-  rhs <- as.character(fml)[length(fml)]
-  spl <- strsplit(rhs, "|", fixed=TRUE)[[1]]
-  rv <- all.vars(stats::reformulate(spl[1]))
-  list(
-    fixed=rv,
-    groups=setdiff(all.vars(stats::reformulate(rhs)), rv)
-  )
-}
 
 
 ##' Convert dataset-model-comparison hierarchy into data.frame

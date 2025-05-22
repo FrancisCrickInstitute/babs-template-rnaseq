@@ -1,8 +1,8 @@
 ---
-title: Starting from a DESeqDataSet object
+title: Starting from preprocessed data
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Starting from a DESeqDataSet object}
+  %\VignetteIndexEntry{Starting from preprocessed data}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 author: Gavin Kelly
@@ -27,13 +27,21 @@ make check-isolated
 ```
 
 The `make` command there will progressively step you through the
-prerequisites for an isolated analysis.  The non-negotiable is a
-`.config` file.
+prerequisites for an isolated analysis. If `make check-isolated`
+completes without any errors, then you are ready to try `make run`,
+otherwise carefully examine and act on what it reports - if it finds
+something to be missing, it will generate an example for you, but it
+won't fit the specifics of your design. Once you have customised it to
+fit your requirements, run `make check-isolated` again to see what the
+next missing piece might be.
+
+The non-negotiable is a `.config` file:
 
 # Config file
 
-the first run of that command will create one called
-`extdata/example.config` that contains empty versions of all possible entries:
+The first run of that command will create a config called
+`extdata/example.config` if you haven't already got a config file. The
+exmple contains empty versions of all possible entries:
 
 ```
 # Name of bioconductor annotation package
@@ -60,8 +68,15 @@ example.rowNoun=gene
 example.nospec=
 ```
 
-This already gives some guidance on ways to get the data into the
-pipeline: an rda file, an rds file or a csv file - plus the fallback
+Base your actual config file on that - it is important to __prefix
+each line__ with the name of the config file: if you rename the above
+to `my.config` but still have `example.org.db=org.Hs.eg.db` that won't
+be recognised. If you have a working config file in another location,
+copy that to the `extdata` folder and remove the example before
+continuing.
+
+The above already gives some guidance on ways to get the data into the
+pipeline: a path to an rda file, an rds file or a csv file - plus the fallback
 of the output of a Nextflow run if the `extdata` doesn't find any of
 the others. Whichever, it needs to be directly named after the config
 file, so I will always use e.g. `extdata/example.csv` here, but change
@@ -99,7 +114,7 @@ file in if you don't have one.
 
 # Running the pipeline
 
-Once you’ve done that (got x.config, x.rda or x.rds and y.spec all in
+Once you’ve done that (got `x.config`, `x.{rda,rds,csv}` and `y.spec` all in
 ./extdata) a `make run` should do everything required.  It’s all a lot
 easier than comes across writing it down long-hand.
 

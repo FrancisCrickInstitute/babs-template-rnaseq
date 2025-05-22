@@ -542,7 +542,7 @@ illustrated below. Note, it is important that there be only **one**
 introduce/transform multiple derived covariates, then separate them by
 commas _within_ the `mutate` expression:
 
-```r
+```{r, eval = FALSE}
 specification(
   sample_sets =list( 
     all = sample_set(
@@ -606,7 +606,7 @@ complex designs where the default option (producing all colours x
 covariate plots) was becoming unmanageably verbose. Now it is
 necessary to add descriptions of the profiles to be plotted explicitly:
 
-```
+```{r, eval = FALSE}
     all = sample_set(
       subset = TRUE,
       models = list(
@@ -652,7 +652,7 @@ phrasing the second instance: regress out the effect of batch.
 If there have been a pair of samples swapped, this can be corrected in
 the spec file.
 
-```
+```{r, eval = FALSE}
     all = sample_set(
       subset = TRUE,
 	  swap=list("A"="B")
@@ -708,7 +708,7 @@ these should be concatenated at the nfcore level, but sometimes they
 get kept separate. We can correct for this in the spec file, for
 example:
 
-```
+```{r, eval = FALSE}
     all = sample_set(
       subset = TRUE,
 	  collapse=~treatment + biological_replicate + timepoint + batch,
@@ -732,7 +732,7 @@ always bad, as the standard errors are badly miscalculated.
 We can fine-tune which genes are analysed and which genes are used to
 calculate size factors:
 
-```
+```{r, eval = FALSE}
     all = sample_set(
       subset = TRUE,
       controlGenes=expression(grepl("^ercc", ID)),
@@ -758,7 +758,7 @@ algorithms. It's possible to set any parameters that the core analysis
 script has made available to you through the `settings` top level
 option:
 
-```r
+```{r, eval = FALSE}
 specification(
   sample_sets =list( 
   ...

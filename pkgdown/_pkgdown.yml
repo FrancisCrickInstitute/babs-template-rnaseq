@@ -36,11 +36,10 @@ home:
   links:
   - text: Demo Results
     href: /test/index.html
-
 repo:
   url:
     home: https://github.com/FrancisCrickInstitute/babs-template-rnaseq
-    source: https://github.com/FrancisCrickInstitute/babs-template-rnaseq/blob/master/babs/differential/
+    source: https://github.com/FrancisCrickInstitute/babs-template-rnaseq/blob/proteomics/babs/differential/
     issue: https://github.com/FrancisCrickInstitute/babs-template-rnaseq/issues/
     user: https://github.com/BABS-STP
-    
+url: https://supreme-disco-o4peje9.pages.github.io
