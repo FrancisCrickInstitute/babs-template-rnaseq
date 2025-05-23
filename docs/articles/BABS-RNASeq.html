@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RNASeq Template</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.20.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.23.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -34,7 +34,7 @@
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="../articles/DESeqDataSet.html">Starting from a DESeqDataSet object</a></li>
+<li><a class="dropdown-item" href="../articles/isolated.html">Starting from preprocessed data</a></li>
     <li><a class="dropdown-item" href="../articles/pipeline-infrastructure.html">The Pipeline</a></li>
     <li><a class="dropdown-item" href="../articles/spec.html">Spec-files for differential analysis</a></li>
   </ul>
@@ -120,7 +120,9 @@ leaving the <code>docs</code> folder out of the all the
 </h2>
 <p>The pipeline expects the following prerequisites in the
 <code>babs/docs</code> folder. Most of them should have been prepared
-during the design discussions.</p>
+during the design discussions. (There is also a way of running just the
+statistical part of the pipeline <a href="isolated.html">described
+here</a> starting from the quantified raw counts/abundances.)</p>
 <div class="section level3">
 <h3 id="experiment_table-csv">experiment_table.csv<a class="anchor" aria-label="anchor" href="#experiment_table-csv"></a>
 </h3>
@@ -182,6 +184,10 @@ star_rsem as the default aligner - if you want to use Salmon, then an
 additional line:</p>
 <pre><code><span><span class="va">aligner</span><span class="op">=</span><span class="va">star_salmon</span></span></code></pre>
 <p>in the config will suffice.</p>
+<p>There are <a href="isolated.html#config-file">extra options</a> if
+you are joining the pipeline at the statistical stage (where we only
+need the <code>org.db</code> line, the other three only being used by
+the nfcore parts of the pipeline.)</p>
 </div>
 <div class="section level3">
 <h3 id="samplesheet-csv">samplesheet.csv<a class="anchor" aria-label="anchor" href="#samplesheet-csv"></a>
@@ -276,11 +282,12 @@ folders <code>docs</code>/<code>ingress</code>/<code>nfcore</code> so
 that they’re not next to the <code>differential</code> folder.</p>
 </div>
 <div class="section level3">
-<h3 id="complete-isolation-starting-from-a-deseqdataset">Complete Isolation Starting from a DESeqDataSet<a class="anchor" aria-label="anchor" href="#complete-isolation-starting-from-a-deseqdataset"></a>
+<h3 id="complete-isolation-starting-from-pre-processed">Complete Isolation Starting from pre-processed<a class="anchor" aria-label="anchor" href="#complete-isolation-starting-from-pre-processed"></a>
 </h3>
-<p>There is a <a href="DESeqDataSet.html">separate vignette</a> on how
-to get a subset of the pipeline that starts from a single DESeqDataSet
-object alongside a spec-file, and produces the reports from there.</p>
+<p>There is a <a href="isolated.html">separate vignette</a> on how to
+get a subset of the pipeline that starts from a single DESeqDataSet
+object (or SummarizedExpression or CSV file) alongside a spec-file, and
+produces the reports from there.</p>
 </div>
 <div class="section level3">
 <h3 id="differential-analysis">Differential analysis<a class="anchor" aria-label="anchor" href="#differential-analysis"></a>
@@ -379,7 +386,7 @@ documentation on this at some point.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.1.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.2.</p>
 </div>
 
     </footer>

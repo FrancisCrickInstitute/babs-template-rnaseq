@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RNASeq Template</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.20.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.23.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -34,7 +34,7 @@
 <li class="active nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="../articles/DESeqDataSet.html">Starting from a DESeqDataSet object</a></li>
+<li><a class="dropdown-item" href="../articles/isolated.html">Starting from preprocessed data</a></li>
     <li><a class="dropdown-item" href="../articles/pipeline-infrastructure.html">The Pipeline</a></li>
     <li><a class="dropdown-item" href="../articles/spec.html">Spec-files for differential analysis</a></li>
   </ul>
@@ -75,7 +75,7 @@ Kelly</h4>
 <h2 id="analysis-philosophy">Analysis Philosophy<a class="anchor" aria-label="anchor" href="#analysis-philosophy"></a>
 </h2>
 <p>This is a wrapper round DESeq2 which standardises the process of
-generating <code>DESeq2::results</code> objects for a specifiable set of
+generating <code><a href="https://rdrr.io/pkg/DESeq2/man/results.html" class="external-link">DESeq2::results</a></code> objects for a specifiable set of
 comparisons. Each comparison is done in the context of a model (a
 specification of what covariates need to be accounted for in predicting
 the expression of any transcript). And each model is formulated in a
@@ -618,17 +618,17 @@ see more complex designs where the default option (producing all colours
 x covariate plots) was becoming unmanageably verbose. Now it is
 necessary to add descriptions of the profiles to be plotted
 explicitly:</p>
-<pre><code>    all = sample_set(
-      subset = TRUE,
-      models = list(
-        nested = model(
-          design = ~treatment * time + batch,
-          profile_plots = list(
-        aes(x=time, colour=batch, shape=treatment)  ~ treatment + time + timepoint * time + batch,
-        aes(x=time, colour=treatment)  ~ treatment + time + timepoint * time,
-        aes(x=time, colour=treatment) ~ . - batch
-      )
-      ...</code></pre>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>    all <span class="ot">=</span> <span class="fu">sample_set</span>(</span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a>      <span class="at">subset =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a>      <span class="at">models =</span> <span class="fu">list</span>(</span>
+<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a>        <span class="at">nested =</span> <span class="fu">model</span>(</span>
+<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a>          <span class="at">design =</span> <span class="sc">~</span>treatment <span class="sc">*</span> time <span class="sc">+</span> batch,</span>
+<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a>          <span class="at">profile_plots =</span> <span class="fu">list</span>(</span>
+<span id="cb15-7"><a href="#cb15-7" tabindex="-1"></a>        <span class="fu">aes</span>(<span class="at">x=</span>time, <span class="at">colour=</span>batch, <span class="at">shape=</span>treatment)  <span class="sc">~</span> treatment <span class="sc">+</span> time <span class="sc">+</span> timepoint <span class="sc">*</span> time <span class="sc">+</span> batch,</span>
+<span id="cb15-8"><a href="#cb15-8" tabindex="-1"></a>        <span class="fu">aes</span>(<span class="at">x=</span>time, <span class="at">colour=</span>treatment)  <span class="sc">~</span> treatment <span class="sc">+</span> time <span class="sc">+</span> timepoint <span class="sc">*</span> time,</span>
+<span id="cb15-9"><a href="#cb15-9" tabindex="-1"></a>        <span class="fu">aes</span>(<span class="at">x=</span>time, <span class="at">colour=</span>treatment) <span class="sc">~</span> . <span class="sc">-</span> batch</span>
+<span id="cb15-10"><a href="#cb15-10" tabindex="-1"></a>      )</span>
+<span id="cb15-11"><a href="#cb15-11" tabindex="-1"></a>      ...</span></code></pre></div>
 <p>Everything on the LHS is used as an aesthetic mapping for any given
 plot, and the model on the right says which covariates’s effects are
 kept in the ‘normalised’ data: anything that is omitted is effectively
@@ -659,9 +659,9 @@ the effect of batch.</p>
 </h4>
 <p>If there have been a pair of samples swapped, this can be corrected
 in the spec file.</p>
-<pre><code>    all = sample_set(
-      subset = TRUE,
-      swap=list("A"="B")</code></pre>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>    all <span class="ot">=</span> <span class="fu">sample_set</span>(</span>
+<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a>      <span class="at">subset =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a>      <span class="at">swap=</span><span class="fu">list</span>(<span class="st">"A"</span><span class="ot">=</span><span class="st">"B"</span>)</span></code></pre></div>
 <p>This will swap the <em>metadata</em> of sample with ID <code>A</code>
 with that of sample ID <code>B</code>. <strong>Every</strong> column of
 the metadata will be exchanged: this is generally what is required
@@ -698,10 +698,10 @@ counter-intuitive).</p>
 these should be concatenated at the nfcore level, but sometimes they get
 kept separate. We can correct for this in the spec file, for
 example:</p>
-<pre><code>    all = sample_set(
-      subset = TRUE,
-      collapse=~treatment + biological_replicate + timepoint + batch,
-      ...</code></pre>
+<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a>    all <span class="ot">=</span> <span class="fu">sample_set</span>(</span>
+<span id="cb21-2"><a href="#cb21-2" tabindex="-1"></a>      <span class="at">subset =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb21-3"><a href="#cb21-3" tabindex="-1"></a>      <span class="at">collapse=</span><span class="sc">~</span>treatment <span class="sc">+</span> biological_replicate <span class="sc">+</span> timepoint <span class="sc">+</span> batch,</span>
+<span id="cb21-4"><a href="#cb21-4" tabindex="-1"></a>      ...</span></code></pre></div>
 <p>The collapse formula should identify the distinct experimental
 groups, so in the above formula we might expect that there are multiple
 samples (rows in the experiment_table) with the same values for each of
@@ -718,11 +718,11 @@ almost always bad, as the standard errors are badly miscalculated.</p>
 </h4>
 <p>We can fine-tune which genes are analysed and which genes are used to
 calculate size factors:</p>
-<pre><code>    all = sample_set(
-      subset = TRUE,
-      controlGenes=expression(grepl("^ercc", ID)),
-      subsetGenes=expression(symbol!=""),
-      ...</code></pre>
+<div class="sourceCode" id="cb22"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a>    all <span class="ot">=</span> <span class="fu">sample_set</span>(</span>
+<span id="cb22-2"><a href="#cb22-2" tabindex="-1"></a>      <span class="at">subset =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb22-3"><a href="#cb22-3" tabindex="-1"></a>      <span class="at">controlGenes=</span><span class="fu">expression</span>(<span class="fu">grepl</span>(<span class="st">"^ercc"</span>, ID)),</span>
+<span id="cb22-4"><a href="#cb22-4" tabindex="-1"></a>      <span class="at">subsetGenes=</span><span class="fu">expression</span>(symbol<span class="sc">!=</span><span class="st">""</span>),</span>
+<span id="cb22-5"><a href="#cb22-5" tabindex="-1"></a>      ...</span></code></pre></div>
 <p><code>controlGenes</code> and <code>subsetGenes</code> both take an R
 expression that should evaluate to a boolean of the featureData of the
 dataset (traditionally, <code>symbol</code> and <code>entrez</code> get
@@ -804,7 +804,7 @@ situations.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.1.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.2.</p>
 </div>
 
     </footer>
