@@ -592,7 +592,7 @@ for (dataset_id in names(dds_model_comp)) {
       if (is_null(plot_formulae) || !any(is_diff)) next
       exists_profile_plot <- TRUE
       partials <- partialise.matrix(
-        assay(this_dds[is_diff,], "vst"),
+        assay(this_dds[is_diff,], ifelse(inherits(this_dds, "DESeqDataSeq"),"vst", 1)),
         as.data.frame(colData(this_dds)),
         fml=metadata(this_dds)$model$design)
       for (plot_fml in plot_formulae) {

@@ -73,12 +73,8 @@ partialise.DESeqDataSet <- function(obj, assay="vst") {
   )
 }
 
-partialise.SummarizedExperiment <- function(obj, assay="vst") {
-  if (assay %in% assayNames(obj)) {
-    mat <- assay(obj, assay)
-  } else {
-    mat <-assay(vst(obj, nsub=min(1000, nrow(obj))))
-  }
+partialise.SummarizedExperiment <- function(obj, assay=1) {
+  mat <- assay(obj, assay)
   partialise.matrix(
     obj=mat,
     cdata=as.data.frame(colData(obj)),

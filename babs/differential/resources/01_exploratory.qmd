@@ -183,14 +183,16 @@ if (is_des) {
 } else {
   param$set("impute")
   param$set("normalise")
+  library(MSnbase)
+  library(imputeLCMD)
   ddsList <- lapply(ddsList, function(dds) {
     assay(dds)[is.nan(assay(dds))] <- NA
     assayNames(dds)[1] <- noun_to_readout(rowNoun)
     rowData(dds)$nna <- apply(is.na(assay(dds)), 1, sum)
     if (param$get("normalise")=="vsn") {
       fit <- vsn::vsnMatrix(assay(dds))
-      assay(dds, "vsn") <- vsn::predict(fit, assay(dds))
-      assays(dds) <- assays(dds)[c("vsn", setdiff(assayNames(dds), "vsn"))]
+      assay(dds, "vst") <- vsn::predict(fit, assay(dds))
+      assays(dds) <- assays(dds)[c("vst", setdiff(assayNames(dds), "vst"))]
     }
     if (length(param$get("impute")) > 0) {
       assay(dds, "imputed") <- MSnbase::exprs(do.call(MSnbase::impute, modifyList(param$get("impute"), list(object=as(dds, "MSnSet")))))
@@ -260,7 +262,7 @@ table1(dds, ddsList) %>%
 assay_files <- list()
 anames <- unique(unlist(lapply(ddsList, assayNames)))
 if (is_des) anames <- c(anames, "norm")
-anames <- intersect(anames, c("counts", "vst", "norm", "vsn", "imputed"))
+anames <- intersect(anames, c("counts", "vst", "norm", "abundance", "imputed"))
 for (aname in anames) {
   fname <- write_assay(ddsList,
                        aname=aname,
@@ -450,7 +452,7 @@ for (dataset_id in names(ddsList)) {
     if (sum(mdls)>1) {
       dmc_heading(ddsList, dataset=dataset_id, model=model_id, depth="##")
     }
-    var_stab <- assay(this_dds, "vst")
+    var_stab <- assay(this_dds, ifelse(is_des,"vst", 1))
     top <- order(apply(var_stab, 1, sd), decreasing = TRUE)[1:min(nrow(var_stab),param$get("top_n_variable"))]
     nice_legends <- separate_legend(ddsList[[dataset_id]], model_vars$all)
     pl <- do.call(gridExtra::arrangeGrob, c(

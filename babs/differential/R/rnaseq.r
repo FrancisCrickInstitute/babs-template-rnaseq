@@ -381,19 +381,20 @@ build_dds_list <- function(dds, spec) {
 ##' @author Gavin Kelly
 ##' @export
 add_dim_reduct  <-  function(dds, n=Inf, family="norm", batch=~1, do_vst=inherits(dds, "DESeqDataSet")) {
-  if ("vst" %in% assayNames(dds)) {
-    var_stab <- assay(dds, "vst")
-  } else {
-    if (do_vst)
+  if (do_vst) {
+    if ("vst" %in% assayNames(dds)) {
+      var_stab <- assay(dds, "vst")
+    } else {
       var_stab <- assay(vst(dds, nsub=min(1000, nrow(dds))))
-    else
-      var_stab <- assay(dds)
+      assay(dds, "vst") <- var_stab
+    }
+  } else {
+    var_stab <- assay(dds)
   }
   if (batch != ~1) {
     var_stab <- residuals(limma::lmFit(var_stab, model.matrix(batch, as.data.frame(colData(dds)))), var_stab)
   }
   colnames(var_stab) <- colnames(dds)
-  assay(dds, "vst") <- var_stab
   if (family=="norm") {
     pc <- prcomp(t(var_stab), scale=FALSE)
     percentVar <- round(100 * pc$sdev^2 / sum( pc$sdev^2 ))
@@ -841,7 +842,7 @@ get_result <- function(dds, mcols=c("symbol", "entrez"), filterFun=IHW::ihw, lfc
                             pvalue=P.Value,
                             padj=adj.P.Val,
                             row.names=row.names(dds)))
-      
+      metadata(r)$alpha <- alpha1
     }
   } else {  # Wald
     if (is.character(comp) && length(comp)==1) { #  it's a name
@@ -978,7 +979,11 @@ summarise_results <- function(dds) {
 
 tidy_significant_dds <- function(dds, res, columns=NULL, weights=NULL) {
   ind <- grepl("\\*$", res$class)
-  mat <- assay(dds, "vst")[ind,,drop=FALSE]
+  if (inherits(dds, "DESeqDataSet")) {
+    mat <- assay(dds, "vst")[ind,,drop=FALSE]
+  } else {
+    mat <- assay(dds)[ind,,drop=FALSE]
+  }
   pdat <- as.data.frame(colData(dds))
   if (!is.null(weights) && is.numeric(weights)) {
     offset <- mat %*%  weights

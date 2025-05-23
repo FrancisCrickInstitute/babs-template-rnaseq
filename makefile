@@ -26,7 +26,7 @@ endif
 
 .PHONY: infrastructure
 launchers=$(patsubst $(generic_dir)/%,babs/differential/%,$(wildcard $(generic_dir)/resources/shell/*))
-shared=$(patsubst %,babs/%/shared.mk,docs ingress nfcore) pkgdown/shared.mk
+shared=$(patsubst %,babs/%/shared.mk,docs ingress nfcore)
 
 infrastructure: $(launchers) $(shared)
 

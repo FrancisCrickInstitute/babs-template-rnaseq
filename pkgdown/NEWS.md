@@ -4,6 +4,9 @@
  - Update 'differential heatmap baseline' method so that it uses
    emmeans modifications to work directly with constituent factors and
    their levels
+ - Remove site Renviron. Users must now set
+   `SINGULARITYENV_RENV_PATHS_{LIBRARY,ROOT,PREFIX_AUTO}` in their
+   bashrc file
 ## Minor Changes
 
 # Version 0.22.0
