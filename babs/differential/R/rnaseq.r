@@ -189,7 +189,11 @@ build_dds_list <- function(dds, spec) {
   spec <- trickle_down(field="varNames", to="sample_sets", merge_fn=modifyList, default=list())
   spec <- trickle_down(field="varDescriptions", to="sample_sets", merge_fn=modifyList, default=list())
   spec <- trickle_down(field="termNames", to="sample_sets", merge_fn=modifyList, default=list())
-  
+  spec <- trickle_down(field="filterFeatures", to="sample_sets", default=spec$settings$filterFeatures)
+  spec <- trickle_down(field="filterQC", to="sample_sets", default=spec$settings$filterQC)
+  spec <- trickle_down(field="impute", to="sample_sets", default=spec$settings$impute)
+  spec <- trickle_down(field="normalise", to="sample_sets", default=spec$settings$normalise)
+  spec <- trickle_down(field="external_list", to="models", default=NULL)
   modelled_terms <- lapply(
     spec$sample_sets,
     function(x) {lapply(
@@ -230,7 +234,6 @@ build_dds_list <- function(dds, spec) {
       }
     }
     dataset_spec <- spec$sample_sets[[dataset_i]]
-    mdlList <- spec$models
     obj <- dds
     if ("baseline" %in% names(dataset_spec)) {
       if (!is.list(dataset_spec$baseline$ind)) {
@@ -243,26 +246,28 @@ build_dds_list <- function(dds, spec) {
       obj <- obj[,is_numerator]
       normalizationFactors(obj) <- norm
     }
-    if (is.list(dataset_spec)) {
-      ind <- dataset_spec$subset
-      mdlList <- c(mdlList, dataset_spec$models)
-    } else {
-      ind <- dataset_spec
-    }
-    obj <- obj[,ind]
+    mdlList <- dataset_spec$models
+    obj <- obj[, dataset_spec$subset]
     colData(obj) <- droplevels(colData(obj))
+    if (!is.null(dataset_spec$filterFeatures)) {
+      keepFeaturesInd <- eval_dds(obj, dataset_spec$filterFeatures, assays=c(assayNames(obj), "norm", "missing"))
+      obj <- obj[keepFeaturesInd,]
+    }
+    if (!is.null(dataset_spec$filterQC)) {
+      mcols(obj)$filterQC <- eval_dds(obj, dataset_spec$filterQC,assays=c(assayNames(obj), "norm", "missing"))
+    }    
     if ("termNames" %in% names(dataset_spec)) {
       metadata(obj)$termNames <- dataset_spec$termNames
     } else {
       metadata(obj)$termNames <- list()
     }
     if ("varNames" %in% dataset_spec) {
-      varNames <- sapply(names(colData(dds)), identity)
+      varNames <- sapply(names(colData(obj)), identity)
       varNames[names(dataset_spec$varNames)] <- unlist(dataset_spec$varNames)
       mcols(colData(obj))$name <- varNames
     }
     if ("varDescriptions" %in% dataset_spec) {
-      varDescriptions <- sapply(names(colData(dds)), identity)
+      varDescriptions <- sapply(names(colData(obj)), identity)
       varDescriptions[names(dataset_spec$varDescriptions)] <- unlist(dataset_spec$varDescriptions)
       mcols(colData(obj))$description <- varDescriptions
     }
@@ -321,8 +326,9 @@ build_dds_list <- function(dds, spec) {
       .mu <- purrr::partial(mutate, .data=as.data.frame(colData(obj)))
       tr[[1]] <- .mu
       cnames <- colnames(obj)
+      md <- metadata(colData(obj))
       colData(obj) <- S4Vectors::DataFrame(eval(tr))
-      metadata(colData(obj)) <- metadata(colData(dds))
+      metadata(colData(obj)) <- md
       colnames(obj) <- cnames
       if (".include" %in% names(colData(obj))) {
         obj <- obj[,colData(obj)[[".include"]]]
@@ -333,10 +339,10 @@ build_dds_list <- function(dds, spec) {
       if (length(old_cols)>0) {
         is_modified <- sapply(old_cols,
                                function(x) {
-                                 if (class(colData(obj)[[x]]) != class(colData(dds)[[x]])) return(TRUE)
-                                 if (is.factor(colData(obj)[[x]])) return(!all(levels(colData(obj)[[x]]) %in%  levels(colData(dds)[[x]])))
-                                 if (is.character(colData(obj)[[x]])) return(!all(unique(colData(obj)[[x]]) %in%  levels(unique(dds)[[x]])))
-                                 return(!all(range(colData(obj)[[x]], na.rm=TRUE)==range(colData(dds)[[x]], na.rm=TRUE)))
+                                 if (class(colData(obj)[[x]]) != class(colData(obj)[[x]])) return(TRUE)
+                                 if (is.factor(colData(obj)[[x]])) return(!all(levels(colData(obj)[[x]]) %in%  levels(colData(obj)[[x]])))
+                                 if (is.character(colData(obj)[[x]])) return(!all(unique(colData(obj)[[x]]) %in%  levels(unique(obj)[[x]])))
+                                 return(!all(range(colData(obj)[[x]], na.rm=TRUE)==range(colData(obj)[[x]], na.rm=TRUE)))
                                })
         new_cols <- c(new_cols, old_cols[is_modified])
       }
@@ -355,6 +361,8 @@ build_dds_list <- function(dds, spec) {
                    do.call(paste, c(unique(mf), sep="\r")))
       obj <- collapseReplicates(obj, groupby=factor(ind), renameCols=FALSE)
     }
+    metadata(obj)$impute <- dataset_spec$impute
+    metadata(obj)$normalise <- dataset_spec$normalise
     ddsList[[names(spec$sample_sets)[dataset_i]]] <- obj
   }
   ddsList <- imap(ddsList,
@@ -977,8 +985,7 @@ summarise_results <- function(dds) {
 }    
 
 
-tidy_significant_dds <- function(dds, res, columns=NULL, weights=NULL) {
-  ind <- grepl("\\*$", res$class)
+tidy_significant_dds <- function(dds, ind = TRUE, columns=NULL, weights=NULL) {
   if (inherits(dds, "DESeqDataSet")) {
     mat <- assay(dds, "vst")[ind,,drop=FALSE]
   } else {
@@ -986,7 +993,11 @@ tidy_significant_dds <- function(dds, res, columns=NULL, weights=NULL) {
   }
   pdat <- as.data.frame(colData(dds))
   if (!is.null(weights) && is.numeric(weights)) {
-    offset <- mat %*%  weights
+    if (any(is.na(mat))) {
+      offset <- assay(dds, "imputed")[ind,,drop=FALSE] %*%  weights
+    } else {
+      offset <- mat %*%  weights
+    }
     mat <- mat - as.vector(offset)
   }
   if (is.null(columns)) {

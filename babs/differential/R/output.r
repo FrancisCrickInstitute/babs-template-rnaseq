@@ -21,11 +21,8 @@ p2filename <- function(p, prefix, suffix) {
 write_assay <- function(ddsList, aname="vst", p,  formula=NULL, terms_to_remove=NULL) {
   out <- list()
   for (i in names(ddsList)) {
-    if (aname %in% assayNames(ddsList[[i]])) {
-      x <- assay(ddsList[[i]], aname)
-    } else if (aname=="norm") {
-      x <- counts(ddsList[[i]], norm=TRUE)
-    } else {
+    x <- assayPlus(ddsList[[i]], aname)
+    if (is.null(x)) {
       next
     }
     if (!is.null(formula)) {
@@ -133,11 +130,11 @@ write_results <- function(ddsList, param, params, assays=NULL) {
       for (contrast_name in names(ddsList[[dataset]][[design_ind]])) {
         dframe <- as.data.frame(mcols(ddsList[[dataset]][[design_ind]][[contrast_name]])$results)
         for (assay_name in assays) {
-          if (!assay_name %in% assayNames(ddsList[[dataset]][[design_ind]][[contrast_name]])) {
+          this_assay <- assayPlus(ddsList[[dataset]][[design_ind]][[contrast_name]], assay_name)
+          if (is.null(this_assay)) {
             warning(assay_name, " not an assay, so not added to output")
             next
           }
-          this_assay <- assay(ddsList[[dataset]][[design_ind]][[contrast_name]], assay_name)
           if (length(assays)>1) {
             names(this_assay) <- paste(this_assay, names(this_assay), sep="_")
           }

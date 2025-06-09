@@ -439,3 +439,78 @@ noun_to_readout <- function(noun) {
     stringr::str_to_title(readout[[stringr::str_to_lower(noun)]]) %||%
     default
 }
+
+## eval_dds <- function(dds, expr, assays=assayNames(dds)) {
+##   df_env <- new.env()
+##   df_env$df <- as.data.frame(colData(dds))
+##   for (a in assays) {
+##     assign(a, function(transform=identity) {
+##       (df_env$df %>% transform)[[a]]
+##     },
+##     envir=df_env)
+##   }
+##   sapply(
+##     1:nrow(dds),
+##     function(i) {
+##       for (a in assays) df_env$df[[a]] <- as.vector(assay(dds[i,], a))
+##       eval_tidy(expr, env=df_env)
+##     }
+##   )
+## }
+
+eval_dds <- function(dds, expr, assays = assayNames(dds)) {
+  df_env <- new.env()
+  df_env$df <- as.data.frame(colData(dds))
+
+  # Cache each assay matrix mentioned in expr in a list
+  assays <- intersect(assays, all.names(expr))
+  assay_mats <- lapply(setNames(assays, assays),function(a) assayPlus(dds, a))
+
+  # Define an accessor function per assay
+  for (a in assays) {
+    assign(a, function(transform = identity) {
+      (df_env$df %>% transform)[[a]]
+    }, envir = df_env)
+  }
+
+  # Preallocate result vector
+  res <- logical(nrow(dds))
+
+  for (i in seq_len(nrow(dds))) {
+    # Set each assay vector directly from the cached matrix
+    for (a in assays) {
+      df_env$df[[a]] <- assay_mats[[a]][i, ]
+    }
+    res[[i]] <- rlang::eval_tidy(expr, env = df_env)
+  }
+
+  res
+}
+
+assayPlus <- function(dds, i) {
+  if (is.numeric(i) || i %in% assayNames(dds)) {
+    out <- assay(dds, i)
+  } else  if (i=="norm") {
+    if (inherits(dds, "DESeqDataSet")) {
+      out <- counts(dds, norm=TRUE)
+    } else {
+      out <- NULL
+    }
+  } else if (i=="missing") {
+    out <- is.na(assay(dds))
+  } else {
+    out <- NULL
+  }
+  out
+}
+
+setFirstAssay <- function(dds, ...) {
+  fst <- list(...)[[1]]
+  if (is.character(fst)) {
+    nm <- fst
+  } else {
+    nm <- names(list(...))[1]
+    assay(dds, nm) <- fst
+  }
+    assays(dds)[c(nm, setdiff(assayNames(dds), nm))]
+}

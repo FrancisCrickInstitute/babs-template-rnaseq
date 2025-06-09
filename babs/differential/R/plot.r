@@ -228,10 +228,16 @@ aes_caption <- function(ae) {
 }
 
 
-cluster_calc <- function(mat, clusterID) {
-  tbl <- table(clusterID)
-  levels(clusterID) <- paste0("|", sub("[0-9]+", "", names(tbl)[1]), rank(-tbl, ties="first"), "|=", tbl) # change the labels
-  clusterID <- factor(clusterID, levels=levels(clusterID)[rev(order(tbl))])
-  centres <- apply(mat, 2, function(samp) tapply(samp, clusterID, mean))
-  as.data.frame(t(centres))
+cluster_calc <- function(mat, clusterID, relevel=TRUE) {
+  if (relevel) {
+    tbl <- table(clusterID)
+    levels(clusterID) <- paste0("|", sub("[0-9]+", "", names(tbl)[1]), rank(-tbl, ties="first"), "|=", tbl) # change the labels
+    clusterID <- factor(clusterID, levels=levels(clusterID)[rev(order(tbl))])
+  }
+  if (length(levels(clusterID))==1) {
+    setNames(data.frame(apply(mat, 2, mean)), levels(clusterID))
+  } else {
+    centres <- apply(mat, 2, function(samp) tapply(samp, clusterID, mean))
+    as.data.frame(t(centres))
+  }
 }

@@ -1,3 +1,4 @@
+
 .DEFAULT_GOAL=help
 
 template_dir := /nemo/stp/babs/working/bioinformatics/templates
@@ -58,7 +59,7 @@ test: airway/fastq infrastructure ## Generate a test folder setup for the airway
 	rsync -av  babs/. $@/babs/. --exclude '.~'
 	( cd $@ && git init )
 	( cd $@/babs && \
-	ln -s ../../airway/fastq fastq && \
+	ln -sfn ../../airway/fastq fastq && \
 	cp -r ../../airway/docs . && \
 	if [ -n "$(aligner)" ]; then echo "aligner=$(aligner)" >> docs/GRCh38.config; fi && \
 	git commit --allow-empty -m "Restart git repo for testing" && \

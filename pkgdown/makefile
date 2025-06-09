@@ -42,7 +42,7 @@ $(wrapped-targets): $(optionalContainer)
 endif
 
 publish:
-	rsync -a --delete docs/ /nemo/stp/babs/www/html/internal/resources/info ;\
+	rsync -a --delete docs/ /nemo/stp/babs/www/html/internal/resources/info/babs-rnaseq 
 	tmpdir=$$(mktemp -d) ;\
 	git worktree add $$tmpdir gh-pages ;\
 	rsync -a --delete docs/ $$tmpdir/docs/ ;\

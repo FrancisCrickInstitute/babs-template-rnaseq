@@ -102,7 +102,6 @@ if (isTRUE(getOption('knitr.in.progress'))) {
 data(list=paste0("counts_", params$alignment))
 is_des <- inherits(dds, "DESeqDataSet")
 
-
 if (!is.null(metadata(dds)$organism$org)) {
   library(metadata(dds)$organism$org, character.only=TRUE)
 }
@@ -139,6 +138,7 @@ param$set("alignment", params$alignment, "Using alignment settings '{}'", postpo
 param$set("baseline_heuristic", postpone=TRUE)
 param$set("LRT_effect", postpone=TRUE)
 param$set("baseMeanMin")
+
 
 ddsList <- build_dds_list(dds, specs)
 dtag <- dmc_factory(ddsList, type="dataset")
@@ -181,22 +181,24 @@ if (is_des) {
                      )
   }
 } else {
-  param$set("impute")
-  param$set("normalise")
   library(MSnbase)
   library(imputeLCMD)
   ddsList <- lapply(ddsList, function(dds) {
-    assay(dds)[is.nan(assay(dds))] <- NA
     assayNames(dds)[1] <- noun_to_readout(rowNoun)
     rowData(dds)$nna <- apply(is.na(assay(dds)), 1, sum)
-    if (param$get("normalise")=="vsn") {
-      fit <- vsn::vsnMatrix(assay(dds))
-      assay(dds, "vst") <- vsn::predict(fit, assay(dds))
-      assays(dds) <- assays(dds)[c("vst", setdiff(assayNames(dds), "vst"))]
+    if ((metadata(dds)$normalise %||% "none") =="vsn") {
+      assays(dds) <- setFirstAssay(
+        dds,
+        vst= vsn::predict(vsn::vsnMatrix(assay(dds)), assay(dds)))
     }
-    if (length(param$get("impute")) > 0) {
-      assay(dds, "imputed") <- MSnbase::exprs(do.call(MSnbase::impute, modifyList(param$get("impute"), list(object=as(dds, "MSnSet")))))
-      assays(dds) <- assays(dds)[c("imputed", setdiff(assayNames(dds), "imputed"))]
+    imp <- metadata(dds)$impute
+    if (!is.null(imp)) {
+      assays(dds) <- setFirstAssay(
+        dds,
+        imputed=MSnbase::exprs(do.call(
+          MSnbase::impute,
+          modifyList(imp,
+                     list(object=as(dds, "MSnSet"), differential=NULL)))))
     }
     dds
   })
@@ -453,6 +455,9 @@ for (dataset_id in names(ddsList)) {
       dmc_heading(ddsList, dataset=dataset_id, model=model_id, depth="##")
     }
     var_stab <- assay(this_dds, ifelse(is_des,"vst", 1))
+    if ("filterQC" %in%  names(mcols(this_dds))) {
+      var_stab <- var_stab[mcols(this_dds)$filterQC,]
+    }
     top <- order(apply(var_stab, 1, sd), decreasing = TRUE)[1:min(nrow(var_stab),param$get("top_n_variable"))]
     nice_legends <- separate_legend(ddsList[[dataset_id]], model_vars$all)
     pl <- do.call(gridExtra::arrangeGrob, c(
@@ -583,12 +588,20 @@ for (dataset_id in names(ddsList)) {
           removed <- paste(
             translate_terms(dropped_terms(partials, update(plot_fml, NULL ~ .)), this_dds),
             sep=", ", collapse=", ")
-          if (length(removed)==0 || removed=="") removed <- "nothing"
+          if (length(removed)==0 || removed=="") {
+            removed <- ""
+          } else {
+            removed <- paste0(" having removed effect of ", removed)
+          }
+          
           part_res <- assemble_partialised(partials, update(plot_fml, NULL ~ .))
           if (is.na(split)) {
-            my_caption <- paste("In",  dtag(dataset_id), "having removed effect of", removed)
+            my_caption <- paste0("In ",  dtag(dataset_id), removed)
           } else {
-            my_caption <- paste("Split on", paste(all.vars(split), collapse=":"), "in",  dtag(dataset_id), "having removed effect of", removed) # TODO
+            my_caption <- paste0("Split on ", paste(all.vars(split), collapse=":"), " in ",  dtag(dataset_id), removed) # TODO
+          }
+          if ("filterQC" %in%  names(mcols(this_dds))) {
+            part_res <- part_res[mcols(this_dds)$filterQC,]
           }
           top <- order(apply(part_res, 1, sd), decreasing = TRUE)[1:min(nrow(part_res),param$get("top_n_variable"))]
           plotDat <- part_res[top, ]
@@ -641,7 +654,7 @@ for (dataset_id in names(ddsList)) {
           if ("ScaleDiscrete" %in% class(layer_scales(pl)$x)) {
             pl <- pl + scale_x_discrete(guide=guide_axis(n.dodge=2))
           }
-          capt <- paste("Cluster profile in", dtag(dataset_id), "having removed", removed)
+          capt <- paste0("Cluster profile in ", dtag(dataset_id), removed)
           do_plot(pl,
                   label= "clustProfile",
                   caption=capt)
@@ -783,10 +796,14 @@ for (dataset_id in names(ddsList)) {
           removed <- paste(
             translate_terms(dropped_terms(partials, update(plot_fml, NULL ~ .)),this_dds),
             sep=", ", collapse=", ")          
-          if (length(removed)==0 || removed=="") removed <- "nothing"
+          if (length(removed)==0 || removed=="") {
+            removed <- ""
+          } else {
+            removed <- paste0(" having removed effect of ", removed)
+          }
           do_plot(pl,
                   label="focus",
-                  caption=paste("Annotated by", aes_caption(eval(this_aes)), "in", dtag(dataset_id), "having removed effect of", removed)
+                  caption=paste0("Annotated by ", aes_caption(eval(this_aes)), " in ", dtag(dataset_id), removed)
                   )
           cat("\n\n---\n\n")
         } # Repeat if need to annotate by an overwritten 'x'
@@ -818,10 +835,14 @@ for (dataset_id in names(ddsList)) {
         removed <- paste(
           translate_terms(dropped_terms(partials, update(plot_fml, NULL ~ .)),this_dds),
           sep=", ", collapse=", ")
-        if (length(removed)==0 || removed=="") removed <- "nothing"
+        if (length(removed)==0 || removed=="") {
+          removed <- ""
+        } else {
+          removed <- paste0(" having removed effect of ", removed)
+        }
         do_plot(pl,
                 label= "covariate",
-                caption=paste("Annotated by",aes_caption(eval(plot_fml[[2]])), "in", dtag(dataset_id), "having removed effect of", removed) 
+                caption=paste("Annotated by ",aes_caption(eval(plot_fml[[2]])), " in ", dtag(dataset_id), removed) 
                 )
         cat("\n\n---\n\n")
       }

@@ -99,9 +99,19 @@ if (isTRUE(getOption('knitr.in.progress'))) {
 
 ```{r}
 #| label: read-diff
+
+base_dir <- getwd()
 data(list=paste0("counts_", params$alignment))
 data(list=paste0("pca_", params$alignment, "_", params$spec))
 
+ddsList <- lapply(ddsList, function(dds) {
+  imp <- metadata(dds)$impute
+  if (!is.null(imp) && !is.null(imp$differential) && !imp$differential) {
+    assays(dds) <- setFirstAssay(dds, setdiff(assayNames(dds), "imputed")[1])
+  }
+  dds
+})
+  
 if (!is.null(metadata(dds)$organism$org)) {
   library(metadata(dds)$organism$org, character.only=TRUE)
 }
@@ -394,46 +404,55 @@ for (dataset in names(dds_model_comp)) {
     met <- metadata(dds_model_comp[[dataset]][[mdl]][[1]])$dmc
     dmc_heading(dds_model_comp, dataset=dataset, model=mdl, depth="###")
     this_mdl <- dds_model_comp[[dataset]][[mdl]]
-    for (comp_name in names(this_mdl)) {
-      res <- as.data.frame(mcols(this_mdl[[comp_name]])$results)
-      md <- metadata(this_mdl[[comp_name]])
-      pal <- RColorBrewer::brewer.pal(12, "Set3")
+    if (!is.null(metadata(this_mdl[[1]])$model$external_list)) {
+      external_list <- read.csv(file.path(base_dir, metadata(this_mdl[[1]])$model$external_list))
+      external_list <- subset(external_list, ID %in% row.names(this_mdl[[1]]))
+    } else {
+      external_list <- NULL
+    }
+    for (comp_id in names(this_mdl)) {
+      res <- as.data.frame(mcols(this_mdl[[comp_id]])$results)
+      md <- metadata(this_mdl[[comp_id]])
+      pal <- RColorBrewer::brewer.pal(9, "Set1")
+      res$class <- ifelse(grepl("\\*", res$class), "Sig", "Not")
       if (is_formula(md$comparison)) {
-        res$class <- ifelse(grepl("\\*", res$class),res$class, "None")
-        colind <- (seq(along=unique(res$class), from=0)) %% length(pal) + 1
         yax <- "Largest fold change"
-        if (length(colind)>12) {
-          res$class <- ifelse(res$class=="None","None","Sig")
-          cols <- setNames(c("blue","grey"), c("Sig","None"))
-          lpos <- "none"
-        } else {
-          cols <- setNames(c(pal[colind]), unique(res$class))
-          cols["None"] <- "grey"
-          lpos <- "bottom"
-        }
       } else {
-        res$class <- ifelse(grepl("\\*", res$class), "Sig", "Not")
-        cols <- setNames(c("blue","grey"), c("Sig","Not"))
         yax <- "Log fold change (shrunk)"
-        lpos <- "none"
       }
       pl <- ggplot(res,
                   aes(x=baseMean,
                       y=shrunkLFC,
-                      colour=class,
-                      size=ifelse(class %in% c("Not","None"),.1 , .5),
-                      label=ifelse(class %in% c("Not","None"), "" , symbol)
+                      colour=ifelse(class == "Not", "#aaaaaa","#000000"),
+                      size=ifelse(class == "Not", 0.5 , 2),
+                      label=symbol
                       )
                   ) +
         geom_point() +
-        scale_x_log10() + scale_colour_manual(values=cols) + scale_size_identity() +
-        theme(legend.position=lpos) +
+        scale_x_log10()  + scale_size_identity() +
         labs(x="Mean of normalised counts", y=yax)+ theme_bw()
-      ind <- order(res$shrunkLFC)[c(1:5, nrow(res)-(0:4))]
-      pl <- pl+ggrepel::geom_text_repel(size=4, data=res[ind,])
+      colour_scale <- list(labels = c("Not", "Significant"),
+                           breaks = c("#aaaaaa", "#000000"))
+      is_sig <- res$class != "Not"
+      ind <- which(is_sig)[order(res$shrunkLFC[is_sig])]
+      top_ind_ind <- 1:min(5,sum(is_sig))
+      ind <- ind[unique(c(top_ind_ind, sum(is_sig)+1-top_ind_ind))]
+      pl <- pl+ggrepel::geom_text_repel(size=3, data=res[ind,])
+      if (!is.null(external_list)) {
+        dat <- res[external_list$ID,]
+        if (length(unique(external_list$Comparison)) <= length(pal)) {
+          col <- pal[match(external_list$Comparison, unique(external_list$Comparison))]
+        } else {
+          col <- rep(pal[1], nrow(dat))
+        }
+        colour_scale$labels <- c(colour_scale$labels, unique(external_list$Comparison))
+        colour_scale$breaks <- c(colour_scale$breaks, pal[seq_along(unique(external_list$Comparison))])
+        pl <- pl + ggrepel::geom_text_repel(aes(colour=col), size=3, data=res[external_list$ID,], max.overlaps=Inf)
+      }
+      pl <- pl + scale_colour_identity(labels=colour_scale$labels, breaks=colour_scale$breaks)
       do_plot(pl,
               label="MA",
-              caption=paste0("MA plot of differential ",rowNoun,"s ", sub(".*\\t", "", comp_name)),
+              caption=paste0("MA plot of differential ",rowNoun,"s ", sub(".*\\t", "", comp_id)),
               preview=first
               )
       first <- FALSE
@@ -472,10 +491,26 @@ for (dataset in names(dds_model_comp)) {
     dmc_heading(dds_model_comp, dataset=dataset, model=mdl_name, depth="###")
     this_mdl <- dds_model_comp[[dataset]][[mdl_name]]
     first_done <- FALSE
-    for (comp_name in names(this_mdl)) {
-      this_comp <- this_mdl[[comp_name]]
-      if (!any(grepl("\\*$", mcols(this_comp)$results$class))) {
-        next
+    if (!is.null(metadata(this_mdl[[1]])$model$external_list)) {
+      external_list <- read.csv(file.path(base_dir, metadata(this_mdl[[1]])$model$external_list))
+      external_list <- subset(external_list, ID %in% row.names(this_mdl[[1]]))
+    } else {
+      external_list <- NULL
+    }
+    for (comp_id in c(names(this_mdl), unique(external_list$Comparison))) {
+      this_comp <- this_mdl[[comp_id]]
+      comp_name <- sub(".*\\t", "", comp_id)
+      is_external <- !(comp_id %in% names(this_mdl))
+      if (is_external) {
+        ind <- row.names(this_mdl[[1]]) %in% external_list$ID[external_list$Comparison==comp_id]
+        this_comp <- this_mdl[[1]]
+        comp_type <- " "
+      } else {
+        ind <- grepl("\\*$", mcols(this_comp)$results$class)
+        comp_type <- "-differential "
+        if (!any(ind)) {
+          next
+        }
       }
       comp <- metadata(this_comp)$comparison
       fml <- metadata(this_comp)$model$design
@@ -486,7 +521,7 @@ for (dataset in names(dds_model_comp)) {
         mmat <- model.matrix(mdl$design, colData(this_comp))
       }
       var_roles <- list(all.vars(fml))
-      if ("baseline_contrast" %in% names(attributes(metadata(this_comp)$comparison))) {
+      if (!is_external && "baseline_contrast" %in% names(attributes(metadata(this_comp)$comparison))) {
         var_roles <- c(emmeans:::.parse.by.formula(attr(comp, "spec"))[c("by", "rhs")], var_roles)
         weights <- as.vector(attr(metadata(this_comp)$comparison, "baseline_contrast") %*% MASS::ginv(mmat))
         baseline_str <- paste("baseline", noun_to_readout(rowNoun))
@@ -494,12 +529,11 @@ for (dataset in names(dds_model_comp)) {
         weights <- rep(1/nrow(mmat), times=nrow(mmat))
         baseline_str <- paste("average", noun_to_readout(rowNoun))
       }
-      tidied_data <- tidy_significant_dds(this_comp, mcols(this_comp)$results, unique(unlist(var_roles)), weights=weights)
+      tidied_data <- tidy_significant_dds(this_comp, ind, unique(unlist(var_roles)), weights=weights)
       pdat <- tidied_data$pdat
       pdat[sapply(pdat, is.character)] <- lapply(pdat[sapply(pdat, is.character)], 
                                                 as.factor)
       colnames(tidied_data$mat) <- rownames(pdat)
-      name <- sub(".*\\t", "", comp_name)
       if (length(var_roles$by)==0) {
         col_split <- NULL
       } else {
@@ -512,9 +546,9 @@ for (dataset in names(dds_model_comp)) {
         show_legend=FALSE)
       pl <- ComplexHeatmap::Heatmap(
         tidied_data$mat,
-        col=sym_colour(tidied_data$mat),
+        col=sym_colour(na.omit(as.vector(tidied_data$mat))),
         heatmap_legend_param = list(direction = "horizontal" ),
-        name=sub(".*\\t", "", comp_name),
+        name=comp_name,
         cluster_columns = FALSE,
         show_column_names = TRUE,
         clustering_distance_rows=param$get("clustering_distance_rows"),
@@ -524,7 +558,7 @@ for (dataset in names(dds_model_comp)) {
         show_row_names = nrow(tidied_data$mat)<100)
       do_plot(pl,
               label="Heatmap",
-              caption=paste0("Heatmap on ", name, "-differential ",rowNoun,"s. White for ", baseline_str),
+              caption=paste0("Heatmap on ", comp_name, comp_type, rowNoun,"s. White for ", baseline_str),
               height_mult=nrow(tidied_data$mat)/30,
               max_height=15, min_height=5)
       cat('\n\n---\n\n')
@@ -537,7 +571,7 @@ for (dataset in names(dds_model_comp)) {
             tdat,
             col=sym_colour(tdat),
             heatmap_legend_param = list(direction = "horizontal" ),
-            name=paste(sub(".*\\t", "", comp_name),term_name),
+            name=paste(comp_name,term_name),
             cluster_columns = FALSE,
             show_column_names = TRUE,
             column_split = col_split,
@@ -547,7 +581,7 @@ for (dataset in names(dds_model_comp)) {
             show_row_names = nrow(tidied_data$mat)<100)
           do_plot(pl,
                   label="focussed",
-                  caption=paste0("Heatmap on differential ",rowNoun,"s ", name, ", ", term_name, "-focussed")
+                  caption=paste0("Heatmap on differential ",rowNoun,"s ", comp_name, ", ", term_name, "-focussed")
                   )
           cat('\n\n---\n\n')
         }
@@ -585,14 +619,27 @@ for (dataset_id in names(dds_model_comp)) {
   dmc_heading(dds_model_comp, dataset=dataset_id, model=NULL, depth="##")
   for (model_id in names(dds_model_comp[[dataset_id]])) {
     dmc_heading(dds_model_comp, dataset=dataset_id, model=model_id, depth="###")
-    for (comp_id in names(dds_model_comp[[dataset_id]][[model_id]])) {
-      this_dds <- dds_model_comp[[dataset_id]][[model_id]][[comp_id]]
-      is_diff <- grepl("^.*\\*", mcols(this_dds)$results$class)
+    if (!is.null(metadata(this_mdl[[1]])$model$external_list)) {
+      external_list <- read.csv(file.path(base_dir, metadata(this_mdl[[1]])$model$external_list))
+      external_list$Cluster[is.na(external_list$Cluster)] <- external_list$ID[is.na(external_list$Cluster)]
+    } else {
+      external_list <- NULL
+    }
+    
+    for (comp_id in c(names(dds_model_comp[[dataset_id]][[model_id]]), unique(external_list$Comparison))) {
+      is_external <- !(comp_id %in% names(dds_model_comp[[dataset_id]][[model_id]]))
+      if (is_external) {
+        this_dds <- dds_model_comp[[dataset_id]][[model_id]][[1]]
+        is_diff <- row.names(this_dds) %in% external_list$ID[external_list$Comparison==comp_id]
+      } else {
+        this_dds <- dds_model_comp[[dataset_id]][[model_id]][[comp_id]]
+        is_diff <- grepl("^.*\\*", mcols(this_dds)$results$class)
+      }
       plot_formulae <- section_chooser(metadata(this_dds)$model, "differential_profile_plots", "profile_plots")
       if (is_null(plot_formulae) || !any(is_diff)) next
       exists_profile_plot <- TRUE
       partials <- partialise.matrix(
-        assay(this_dds[is_diff,], ifelse(inherits(this_dds, "DESeqDataSeq"),"vst", 1)),
+        assay(this_dds[is_diff,,drop=FALSE], ifelse(inherits(this_dds, "DESeqDataSeq"),"vst", 1)),
         as.data.frame(colData(this_dds)),
         fml=metadata(this_dds)$model$design)
       for (plot_fml in plot_formulae) {
@@ -603,21 +650,31 @@ for (dataset_id in names(dds_model_comp)) {
         removed <- paste(
           translate_terms(dropped_terms(partials, update(plot_fml, NULL ~ .)),this_dds),
           sep=", ", collapse=", ")
-        if (length(removed)==0 || removed=="") removed <- "nothing"
+        if (length(removed)==0 || removed=="") {
+          removed <- ""
+        } else {
+          removed <- paste0(" having removed effect of ", removed)
+        }
         hc <- param$get("gene_clust")
         if ("cut.params" %in% slotNames(hc) && "k" %in% names(slot(hc, "cut.params")) && slot(hc, "cut.params")$k >= nrow(mat)) {
           slot(hc, "cut.params") <- modifyList(slot(hc, "cut.params"), list(k=ceiling(nrow(mat)/3)))
         }
-        if (nrow(mat)>1) {
-          gene_clust <- bluster::clusterRows(mat, hc, full=TRUE)
+        if (is_external) {
+          gene_clust <- list(clusters=setNames(
+            factor(external_list$Cluster[match(row.names(mat), external_list$ID)]),
+            row.names(mat)))
         } else {
-          gene_clust <- list(
-            clusters=setNames(factor(1), row.names(mat))
-          )
+          if (nrow(mat)>1) {
+          gene_clust <- bluster::clusterRows(mat, hc, full=TRUE)
+          } else {
+            gene_clust <- list(
+              clusters=setNames(factor(1), row.names(mat))
+            )
+          }
+          this_clust <- cluster_ind()
+          levels(gene_clust$clusters) <- paste0(this_clust, levels(gene_clust$clusters))
         }
-        this_clust <- cluster_ind()
-        levels(gene_clust$clusters) <- paste0(this_clust, levels(gene_clust$clusters))
-        cc <- cluster_calc(mat, clusterID=gene_clust$clusters)
+        cc <- cluster_calc(mat, clusterID=gene_clust$clusters, relevel=!is_external)
         centroid_df <- cbind(cc, cdata_df) %>%
           pivot_longer(cols=any_of(names(cc)), names_to="babs.name", values_to="babs.value") %>%
           mutate(babs.name=factor(babs.name, levels=names(cc)))
@@ -628,27 +685,22 @@ for (dataset_id in names(dds_model_comp)) {
           geom_point(aes(y= babs.value)) +
           labs(y=noun_to_readout(RowNoun))
         if ("group" %in% names(plot_fml[[2]])) {
-          group_mat <- t(scale(t(
-            assemble_partialised(partials, update(plot_fml, NULL ~ .), resids=FALSE)
-          )))
-          group_cc <- cluster_calc(group_mat, clusterID=gene_clust$clusters)
-          group_df <- cbind(group_cc, cdata_df)  %>%
-            pivot_longer(cols=any_of(names(group_cc)), names_to="babs.name", values_to="babs.value") %>%
-            mutate(babs.name=factor(babs.name, levels=names(group_cc)))
-          pl <- pl+geom_line(data=group_df, aes(y=babs.value))
+          pl <- pl+geom_line(aes(y=babs.value), stat="summary", fun=mean)
         }
         if ("ScaleDiscrete" %in% class(layer_scales(pl)$x)) {
           pl <- pl + scale_x_discrete(guide=guide_axis(n.dodge=2))
         }
-        capt <- paste0("Cluster profile for ", comp_id, " ",rowNoun,"s  of ", mtag(model_id), " in ", dtag(dataset_id), " having removed effect of ", removed)
+        capt <- paste0("Cluster profile for ", comp_id, " ",rowNoun,"s  of ", mtag(model_id), " in ", dtag(dataset_id), removed)
         do_plot(pl,
                 label= "diffClustProfile",
                 caption=capt
                 )
-        all_clusters[[this_clust]] <- list(
-          id=gene_clust$clusters,
-          description=capt
-        )
+        if (!is_external) {
+          all_clusters[[this_clust]] <- list(
+            id=gene_clust$clusters,
+            description=capt
+          )
+        }
         cat('\n\n---\n\n')
       }
     }

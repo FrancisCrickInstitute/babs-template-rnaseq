@@ -190,6 +190,9 @@ if (file.exists(csv)) {
   dds <- SummarizedExperiment(assays=SimpleList(raw=mat),
                              colData=sample_sheet[as.character(sample_sheet[[file_col]]) %in% colnames(mat),]
                              )
+
+  assay(dds)[is.nan(assay(dds))] <- NA
+  if (any(is.na(assay(dds)))) dds$'.percentNA' <- 100 *apply(is.na(assay(dds)), 2, mean)
   mcols(dds) <- df[setdiff(names(df), colnames(mat))]
   mcols(dds)$symbol <- mcols(dds)[[align_params$symbolColumn %||% 1]]
   colnames(dds) <- as.character(dds[[name_col]])
