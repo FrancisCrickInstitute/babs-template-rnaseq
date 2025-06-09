@@ -748,6 +748,51 @@ size factors are calculated on all rows that pass the controlGenes
 filter, and then the subset filter is applied to all the original rows
 (so one can calculate on the spike-ins, and then drop them out.)
 
+#### External genelists
+
+If there are lists of _a priori_ interesting genes, the analysis can
+be informed of these via an additional csv file, the location of which
+is supplied with a line in the spec-file:
+
+```{r, eval = FALSE}
+  external_list="extdata/lists.csv"
+```
+
+This can either be an element of the `settings`, or the
+`specification` or any individual `sample_set`, and is expected to be of the form:
+
+
+|ID  | Comparison | Cluster |
+|----|------------|---------|
+|S1  | Pos Control|  C1     |
+|S2  | Pos Control|  C2     |
+|S3  | Pos Control|  C3     |
+|S4  | Public     |  C4     |
+|S5  | Public     |  C4     |
+
+`ID` needs to match up with the `row.names` of your assay,
+`Comparison` will determine which genes are grouped together in a plot
+(given the same colour in scatter plots; given their own plot in a
+heatmap or profile-plot), and the `Cluster` is only used in the
+profile plots: genes with the same Cluster within a Comparison will be
+averaged, to provide a single trace - if Cluster is omitted, each
+symbol will be plotted as its own singleton cluster.
+
+#### Imputation
+
+For `limma`-like analyses, (see [this vignette on running just the
+'differential' phase of the analysis]{isolated.html} ), it is possible
+to define different imputation strategies:
+
+```
+sample_set(...,
+    normalise = "vsn",
+    impute    = list(method="MinProb", q=0.01),
+    ...
+)
+```
+
+We will better document this shortly.
 
 
 ### Settings
