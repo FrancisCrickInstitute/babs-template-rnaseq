@@ -1,3 +1,12 @@
+# Version 0.24.0
+## Major Changes
+ - Add external genelists
+## Minor Changes
+ - Add documentation on external genelists
+ - Better handling of impute and normalise.
+ - Fix long-standing bug  symbol-labelling of MA plots
+ - Tidy up "remove nothing" captions
+
 # Version 0.23.0
 ## Major Changes
  - Add ability to take on summarizedexperiments
