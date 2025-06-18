@@ -454,7 +454,7 @@ for (dataset_id in names(ddsList)) {
     if (sum(mdls)>1) {
       dmc_heading(ddsList, dataset=dataset_id, model=model_id, depth="##")
     }
-    var_stab <- assay(this_dds, ifelse(is_des,"vst", 1))
+    var_stab <- assay(this_dds, ifelse(is_des, "vst", 1))
     if ("filterQC" %in%  names(mcols(this_dds))) {
       var_stab <- var_stab[mcols(this_dds)$filterQC,]
     }
@@ -556,6 +556,7 @@ for (dataset_id in names(ddsList)) {
           facet_wrap(~ babs.name) +
           theme_bw() +
           geom_point(aes(y= babs.value)) +
+          my_alpha_scale(pl) +
           labs(y=noun_to_readout(RowNoun))
         if ("group" %in% names(plot_fml[[2]])) {
           pl <- pl+geom_line(aes(y=babs.value),

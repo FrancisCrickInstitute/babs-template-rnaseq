@@ -437,7 +437,6 @@ for (dataset in names(dds_model_comp)) {
       ind <- which(is_sig)[order(res$shrunkLFC[is_sig])]
       top_ind_ind <- 1:min(5,sum(is_sig))
       ind <- ind[unique(c(top_ind_ind, sum(is_sig)+1-top_ind_ind))]
-      pl <- pl+ggrepel::geom_text_repel(size=3, data=res[ind,])
       if (!is.null(external_list)) {
         dat <- res[external_list$ID,]
         if (length(unique(external_list$Comparison)) <= length(pal)) {
@@ -447,9 +446,15 @@ for (dataset in names(dds_model_comp)) {
         }
         colour_scale$labels <- c(colour_scale$labels, unique(external_list$Comparison))
         colour_scale$breaks <- c(colour_scale$breaks, pal[seq_along(unique(external_list$Comparison))])
-        pl <- pl + ggrepel::geom_text_repel(aes(colour=col), size=3, data=res[external_list$ID,], max.overlaps=Inf)
+        pl <- pl +
+          ggrepel::geom_text_repel(aes(colour=col), size=3, data=res[external_list$ID,], max.overlaps=Inf, show_guide = FALSE) +
+          geom_point(aes(colour=col), data=res[external_list$ID,])
+        ind <- ind[!row.names(res)[ind] %in% external_list$ID]
       }
-      pl <- pl + scale_colour_identity(labels=colour_scale$labels, breaks=colour_scale$breaks)
+      pl <- pl+ggrepel::geom_text_repel(size=3, data=res[ind,], show_guide = FALSE) 
+      pl <- pl +
+        scale_colour_identity(labels=colour_scale$labels, breaks=colour_scale$breaks, guide = "legend") +
+        labs(colour="Class")
       do_plot(pl,
               label="MA",
               caption=paste0("MA plot of differential ",rowNoun,"s ", sub(".*\\t", "", comp_id)),
@@ -683,6 +688,7 @@ for (dataset_id in names(dds_model_comp)) {
           facet_wrap(~ babs.name) +
           theme_bw() +
           geom_point(aes(y= babs.value)) +
+          my_alpha_scale(pl) +
           labs(y=noun_to_readout(RowNoun))
         if ("group" %in% names(plot_fml[[2]])) {
           pl <- pl+geom_line(aes(y=babs.value), stat="summary", fun=mean)

@@ -241,3 +241,13 @@ cluster_calc <- function(mat, clusterID, relevel=TRUE) {
     as.data.frame(t(centres))
   }
 }
+
+my_alpha_scale <- function(pl, decay=0.3) {
+  mapping <- pl$mapping$alpha
+  if (is.null(mapping)) {
+    return(NULL)
+  }
+  alpha_var <- rlang::as_name(mapping)
+  fac_levels <- levels(factor(pl$data[[alpha_var]]))
+  scale_alpha_manual(values = setNames(rev((decay)^(seq_along(fac_levels)-1)), fac_levels))
+}
