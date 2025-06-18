@@ -58,7 +58,7 @@ treated with as much caution, security-wise, as any other script), but
 is expected to be of a certain form, the first criterion is that it
 should start and end as follows:
 
-```r
+```{r, eval = FALSE}
 specification(
 ...
 )
@@ -72,7 +72,7 @@ even in the simplest experiment, it might be observed for example that
 one sample is an outlier and we'd like to examine the effect of
 omitting or retaining this sample. We can accomplish this easily:
 
-```r
+```{r, eval = FALSE}
 specification(
   sample_sets =list( 
     all = sample_set(
@@ -102,7 +102,7 @@ the estimates of dispersion that hold for the other set. Of course it
 then becomes impossible to _statistically test_ between the two
 cohorts, but we can have a third set that still combines them:
 
-```r
+```r{r, eval = FALSE}
 specification(
   sample_sets =list( 
     all = sample_set(
@@ -123,7 +123,7 @@ It's possible for `sample_set`s to inherit subsets from the
 `specification` level.  We discuss [this concept later on]{#cascade#}, but a simple
 example should suffice to illustrate how we can refine a 'global' subset:
 
-```r
+```{r, eval = FALSE}
 specification(
   subset = ! sample_id %in% c("bad1","bad2"), # get rid of two samples that failed qc
   sample_sets =list( 
@@ -151,7 +151,7 @@ table. It is possible to transform some of the predictors (columns of
 Each specification can have a single `transform` which is a
 `dplyr::mutate` clause, but with no need for the initial data object:
 
-```
+```{r, eval = FALSE}
 specification(
     transform=mutate(
                treatement=relevel(factor(treatment), "control"),
@@ -199,7 +199,7 @@ if it's substantial then we want to make our estimates more precise by
 accounting for it. So we allow, in any given sample_set, for there to
 be multiple models:
 
-```r
+```{r, eval = FALSE}
 specification(
   sample_sets =list( 
     all = sample_set(
@@ -232,7 +232,7 @@ Sometimes all/some models should apply to all `sample_sets` in a spec
 file. To save typing, it's possible to elevate the models to the
 top-level within a `specification`, so for example:
 
-```r
+```{r, eval = FALSE}
 specification(
   models = list(
           powerful = model(
@@ -271,7 +271,7 @@ supported, and again as 'comparisons' is plural, we can have a list of
 them, and have the pipeline loop through all of them for the parent
 model:
 
-```r
+```{r, eval = FALSE}
 specification(
   sample_sets =list( 
     all = sample_set(
@@ -326,7 +326,7 @@ _standard_, _novel\_treatment_}, and we wanted to compare everything to
 _control_, then we'd need to hand-write three comparisons. Instead we
 can now write
 
-```r
+```{r, eval = FALSE}
 specification(
   sample_sets =list( 
     all = sample_set(
@@ -401,7 +401,7 @@ continuous covariates, so to specifiy a test of difference of slopes,
 it's necessary to request that functionality by providing a `var`
 argument to the `mult_comp` call, e.g.:
 
-```
+```{r, eval = FALSE}
 ...
 #design= ~ Infection * time + Participant_in_infection:infection
 mult_comp(revpairwise ~ Infection, var="time")
@@ -428,7 +428,7 @@ are responding to treatment in the WT; which genes are differential
 between WT and KO in the untreated. These are all questions of the
 first type, and we can automatically generate their contrasts by:
 
-```r
+```{r, eval = FALSE}
 specification(
   sample_sets =list( 
     all = sample_set(
@@ -457,7 +457,7 @@ treatment group.
 The second type of question, where we want to investigate a
 'difference of differences', is achieved by the following grammar:
 
-```r
+```{r, eval = FALSE}
 mult_comp(revpairwise+revpairwise ~ treatment + genotype, interaction=TRUE)
 ```
 
@@ -784,7 +784,7 @@ For `limma`-like analyses, (see [this vignette on running just the
 'differential' phase of the analysis]{isolated.html} ), it is possible
 to define different imputation strategies:
 
-```
+```{r, eval = FALSE}
 sample_set(...,
     normalise = "vsn",
     impute    = list(method="MinProb", q=0.01),

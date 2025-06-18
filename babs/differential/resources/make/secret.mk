@@ -21,9 +21,9 @@ BABS_SINGULARITY_OVERLAYS=/nemo/stp/babs/working/bioinformatics/software/singula
 
 TEMPLATE_DIR=/nemo/stp/babs/working/bioinformatics/templates
 
-.bp = $(subst /, ,$(setting_Path))
+.bp = $(subst /, ,$(or $(setting_Path),$(CURDIR)))
 .myname = $(firstword $(subst @,$(space),$(shell $(GIT) config --global user.email || echo $(USER))))
-babs_userpath = $(patsubst /camp%,/nemo%,$(subst /working/bioinformatics/,/working/$(USER)/,$(setting_Path)))
+babs_userpath = $(patsubst /camp%,/nemo%,$(subst /working/bioinformatics/,/working/$(USER)/,$(or $(setting_Path),$(CURDIR))))
 
 redirect_outputs = /nemo/stp/babs/outputs/$(word 7, $(.bp))/$(word 8,$(.bp))/$(.myname)/$(word 9, $(.bp))
 redirect_intranet = $(subst /working/,/www/html/internal/users/,$(babs_userpath))
