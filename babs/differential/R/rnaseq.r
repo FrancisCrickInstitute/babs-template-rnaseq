@@ -425,6 +425,11 @@ add_dim_reduct  <-  function(dds, n=Inf, family="norm", batch=~1, do_vst=inherit
   dds
 }
 
+if(!isGeneric("design")) {
+  setGeneric("design", function(object,...){standardGeneric("design")})
+  setGeneric("design<-", function(object, value, ...){standardGeneric("design")})
+}
+
 #' @importFrom DESeq2 design
 #' @importFrom DESeq2 "design<-"
 setMethod("design", "SummarizedExperiment", function(object) {
@@ -537,7 +542,10 @@ fit_comparison <- function(comp, model_dds, mdl, ...) {
         mm <- design(model_dds)
       }
       fit <- limma::lmFit(assay(model_dds), mm)
+      nb <- apply(!is.na(assay(model_dds)), 1, function(x) estimability::nonest.basis(fit$design[x,]))
+      isEst <- sapply(contrs, function(x) {sapply(nb,  function(y) estimability::is.estble(x, y))})
       fit <- limma::contrasts.fit(fit, do.call(cbind, contrs))
+      fit$coefficients[!isEst] <- NA
       fit <- limma::eBayes(fit)
       metadata(model_dds)$limma <- fit
     } else {
@@ -611,7 +619,7 @@ check_model <- function(dds) {
     } else {
       df$.x <- rnorm(ncol(dds))
     }
-    fml <- as.formula(paste0(".x ~ ", as.character(DESeq2::design(dds)[2])))
+    fml <- update(mdl$design, .x ~ .)
     fit <- lm(fml, data=df)
     mdl$lm <- fit
     if ("drop_unsupported_combinations" %in% names(mdl) && mdl$drop_unsupported_combinations==TRUE) {
