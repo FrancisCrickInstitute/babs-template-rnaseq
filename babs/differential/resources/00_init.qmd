@@ -75,6 +75,11 @@ if (file.exists(preprocessed)) {
     }
     if (length(which(is_ok))>1) warning(preprocessed, " contains many SummarizedExperiment objects, only using ", objnames[is_ok][1])
     dds <- get(objNames[is_ok][1])
+    assay(dds)[is.nan(assay(dds))] <- NA
+    if (any(is.na(assay(dds)))) dds$'.percentNA' <- 100 *apply(is.na(assay(dds)), 2, mean)
+  }
+  if (!"symbol" %in% names(mcols(dds))) {
+    mcols(dds)$symbol <- mcols(dds)[[align_params$symbolColumn %||% 1]]
   }
   save(dds, file=file.path("data",paste0("counts_", params$alignment, ".rda")))
   saveRDS(dds, file=file.path("data",paste0("counts_", params$alignment, ".rds")))
@@ -97,6 +102,11 @@ if (file.exists(preprocessed)) {
     dds <- obj
   } else {
     stop("rds object is neither DESeqDataSet nor SummarizedExperiment")
+  }
+  assay(dds)[is.nan(assay(dds))] <- NA
+  if (any(is.na(assay(dds)))) dds$'.percentNA' <- 100 *apply(is.na(assay(dds)), 2, mean)
+  if (!"symbol" %in% names(mcols(dds))) {
+    mcols(dds)$symbol <- mcols(dds)[[align_params$symbolColumn %||% 1]]
   }
   save(dds, file=file.path("data",paste0("counts_", params$alignment, ".rda")))
   saveRDS(dds, file=file.path("data",paste0("counts_", params$alignment, ".rds")))
@@ -190,7 +200,6 @@ if (file.exists(csv)) {
   dds <- SummarizedExperiment(assays=SimpleList(raw=mat),
                              colData=sample_sheet[as.character(sample_sheet[[file_col]]) %in% colnames(mat),]
                              )
-
   assay(dds)[is.nan(assay(dds))] <- NA
   if (any(is.na(assay(dds)))) dds$'.percentNA' <- 100 *apply(is.na(assay(dds)), 2, mean)
   mcols(dds) <- df[setdiff(names(df), colnames(mat))]
