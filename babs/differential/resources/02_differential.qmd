@@ -688,8 +688,8 @@ for (dataset_id in names(dds_model_comp)) {
           facet_wrap(~ babs.name) +
           theme_bw() +
           geom_point(aes(y= babs.value)) +
-          my_alpha_scale(pl) +
           labs(y=noun_to_readout(RowNoun))
+        pl <- pl + my_alpha_scale(pl)
         if ("group" %in% names(plot_fml[[2]])) {
           pl <- pl+geom_line(aes(y=babs.value), stat="summary", fun=mean)
         }

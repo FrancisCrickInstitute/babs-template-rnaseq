@@ -556,13 +556,13 @@ for (dataset_id in names(ddsList)) {
           facet_wrap(~ babs.name) +
           theme_bw() +
           geom_point(aes(y= babs.value)) +
-          my_alpha_scale(pl) +
           labs(y=noun_to_readout(RowNoun))
         if ("group" %in% names(plot_fml[[2]])) {
           pl <- pl+geom_line(aes(y=babs.value),
                             stat="summary",
                             fun=mean)
         }
+        pl <- pl + my_alpha_scale(pl)
         if ("ScaleDiscrete" %in% class(layer_scales(pl)$x)) {
           pl <- pl + scale_x_discrete(guide=guide_axis(n.dodge=2))
         }
