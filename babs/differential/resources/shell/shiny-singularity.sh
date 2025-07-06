@@ -30,7 +30,7 @@ END
 fi
 
 if [ -z "$@" ]; then 
-    eval ${caller} "R  -e \"shiny::runApp(host='0.0.0.0',port=${PORT})\""
+    my_caller R -e "shiny::runApp(host='0.0.0.0',port=${PORT})"
 else
-    eval ${caller} "R  -e \"shiny::runApp(appDir='$1', host='0.0.0.0',port=${PORT})\""
+    my_caller R -e "shiny::runApp(appDir='$1', host='0.0.0.0',port=${PORT})"
 fi

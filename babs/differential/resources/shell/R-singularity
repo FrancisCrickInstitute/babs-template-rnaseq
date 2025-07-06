@@ -12,7 +12,7 @@ if [ -z "${SLURM_JOB_ID}" ]; then
     NUM_THREADS=2
 else
     basename=$(basename $(scontrol show job $SLURM_JOB_ID | awk -F= '/Command=/{print $2}'))
-    NUM_THREADS=${SLURM_JOB_CPUS_PER_NODE}
+    NUM_THREADS=${SLURM_JOB_CPUS_PER_NODE:-2}
     hname=babs002
 fi
 cmd=${BABS_CMD:-${basename%-*}}
@@ -31,7 +31,10 @@ fi
 
 PASSWORD=$(openssl rand -base64 15)
 
-export caller="${CONTAINER} ${CONTAINER_OPTIONS} ${image}"
+my_caller () {
+    module is-loaded Singularity/3.11.3 || module load Singularity/3.11.3 || true
+    singularity ${method:-exec} --bind ${wd},/tmp,${SINGULARITYENV_RENV_PATHS_ROOT:-${HOME}/.cache/R/renv} --pwd $(realpath .) --containall --cleanenv --env SQLITE_TMPDIR=/tmp,BIOCPARALLEL_WORKER_NUMBER=${NUM_THREADS:-2},GITHUB_PAT=${GITHUB_PAT},OMP_NUM_THREADS=${NUM_THREADS:-2},OPENBLAS_NUM_THREADS=${NUM_THREADS:-2} ${image} "$@"
+}
 
 seed=0
 while :; do
@@ -41,7 +44,7 @@ while :; do
 done
 
 rstudio_binds="./run:/run,./database.conf:/etc/rstudio/database.conf,\
-./rsession.sh:/etc/rstudio/rsession.sh,./var/lib/rstudio-server:/var/lib/rstudio-server,\
+./var/lib/rstudio-server:/var/lib/rstudio-server,\
 ./rsession.conf:/etc/rstudio/rsession.conf,./R:$HOME/.config/R,./rstudio:$HOME/.config/rstudio,\
 /etc/ssl/certs/ca-bundle.crt,$HOME/.ssh,/sys/fs/cgroup"
 
@@ -59,8 +62,8 @@ elif [ "$cmd" == jupyter ]; then
     cd .babs-launchers
     source jupyter.sh
 elif [ "$cmd" == shell ]; then
-    eval "${caller/exec/shell}"
+    method=shell my_caller
 else
-    eval "${caller} ${cmd} $@"
+    my_caller $cmd $@
 fi
 

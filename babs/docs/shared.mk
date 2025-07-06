@@ -202,12 +202,12 @@ excluded-targets += Dockerfile install_all.sh
 CONTAIN=false#An internal flag
 BIND_DIR = $$(git rev-parse --show-toplevel 2>/dev/null || echo $$(realpath .))
 EXECUTOR?=singularity
-
+renv_root=$(or $(SINGULARITYENV_RENV_PATHS_ROOT),~/.cache/R/renv)
 ifeq ($(EXECUTOR),singularity)
 #Sometimes we want to do e.g. env SINGULARITYENV_APPEND_PATH=/stuff - that's what CONTAINER_VARS is for
 CONTAINER= $(call ml,Singularity/$(SINGULARITY_VERSION)); $(CONTAINER_VARS) singularity
 CONTAINER_IMAGE=$(or $(SINGULARITY_ROOT),.)/$(IMAGE)_$(IMAGE_TAG).sif
-CONTAINER_BIND=--bind $(BIND_DIR),/tmp$(and $(SINGULARITYENV_RENV_PATHS_ROOT),$(comma)$(SINGULARITYENV_RENV_PATHS_ROOT))
+CONTAINER_BIND=--bind $(BIND_DIR),/tmp,$(renv_root)
 CONTAINER_ENV=--env SQLITE_TMPDIR=/tmp,BIOCPARALLEL_WORKER_NUMBER=$(NUM_THREADS),GITHUB_PAT=$${GITHUB_PAT},OMP_NUM_THREADS=${NUM_THREADS},OPENBLAS_NUM_THREADS=${NUM_THREADS}
 CONTAINER_OPTIONS= exec $(CONTAINER_BIND) --pwd $$(realpath .) --containall --cleanenv $(CONTAINER_ENV)
 $(CONTAINER_IMAGE): 
@@ -223,7 +223,7 @@ CONTAINER_IMAGE=$(IMAGE)$(colon)$(IMAGE_TAG)
 CONTAINER_OPTIONS=run \
 --mount type=bind,source="$(BIND_DIR)",target="$(BIND_DIR)" \
 --mount type=bind,source="/tmp",target="/tmp" \
-$(if $(SINGULARITYENV_RENV_PATHS_ROOT),--mount type=bind,source="$(SINGULARITYENV_RENV_PATHS_ROOT)",target="$(SINGULARITYENV_RENV_PATHS_ROOT)" --env RENV_PATHS_ROOT=$(SINGULARITYENV_RENV_PATHS_ROOT))\
+--mount type=bind,source="$(renv_root)",target="$(renv_root)" --env RENV_PATHS_ROOT=$(renv_root)\
 --env SQLITE_TMPDIR=/tmp \
 --env BIOCPARALLEL_WORKER_NUMBER=$(NUM_THREADS) \
 --env GITHUB_PAT=$${GITHUB_PAT} \

@@ -32,7 +32,7 @@ curl -s -H "Title: Jupyter server ready" -H "Tag:information_source"  https://nt
  -d "Access server on port ${PORT} - see jupyter-server.log for details. To cancel any slurm job, scancel -f ${SLURM_JOB_ID}"  >/dev/null 2>&1
 fi
 
-eval ${caller} uv run --no-cache  --with jupyter jupyter lab \
+my_caller uv run --no-cache  --with jupyter jupyter lab \
      --ip 0.0.0.0 \
      --no-browser \
      --port ${PORT} \

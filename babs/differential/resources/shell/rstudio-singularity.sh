@@ -9,11 +9,6 @@ provider=sqlite
 directory=/var/lib/rstudio-server
 END
 
-cat > rsession.sh <<END
-#!/bin/sh
-export OMP_NUM_THREADS=${NUM_THREADS}
-exec /usr/lib/rstudio-server/bin/rsession "\${@}"
-END
 
 cat > rsession.conf <<END
 session-default-working-dir=$(realpath ..)
@@ -24,12 +19,6 @@ cat > rstudio/rstudio-prefs.json <<EOF
     "knit_working_dir": "current"
 }
 EOF
-
-chmod +x ./rsession.sh
-
-# Do not suspend idle sessions.
-# Alternative to setting session-timeout-minutes=0 in /etc/rstudio/rsession.conf
-# https://github.com/rstudio/rstudio/blob/v1.4.1106/src/cpp/server/ServerSessionManager.cpp#L126
 
 
 ## Produce the informative message
@@ -69,10 +58,10 @@ curl -s -H "Title: RStudio server ready" -H "Tag:information_source"  https://nt
  -d "Access server on port ${PORT} - see log file for details. To cancel any slurm job, scancel -f ${SLURM_JOB_ID}"  >/dev/null 2>&1
 fi
 
-eval ${caller} /usr/lib/rstudio-server/bin/rserver --www-port ${PORT} \
+
+my_caller bash -c 'env > ~/.Renviron ; exec /usr/lib/rstudio-server/bin/rserver --www-port '$PORT' \
     --auth-none=1 \
     --auth-pam-helper-path=pam-helper \
-    --server-user $(whoami) \
+    --server-user '$(whoami)' \
     --auth-stay-signed-in-days=30 \
-    --auth-timeout-minutes=0 \
-    --rsession-path=/etc/rstudio/rsession.sh  
+    --auth-timeout-minutes=0'
