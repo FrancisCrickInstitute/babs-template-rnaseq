@@ -624,6 +624,7 @@ for (dataset_id in names(dds_model_comp)) {
   dmc_heading(dds_model_comp, dataset=dataset_id, model=NULL, depth="##")
   for (model_id in names(dds_model_comp[[dataset_id]])) {
     dmc_heading(dds_model_comp, dataset=dataset_id, model=model_id, depth="###")
+    this_mdl <- dds_model_comp[[dataset_id]][[model_id]]    
     if (!is.null(metadata(this_mdl[[1]])$model$external_list)) {
       external_list <- read.csv(file.path(base_dir, metadata(this_mdl[[1]])$model$external_list))
       external_list$Cluster[is.na(external_list$Cluster)] <- external_list$ID[is.na(external_list$Cluster)]
@@ -631,13 +632,13 @@ for (dataset_id in names(dds_model_comp)) {
       external_list <- NULL
     }
     
-    for (comp_id in c(names(dds_model_comp[[dataset_id]][[model_id]]), unique(external_list$Comparison))) {
-      is_external <- !(comp_id %in% names(dds_model_comp[[dataset_id]][[model_id]]))
+    for (comp_id in c(names(this_mdl), unique(external_list$Comparison))) {
+      is_external <- !(comp_id %in% names(this_mdl))
       if (is_external) {
-        this_dds <- dds_model_comp[[dataset_id]][[model_id]][[1]]
+        this_dds <- this_mdl[[1]]
         is_diff <- row.names(this_dds) %in% external_list$ID[external_list$Comparison==comp_id]
       } else {
-        this_dds <- dds_model_comp[[dataset_id]][[model_id]][[comp_id]]
+        this_dds <- this_mdl[[comp_id]]
         is_diff <- grepl("^.*\\*", mcols(this_dds)$results$class)
       }
       plot_formulae <- section_chooser(metadata(this_dds)$model, "differential_profile_plots", "profile_plots")

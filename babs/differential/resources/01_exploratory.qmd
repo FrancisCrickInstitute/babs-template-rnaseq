@@ -557,12 +557,12 @@ for (dataset_id in names(ddsList)) {
           theme_bw() +
           geom_point(aes(y= babs.value)) +
           labs(y=noun_to_readout(RowNoun))
+        pl <- pl + my_alpha_scale(pl)
         if ("group" %in% names(plot_fml[[2]])) {
           pl <- pl+geom_line(aes(y=babs.value),
                             stat="summary",
                             fun=mean)
         }
-        pl <- pl + my_alpha_scale(pl)
         if ("ScaleDiscrete" %in% class(layer_scales(pl)$x)) {
           pl <- pl + scale_x_discrete(guide=guide_axis(n.dodge=2))
         }

@@ -41,6 +41,7 @@ load_specs <- function(file="", context) {
     assign("specification", list_ok, envir=e)
     assign("comparison",
            function(x, name=NULL, description=NULL,...) {
+             # Allow for potentially missing mult_comp wrapper around e.g. revpairwise ~ treatment
              if (is_formula(x) && length(x)==3) {
                  out <- list(spec=x,...)
                  class(out) <- "post_hoc"
@@ -516,10 +517,10 @@ fit_model <- function(mdl, dds, ...) {
 
 fit_comparison <- function(comp, model_dds, mdl, ...) {
   if (is_formula(comp)) { # Do the usual DESeq2 LRT
-    return(list(fitLRT(model_dds, mdl=mdl, reduced=comp, ...)))
+    return(fitLRT(model_dds, mdl=mdl, reduced=comp, ...))
   } else if (class(comp)=="post_hoc") { #Multiple-comparisons
     strip <- c("spec","name","description")
-    contrs <- emcontrasts(dds=model_dds, spec=comp$spec, extra=comp[setdiff(names(comp), strip)])
+    contrs <- emcontrasts(dds=model_dds, comp=comp)
     if (length(contrs)==0) return(list())
     if (comp$LRT %||% FALSE) { # Do LRT-equivalents of the multiple ward tests
       mdl_mat <- metadata(model_dds)$model$mat %||% model.matrix(mdl$design, as.data.frame(colData(model_dds)))
@@ -543,7 +544,7 @@ fit_comparison <- function(comp, model_dds, mdl, ...) {
       }
       fit <- limma::lmFit(assay(model_dds), mm)
       nb <- apply(!is.na(assay(model_dds)), 1, function(x) estimability::nonest.basis(fit$design[x,]))
-      isEst <- sapply(contrs, function(x) {sapply(nb,  function(y) estimability::is.estble(x, y))})
+      isEst <- apply(do.call(cbind,contrs),2, function(x) {sapply(nb,  function(y) estimability::is.estble(x, y))})
       fit <- limma::contrasts.fit(fit, do.call(cbind, contrs))
       fit$coefficients[!isEst] <- NA
       fit <- limma::eBayes(fit)
@@ -578,13 +579,13 @@ fit_comparison <- function(comp, model_dds, mdl, ...) {
 }
 
 
+annihilator <- function(x) diag(nrow = nrow(x)) - x %*% solve(t(x) %*% x) %*% t(x)
 reduced_design.fit <- function(fit, reduced_design){
   full_design <- fit$design
   mapping <- lm(reduced_design ~ full_design - 1)
   if(sum(abs(residuals(mapping))) > 1e-8){
     stop("Apparently the reduced design is not nested in the full design")
   }
-  annihilator <- function(x) diag(nrow = nrow(x)) - x %*% solve(t(x) %*% x) %*% t(x)
   cntrst <- annihilator(coef(mapping))
   colnames(cntrst) <- colnames(full_design)
   rownames(cntrst) <- colnames(full_design)
@@ -665,8 +666,8 @@ check_model <- function(dds) {
 ##' @return 
 ##' @author Gavin Kelly
 ##' @export
-mult_comp <- function(spec, name=NULL, description=NULL, ...) {
-  obj <- list(spec=spec,...)
+mult_comp <- function(spec, name=NULL, description=NULL, omnibus=FALSE, keep=TRUE, trend=FALSE, ...) {
+  obj <- list(spec=spec, omni=omnibus, keep=keep, trend=trend, ...)
   class(obj) <- "post_hoc"
   attributes(obj) <- c(attributes(obj), list(name=name, description=description))
   obj
@@ -681,47 +682,45 @@ mult_comp <- function(spec, name=NULL, description=NULL, ...) {
 ##' @return 
 ##' @author Gavin Kelly
 ##' @export
-emcontrasts <- function(dds, spec, extra=NULL, prefix="my") {
-  if ("keep" %in% names(extra)) {
-    keep <- extra$keep
-    extra$keep <- NULL
-  } else {
-    keep <- NA
-  }
-  if ("LRT" %in% names(extra)) {
-    LRT <- extra$keep
-    extra$LRT <- NULL
-  } else {
-    LRT <- FALSE
-  }
-  
+emcontrasts <- function(dds, comp, prefix="my") {
+  em_extra <- comp[setdiff(names(comp), c("spec", "keep", "LRT", "omni", "trend"))]
   mdl <- metadata(dds)$model
-  if ("var" %in% names(extra)) {
+  if (comp$trend) {
     em_fn <- emmeans::emtrends
   } else {
     em_fn <- emmeans::emmeans
   }
-  emfit <- do.call(em_fn, c(list(object=mdl$lm, specs= spec),extra))
-  contr_frame <- as.data.frame(summary(emfit$contrasts))
+  emc <- do.call(em_fn, c(list(object=mdl$lm, specs= comp$spec), em_extra))$contrasts
+  contr_frame <- as.data.frame(summary(emc))
   ind_est <- !is.na(contr_frame$estimate)
-  new_emmc <- sub("\\.emmc$", "", ls("package:emmeans", pattern="*.emmc"))
-  embaseline <- do.call(em_fn, c(list(object=mdl$lm, specs= replace_emmc(spec, new_emmc)),extra))
   contr_frame <- contr_frame[ind_est,1:(which(names(contr_frame)=="estimate")-1), drop=FALSE]
   contr_frame[] <- lapply(contr_frame, function(x) sub("|", "†", x, fixed=TRUE))
-  contr_mat <- emfit$contrast@linfct[ind_est, !mdl$dropped, drop=FALSE]
-  baseline_mat <- embaseline$contrast@linfct[ind_est, !mdl$dropped, drop=FALSE]
+  contr_mat <- emc@linfct[ind_est, !mdl$dropped, drop=FALSE]
   if (inherits(dds, "DESeqDataSet")) {
     colnames(contr_mat) <- .resNames(colnames(contr_mat))
   }
-  contr <- lapply(seq_len(nrow(contr_frame)), function(i) contr_mat[i,,drop=TRUE])
-  contr <- lapply(seq(along.with=contr), function(i) {
-    attr(contr[[i]], "spec") <- spec
-    attr(contr[[i]], "baseline_contrast") <- baseline_mat[i,,drop=TRUE]
-    contr[[i]]})
-  names(contr) <- do.call(paste, c(contr_frame,sep= "|"))
-  if (!is.na(keep[1])) {
-    contr  <- contr[keep]
+  new_emmc <- sub("\\.emmc$", "", ls("package:emmeans", pattern="*.emmc"))
+  embaseline <- do.call(em_fn, c(list(object=mdl$lm, specs= replace_emmc(comp$spec, new_emmc)), em_extra))
+  baseline_mat <- embaseline$contrast@linfct[ind_est, !mdl$dropped, drop=FALSE]
+  if (comp$omni) {
+    split_idx <- split(which(ind_est), interaction(emc@grid[ind_est, emc@misc$by.vars], drop = TRUE))
+  } else {
+    split_idx <- setNames(
+      seq_len(nrow(contr_frame)),
+      do.call(paste, c(contr_frame,sep= "|"))
+    )
   }
+  contr <- lapply(split_idx, function(i) t(contr_mat[i,,drop=FALSE]))
+  contr <- mapply( function(cont, base) {
+    attr(cont, "spec") <- comp$spec
+    if (!comp$omni) {
+      attr(cont, "baseline_contrast") <- base
+    }
+    cont},
+    contr,
+    lapply(split_idx, function(i) t(baseline_mat[i,,drop=FALSE])),
+    SIMPLIFY=FALSE)
+  contr  <- contr[comp$keep]
   contr
 }
 
@@ -770,6 +769,28 @@ fitLRT <- function(dds, mdl, reduced, ...) {
   } else {
     full <- mdl$design
   }
+  if (is_formula(reduced) && grepl("\\|", as.character(reduced)[[2]])) {
+    emc <- emmeans(metadata(dds)$model$lm,
+                  update.formula(reduced, trt.vs.ctrl ~ .))$contrasts
+    split_idx <- split(seq_len(nrow(emc@grid)), interaction(emc@grid[emc@misc$by.vars], drop = TRUE))
+    linfct_by_stratum <- lapply(split_idx, function(idx) t(emc@linfct[idx, , drop = FALSE]))
+    # TODO: Need to generate n=|stratum| separate reduced model matrices
+    if (inherits(dds, "DESeqDataSet")) {
+      stop("DEseq2 stratified ANOVA not implemented yet")
+    } else {
+      mm <- model.matrix(design(dds), colData(dds))
+      fit <- limma::lmFit(assay(dds), mm)
+      return(
+        lapply(
+          linfct_by_stratum,
+          function(cntrst) {
+            out <- dds
+            metadata(out)$limma <- limma::eBayes(limma::contrasts.fit(fit, contrast = cntrst))
+            out
+          })
+      )
+    } 
+  }
   if (inherits(dds, "DESeqDataSet")) {
     DESeq2::design(dds) <- full
     dds <- DESeq2::DESeq(dds, test="LRT", full=full, reduced=reduced, ...)
@@ -791,11 +812,10 @@ fitLRT <- function(dds, mdl, reduced, ...) {
     fit <- reduced_design.fit(fit, reduced)
     fit <- limma::eBayes(fit)
     metadata(dds)$limma <- fit
-    metadata(dds)$limma <- fit
   }
   metadata(dds)$models <- NULL
   metadata(dds)$comparisons <- NULL
-  dds
+  list(dds)
 }
 
 
@@ -869,15 +889,19 @@ get_result <- function(dds, mcols=c("symbol", "entrez"), filterFun=IHW::ihw, lfc
       } else {
         if ("limma" %in% names(metadata(dds))) {
           lim <- metadata(dds)$limma
-          this_contr <- which(apply(metadata(dds)$limma$contrasts, 2, function(x) all(x==comp)))
+          this_contr <- apply(comp, 2, function(x) which(apply(metadata(dds)$limma$contrasts, 2, function(y) all(x==y))))
           r <- limma::topTable(lim, coef=this_contr,
                               genelist=row.names(lim$genes),
                               number=Inf, sort.by="none")
+          if (!"logFC" %in% names(r)) {
+            is_coef <- grepl("^Coef[0-9]+$", names(r))
+            r$logFC <- apply(abs(as.matrix(r[,is_coef])), 1, max, na.rm=TRUE)
+          }
           r <- with(r, DataFrame(baseMean=2^AveExpr,
                                 log2FoldChange=logFC,
                                 pvalue=P.Value,
                                 padj=adj.P.Val,
-                                lfcSE=lim$stdev.unscaled[,this_contr] * lim$sigma,
+                                lfcSE=apply(lim$stdev.unscaled[,this_contr,drop=FALSE], 1, mean) * lim$sigma,
                                 row.names=row.names(dds)))
           metadata(r)$alpha <- alpha1
         } else {
