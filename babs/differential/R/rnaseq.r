@@ -302,6 +302,9 @@ build_dds_list <- function(dds, spec) {
           }
         }
       }
+      if ("differential_subset" %in% names(mdlList[[i]])) {
+        mdlList[[i]]$differential_subset <- mdlList[[i]]$differential_subset[dataset_spec$subset]
+      }
     }
     metadata(obj)$models <- mdlList
     if ("sample_swap" %in% names(dataset_spec)) {
@@ -482,6 +485,10 @@ fit_model <- function(mdl, dds, ...) {
   model_dds <- dds
   design(model_dds) <- mdl$design
   metadata(model_dds)$model <- mdl
+  if ("differential_subset" %in% names(metadata(model_dds)$model)) {
+    model_dds <- model_dds[, metadata(model_dds)$model$differential_subset]
+    colData(model_dds) <- droplevels(colData(model_dds))
+  } 
   model_dds <- check_model(model_dds)
   if (any(metadata(model_dds)$model$dropped)) {
     design(model_dds) <- metadata(model_dds)$model$mat
@@ -1152,7 +1159,7 @@ default_spec_settings <- function() {
 }
 
 
-add_org_annotation <- function(dds, org, keytype="ENSEMBL", extra_mcols=list(entrez="ENTREZID", symbol="SYMBOL")) {
+add_org_annotation <- function(dds, org, keytype="ENSEMBL", extra_mcols=list(entrez="ENTREZID", symbol="SYMBOL", ensembl="ENSEMBL")) {
   metadata(dds)$organism <- list(org=org)
   metadata(dds)$count_source <- params$count_source
   if (is.null(org) || system.file(package=org)=="") {

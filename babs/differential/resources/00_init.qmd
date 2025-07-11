@@ -50,6 +50,7 @@ if (!isTRUE(getOption('knitr.in.progress'))) {
 }
 
 align_params <- get_align_params(params$alignment)
+align_params$keytype <- align_params$keytype %||% "ENSEMBL"
 
 organism <- list(org=align_params$org.db)
 ```
@@ -67,7 +68,7 @@ if (file.exists(preprocessed)) {
   if (any(is_ok)) {
     if (length(which(is_ok))>1) warning(preprocessed, " contains many DESeqDataSet objects, only using ", objnames[is_ok][1])
     dds <- get(objNames[is_ok][1])
-    dds <- add_org_annotation(dds, organism$org)
+    dds <- add_org_annotation(dds, organism$org, keytype=align_params$keytype)
   } else {
     is_ok <- sapply(objNames, function(x) is(get(x),"SummarizedExperiment"))
     if (!any(is_ok)) {
@@ -97,7 +98,7 @@ if (file.exists(preprocessed)) {
   print(gt(list2df(c('Data-source Type'="Binary RDS", File=preprocessed, align_params))))
   obj <- readRDS(preprocessed)
   if (is(obj, "DESeqDataSet")) {
-    dds <- add_org_annotation(obj, organism$org)
+    dds <- add_org_annotation(obj, organism$org, keytype=align_params$keytype)
   } else if (is(obj("SummarizedExperiment"))) {
     dds <- obj
   } else {
@@ -165,7 +166,7 @@ if (all(is.na(sample_sheet[[file_col]]))) {
     design=~1,
     )
   colnames(dds) <- as.character(dds[[name_col]])
-  dds <- add_org_annotation(dds, organism$org)
+  dds <- add_org_annotation(dds, organism$org, keytype=align_params$keytype)
   save(dds, file=file.path("data",paste0("counts_", params$alignment, ".rda")))
   saveRDS(dds, file=file.path("data",paste0("counts_", params$alignment, ".rds")))
   knitr::knit_exit()
@@ -204,6 +205,7 @@ if (file.exists(csv)) {
   if (any(is.na(assay(dds)))) dds$'.percentNA' <- 100 *apply(is.na(assay(dds)), 2, mean)
   mcols(dds) <- df[setdiff(names(df), colnames(mat))]
   mcols(dds)$symbol <- mcols(dds)[[align_params$symbolColumn %||% 1]]
+  dds <- add_org_annotation(dds, organism$org, keytype=align_params$keytype)
   colnames(dds) <- as.character(dds[[name_col]])
   row.names(dds) <- rowData(dds)[[1]]
   save(dds, file=file.path("data",paste0("counts_", params$alignment, ".rda")))
@@ -266,7 +268,7 @@ ind <- rowSums(counts(dds)!=0) > 0
 dds <- dds[ind,]
 txi[c("abundance", "counts", "length")] <- map(txi[c("abundance", "counts", "length")], ~ .[ind,])
 
-dds <- add_org_annotation(dds, organism$org)
+dds <- add_org_annotation(dds, organism$org, keytype=align_params$keytype)
 
 trim_names <- function(names) {
   chars <- strsplit(names, "")

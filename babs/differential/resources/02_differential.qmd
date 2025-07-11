@@ -528,13 +528,16 @@ for (dataset in names(dds_model_comp)) {
       var_roles <- list(all.vars(fml))
       if (!is_external && "baseline_contrast" %in% names(attributes(metadata(this_comp)$comparison))) {
         var_roles <- c(emmeans:::.parse.by.formula(attr(comp, "spec"))[c("by", "rhs")], var_roles)
-        weights <- as.vector(attr(metadata(this_comp)$comparison, "baseline_contrast") %*% MASS::ginv(mmat))
+        weights <- t(as.vector(attr(metadata(this_comp)$comparison, "baseline_contrast")) %*% MASS::ginv(mmat))
         baseline_str <- paste("baseline", noun_to_readout(rowNoun))
       } else {
         weights <- rep(1/nrow(mmat), times=nrow(mmat))
         baseline_str <- paste("average", noun_to_readout(rowNoun))
       }
-      tidied_data <- tidy_significant_dds(this_comp, ind, unique(unlist(var_roles)), weights=weights)
+      zweights <- setNames(rep(0, ncol(ddsList[[dataset]])), colnames(ddsList[[dataset]]))
+      zweights[colnames(this_comp)] <- weights
+#      tidied_data <- tidy_significant_dds(this_comp, ind, unique(unlist(var_roles)), weights=weights)
+      tidied_data <- tidy_significant_dds(ddsList[[dataset]], ind, unique(unlist(var_roles)), weights=zweights)
       pdat <- tidied_data$pdat
       pdat[sapply(pdat, is.character)] <- lapply(pdat[sapply(pdat, is.character)], 
                                                 as.factor)
@@ -568,6 +571,7 @@ for (dataset in names(dds_model_comp)) {
               max_height=15, min_height=5)
       cat('\n\n---\n\n')
       if (do_residual_transform <- FALSE) {#length(all.vars(fml))>1) {
+        # TODO: Check this works with the zweights above. tidied_data$mat is now possibly larger than this_comp
         part_resid <- partialise(tidied_data$mat, pdat, fml)
         term_names <- intersect(dimnames(part_resid$terms)[[3]], var_roles$rhs %||% unique(unlist(var_roles)))
         for (term_name in term_names) {
@@ -645,16 +649,16 @@ for (dataset_id in names(dds_model_comp)) {
       if (is_null(plot_formulae) || !any(is_diff)) next
       exists_profile_plot <- TRUE
       partials <- partialise.matrix(
-        assay(this_dds[is_diff,,drop=FALSE], ifelse(inherits(this_dds, "DESeqDataSeq"),"vst", 1)),
-        as.data.frame(colData(this_dds)),
+        assay(ddsList[[dataset_id]][is_diff,,drop=FALSE], ifelse(inherits(this_dds, "DESeqDataSeq"),"vst", 1)),
+        as.data.frame(colData(ddsList[[dataset_id]])),
         fml=metadata(this_dds)$model$design)
       for (plot_fml in plot_formulae) {
-        cdata_df <- as.data.frame(colData(this_dds)[, all.vars(plot_fml), drop=FALSE])
+        cdata_df <- as.data.frame(colData(ddsList[[dataset_id]])[, all.vars(plot_fml), drop=FALSE])
         mat <- t(scale(t(
           assemble_partialised(partials, update(plot_fml, NULL ~ .), resids=TRUE)
         )))
         removed <- paste(
-          translate_terms(dropped_terms(partials, update(plot_fml, NULL ~ .)),this_dds),
+          translate_terms(dropped_terms(partials, update(plot_fml, NULL ~ .)),ddsList[[dataset_id]]),
           sep=", ", collapse=", ")
         if (length(removed)==0 || removed=="") {
           removed <- ""
