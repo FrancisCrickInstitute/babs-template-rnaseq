@@ -177,8 +177,6 @@ build_dds_list <- function(dds, spec) {
   }
   # Share any top-level models down to each sample-set
   spec <- trickle_down(field="models", to="sample_sets", merge_fn=c)
-  # Fill in any missing qc_formulae with values from closest parent if necessary
-  spec <- trickle_down(field="qc_formulae", to="models")
   spec <- trickle_down(field="profile_plots", to="models")
   # Conjunct or cascade any top-level subsetting - if missing, use all samples
   spec <- trickle_down(field="subset", to="sample_sets", default=TRUE, merge_fn=`&`)
@@ -273,25 +271,7 @@ build_dds_list <- function(dds, spec) {
       mcols(colData(obj))$description <- varDescriptions
     }
 
-    # If no models have qc_formulae, set the first model to have a sensible default based on design
-    if (!any(sapply(mdlList, function(x) "qc_formulae" %in% names(x)))) {
-      mdlList[[1]]$qc_formulae <- as.formula(
-        paste0(
-          paste(all.vars(mdlList[[1]]$design), collapse=" + "),
-          "~",
-          0))
-      
-    }
     for (i in seq_along(mdlList)) {
-      if (!"qc_formulae" %in% names(mdlList[[i]])) {
-        # default to the set of models removing any terms that will preserve marginality
-        mdlList[[i]]$qc_formulae <- find_simpler_models(mdlList[[i]]$design, do_aes=FALSE, type="simplest")
-      } else {
-        if (is_formula(mdlList[[i]]$qc_formulae)) {
-          # We used to allow a singleton formula - wrap these in a list.
-          mdlList[[i]]$qc_formulae <- list(I(mdlList[[i]]$qc_formulae))
-        }
-      }
       if (is_null(section_chooser(mdlList[[i]], "profile_plots", "exploratory_profile_plots", "differential_profile_plots"))) {      
         # default to the set of models removing any terms that will preserve marginality
         mdlList[[i]]$profile_plots <- find_simpler_models(mdlList[[i]]$design, do_aes=TRUE, type="auto")
