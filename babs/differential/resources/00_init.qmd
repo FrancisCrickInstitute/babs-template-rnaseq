@@ -99,7 +99,7 @@ if (file.exists(preprocessed)) {
   obj <- readRDS(preprocessed)
   if (is(obj, "DESeqDataSet")) {
     dds <- add_org_annotation(obj, organism$org, keytype=align_params$keytype)
-  } else if (is(obj("SummarizedExperiment"))) {
+  } else if (is(obj,"SummarizedExperiment")) {
     dds <- obj
   } else {
     stop("rds object is neither DESeqDataSet nor SummarizedExperiment")

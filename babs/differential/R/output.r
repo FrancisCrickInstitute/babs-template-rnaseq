@@ -155,7 +155,7 @@ write_results <- function(ddsList, param, params, assays=NULL) {
           comparison_name_lookup[[alpha_key]] <- sn
           sn <- alpha_key
         }
-        addWorksheet(wb, sn, tabColour=crick_colours$secondary[[design_ind]])
+        addWorksheet(wb, sn, tabColour=crick_colours$secondary[[(design_ind - 1) %% length(crick_colours$secondary) + 1]])
         writeData(wb, sn, dframe, headerStyle=hs1, withFilter=TRUE)
         groupRows(wb, sn, rows=which(!grepl("\\*$", dframe$class))+1, hidden=TRUE)
         filtCol <- match("class", names(dframe))

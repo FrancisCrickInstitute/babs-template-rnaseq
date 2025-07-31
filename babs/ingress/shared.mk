@@ -14,7 +14,7 @@ metadata_id_column = ID
 name_col = sample_name
 samples_db = samples.db
 
-NEXTFLOW = $(call ml,Nextflow/$(NEXTFLOW_VERSION)); $(call ml,Singularity/$(SINGULARITY_VERSION)); $(call ml,CAMP_proxy); nextflow
+NEXTFLOW = $(call ml,Nextflow/$(NEXTFLOW_VERSION)); $(call ml,Singularity/$(SINGULARITY_VERSION)); nextflow
 SQLITE = $(call ml,SQLite/3.42.0-GCCcore-12.3.0); sqlite3
 
 
@@ -64,8 +64,8 @@ OUR_VERSION=v0.8.0
 ################################################################
 
 IMAGE_NAME=bioconductor_docker
-IMAGE_REG=$(if $(OUR_VERSION),ghcr,docker).io/
-IMAGE_REPO=$(if $(OUR_VERSION),franciscrickinstitute/babs-template-rnaseq,bioconductor)
+IMAGE_REG=$(if $(OUR_VERSION),docker,docker).io/
+IMAGE_REPO=$(if $(OUR_VERSION),gavinpaulkelly,bioconductor)
 IMAGE_TAG=$(BIOCONDUCTOR_VERSION)-R-$(RVERSION)$(and $(OUR_VERSION),-$(OUR_VERSION))
 IMAGE=$(IMAGE_REPO)/$(IMAGE_NAME)
 export SINGULARITYENV_RENV_PATHS_PREFIX=$(subst /,-,$(IMAGE))
@@ -76,8 +76,7 @@ GIT=git
 
 ## Module loader
 ml = module is-loaded $1 || module load $1 || true # ie fall back to true (ie rely on system version if can't load a module)
-make_rwx = setfacl -m u::rwx
-makeg_rwx = setfacl -m g::rwx
+chmod = setfacl -m $2:$3 $1 >/dev/null 2>&1 || chmod $2=$3 $1
 
 # Environment Variables
 NUM_THREADS=$${NUM_THREADS:-2}
@@ -153,6 +152,20 @@ endif
 	mkdir -p $@
 	ln -sfn $(VERSION) $(pubdir)/latest
 
+.PHONY: prepare-rsync
+prepare-rsync:
+# 'updateInstead' allows us to push back here
+	@git config --local receive.denyCurrentBranch updateInstead
+	@echo "Type the following commands on a local terminal (ie NOT a NEMO node)"
+	@echo "git clone $(USER)@$(shell hostname -f):$(CURDIR)"
+	@if [ ! -f ".data-transfer-rules" ]; then \
+	  echo "# No extra files to be transferred - you can set up file .data-transfer-rules with contents e.g.";\
+	  echo "+ extdata/" ;\
+	  echo "+ extdata/**" ;\
+	  echo "- *" ;\
+	  echo "# to selectively transfer extra files with the command (won't work right now!):" ;\
+	fi
+	@echo "ssh $(USER)@$(shell hostname -f) 'cat $(CURDIR)/.data-transfer-rules' | rsync -av --filter=\"merge -\" $(USER)@$(shell hostname -f):$(CURDIR)/ $(notdir $(CURDIR))"
 
 ################################################################
 ## SLURM
@@ -177,15 +190,17 @@ define slurm
 #SBATCH --output=slurm-%x-%A_%a.out
 export MAKEFLAGS="$(MAKEFLAGS)"
 NUM_THREADS=$${SLURM_JOB_CPUS_PER_NODE}
-$(containerPrefix) make $@ SUBMIT=false EXECUTOR=make $(send_notification)
+$(containerPrefix) make $@ SUBMIT=false EXECUTOR=make $(call send_notification,SLURM submission)
 endef
 
 export slurm
 
 ifdef NTFY
 send_notification=; r=$$?; [ $$r -eq 0 ] && \
-curl -H "Title: SLURM submission complete" -H "Tags: +1" -d "Finished $@" ntfy.sh/$(NTFY) || \
-curl -H "Title: SLURM submission failed"   -H "Tags: warning" -d "Failed $@: status $$r" ntfy.sh/$(NTFY)
+curl -H "Title: $(1) complete" -H "Tags: +1" -d "Finished '$@'" -o /dev/null ntfy.sh/$(NTFY) || \
+curl -H "Title: $(1) failed"   -H "Tags: warning" -d "Failed '$@': status $$r" -o /dev/null ntfy.sh/$(NTFY)
+else
+send_notification=; r=$$?; [ $$r -eq 0 ] && echo "$(1) of '$@' completed" || echo "$(1) of '$@' failed with status $$r"
 endif
 
 ################################################################
@@ -213,7 +228,8 @@ CONTAINER_OPTIONS= exec $(CONTAINER_BIND) --pwd $$(realpath .) --containall --cl
 $(CONTAINER_IMAGE): 
 	cd $(dir $(CONTAINER_IMAGE)) ;\
 	$(CONTAINER) pull docker://$(IMAGE_REG)$(IMAGE)$(colon)$(IMAGE_TAG)
-	$(makeg_rwx) $(CONTAINER_IMAGE)
+	$(call chmod,$(CONTAINER_IMAGE),g,rwx)
+	$(call chmod,$(CONTAINER_IMAGE),u,rwx)
 CONTAIN=true
 
 
@@ -323,11 +339,12 @@ excluded-targets += R R-local R-$(RVERSION) .Rprofile
 R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses).  Also EXECUTOR=docker means the launchers will use docker rather than singularity
 
 R-$(RVERSION): BIND_DIR=$${wd}#Again, pick up local runtime setting
-R-$(RVERSION): resources/shell/R-$(EXECUTOR)
-	< $< $(call envsubst,CONTAINER_IMAGE CONTAINER CONTAINER_OPTIONS RVERSION SINGULARITYENV_RENV_PATHS_PREFIX) > $@
-	@$(make_rwx) $@
+R-$(RVERSION): REGISTRY_URL=$(IMAGE_REG)$(IMAGE)$(colon)$(IMAGE_TAG)
+R-$(RVERSION): resources/shell/R-local
+	< $< $(call envsubst,CONTAINER_IMAGE CONTAINER CONTAINER_OPTIONS RVERSION SINGULARITYENV_RENV_PATHS_PREFIX REGISTRY_URL) > $@
+	@$(call chmod,$@,u,rwx)
 	mkdir -p $(launch_dir)/
-	for i in rstudio shiny jupyter; do cp resources/shell/$${i}-$(EXECUTOR).sh $(launch_dir)/$${i}.sh || echo "$${i}-$(EXECUTOR).sh doesn't yet exist"; done
+	for i in rstudio shiny jupyter server-info; do cp resources/shell/$${i}.sh $(launch_dir)/$${i}.sh || echo "$${i}.sh doesn't yet exist"; done
 
 R:
 	@echo "Starting R $(RVERSION) in container $(CONTAINER_IMAGE) ..."

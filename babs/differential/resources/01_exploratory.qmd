@@ -713,7 +713,7 @@ for (dataset_id in names(ddsList)) {
                       data.frame(
                         PC1 = pc[, param$get("pc_x")],
                         PC2 = pc[, param$get("pc_y")], 
-                        sample = rownames(colDat)))
+                        .sample = rownames(colDat)))
         pl <- ggplot(
           pc.df,
           modifyList(eval(this_aes), aes(x=PC1, y=PC2))) +
@@ -730,7 +730,7 @@ for (dataset_id in names(ddsList)) {
           pl <- pl + scale_colour_manual(values = metadata(colData(this_dds))$palette$ggplot[[colour_by]])
         }
         if (do_labels) {
-          pl <- pl + geom_text_repel(aes(label = sample))
+          pl <- pl + geom_text_repel(aes(label = .sample))
         }
         do_plot(pl,
                 label="color",
@@ -775,7 +775,7 @@ for (dataset_id in names(ddsList)) {
                       data.frame(
                         PC1 = my_pc$x[, param$get("pc_x")],
                         PC2 = my_pc$x[, param$get("pc_y")], 
-                        sample = rownames(colDat)))
+                        .sample = rownames(colDat)))
         for (this_aes in aes_list) {
           pl <- ggplot(pc.df,
                       modifyList(eval(this_aes), aes(x=PC1, y=PC2))) + 
@@ -792,7 +792,7 @@ for (dataset_id in names(ddsList)) {
             pl <- pl + scale_colour_manual(values = metadata(colData(this_dds))$palette$ggplot[[colour_by]])
           }
           if (do_labels) {
-            pl <- pl + geom_text_repel(aes(label = sample))
+            pl <- pl + geom_text_repel(aes(label = .sample))
           }
           removed <- paste(
             translate_terms(dropped_terms(partials, update(plot_fml, NULL ~ .)),this_dds),
