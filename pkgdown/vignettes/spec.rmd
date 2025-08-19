@@ -141,6 +141,17 @@ specification(
 )
 ```
 
+There's also a `differential_subset` field that takes the same form.
+This is to allow situations where you want to focus the statistical
+testing to a subset of samples but not limit the visualisations of the
+differential results to those samples. So in the above example, the
+differential heatmaps of the tumour samples wouldn't show the
+behaviour in the normals. Setting `subset = TRUE` and supplying the
+restriction of the test as `differential_subset = condition ==
+"tumour"` would visualise just the differential genes in the tumour
+subset (same number of genes/rows), but show their expression in all
+samples (larger number of samples/columns).
+
 The conditions on which we `subset` must be defined in the experiment
 table. It is possible to transform some of the predictors (columns of
 `colData`) using the other main component of a `sample_set`, the
