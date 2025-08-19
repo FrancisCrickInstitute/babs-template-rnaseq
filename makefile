@@ -45,6 +45,8 @@ $(shared) : babs/differential/resources/make/shared.mk
 	ln -f $< $@
 babs/differential/resources/make/shared.mk: $(wildcard $(generic_dir)/template/resources/make/shared-rnaseq.mk)
 	cp $< $@
+	for i in $(generic_dir)/template/resources/shell/env*; do [ $$i = "env*" ] || cp $$i babs/differential/.$$(basename $$i); done
+
 
 
 ################################################################

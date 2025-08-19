@@ -57,17 +57,17 @@ SINGULARITY_VERSION=3.11.3
 NEXTFLOW_VERSION=23.10.0
 RVERSION=4.5.1
 BIOCONDUCTOR_TAG=3.21-r-4.5.1
-OUR_DOCKER_VERSION=v0.21.3
-OUR_DOCKER_REPO=franciscrickinstitute/babs-wg-environments
+OUR_VERSION=v0.21.3
+OUR_REPO=franciscrickinstitute/babs-wg-environments
 
 ################################################################
 # Singularity Images
 ################################################################
 
 IMAGE_NAME=bioconductor_docker
-IMAGE_REG=$(if $(OUR_DOCKER_VERSION),ghcr,docker).io/
+IMAGE_REG=$(if $(OUR_VERSION),ghcr,docker).io/
 IMAGE_REPO=$(or $(OUR_REPO),bioconductor)
-IMAGE_TAG=$(BIOCONDUCTOR_TAG)$(and $(OUR_DOCKER_VERSION),-$(OUR_DOCKER_VERSION))
+IMAGE_TAG=$(BIOCONDUCTOR_TAG)$(and $(OUR_VERSION),-$(OUR_VERSION))
 IMAGE=$(IMAGE_REPO)/$(IMAGE_NAME)
 REGISTRY_URL=$(IMAGE_REG)$(IMAGE)$(colon)$(IMAGE_TAG)
 export SINGULARITYENV_RENV_PATHS_PREFIX=$(subst /,-,$(IMAGE))
@@ -319,7 +319,7 @@ docker/build.sh: resources/docker/build.sh docker/Dockerfile.base
 
 docker/Dockerfile.base: resources/docker/Dockerfile
 	mkdir -p docker/.devcontainer
-	< $< $(call envsubst,BIOCONDUCTOR_TAG OUR_DOCKER_VERSION IMAGE_REPO) > $@
+	< $< $(call envsubst,BIOCONDUCTOR_TAG OUR_VERSION IMAGE_REPO) > $@
 
 
 

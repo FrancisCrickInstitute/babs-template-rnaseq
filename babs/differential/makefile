@@ -144,11 +144,11 @@ $(staging_dir)/R.bib: extdata/R.bib
 extdata/R.bib: renv.lock
 	$(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")' $(call log,bib)
 
-renv.lock: resources/_dependencies.R $(wildcard resources/renv/renv.lock) .Rprofile renv/activate.R | $(log_dir)
+renv.lock: resources/_dependencies.R $(wildcard resources/renv/renv.lock) | $(log_dir)
 	if [ -f resources/renv/renv.lock ] ; then \
 	  $(GIT) mv resources/renv/renv.lock renv.lock 2>/dev/null || mv resources/renv/renv.lock renv.lock;\
-	  $(R) -e 'library(renv); restore()' ;\
-	  $(R) -e 'library(renv); install(); snapshot()' ;\
+	  $(R) -e 'library(renv); activate()' ;\
+	  $(R) -e 'library(renv); restore(); install(); snapshot()' ;\
 	else \
 	  $(GIT) stash push -m "Pipeline stashed. Use 'git stash pop' to retrieve it" -- $@ $(call log,renv) ;\
 	  $(R) -e 'library(renv); init(bioconductor=TRUE); snapshot()' ;\
