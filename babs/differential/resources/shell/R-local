@@ -2,30 +2,54 @@
 #SBATCH --ntasks=1
 #SBATCH --output=slurm-%x.out
 
-image='${CONTAINER_IMAGE}'
-docker_image='${REGISTRY_URL}'
-export SINGULARITYENV_RENV_PATHS_PREFIX='${SINGULARITYENV_RENV_PATHS_PREFIX}'
+export SINGULARITYENV_RENV_PATHS_PREFIX='${envsubst_SINGULARITYENV_RENV_PATHS_PREFIX}'
+docker_image='${envsubst_REGISTRY_URL}'
+SINGULARITY_VERSION='${envsubst_SINGULARITY_VERSION}'
+image="${SINGULARITY_IMAGEDIR:-${SINGULARITY_CACHEDIR:-$HOME/.singularity/cache}/library}/${docker_image/:/_}.sif"
+env_file_name=.env
 
 pdir=$(git rev-parse --show-toplevel 2>/dev/null || echo $(realpath .))
 ldir=.babs-launchers
+
+## source any .env files between this directory and the project-level
+if [[ -n "$env_file_name" ]]; then
+    curdir="$(realpath .)"
+    env_files=()
+    while [[ "$curdir" != "/" ]]; do
+        [[ -f "$curdir/${env_file_name}.local.${USER}" ]] && env_files+=("$curdir/${env_file_name}.local.${USER}")
+        [[ -f "$curdir/${env_file_name}.${USER}" ]] && env_files+=("$curdir/${env_file_name}.${USER}")
+        [[ -f "$curdir/${env_file_name}.local" ]] && env_files+=("$curdir/${env_file_name}.local")
+        [[ -f "$curdir/$env_file_name" ]] && env_files+=("$curdir/$env_file_name")
+        [[ "$curdir" == "$pdir" ]] && break
+        curdir="$(dirname "$curdir")"
+    done
+    # Source from top-most to bottom-most
+    for file in $(printf "%s\n" "${env_files[@]}" | tac); do
+        source "$file"
+    done
+fi
 
 if [ -z "${SLURM_JOB_ID}" ]; then
     basename=$(basename $0)
     NUM_THREADS=2
 else
-    basename=$(basename $(scontrol show job $SLURM_JOB_ID | awk -F= '/Command=/{print $2}'))
+    basename=$(scontrol show job $SLURM_JOB_ID | awk -F= '/Command=/{print $2}' | head -n1 | xargs basename)
     NUM_THREADS=${SLURM_JOB_CPUS_PER_NODE:-2}
     login_node=${__login_node:-login}
 fi
 cmd=${BABS_CMD:-${basename%-*}}
 
-if [[ -f "renv/activate.R" && -z "$SINGULARITYENV_RENV_PATHS_ROOT" ]] ; then
+if [[ -z "$SINGULARITYENV_RENV_PATHS_ROOT" ]] ; then
     export SINGULARITYENV_RENV_PATHS_ROOT="$HOME/.cache/R/renv"
+    echo -e "\033[44;97m i \033[0m Setting SINGULARITYENV_RENV_PATHS_ROOT to : ,${SINGULARITYENV_RENV_PATHS_ROOT}. " 1>&2
+    mkdir -p ${SINGULARITYENV_RENV_PATHS_ROOT}
 fi
-export SINGULARITY_BIND=${SINGULARITY_BIND:+$SINGULARITY_BIND,}$SINGULARITYENV_RENV_PATHS_ROOT
+[[ ",${SINGULARITY_BIND}," == *",/tmp,"* ]] ||
+    SINGULARITY_BIND=${SINGULARITY_BIND},/tmp
+export SINGULARITY_BIND=${SINGULARITY_BIND},$SINGULARITYENV_RENV_PATHS_ROOT
 
 if [[ -n "${SINGULARITY_BIND}" ]]; then
-    echo -e "\033[44;97m i \033[0m Extra directories being bound to the container. This might affect reproducibility: ${SINGULARITY_BIND}" 1>&2
+    echo -e "\033[44;97m i \033[0m Extra directories being bound to the container. This might affect reproducibility: ,${SINGULARITY_BIND}"  | tr ',' '\n' 1>&2
 fi
 if compgen -v | grep SINGULARITYENV 1>&2 > /dev/null; then
   echo -e "\033[44;97m i \033[0m The following environment variables are inherited in the container. Remove the corresponding SINGULARITYENV_* variable (unset) if you don't want the following values to be used:"
@@ -43,75 +67,90 @@ while :; do
     ((seed++))
 done
 
-if [ -f "${image}" ]; then
+if  ! command -v docker >/dev/null 2>&1; then
+    if [ ! -f "${image}" ]; then
+        echo "✅ Creating ${image} from ${docker_image}..."
+        module is-loaded Singularity/${SINGULARITY_VERSION} ||
+	    module load Singularity/${SINGULARITY_VERSION} ||
+	    true
+	mkdir -p $(dirname "$image")
+        singularity pull ${image} docker://${docker_image} || exit
+    fi
     container=singularity
     my_caller () {
-	module is-loaded Singularity/3.11.3 || module load Singularity/3.11.3 || true
-        local singularity_args=(
-	    ${method:-exec}
-	    --bind ${pdir}
-	    --pwd $(realpath .)
-	    --containall
-	    --scratch /run,/var/lib/rstudio-server
-	    --cleanenv
-	    --env SQLITE_TMPDIR=/tmp,BIOCPARALLEL_WORKER_NUMBER=${NUM_THREADS:-2},GITHUB_PAT=${GITHUB_PAT},OMP_NUM_THREADS=${NUM_THREADS:-2},OPENBLAS_NUM_THREADS=${NUM_THREADS:-2}
-	    ${image}
-	)
-	singularity_args+=("$@")
-	singularity "${singularity_args[@]}"
+	module is-loaded Singularity/${SINGULARITY_VERSION} ||
+	    module load Singularity/${SINGULARITY_VERSION} ||
+	    true
+    local singularity_args=(
+        ${method:-exec}
+        --bind ${pdir}
+        --pwd $(realpath .)
+        --containall
+        --scratch /run,/var/lib/rstudio-server
+        --cleanenv
+        --env SQLITE_TMPDIR=/tmp,BIOCPARALLEL_WORKER_NUMBER=${NUM_THREADS:-2},GITHUB_PAT=${GITHUB_PAT},OMP_NUM_THREADS=${NUM_THREADS:-2},OPENBLAS_NUM_THREADS=${NUM_THREADS:-2}
+        ${image}
+    )
+    singularity_args+=("$@")
+    singularity "${singularity_args[@]}"
     }
 else
     container=docker
     my_caller () {
-	local docker_args=(
-	    --rm
-	    -w /home/rstudio/project
-	    -v "${pdir}:/home/rstudio/project"
-	)
-	IFS=',' read -ra binds <<< "$SINGULARITY_BIND"
-	for bind in "${binds[@]}"; do
-	    if [[ "$bind" == *:* ]]; then
-		docker_args+=("-v" "$bind")
-	    else
-		docker_args+=("-v" "$bind:$bind")
-	    fi
-	done
-	docker_args+=(
-	    -e USERID=$(id -u)
-	    -e GROUPID=$(id -g)
-	    -e SQLITE_TMPDIR=/tmp
-	    -e BIOCPARALLEL_WORKER_NUMBER=${NUM_THREADS:-2}
-	    -e OMP_NUM_THREADS=${NUM_THREADS:-2}
-	    -e OPENBLAS_NUM_THREADS=${NUM_THREADS:-2}
-	)
-	while IFS='=' read -r name value; do
-	    if [[ "$name" == SINGULARITYENV_* ]]; then
-		varname="${name#SINGULARITYENV_}"
-		docker_args+=("-e" "${varname}=${value}")
-	    fi
-	done < <(env | grep ^SINGULARITYENV_)
-	[[ -n "$GITHUB_PAT" ]] && docker_args+=(-e GITHUB_PAT)
-	[[ -n "$GITHUB_TOKEN" ]] && docker_args+=(-e GITHUB_TOKEN)
-	[[ "$interactive" == true ]] && docker_args+=(-it) || docker_args+=(-d)
-	docker_args+=(-p "$PORT:$PORT")
-	docker_args+=("$docker_image")
-	[[ "$method" == shell ]] && docker_args+=("bash")
-	docker_args+=("$@")
-	docker run "${docker_args[@]}"
+    local docker_args=(
+        --rm
+        -w /home/rstudio/project
+        -v "${pdir}:/home/rstudio/project"
+    )
+    IFS=',' read -ra binds <<< "$SINGULARITY_BIND"
+    for bind in "${binds[@]}"; do
+        if [[ "$bind" == *:* ]]; then
+        docker_args+=("-v" "$bind")
+        else
+        docker_args+=("-v" "$bind:$bind")
+        fi
+    done
+    docker_args+=(
+        -e USERID=$(id -u)
+        -e GROUPID=$(id -g)
+        -e SQLITE_TMPDIR=/tmp
+        -e BIOCPARALLEL_WORKER_NUMBER=${NUM_THREADS:-2}
+        -e OMP_NUM_THREADS=${NUM_THREADS:-2}
+        -e OPENBLAS_NUM_THREADS=${NUM_THREADS:-2}
+    )
+    while IFS='=' read -r name value; do
+        if [[ "$name" == SINGULARITYENV_* ]]; then
+        varname="${name#SINGULARITYENV_}"
+        docker_args+=("-e" "${varname}=${value}")
+        fi
+    done < <(env | grep ^SINGULARITYENV_)
+    docker_args+=(-e INSIDE_DOCKER=1)
+    [[ -n "$GITHUB_PAT" ]] && docker_args+=(-e GITHUB_PAT)
+    [[ -n "$GITHUB_TOKEN" ]] && docker_args+=(-e GITHUB_TOKEN)
+    [[ "$interactive" == true ]] && docker_args+=(-it) || docker_args+=(-d)
+    docker_args+=(-p "$PORT:$PORT")
+    docker_args+=("$docker_image")
+    [[ "$method" == shell ]] && docker_args+=("bash")
+    docker_args+=("$@")
+    docker run "${docker_args[@]}"
     }
 fi
 
-# For reporting how to access/close server
-source $ldir/server-info.sh
 
-if [ "$cmd" == rstudio ]; then
-    source $ldir/rstudio.sh
-elif [ "$cmd" == shiny ]; then
-    source $ldir/shiny.sh
-elif [ "$cmd" == jupyter ]; then
-    source $ldir/jupyter.sh
-elif [ "$cmd" == shell ]; then
-    interactive=${BABS_INTERACTIVE:-true} method=shell my_caller
-else
-    interactive=${BABS_INTERACTIVE:-true} my_caller $cmd $@
-fi
+case "$cmd" in
+    rstudio|shiny|jupyter)
+        if [[ -d $ldir ]]; then
+            source $ldir/server-info.sh
+        else
+            echo "This command needs to be run from a directory with a '$ldir' subdirectory - please copy that from the launcher directory" >&2
+            exit 1
+        fi
+        source $ldir/${cmd}.sh
+        ;;
+    shell)
+        interactive=${BABS_INTERACTIVE:-true} method=shell my_caller
+        ;;
+    *)
+        interactive=${BABS_INTERACTIVE:-true} my_caller $cmd "$@"
+        ;;
+esac

@@ -700,7 +700,6 @@ for (dataset_id in names(ddsList)) {
     percentVar <- metadata(colData(this_dds)$.PCA)$percentVar
     done_aes <- list()
     for (plot_fml in plot_formulae) {
-      if (length(all.vars(plot_fml[[3]]))==0) next
       if (as.character(plot_fml)[2] %in% done_aes) {
         next
       } else {

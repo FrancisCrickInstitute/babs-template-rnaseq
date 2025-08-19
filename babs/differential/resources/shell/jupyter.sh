@@ -7,8 +7,9 @@ jupyter_local_share=$ldir/jupyter-share
 sentinel=$ldir/jupyter-kernel.sentinel
 
 mkdir -p ${SINGULARITY_UV_CACHE_DIR} ${SINGULARITYENV_PIP_CACHE_DIR} ${jupyter_local_share}
-
-SINGULARITY_BIND=${SINGULARITY_BIND:+$SINGULARITY_BIND,}"${jupyter_local_share}":"$HOME/.local/share/jupyter"
+jupyter_local_share="${jupyter_local_share}":"$HOME/.local/share/jupyter"
+[[ ",${SINGULARITY_BIND}," == *",$jupyter_local_share,"* ]] ||
+    SINGULARITY_BIND=${SINGULARITY_BIND},$jupyter_local_share
 
 
 if [ ! -f "./pyproject.toml" ]; then
@@ -34,7 +35,7 @@ my_caller uv run --with jupyter jupyter lab \
      --no-browser \
      --port ${PORT} \
      --NotebookApp.allow_origin='*' \
-     --NotebookApp.token="${PASSWORD}"
+     --NotebookApp.token="${PASSWORD}" &
 PID=$!
 
 server_info jupyter 8888 "/lab?token=${PASSWORD}"

@@ -4,26 +4,31 @@
 export SINGULARITYENV_RSTUDIO_SESSION_TIMEOUT=0
 export SINGULARITYENV_USER=$(id -un)
 export SINGULARITYENV_PASSWORD=$PASSWORD
-export SINGULARITY_BIND="${SINGULARITY_BIND:+$SINGULARITY_BIND,}\
-$ldir/rsession.conf:/etc/rstudio/rsession.conf,\
-$ldir/R:$HOME/.config/R,\
-$ldir/rstudio:$HOME/.config/rstudio,\
-/etc/ssl/certs/ca-bundle.crt,\
-$HOME/.ssh,/sys/fs/cgroup"
+export SINGULARITY_BIND="${SINGULARITY_BIND},\
+$ldir/${USER}/rsession.conf:/etc/rstudio/rsession.conf,\
+$ldir/${USER}/R:$HOME/.config/R,\
+$ldir/${USER}/rstudio:$HOME/.config/rstudio"
+
+[[ ",${SINGULARITY_BIND}," == *",/etc/ssl/certs/ca-bundle.crt,"* ]] ||
+    SINGULARITY_BIND=${SINGULARITY_BIND},/etc/ssl/certs/ca-bundle.crt
+[[ ",${SINGULARITY_BIND}," == *",$HOME/.ssh,"* ]] ||
+    SINGULARITY_BIND=${SINGULARITY_BIND},$HOME/.ssh
+[[ ",${SINGULARITY_BIND}," == *",/sys/fs/cgroup,"* ]] ||
+    SINGULARITY_BIND=${SINGULARITY_BIND},/sys/fs/cgroup
 
 # Create temporary directory to be populated with directories to bind-mount in the container
 # where writable file systems are necessary. Adjust path as appropriate for your computing environment.
-mkdir -p -m 700 $ldir/rstudio $ldir/R
+mkdir -p  $ldir/${USER}/rstudio $ldir/${USER}/R
 
 
 if [ "$container" = singularity ]; then
-    echo "session-default-working-dir=$pdir" > $ldir/rsession.conf
+    echo "session-default-working-dir=$pdir" > $ldir/${USER}/rsession.conf
 else
-    echo "session-default-working-dir=/home/rstudio/project" > $ldir/rsession.conf
+    echo "session-default-working-dir=/home/rstudio/project" > $ldir/${USER}/rsession.conf
 fi
 
 
-cat > $ldir/rstudio/rstudio-prefs.json <<EOF
+cat > $ldir/${USER}/rstudio/rstudio-prefs.json <<EOF
 {
     "knit_working_dir": "current"
 }

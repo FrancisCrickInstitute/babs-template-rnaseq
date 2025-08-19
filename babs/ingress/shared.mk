@@ -55,19 +55,21 @@ SELF_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 ################################################################
 SINGULARITY_VERSION=3.11.3
 NEXTFLOW_VERSION=23.10.0
-RVERSION=4.5.0
-BIOCONDUCTOR_VERSION=RELEASE_3_21
-OUR_VERSION=v0.8.0
+RVERSION=4.5.1
+BIOCONDUCTOR_TAG=3.21-r-4.5.1
+OUR_DOCKER_VERSION=v0.21.3
+OUR_DOCKER_REPO=franciscrickinstitute/babs-wg-environments
 
 ################################################################
 # Singularity Images
 ################################################################
 
 IMAGE_NAME=bioconductor_docker
-IMAGE_REG=$(if $(OUR_VERSION),docker,docker).io/
-IMAGE_REPO=$(if $(OUR_VERSION),gavinpaulkelly,bioconductor)
-IMAGE_TAG=$(BIOCONDUCTOR_VERSION)-R-$(RVERSION)$(and $(OUR_VERSION),-$(OUR_VERSION))
+IMAGE_REG=$(if $(OUR_DOCKER_VERSION),ghcr,docker).io/
+IMAGE_REPO=$(or $(OUR_REPO),bioconductor)
+IMAGE_TAG=$(BIOCONDUCTOR_TAG)$(and $(OUR_DOCKER_VERSION),-$(OUR_DOCKER_VERSION))
 IMAGE=$(IMAGE_REPO)/$(IMAGE_NAME)
+REGISTRY_URL=$(IMAGE_REG)$(IMAGE)$(colon)$(IMAGE_TAG)
 export SINGULARITYENV_RENV_PATHS_PREFIX=$(subst /,-,$(IMAGE))
 
 R=R
@@ -79,21 +81,53 @@ ml = module is-loaded $1 || module load $1 || true # ie fall back to true (ie re
 chmod = setfacl -m $2:$3 $1 >/dev/null 2>&1 || chmod $2=$3 $1
 
 # Environment Variables
-NUM_THREADS=$${NUM_THREADS:-2}
-
+NUM_THREADS?=2
+data_transfer_filename?=.data-transfer-rules
 
 ################################################################
 # Git-derived variables
 ################################################################
-PROJECT_HOME:=$(shell $(GIT) rev-parse --show-toplevel 2>/dev/null || echo $(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
+PROJECT_HOME:=$(shell $(GIT) rev-parse --show-toplevel 2>/dev/null || echo $(dir $(abspath $(firstword $(MAKEFILE_LIST)))))
 TAG = _$(shell $(GIT) describe --tags --dirty=_altered --always --long 2>/dev/null || echo "uncontrolled")# e.g. v1.0.2-2-ace1729a
 VERSION := $(shell $(GIT) describe --tags --abbrev=0 2>/dev/null || echo "vX.Y.Z")#e.g. v1.0.2
-DELTA-VERSION=$(shell git describe --tags --abbrev=0 $$(git log --format="%H" -n 1 -- $(1)))#For when we want a version that doesn't increment on changes irrelevant to path given by first arg
 git-ignore=touch .gitignore && grep -qxF '$(1)' .gitignore || echo '$(1)' >> .gitignore
 
-
+include .env.mk
 
 include $(SELF_DIR)secret.mk
+
+################################################################
+# Make .env and .env.local available to make
+################################################################
+
+
+# Find all .env and .env.local files from root down to current dir
+
+ENV_FILES := $(shell \
+    dir=$(realpath .); \
+    while :; do \
+        [ -f "$$dir/.env.local.$(USER)" ] && echo "$$dir/.env.local.$(USER)"; \
+        [ -f "$$dir/.env.$(USER)" ] && echo "$$dir/.env.$(USER)"; \
+	[ -f "$$dir/.env.local" ] && echo "$$dir/.env.local"; \
+        [ -f "$$dir/.env" ] && echo "$$dir/.env"; \
+        [ "$$dir" = "$$PROJECT_HOME" ] || [ "$$dir" = "/" ] && break; \
+        dir=$$(dirname "$$dir"); \
+    done | tac\
+)
+
+# Generate makefile with the .env(.local) variables in it
+.env.mk: $(ENV_FILES)
+	@echo "# Auto-generated from: $(ENV_FILES)" > $@
+	@if [ -n "$(ENV_FILES)" ]; then \
+	  for f in $(ENV_FILES); do \
+	    awk '!/^#/ && NF' $$f | while IFS= read -r line; do \
+	      cleaned=$$(echo "$$line" | sed 's/[[:space:]]*=[[:space:]]*/=/g'); \
+	      echo "$$cleaned" >> $@; \
+	    done; \
+	  done; \
+	fi
+
+excluded-targets += .env.mk
 
 ################################################################
 ## Propagation of docs files
@@ -153,19 +187,30 @@ endif
 	ln -sfn $(VERSION) $(pubdir)/latest
 
 .PHONY: prepare-rsync
-prepare-rsync:
+prepare-rsync: ## Prepare for project transfer to another computer, using git and rsync (for files matching patterns in the .data-transfer-rules hidden file)
 # 'updateInstead' allows us to push back here
 	@git config --local receive.denyCurrentBranch updateInstead
 	@echo "Type the following commands on a local terminal (ie NOT a NEMO node)"
-	@echo "git clone $(USER)@$(shell hostname -f):$(CURDIR)"
-	@if [ ! -f ".data-transfer-rules" ]; then \
-	  echo "# No extra files to be transferred - you can set up file .data-transfer-rules with contents e.g.";\
+	@echo "$$ git clone $(USER)@$(shell hostname -f):$(CURDIR)"
+	@echo "You should be able to 'git push' from your local machine back here - but don't make changes in both places!"
+	@if [ ! -f "$(data_transfer_filename)" ]; then \
+	  echo "No extra files to be transferred - you can set up file $(data_transfer_filename) with contents e.g.";\
 	  echo "+ extdata/" ;\
 	  echo "+ extdata/**" ;\
 	  echo "- *" ;\
-	  echo "# to selectively transfer extra files with the command (won't work right now!):" ;\
+	  echo "to selectively transfer extra files with the command (won't work right now - you'll need to 'git add' it!):" ;\
+	else \
+	  echo "$$ cd $(notdir $(CURDIR)) && make do-sync" ;\
 	fi
-	@echo "ssh $(USER)@$(shell hostname -f) 'cat $(CURDIR)/.data-transfer-rules' | rsync -av --filter=\"merge -\" $(USER)@$(shell hostname -f):$(CURDIR)/ $(notdir $(CURDIR))"
+
+do-rsync: ## Transfer required non-VC data to your computer from nemo
+	@if [ -f "$(data_transfer_filename)" ]; then \
+	  rsync -av --filter='merge $(data_transfer_filename)' $$url/ . || echo "Couldn't rsync from $url." ;\
+	else \
+	 echo $(data_transfer_filename) doesn\'t exist, so no additional transfers have been carried out. ;\
+	fi
+
+excluded-targets += prepare-rsync do-rsync
 
 ################################################################
 ## SLURM
@@ -219,9 +264,8 @@ BIND_DIR = $$(git rev-parse --show-toplevel 2>/dev/null || echo $$(realpath .))
 EXECUTOR?=singularity
 renv_root=$(or $(SINGULARITYENV_RENV_PATHS_ROOT),~/.cache/R/renv)
 ifeq ($(EXECUTOR),singularity)
-#Sometimes we want to do e.g. env SINGULARITYENV_APPEND_PATH=/stuff - that's what CONTAINER_VARS is for
-CONTAINER= $(call ml,Singularity/$(SINGULARITY_VERSION)); $(CONTAINER_VARS) singularity
-CONTAINER_IMAGE=$(or $(SINGULARITY_ROOT),.)/$(IMAGE)_$(IMAGE_TAG).sif
+CONTAINER= $(call ml,Singularity/$(SINGULARITY_VERSION)); singularity	
+CONTAINER_IMAGE=$(or $(SINGULARITY_ROOT),.)/$(IMAGE_REG)$(IMAGE)_$(IMAGE_TAG).sif
 CONTAINER_BIND=--bind $(BIND_DIR),/tmp,$(renv_root)
 CONTAINER_ENV=--env SQLITE_TMPDIR=/tmp,BIOCPARALLEL_WORKER_NUMBER=$(NUM_THREADS),GITHUB_PAT=$${GITHUB_PAT},OMP_NUM_THREADS=${NUM_THREADS},OPENBLAS_NUM_THREADS=${NUM_THREADS}
 CONTAINER_OPTIONS= exec $(CONTAINER_BIND) --pwd $$(realpath .) --containall --cleanenv $(CONTAINER_ENV)
@@ -264,17 +308,19 @@ else
   $(error "# Don't recognise '$(EXECUTOR)' as an executor")
 endif
 
-# 
-docker/Dockerfile: OUR_VERSION=$(call DELTA-VERSION,resources/docker)
-docker/Dockerfile: resources/docker/Dockerfile docker/install_all.sh## Create a Dockerfile corresponding to the image in use.
-	< $< $(call envsubst,RVERSION BIOCONDUCTOR_VERSION OUR_VERSION IMAGE_REPO) > $@
-docker/install_all.sh: $(wildcard resources/docker/install_*.sh) docker/build.sh
-	cat resources/docker/install_*.sh > $@
-docker/build.sh:
-	mkdir -p docker
-	echo "docker build -t $(IMAGE_NAME) ." > $@
-	echo "docker tag  $(IMAGE_NAME) $(IMAGE_REG)$(IMAGE):$(IMAGE_TAG)" >> $@
-	echo "docker push $(IMAGE_REG)$(IMAGE):$(IMAGE_TAG)" >> $@
+.PHONY: docker
+docker:  ## Generate the recipe to create the dockerfile behind the analysis
+
+docker: docker/build.sh
+	cp resources/docker/devcontainer.json  docker/.devcontainer/
+
+docker/build.sh: resources/docker/build.sh docker/Dockerfile.base
+	< $< $(call envsubst,IMAGE_NAME IMAGE_REG IMAGE IMAGE_TAG) > $@
+
+docker/Dockerfile.base: resources/docker/Dockerfile
+	mkdir -p docker/.devcontainer
+	< $< $(call envsubst,BIOCONDUCTOR_TAG OUR_DOCKER_VERSION IMAGE_REPO) > $@
+
 
 
 ifeq ($(CONTAIN),true)
@@ -285,6 +331,7 @@ optionalContainer=
 containerPrefix=
 endif
 
+excluded-targets += docker
 
 ################################################################
 #Standard makefile hacks
@@ -323,15 +370,15 @@ log=2>&1 | tee $2 $(log_dir)/$1.log
 #log=$(subst -a,>)$(log_dir)/$1.log 2>&1
 
 # Templating a text file - replace instances of ${A} with the value of variable A
-# $(call envsubst,A B) produces A='$(A)' B='$(B)' envsubst '$$A $$B'
+# $(call envsubst,A B) produces envsubst_A='$(A)' envsubst_B='$(B)' envsubst 'envsubst_$$A envsubst_$$B'
 # In shell, this transfers out the values of variables A and B, then calls envsubst on a file provided by stdin which  replaces instances in that file  of '$A' with its value...
-envsubst = $(foreach v,$(1),$v='$($(v))' )envsubst '$(foreach v,$(1),$${$v})'
+envsubst = $(foreach v,$(1),envsubst_$v='$($(v))' )envsubst '$(foreach v,$(1),$${envsubst_$v})'
 
 ################################################################
 ## Recipes for calling R/Rstudio
 ##
 ################################################################
-excluded-targets += R R-local R-$(RVERSION) .Rprofile
+excluded-targets += R R-local R-$(RVERSION)
 
 .PHONY: R R-local R-$(RVERSION)
 
@@ -339,9 +386,8 @@ excluded-targets += R R-local R-$(RVERSION) .Rprofile
 R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses).  Also EXECUTOR=docker means the launchers will use docker rather than singularity
 
 R-$(RVERSION): BIND_DIR=$${wd}#Again, pick up local runtime setting
-R-$(RVERSION): REGISTRY_URL=$(IMAGE_REG)$(IMAGE)$(colon)$(IMAGE_TAG)
 R-$(RVERSION): resources/shell/R-local
-	< $< $(call envsubst,CONTAINER_IMAGE CONTAINER CONTAINER_OPTIONS RVERSION SINGULARITYENV_RENV_PATHS_PREFIX REGISTRY_URL) > $@
+	$(call envsubst,SINGULARITYENV_RENV_PATHS_PREFIX REGISTRY_URL SINGULARITY_VERSION) < $< > $@
 	@$(call chmod,$@,u,rwx)
 	mkdir -p $(launch_dir)/
 	for i in rstudio shiny jupyter server-info; do cp resources/shell/$${i}.sh $(launch_dir)/$${i}.sh || echo "$${i}.sh doesn't yet exist"; done
@@ -350,14 +396,6 @@ R:
 	@echo "Starting R $(RVERSION) in container $(CONTAINER_IMAGE) ..."
 	@$(CONTAINER) $(CONTAINER_OPTIONS) $(CONTAINER_IMAGE) R
 
-
-.Rprofile: $(wildcard resources/renv/Rprofile) | renv/activate.R
-	mkdir -p renv
-	[ ! -f "$<" ] || $(GIT) mv $< $@ 2>/dev/null || mv $< $@
-
-renv/activate.R: $(wildcard resources/renv/activate.R)
-	mkdir -p renv
-	[ ! -f "$<" ] || $(GIT) mv $< $@ 2>/dev/null || mv $< $@
 
 
 ################################################################
@@ -368,12 +406,12 @@ renv/activate.R: $(wildcard resources/renv/activate.R)
 # are reflected in the secrets file.
 
 $(SELF_DIR)secret.mk: $(wildcard $(PROJECT_HOME)/.babs)
-	if [ ! -f "$@" ]; then \
+	@if [ ! -f "$@" ]; then \
 	echo "SINGULARITY_ROOT=.#where .sif's are stored" > $@ ;\
 	echo "SCRATCH_DIR=/tmp#Somewhere for transient, possibly large, files" >> $@ ;\
 	echo "Created a dummy copy of $@, please edit it" ;\
 	fi
-	if [ -n "$<" ]; then \
+	@if [ -n "$<" ]; then \
 	  sed  -i '/^setting_/d' $@ ;\
 	  sed -r -n 's/^(\s*)(.*)\s*:\s*(.*$$)/setting_\2=\3/p' $< >> $@ ;\
 	fi
