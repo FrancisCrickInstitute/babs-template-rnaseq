@@ -43,7 +43,7 @@ publish:
 	(cd $$tmpdir ;\
 	git commit -a -m "Updating docs to those of $(VERSION)" ;\
 	git push origin gh-pages) ;\
-	git worktree remove $$tmpdir
+	git worktree remove --force $$tmpdir
 
 
 ################################################################
