@@ -1,3 +1,21 @@
+# Version 1.0.0
+## Major Changes
+ - Add differential_subsets functionality
+ - Update to v1.0.1 of generic template
+ - Slurm refactor - 'make sbatch run' instead of 'make run SUBMIT=true'
+## Minor Changes
+ - Ensure percentNA is available where applicable
+ - Add custom alpha for profile plots
+ - Ensure non-estimable 'fully missing' coefs aren't calculated
+ - Minor changes
+ - Fix the alpha_scale lack of self-reflection
+ - Add omnibus for limma
+ - Update to latest launchers
+ - remove qc_formulae
+ - Update launchers. Fix edge-cases in pipeline
+ - Fix renv calling
+ - Document the differential_subset setting
+ - Update pkgdown generation
 # Version 0.24.0
 ## Major Changes
  - Add external genelists
