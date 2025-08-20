@@ -116,7 +116,13 @@ file in if you don't have one.
 
 Once you’ve done that (got `x.config`, `x.{rda,rds,csv}` and `y.spec` all in
 ./extdata) a `make run` should do everything required.  It’s all a lot
-easier than comes across writing it down long-hand.
+easier than comes across writing it down long-hand. You can also do
+
+```
+make sbatch run #append any --slurm_arg=value flags at the end as necessary
+```
+
+if you want to run the job under slurm.
 
 # Limma-mode
 

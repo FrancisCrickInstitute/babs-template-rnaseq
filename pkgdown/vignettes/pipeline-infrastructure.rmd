@@ -70,12 +70,9 @@ the docs folder has changed (and is more recent than the one in the
 differential folder) that will propogate into the differential
 folder. An important aspect is that after everything had run through
 successfully, it should be possible to share just, say, the
-differential folder and for everything to work. Initially I thought
-that meant we had to go with the two stage 'build + run' approach, but
-I've figured a work-around: if the folder that ought to contain the
-original source material (e.g. docs) no longer exists, then no
-dependencies should be taken on it. This work-around means that as
-long as things run through once, we are subsequently free to either
+differential folder and for everything to work.
+
+As long as things run through once, we are subsequently free to either
 analyse with all the component directories in place (in case we make a
 change that e.g. means nfcore needs to be re-run), or we can chop off
 the final stage of the analysis as an entirely self-contained

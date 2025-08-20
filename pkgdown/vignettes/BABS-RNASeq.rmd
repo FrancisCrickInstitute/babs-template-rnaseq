@@ -76,9 +76,9 @@ The [experiment
 table](https://bioinformatics.thecrick.org/babs/working-with-us/experiment-table-preparation/)
 CSV file containing sample level experimental meta data.
 
-> * :loudspeaker: This file must be in CSV format
-> * :loudspeaker: Please check the first column, which must be named `ID`. It is left blank at the design stage, but must be filled in with labels that correspond to the IDs used in the fastq files.
-> * :loudspeaker: If there's another column in the table that has unduplicated text values, that column is picked up as a convenient sample label - otherwise the ID column will be used as the label.
+ * ⚠️ This file must be in CSV format
+ * ⚠️ Please check the first column, which must be named `ID`. It is left blank at the design stage, but must be filled in with labels that correspond to the IDs used in the fastq files.
+ * ⚠️ If there's another column in the table that has unduplicated text values, that column is picked up as a convenient sample label - otherwise the ID column will be used as the label.
 	  
 It is best practice to create a draft of this file using the
 information provided in proposal document, prior to the design
@@ -152,7 +152,7 @@ yourself, in accordance with standard nfcore requirements.
 
 ### Whole pipeline
 
-TLDR: `make all` in the `babs` folder will run the whole pipeline.
+TLDR: `make all` in the `babs` folder will run the whole pipeline. `make sbatch` will do the same but run the final differential stage over slurm.
 
 `cd` into the `./babs` folder, and there should be a makefile there,
 along with folders for each 'module' of functionality.  `docs` is the
@@ -177,8 +177,8 @@ the three main inputs, metadata needs to be transferred from the
 `docs` folder (the original source of experiment table and spec files
 that describe the analysis to be carried out), and data (the aligned
 counts) need to be transferred from the `nfcore` module. Achieving
-that should just be a matter of running `make run` in the
-`differential` folder. However:
+that should just be a matter of running `make run` (or `make sbatch
+run`) in the `differential` folder. However:
 
 If you're taking counts etc from different sources, then it's possible
 to join the pipeline just at this `differential` stage by manually
@@ -247,6 +247,8 @@ The vast majority of work is carried out by:
 ```
 # cd babs/differential
 make run
+# or to auto-submit to via slurm
+# make sbatch run --time=04:00:00 # any such '--' flags will override our default slurm parameters
 ```
 
 which will discover all `spec` files in the current directory, and
