@@ -43,5 +43,10 @@
 <url><loc>https://bioinformatics.thecrick.org/resources/info/babs-rnaseq/reference/write_all_results.html</loc></url>
 <url><loc>https://bioinformatics.thecrick.org/resources/info/babs-rnaseq/reference/write_assay.html</loc></url>
 <url><loc>https://bioinformatics.thecrick.org/resources/info/babs-rnaseq/reference/write_results.html</loc></url>
+<url><loc>https://bioinformatics.thecrick.org/resources/info/babs-rnaseq/test/00_init_GRCh38.html</loc></url>
+<url><loc>https://bioinformatics.thecrick.org/resources/info/babs-rnaseq/test/01_exploratory_analyse_GRCh38.html</loc></url>
+<url><loc>https://bioinformatics.thecrick.org/resources/info/babs-rnaseq/test/02_differential_analyse_GRCh38.html</loc></url>
+<url><loc>https://bioinformatics.thecrick.org/resources/info/babs-rnaseq/test/03_enrichment_analyse_GRCh38.html</loc></url>
+<url><loc>https://bioinformatics.thecrick.org/resources/info/babs-rnaseq/test/index.html</loc></url>
 </urlset>
 

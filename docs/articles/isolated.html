@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RNASeq Template</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.23.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -75,7 +75,7 @@ Kelly</h4>
 analysis for a pre-processed dataset that already exists as an R object.
 Here, we describe the easiest way to this, assuming we have a spec-file
 and either an rds or rda R object that contains the raw counts and
-metadata as a <code><a href="https://rdrr.io/pkg/DESeq2/man/DESeqDataSet.html" class="external-link">DESeq2::DESeqDataSet</a></code> object.</p>
+metadata as a <code>DESeq2::DESeqDataSet</code> object.</p>
 <p>The objective is to create a folder containing the scripts and
 resources usually provided by the <code>differential</code> folder of
 the whole pipeline. Navigate to the directory in which you want to carry
@@ -179,7 +179,9 @@ put an example spec file in if you don’t have one.</p>
 <p>Once you’ve done that (got <code>x.config</code>,
 <code>x.{rda,rds,csv}</code> and <code>y.spec</code> all in ./extdata) a
 <code>make run</code> should do everything required. It’s all a lot
-easier than comes across writing it down long-hand.</p>
+easier than comes across writing it down long-hand. You can also do</p>
+<pre><code>make sbatch run #append any --slurm_arg=value flags at the end as necessary</code></pre>
+<p>if you want to run the job under slurm.</p>
 </div>
 <div class="section level2">
 <h2 id="limma-mode">Limma-mode<a class="anchor" aria-label="anchor" href="#limma-mode"></a>
@@ -200,7 +202,7 @@ spec-file format remains identical.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.2.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.3.</p>
 </div>
 
     </footer>

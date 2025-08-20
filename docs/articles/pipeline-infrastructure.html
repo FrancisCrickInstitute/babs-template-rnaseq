@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RNASeq Template</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.23.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -132,18 +132,14 @@ spec file in the docs folder has changed (and is more recent than the
 one in the differential folder) that will propogate into the
 differential folder. An important aspect is that after everything had
 run through successfully, it should be possible to share just, say, the
-differential folder and for everything to work. Initially I thought that
-meant we had to go with the two stage ‘build + run’ approach, but I’ve
-figured a work-around: if the folder that ought to contain the original
-source material (e.g. docs) no longer exists, then no dependencies
-should be taken on it. This work-around means that as long as things run
-through once, we are subsequently free to either analyse with all the
-component directories in place (in case we make a change that e.g. means
-nfcore needs to be re-run), or we can chop off the final stage of the
-analysis as an entirely self-contained directory (the only criterion
-being that the directory is not located alongside other directories that
-share a name of one of the original siblings, such as <code>docs</code>
-as that will confuse things!)</p>
+differential folder and for everything to work.</p>
+<p>As long as things run through once, we are subsequently free to
+either analyse with all the component directories in place (in case we
+make a change that e.g. means nfcore needs to be re-run), or we can chop
+off the final stage of the analysis as an entirely self-contained
+directory (the only criterion being that the directory is not located
+alongside other directories that share a name of one of the original
+siblings, such as <code>docs</code> as that will confuse things!)</p>
 <p>This illustrates the general flow: there’s a linear progression of
 phases, each of which will bootstrap itself so it gathers all its
 pre-requisites into its own scope, and then generate all its output in a
@@ -193,7 +189,7 @@ been run.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.2.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.3.</p>
 </div>
 
     </footer>

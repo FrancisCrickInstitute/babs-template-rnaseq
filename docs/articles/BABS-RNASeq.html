@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RNASeq Template</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.23.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -128,18 +128,16 @@ here</a> starting from the quantified raw counts/abundances.)</p>
 </h3>
 <p>The <a href="https://bioinformatics.thecrick.org/babs/working-with-us/experiment-table-preparation/" class="external-link">experiment
 table</a> CSV file containing sample level experimental meta data.</p>
-<blockquote>
 <ul>
-<li>:loudspeaker: This file must be in CSV format</li>
-<li>:loudspeaker: Please check the first column, which must be named
+<li>⚠️ This file must be in CSV format</li>
+<li>⚠️ Please check the first column, which must be named
 <code>ID</code>. It is left blank at the design stage, but must be
 filled in with labels that correspond to the IDs used in the fastq
 files.</li>
-<li>:loudspeaker: If there’s another column in the table that has
-unduplicated text values, that column is picked up as a convenient
-sample label - otherwise the ID column will be used as the label.</li>
+<li>⚠️ If there’s another column in the table that has unduplicated text
+values, that column is picked up as a convenient sample label -
+otherwise the ID column will be used as the label.</li>
 </ul>
-</blockquote>
 <p>It is best practice to create a draft of this file using the
 information provided in proposal document, prior to the design meeting.
 The table can then be used to frame the experimental design discussion
@@ -205,7 +203,8 @@ yourself, in accordance with standard nfcore requirements.</p>
 <h3 id="whole-pipeline">Whole pipeline<a class="anchor" aria-label="anchor" href="#whole-pipeline"></a>
 </h3>
 <p>TLDR: <code>make all</code> in the <code>babs</code> folder will run
-the whole pipeline.</p>
+the whole pipeline. <code>make sbatch</code> will do the same but run
+the final differential stage over slurm.</p>
 <p><code>cd</code> into the <code>./babs</code> folder, and there should
 be a makefile there, along with folders for each ‘module’ of
 functionality. <code>docs</code> is the source of all truth;
@@ -232,8 +231,8 @@ To get the three main inputs, metadata needs to be transferred from the
 spec files that describe the analysis to be carried out), and data (the
 aligned counts) need to be transferred from the <code>nfcore</code>
 module. Achieving that should just be a matter of running
-<code>make run</code> in the <code>differential</code> folder.
-However:</p>
+<code>make run</code> (or <code>make sbatch run</code>) in the
+<code>differential</code> folder. However:</p>
 <p>If you’re taking counts etc from different sources, then it’s
 possible to join the pipeline just at this <code>differential</code>
 stage by manually ‘simulating’ the ‘gathering’ stage that
@@ -294,7 +293,9 @@ produces the reports from there.</p>
 </h3>
 <p>The vast majority of work is carried out by:</p>
 <pre><code># cd babs/differential
-make run</code></pre>
+make run
+# or to auto-submit to via slurm
+# make sbatch run --time=04:00:00 # any such '--' flags will override our default slurm parameters</code></pre>
 <p>which will discover all <code>spec</code> files in the current
 directory, and analyse the data according to the analysis plan.</p>
 <p>The rough steps this goes through is:</p>
@@ -386,7 +387,7 @@ documentation on this at some point.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.2.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.3.</p>
 </div>
 
     </footer>
