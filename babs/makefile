@@ -18,6 +18,9 @@ $(stages): % : %.log
 	cd $*; $(MAKE) --no-print-directory run  >> $*.err 2>&1
 	mv $*/$*.err $@
 
+sbatch: nfcore ## Same as 'all', but submit the final differential stage to slurm. Can add multiple --slurm_arg=value flags.
+	cd differential && $(MAKE) sbatch run
+
 ################################################################
 #### Help texts for the various targets
 ################################################################

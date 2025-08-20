@@ -24,6 +24,20 @@ ingress_dir?=$(wildcard ../ingress)
 nfcore_dir?=$(wildcard ../nfcore)
 diff_dir?=$(wildcard ../differential)
 
+################################################################
+# Handle special sbatch goal
+################################################################
+# Always do this early!!! Delayed hacking of MAKECMDGOALS is risky
+# If sbatch is a goal, don't run anything else for now,
+# but store what was needed for later, so we can do
+# sbatch --wrap='make what-I would-have run'
+ifeq ($(filter sbatch,$(MAKECMDGOALS)),sbatch)
+SBATCH_GOALS:=$(filter-out sbatch,$(MAKECMDGOALS))
+override MAKECMDGOALS := sbatch
+endif
+
+
+
 # The following can be set to singularity|docker|shell
 # and determines the environment in which quarto/R processes
 # will be run in.
@@ -81,7 +95,7 @@ ml = module is-loaded $1 || module load $1 || true # ie fall back to true (ie re
 chmod = setfacl -m $2:$3 $1 >/dev/null 2>&1 || chmod $2=$3 $1
 
 # Environment Variables
-NUM_THREADS?=2
+NUM_THREADS?=$(or ${SLURM_JOB_CPUS_PER_NODE},2)
 data_transfer_filename?=.data-transfer-rules
 
 ################################################################
@@ -213,42 +227,6 @@ do-rsync: ## Transfer required non-VC data to your computer from nemo
 excluded-targets += prepare-rsync do-rsync
 
 ################################################################
-## SLURM
-## 
-## Have default but customisable slurm parameters 
-################################################################
-## By default, run recipes in the usual manner rather than slurm etc.
-SUBMIT=false
-
-SLURM--time=0-02:00:00
-SLURM--mem=64G
-SLURM--cpus-per-task=8
-SLURM--partition=ncpu
-
-define slurm
-#! /usr/bin/bash
-#SBATCH --partition=$(SLURM--partition)
-#SBATCH --time='$(SLURM--time)'
-#SBATCH --cpus-per-task=$(SLURM--cpus-per-task)
-#SBATCH --mem=$(SLURM--mem)
-#SBATCH --job-name=$(notdir $(CURDIR))
-#SBATCH --output=slurm-%x-%A_%a.out
-export MAKEFLAGS="$(MAKEFLAGS)"
-NUM_THREADS=$${SLURM_JOB_CPUS_PER_NODE}
-$(containerPrefix) make $@ SUBMIT=false EXECUTOR=make $(call send_notification,SLURM submission)
-endef
-
-export slurm
-
-ifdef NTFY
-send_notification=; r=$$?; [ $$r -eq 0 ] && \
-curl -H "Title: $(1) complete" -H "Tags: +1" -d "Finished '$@'" -o /dev/null ntfy.sh/$(NTFY) || \
-curl -H "Title: $(1) failed"   -H "Tags: warning" -d "Failed '$@': status $$r" -o /dev/null ntfy.sh/$(NTFY)
-else
-send_notification=; r=$$?; [ $$r -eq 0 ] && echo "$(1) of '$@' completed" || echo "$(1) of '$@' failed with status $$r"
-endif
-
-################################################################
 ## Reproducible containers
 ##
 ## We've set a default value of EXECUTOR=singularity. This can be
@@ -259,7 +237,7 @@ endif
 
 excluded-targets += Dockerfile install_all.sh
 
-CONTAIN=false#An internal flag
+CONTAINER=
 BIND_DIR = $$(git rev-parse --show-toplevel 2>/dev/null || echo $$(realpath .))
 EXECUTOR?=singularity
 renv_root=$(or $(SINGULARITYENV_RENV_PATHS_ROOT),~/.cache/R/renv)
@@ -267,14 +245,13 @@ ifeq ($(EXECUTOR),singularity)
 CONTAINER= $(call ml,Singularity/$(SINGULARITY_VERSION)); singularity	
 CONTAINER_IMAGE=$(or $(SINGULARITY_ROOT),.)/$(IMAGE_REG)$(IMAGE)_$(IMAGE_TAG).sif
 CONTAINER_BIND=--bind $(BIND_DIR),/tmp,$(renv_root)
-CONTAINER_ENV=--env SQLITE_TMPDIR=/tmp,BIOCPARALLEL_WORKER_NUMBER=$(NUM_THREADS),GITHUB_PAT=$${GITHUB_PAT},OMP_NUM_THREADS=${NUM_THREADS},OPENBLAS_NUM_THREADS=${NUM_THREADS}
+CONTAINER_ENV=--env SQLITE_TMPDIR=/tmp,BIOCPARALLEL_WORKER_NUMBER=$(NUM_THREADS),GITHUB_PAT=$${GITHUB_PAT},OMP_NUM_THREADS=${NUM_THREADS},OPENBLAS_NUM_THREADS=${NUM_THREADS},MAKEFLAGS="${MAKEFLAGS}"
 CONTAINER_OPTIONS= exec $(CONTAINER_BIND) --pwd $$(realpath .) --containall --cleanenv $(CONTAINER_ENV)
 $(CONTAINER_IMAGE): 
 	cd $(dir $(CONTAINER_IMAGE)) ;\
 	$(CONTAINER) pull docker://$(IMAGE_REG)$(IMAGE)$(colon)$(IMAGE_TAG)
 	$(call chmod,$(CONTAINER_IMAGE),g,rwx)
 	$(call chmod,$(CONTAINER_IMAGE),u,rwx)
-CONTAIN=true
 
 
 else ifeq ($(EXECUTOR),docker)
@@ -289,6 +266,7 @@ CONTAINER_OPTIONS=run \
 --env GITHUB_PAT=$${GITHUB_PAT} \
 --env OMP_NUM_THREADS=${NUM_THREADS} \
 --env OPENBLAS_NUM_THREADS=${NUM_THREADS} \
+--env MAKEFLAGS="${MAKEFLAGS}" \
 --workdir="$$(realpath .)"
 CONTAINER_SHELL = $(CONTAINER) $(patsubst run,exec -it,$(CONTAINER_FLAGS_INTERACTIVE)) $(CONTAINER_IMAGE) /bin/bash
 CONTAIN=true
@@ -323,9 +301,9 @@ docker/Dockerfile.base: resources/docker/Dockerfile
 
 
 
-ifeq ($(CONTAIN),true)
+ifneq ($(CONTAINER),)
 optionalContainer=$(CONTAINER_IMAGE)
-containerPrefix=$(CONTAINER) $(CONTAINER_OPTIONS) --env MAKEFLAGS="$(MAKEFLAGS)" $(CONTAINER_IMAGE)
+containerPrefix=$(CONTAINER) $(CONTAINER_OPTIONS) $(CONTAINER_IMAGE)
 else
 optionalContainer=
 containerPrefix=
@@ -334,10 +312,48 @@ endif
 excluded-targets += docker
 
 ################################################################
+## SLURM
+## 
+## Have default but customisable slurm parameters 
+################################################################
+## By default, run recipes in the usual manner rather than slurm etc.
+
+SBATCH_DEFAULTS := --job-name=$(notdir $(CURDIR))_$(firstword $(SBATCH_GOALS)) \
+                   --output=slurm-%x-%A_%a.out \
+                   --time=00-02:00:00 \
+                   --mem=64G \
+                   --cpus-per-task=8 \
+                   --partition=ncpu
+
+#If we're already in slurm, or inside a container then the sbatch target should be a no-op.
+ifeq ($(SLURM_JOB_ID)$(if $(CONTAINER),,uncontained),)
+sbatch:
+	sbatch $(SBATCH_DEFAULTS) $(filter --%,$(SBATCH_CMDGOALS)) --wrap="$(MAKE) $(SBATCH_GOALS); $(subst ",\",$(call send_notification,SLURM submission))"
+else
+sbatch:
+	true
+endif
+
+
+
+################################################################
 #Standard makefile hacks
 ################################################################
 # These targets will skip any computationally intensive 'include's
 excluded-targets += help clean maintainer-clean print-%
+
+
+# Set up a notifier - If NTFY is an env var, then send a message to the relevant ntfy.sh API endpoint
+# else, just echo to terminal
+
+ifeq ($(origin NTFY),environment)
+send_notification= [ $$? -eq 0 ] && \
+curl -H "Title: $1 complete" -H "Tags: +1" -d "'${MAKECMDGOALS}' in $(CURDIR)" -o /dev/null ntfy.sh/$${NTFY} || \
+curl -H "Title: $1 failed"   -H "Tags: warning" -d "'${MAKECMDGOALS}' in $(CURDIR)" -o /dev/null ntfy.sh/$${NTFY}
+else
+send_notification= [ $$? -eq 0 ] && echo "$1 completed (${MAKECMDGOALS})" || echo "$@ failed (${MAKECMDGOALS})"
+endif
+
 
 comma:= ,
 colon:= :

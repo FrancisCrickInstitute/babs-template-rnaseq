@@ -76,9 +76,8 @@ qmds=$(strip $(foreach section,$(sections),$($(section)_qmds)))
 
 html_reports=$(strip $(foreach section,$(sections),$($(section)_htmls)))
 
-ifeq ($(SUBMIT),false)
-    ifeq ($(CONTAIN),false)
-##     To be executed directly - no further submission or containerisation wrapping needed
+ifeq ($(CONTAINER),)
+##     To be executed directly - no (further) containerisation wrapping needed
 .PHONY: run pages scripts
 
 
@@ -165,24 +164,15 @@ resources/_dependencies.R: $(configs)
 	touch $@
 	$(GIT) add $@
 
-    else
-##   To be executed by container without slurm, so prefix the original call to make with the container
+else # ie CONTAINER != ""
+
+##   To be executed by container so prefix the original call to make with the container
 
 run  pages $(html_reports) scripts $(qmds) $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd  extdata/R.bib renv.lock: $(optionalContainer)
-	$(containerPrefix) make $@ EXECUTOR=make
-    endif
-else
-
-## To be submitted.  The 'slurm' variable (in 'shared.mk') has the sbatch options, and a possibly
-## containerised call to make
-
-run pages $(html_reports) scripts $(qmds) $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd extdata/R.bib renv.lock: $(optionalContainer)
-	echo "$$slurm" | sbatch 
-
+	$(containerPrefix) make $(MAKECMDGOALS) EXECUTOR=make; $(and $(SLURM_JOB_ID),$(call send_notification,Processing))
 endif
 
-
-## Back outside the executor/submission
+## Back outside the container-wrapper
 
 
 # .PHONY: geo
