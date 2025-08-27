@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RNASeq Template</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -203,8 +203,8 @@ yourself, in accordance with standard nfcore requirements.</p>
 <h3 id="whole-pipeline">Whole pipeline<a class="anchor" aria-label="anchor" href="#whole-pipeline"></a>
 </h3>
 <p>TLDR: <code>make all</code> in the <code>babs</code> folder will run
-the whole pipeline. <code>make sbatch</code> will do the same but run
-the final differential stage over slurm.</p>
+the whole pipeline. <code>make all sbatch_args=</code> will do the same
+but run the final differential stage over slurm.</p>
 <p><code>cd</code> into the <code>./babs</code> folder, and there should
 be a makefile there, along with folders for each ‘module’ of
 functionality. <code>docs</code> is the source of all truth;
@@ -220,6 +220,16 @@ intermediate files, processed data objects).</p>
 is hard-wired to go to the endpoint module (currently the
 <code>differential</code> module) and do <code>make run</code> from
 there, so the two approaches are equivalent.</p>
+<p>The option <code>sbatch_args</code> option signals that the
+differential part of the analysis should be submitted to the slurm
+scheduler. So</p>
+<pre><code>make all sbatch_args=
+make all sbatch_args=--time=01-00
+make all sbatch_args="--time=01-00 --job-name='Hello World'"</code></pre>
+<p>if you want to run the job under slurm. The <code>sbatch_args=</code>
+can be empty (purely to flag to <code>make</code> that sbatch is
+required, but with default parameters), or contain one or more sbatch <a href="https://slurm.schedmd.com/sbatch.html" class="external-link">command-line
+options</a></p>
 </div>
 <div class="section level3">
 <h3 id="just-the-differential-part">Just the differential part<a class="anchor" aria-label="anchor" href="#just-the-differential-part"></a>
@@ -231,7 +241,7 @@ To get the three main inputs, metadata needs to be transferred from the
 spec files that describe the analysis to be carried out), and data (the
 aligned counts) need to be transferred from the <code>nfcore</code>
 module. Achieving that should just be a matter of running
-<code>make run</code> (or <code>make sbatch run</code>) in the
+<code>make run</code> (or <code>make run sbatch_args=</code>) in the
 <code>differential</code> folder. However:</p>
 <p>If you’re taking counts etc from different sources, then it’s
 possible to join the pipeline just at this <code>differential</code>
@@ -295,7 +305,7 @@ produces the reports from there.</p>
 <pre><code># cd babs/differential
 make run
 # or to auto-submit to via slurm
-# make sbatch run --time=04:00:00 # any such '--' flags will override our default slurm parameters</code></pre>
+# make run sbatch_args="--time=04:00:00"</code></pre>
 <p>which will discover all <code>spec</code> files in the current
 directory, and analyse the data according to the analysis plan.</p>
 <p>The rough steps this goes through is:</p>

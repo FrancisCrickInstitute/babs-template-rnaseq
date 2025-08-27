@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RNASeq Template</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -180,8 +180,13 @@ put an example spec file in if you don’t have one.</p>
 <code>x.{rda,rds,csv}</code> and <code>y.spec</code> all in ./extdata) a
 <code>make run</code> should do everything required. It’s all a lot
 easier than comes across writing it down long-hand. You can also do</p>
-<pre><code>make sbatch run #append any --slurm_arg=value flags at the end as necessary</code></pre>
-<p>if you want to run the job under slurm.</p>
+<pre><code>make run sbatch_args=
+make run sbatch_args=--time=01-00
+make run sbatch_args="--time=01-00 --job-name='Hello World'"</code></pre>
+<p>if you want to run the job under slurm. The <code>sbatch_args=</code>
+can be empty (purely to flag to <code>make</code> that sbatch is
+required, but with default parameters), or contain one or more sbatch <a href="https://slurm.schedmd.com/sbatch.html" class="external-link">command-line
+options</a></p>
 </div>
 <div class="section level2">
 <h2 id="limma-mode">Limma-mode<a class="anchor" aria-label="anchor" href="#limma-mode"></a>
