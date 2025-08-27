@@ -5,14 +5,13 @@
 export SINGULARITYENV_RENV_PATHS_PREFIX='${envsubst_SINGULARITYENV_RENV_PATHS_PREFIX}'
 docker_image='${envsubst_REGISTRY_URL}'
 SINGULARITY_VERSION='${envsubst_SINGULARITY_VERSION}'
-image="${SINGULARITY_IMAGEDIR:-${SINGULARITY_CACHEDIR:-$HOME/.singularity/cache}/library}/${docker_image/:/_}.sif"
 env_file_name=.env
 
 pdir=$(git rev-parse --show-toplevel 2>/dev/null || echo $(realpath .))
 ldir=.babs-launchers
 if ! (mkdir -p "$ldir" 2>/dev/null && [ -w "$ldir" ]); then
     ldir=$(mktemp -d) || {
-	echo "Failed to create temp directory" >&2
+    echo "Failed to create temp directory" >&2
         exit 1
     }
 fi
@@ -50,18 +49,23 @@ if [[ -z "$SINGULARITYENV_RENV_PATHS_ROOT" ]] ; then
     echo -e "\033[44;97m i \033[0m Setting SINGULARITYENV_RENV_PATHS_ROOT to : ,${SINGULARITYENV_RENV_PATHS_ROOT}. " 1>&2
     mkdir -p ${SINGULARITYENV_RENV_PATHS_ROOT}
 fi
-[[ ",${SINGULARITY_BIND}," == *",/tmp,"* ]] ||
-    SINGULARITY_BIND=${SINGULARITY_BIND},/tmp
-export SINGULARITY_BIND=${SINGULARITY_BIND},$SINGULARITYENV_RENV_PATHS_ROOT
-
-if [[ -n "${SINGULARITY_BIND}" ]]; then
-    echo -e "\033[44;97m i \033[0m Extra directories being bound to the container. This might affect reproducibility: ,${SINGULARITY_BIND}"  | tr ',' '\n' 1>&2
+export SINGULARITY_BIND="${SINGULARITY_BIND:-/tmp}"
+if [[ ",SINGULARITY_BIND," != *",/tmp,"* ]]; then
+  SINGULARITY_BIND+=",/tmp"
 fi
+SINGULARITY_BIND=${SINGULARITY_BIND},$SINGULARITYENV_RENV_PATHS_ROOT
+
+echo -e "\033[44;97m i \033[0m Extra directories being bound to the container. This might affect reproducibility: ,${SINGULARITY_BIND}"  | tr ',' '\n' 1>&2
+
 if compgen -v | grep SINGULARITYENV 1>&2 > /dev/null; then
-  echo -e "\033[44;97m i \033[0m The following environment variables are inherited in the container. Remove the corresponding SINGULARITYENV_* variable (unset) if you don't want the following values to be used:"
-  for var in $(compgen -v | grep SINGULARITYENV); do
-    echo "${var#SINGULARITYENV_}=${!var}" 1>&2
-  done
+    echo -e "\033[44;97m i \033[0m The following environment variables are inherited in the container. Remove the corresponding SINGULARITYENV_* variable (unset) if you don't want the following values to be used:"
+    for var in $(compgen -v | grep SINGULARITYENV); do
+        if [[ "$var" =~ TOKEN|SECRET|KEY|PASSWORD|API|GITHUB_PAT ]]; then
+            echo "${var#SINGULARITYENV_}=****"  1>&2
+        else
+            echo "${var#SINGULARITYENV_}=${!var}" 1>&2
+        fi
+    done
 fi
 
 PASSWORD=$(openssl rand -hex 32)
@@ -74,28 +78,29 @@ while :; do
 done
 
 if  ! command -v docker >/dev/null 2>&1; then
+    image="${SINGULARITY_IMAGEDIR:-${SINGULARITY_CACHEDIR:-$HOME/.singularity/cache}/library}/${docker_image/:/_}.sif"
     if [ ! -f "${image}" ]; then
         echo "✅ Creating ${image} from ${docker_image}..."
         module is-loaded Singularity/${SINGULARITY_VERSION} ||
-	    module load Singularity/${SINGULARITY_VERSION} ||
-	    true
-	mkdir -p $(dirname "$image")
+        module load Singularity/${SINGULARITY_VERSION} ||
+        true
+    mkdir -p $(dirname "$image")
         singularity pull ${image} docker://${docker_image} || exit
     fi
     container=singularity
     my_caller () {
-	module is-loaded Singularity/${SINGULARITY_VERSION} ||
-	    module load Singularity/${SINGULARITY_VERSION} ||
-	    true
+    module is-loaded Singularity/${SINGULARITY_VERSION} ||
+        module load Singularity/${SINGULARITY_VERSION} ||
+        true
     local singularity_args=(
-        ${method:-exec}
-        --bind ${pdir}
-        --pwd $(realpath .)
-        --containall
-        --scratch /run,/var/lib/rstudio-server
-        --cleanenv
-        --env SQLITE_TMPDIR=/tmp,BIOCPARALLEL_WORKER_NUMBER=${NUM_THREADS:-2},GITHUB_PAT=${GITHUB_PAT},OMP_NUM_THREADS=${NUM_THREADS:-2},OPENBLAS_NUM_THREADS=${NUM_THREADS:-2}
-        ${image}
+            ${method:-exec}
+            --bind ${pdir}
+            --pwd $(realpath .)
+            --containall
+            --scratch /run,/var/lib/rstudio-server
+            --cleanenv
+            --env SQLITE_TMPDIR=/tmp,BIOCPARALLEL_WORKER_NUMBER=${NUM_THREADS},OMP_NUM_THREADS=${NUM_THREADS},OPENBLAS_NUM_THREADS=${NUM_THREADS}
+            ${image}
     )
     singularity_args+=("$@")
     singularity "${singularity_args[@]}"
@@ -104,31 +109,31 @@ else
     container=docker
     my_caller () {
     local docker_args=(
-        --rm
-        -w /home/rstudio/project
-        -v "${pdir}:/home/rstudio/project"
+            --rm
+            -w /home/rstudio/project
+            -v "${pdir}:/home/rstudio/project"
     )
     IFS=',' read -ra binds <<< "$SINGULARITY_BIND"
     for bind in "${binds[@]}"; do
-        if [[ "$bind" == *:* ]]; then
+            if [[ "$bind" == *:* ]]; then
         docker_args+=("-v" "$bind")
-        else
+            else
         docker_args+=("-v" "$bind:$bind")
-        fi
+            fi
     done
     docker_args+=(
-        -e USERID=$(id -u)
-        -e GROUPID=$(id -g)
-        -e SQLITE_TMPDIR=/tmp
-        -e BIOCPARALLEL_WORKER_NUMBER=${NUM_THREADS:-2}
-        -e OMP_NUM_THREADS=${NUM_THREADS:-2}
-        -e OPENBLAS_NUM_THREADS=${NUM_THREADS:-2}
+            -e USERID=$(id -u)
+            -e GROUPID=$(id -g)
+            -e SQLITE_TMPDIR=/tmp
+            -e BIOCPARALLEL_WORKER_NUMBER=${NUM_THREADS}
+            -e OMP_NUM_THREADS=${NUM_THREADS}
+            -e OPENBLAS_NUM_THREADS=${NUM_THREADS}
     )
     while IFS='=' read -r name value; do
-        if [[ "$name" == SINGULARITYENV_* ]]; then
+            if [[ "$name" == SINGULARITYENV_* ]]; then
         varname="${name#SINGULARITYENV_}"
         docker_args+=("-e" "${varname}=${value}")
-        fi
+            fi
     done < <(env | grep ^SINGULARITYENV_)
     docker_args+=(-e INSIDE_DOCKER=1)
     [[ -n "$GITHUB_PAT" ]] && docker_args+=(-e GITHUB_PAT)
@@ -152,16 +157,16 @@ case "$cmd" in
         ${cmd}
         ;;
     debug)
-	[ -e ${BABS_TMP:=.}/report.txt ] && {echo ${BABS_TMP)/report.txt already exists; exit 1;}
-	echo $PWD > ${BABS_TMP}/report.txt
-	echo "## SINGULARITY ENV" >> ${BABS_TMP}/report.txt
-	for var in $(compgen -v | grep SINGULARITYENV); do
-	    echo "${var#SINGULARITYENV_}=${!var}"  >> ${BABS_TMP}/report.txt
-	done
-	echo "## SINGULARITY BIND" >> ${BABS_TMP}/report.txt
-	echo ${SINGULARITY_BIND} >>  ${BABS_TMP}/report.txt
-	echo "Please cite $(realpath "$BABS_TMP")/report.txt in any support messages."
-	;;
+    [ -e ${BABS_TMP:=.}/report.txt ] && {echo ${BABS_TMP)/report.txt already exists; exit 1;}
+    echo $PWD > ${BABS_TMP}/report.txt
+    echo "## SINGULARITY ENV" >> ${BABS_TMP}/report.txt
+    for var in $(compgen -v | grep SINGULARITYENV); do
+        echo "${var#SINGULARITYENV_}=${!var}"  >> ${BABS_TMP}/report.txt
+    done
+    echo "## SINGULARITY BIND" >> ${BABS_TMP}/report.txt
+    echo ${SINGULARITY_BIND} >>  ${BABS_TMP}/report.txt
+    echo "Please cite $(realpath "$BABS_TMP")/report.txt in any support messages."
+    ;;
     shell)
         interactive=${BABS_INTERACTIVE:-true} method=shell my_caller
         ;;

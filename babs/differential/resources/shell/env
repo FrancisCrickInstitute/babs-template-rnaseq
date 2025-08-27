@@ -27,3 +27,4 @@ data_transfer_filename=.data-transfer-rules
 #export SINGULARITY_BIND=~/.ssh #etc - we automatically bind SINGULARITY_RENV_PATHS_ROOT, so no need to add that
 #export SINGULARITYENV_DISPLAY="$DISPLAY"
 #export NUM_THREADS=2
+#export SINGULARITYENV_GITHUB_PAT="${GITHUB_PAT}"
