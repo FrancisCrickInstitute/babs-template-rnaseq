@@ -12,10 +12,16 @@ ingress: docs
 ## stage-level log files are the sentinel for the stage having been run
 $(stages): % : %.log
 
+ifeq ($(origin sbatch_args),command line)
+SB=sbatch_args=$(sbatch_args)
+else
+SB=
+endif
+
 ## Do 'make run' in the stage's directory.
 ## Only create the log file if successful, otherwise crash out with the err file
 %.log : 
-	cd $*; $(MAKE) --no-print-directory run  >> $*.err 2>&1
+	cd $*; $(MAKE) --no-print-directory run $(SB) >> $*.err 2>&1
 	mv $*/$*.err $@
 
 sbatch: nfcore ## Same as 'all', but submit the final differential stage to slurm. Can add multiple --slurm_arg=value flags.

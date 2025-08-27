@@ -53,3 +53,5 @@ curl -s -H "Title: $1 server ready" -H "Tag:information_source"  https://ntfy.sh
  -d "Access server on http://$(hostname).$(dnsdomainname):$PORT$3 - see slurm-$1.out for details. To cancel the slurm job, scancel -f ${SLURM_JOB_ID}"  >/dev/null 2>&1
 fi
 }
+
+ 

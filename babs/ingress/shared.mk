@@ -24,20 +24,6 @@ ingress_dir?=$(wildcard ../ingress)
 nfcore_dir?=$(wildcard ../nfcore)
 diff_dir?=$(wildcard ../differential)
 
-################################################################
-# Handle special sbatch goal
-################################################################
-# Always do this early!!! Delayed hacking of MAKECMDGOALS is risky
-# If sbatch is a goal, don't run anything else for now,
-# but store what was needed for later, so we can do
-# sbatch --wrap='make what-I would-have run'
-ifeq ($(filter sbatch,$(MAKECMDGOALS)),sbatch)
-SBATCH_GOALS:=$(filter-out sbatch,$(MAKECMDGOALS))
-override MAKECMDGOALS := sbatch
-endif
-
-
-
 # The following can be set to singularity|docker|shell
 # and determines the environment in which quarto/R processes
 # will be run in.
@@ -97,6 +83,8 @@ chmod = setfacl -m $2:$3 $1 >/dev/null 2>&1 || chmod $2=$3 $1
 # Environment Variables
 NUM_THREADS?=$(or ${SLURM_JOB_CPUS_PER_NODE},2)
 data_transfer_filename?=.data-transfer-rules
+export MAKEFLAGS
+export SINGULARITYENV_GITHUB_PAT=${GITHUB_PAT}
 
 ################################################################
 # Git-derived variables
@@ -237,15 +225,17 @@ excluded-targets += prepare-rsync do-rsync
 
 excluded-targets += Dockerfile install_all.sh
 
-CONTAINER=
-BIND_DIR = $$(git rev-parse --show-toplevel 2>/dev/null || echo $$(realpath .))
+CONTAIN=false#An internal flag
+BIND_DIR = $(shell git rev-parse --show-toplevel 2>/dev/null || echo $(realpath .))
 EXECUTOR?=singularity
 renv_root=$(or $(SINGULARITYENV_RENV_PATHS_ROOT),~/.cache/R/renv)
 ifeq ($(EXECUTOR),singularity)
-CONTAINER= $(call ml,Singularity/$(SINGULARITY_VERSION)); singularity	
+CONTAINER= $(call ml,Singularity/$(SINGULARITY_VERSION)); singularity 
 CONTAINER_IMAGE=$(or $(SINGULARITY_ROOT),.)/$(IMAGE_REG)$(IMAGE)_$(IMAGE_TAG).sif
 CONTAINER_BIND=--bind $(BIND_DIR),/tmp,$(renv_root)
-CONTAINER_ENV=--env SQLITE_TMPDIR=/tmp,BIOCPARALLEL_WORKER_NUMBER=$(NUM_THREADS),GITHUB_PAT=$${GITHUB_PAT},OMP_NUM_THREADS=${NUM_THREADS},OPENBLAS_NUM_THREADS=${NUM_THREADS},MAKEFLAGS="${MAKEFLAGS}"
+CONTAINER_ENV=--env SQLITE_TMPDIR=/tmp,$\
+  OMP_NUM_THREADS=$(NUM_THREADS),OPENBLAS_NUM_THREADS=$(NUM_THREADS),BIOCPARALLEL_WORKER_NUMBER=$(NUM_THREADS),$\
+  SLURM_JOB_ID="$${SLURM_JOB_ID}",SLURM_ARRAY_TASK_ID="$${SLURM_ARRAY_TASK_ID}"
 CONTAINER_OPTIONS= exec $(CONTAINER_BIND) --pwd $$(realpath .) --containall --cleanenv $(CONTAINER_ENV)
 $(CONTAINER_IMAGE): 
 	cd $(dir $(CONTAINER_IMAGE)) ;\
@@ -263,7 +253,7 @@ CONTAINER_OPTIONS=run \
 --mount type=bind,source="$(renv_root)",target="$(renv_root)" --env RENV_PATHS_ROOT=$(renv_root)\
 --env SQLITE_TMPDIR=/tmp \
 --env BIOCPARALLEL_WORKER_NUMBER=$(NUM_THREADS) \
---env GITHUB_PAT=$${GITHUB_PAT} \
+--env GITHUB_PAT \
 --env OMP_NUM_THREADS=${NUM_THREADS} \
 --env OPENBLAS_NUM_THREADS=${NUM_THREADS} \
 --env MAKEFLAGS="${MAKEFLAGS}" \
@@ -301,12 +291,14 @@ docker/Dockerfile.base: resources/docker/Dockerfile
 
 
 
-ifneq ($(CONTAINER),)
-optionalContainer=$(CONTAINER_IMAGE)
-containerPrefix=$(CONTAINER) $(CONTAINER_OPTIONS) $(CONTAINER_IMAGE)
-else
+ifeq ($(CONTAINER),)
 optionalContainer=
 containerPrefix=
+NEED_CONTAINER := false
+else
+optionalContainer=$(CONTAINER_IMAGE)
+containerPrefix=$(CONTAINER) $(CONTAINER_OPTIONS) --env MAKEFLAGS="$(MAKEFLAGS)" $(CONTAINER_IMAGE)
+NEED_CONTAINER := true
 endif
 
 excluded-targets += docker
@@ -318,23 +310,27 @@ excluded-targets += docker
 ################################################################
 ## By default, run recipes in the usual manner rather than slurm etc.
 
-SBATCH_DEFAULTS := --job-name=$(notdir $(CURDIR))_$(firstword $(SBATCH_GOALS)) \
-                   --output=slurm-%x-%A_%a.out \
-                   --time=00-02:00:00 \
-                   --mem=64G \
-                   --cpus-per-task=8 \
-                   --partition=ncpu
-
-#If we're already in slurm, or inside a container then the sbatch target should be a no-op.
-ifeq ($(SLURM_JOB_ID)$(if $(CONTAINER),,uncontained),)
-sbatch:
-	sbatch $(SBATCH_DEFAULTS) $(filter --%,$(SBATCH_CMDGOALS)) --wrap="$(MAKE) $(SBATCH_GOALS); $(subst ",\",$(call send_notification,SLURM submission))"
+# Determine if sbatch is needed
+ifeq ($(SLURM_JOB_ID),)
+  # SLURM_JOB_ID is empty
+  ifeq ($(origin sbatch_args),command line)
+    NEED_SBATCH := true
+  else
+    NEED_SBATCH := false
+  endif
 else
-sbatch:
-	true
+  NEED_SBATCH := false
 endif
 
+default_sbatch_args=\
+ --time=0-02:00:00\
+ --mem=64G\
+ --cpus-per-task=8\
+ --partition=ncpu\
+ --job-name=$(notdir $(CURDIR))-$(firstword $(MAKECMDGOALS))\
+ --output=slurm-%x-%A_%a.out
 
+slurm_wrap=$(subst ','\'',$(containerPrefix) make $@ EXECUTOR=make; $(call send_notification,SLURM submission))
 
 ################################################################
 #Standard makefile hacks
@@ -364,6 +360,15 @@ define newline
 $(empty)
 endef
 bslash := \$(empty)
+
+
+ifeq ($(origin NTFY),environment)
+send_notification= [ $$? -eq 0 ] && \
+curl -H "Title: $1 complete" -H "Tags: +1" -d "'${MAKECMDGOALS}' in $(CURDIR)" -o /dev/null ntfy.sh/$${NTFY} || \
+curl -H "Title: $1 failed"   -H "Tags: warning" -d "'${MAKECMDGOALS}' in $(CURDIR)" -o /dev/null ntfy.sh/$${NTFY}
+else
+send_notification= [ $$? -eq 0 ] && echo "$1 completed (${MAKECMDGOALS})" || echo "$@ failed (${MAKECMDGOALS})"
+endif
 
 #We don't need any of the c default rules
 MAKEFLAGS += --no-builtin-rules
@@ -401,18 +406,27 @@ excluded-targets += R R-local R-$(RVERSION)
 
 R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses).  Also EXECUTOR=docker means the launchers will use docker rather than singularity
 
-R-$(RVERSION): BIND_DIR=$${wd}#Again, pick up local runtime setting
 R-$(RVERSION): resources/shell/R-local
 	$(call envsubst,SINGULARITYENV_RENV_PATHS_PREFIX REGISTRY_URL SINGULARITY_VERSION) < $< > $@
 	@$(call chmod,$@,u,rwx)
 	mkdir -p $(launch_dir)/
-	for i in rstudio shiny jupyter server-info; do cp resources/shell/$${i}.sh $(launch_dir)/$${i}.sh || echo "$${i}.sh doesn't yet exist"; done
+	for i in rstudio shiny jupyter server-info; do sed -i -e "\,source $$i.sh,{" -e "r resources/shell/$$i.sh" -e "d" -e "}" $@; done
 
 R:
 	@echo "Starting R $(RVERSION) in container $(CONTAINER_IMAGE) ..."
 	@$(CONTAINER) $(CONTAINER_OPTIONS) $(CONTAINER_IMAGE) R
 
+launch-%: R-$(RVERSION) ## launch-R launch-rstudio, launch-jupyter etc 
+	BABS_CMD=$* ./R-$(RVERSION)
 
+admin-launch-%: ##  admin-launch-R, admin-launch-debug  etc will use a temporary workspace
+	d=$$(mktemp -d) ;\
+	$(call envsubst,SINGULARITYENV_RENV_PATHS_PREFIX REGISTRY_URL SINGULARITY_VERSION) < resources/shell/R-local > $$d/launcher.sh ;\
+	@$(call chmod,$$d/launcher.sh,u,rwx) ;\
+	mkdir -p $$d/$(launch_dir)/ ;\
+	for i in rstudio shiny jupyter server-info; do sed -i -e "\,source $$i.sh,{" -e "r resources/shell/$$i.sh" -e "d" -e "}" $$d/launcher.sh; done ;\
+	echo "Running in $$d" ;\
+	BABS_CMD=$* BABS_TMP=$$d $$d/launcher.sh >> $$d/report.txt
 
 ################################################################
 ## Generate secrets

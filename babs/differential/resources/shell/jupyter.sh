@@ -1,6 +1,4 @@
-#!/usr/bin/env bash
-
-
+jupyter() {
 export SINGULARITYENV_UV_CACHE_DIR=$ldir/uv-cache
 export SINGULARITYENV_PIP_CACHE_DIR=$ldir/pip-cache
 jupyter_local_share=$ldir/jupyter-share
@@ -41,3 +39,4 @@ PID=$!
 server_info jupyter 8888 "/lab?token=${PASSWORD}"
 
 wait $PID
+}

@@ -1,3 +1,8 @@
+# Version 1.0.1
+## Major Changes
+## Minor Changes
+ - Injecting the demo that got missed
+ - Launchers are now single-file scripts
 # Version 1.0.0
 ## Major Changes
  - Add differential_subsets functionality

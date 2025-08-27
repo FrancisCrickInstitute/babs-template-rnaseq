@@ -10,6 +10,12 @@ env_file_name=.env
 
 pdir=$(git rev-parse --show-toplevel 2>/dev/null || echo $(realpath .))
 ldir=.babs-launchers
+if ! (mkdir -p "$ldir" 2>/dev/null && [ -w "$ldir" ]); then
+    ldir=$(mktemp -d) || {
+	echo "Failed to create temp directory" >&2
+        exit 1
+    }
+fi
 
 ## source any .env files between this directory and the project-level
 if [[ -n "$env_file_name" ]]; then
@@ -136,17 +142,26 @@ else
     }
 fi
 
+source server-info.sh
+source rstudio.sh
+source shiny.sh
+source jupyter.sh
 
 case "$cmd" in
     rstudio|shiny|jupyter)
-        if [[ -d $ldir ]]; then
-            source $ldir/server-info.sh
-        else
-            echo "This command needs to be run from a directory with a '$ldir' subdirectory - please copy that from the launcher directory" >&2
-            exit 1
-        fi
-        source $ldir/${cmd}.sh
+        ${cmd}
         ;;
+    debug)
+	[ -e ${BABS_TMP:=.}/report.txt ] && {echo ${BABS_TMP)/report.txt already exists; exit 1;}
+	echo $PWD > ${BABS_TMP}/report.txt
+	echo "## SINGULARITY ENV" >> ${BABS_TMP}/report.txt
+	for var in $(compgen -v | grep SINGULARITYENV); do
+	    echo "${var#SINGULARITYENV_}=${!var}"  >> ${BABS_TMP}/report.txt
+	done
+	echo "## SINGULARITY BIND" >> ${BABS_TMP}/report.txt
+	echo ${SINGULARITY_BIND} >>  ${BABS_TMP}/report.txt
+	echo "Please cite $(realpath "$BABS_TMP")/report.txt in any support messages."
+	;;
     shell)
         interactive=${BABS_INTERACTIVE:-true} method=shell my_caller
         ;;

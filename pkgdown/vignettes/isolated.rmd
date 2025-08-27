@@ -119,10 +119,15 @@ Once you’ve done that (got `x.config`, `x.{rda,rds,csv}` and `y.spec` all in
 easier than comes across writing it down long-hand. You can also do
 
 ```
-make sbatch run #append any --slurm_arg=value flags at the end as necessary
+make run sbatch_args=
+make run sbatch_args=--time=01-00
+make run sbatch_args="--time=01-00 --job-name='Hello World'"
 ```
 
-if you want to run the job under slurm.
+if you want to run the job under slurm. The `sbatch_args=` can be
+empty (purely to flag to `make` that sbatch is required, but with
+default parameters), or contain one or more sbatch
+[command-line options](https://slurm.schedmd.com/sbatch.html)
 
 # Limma-mode
 

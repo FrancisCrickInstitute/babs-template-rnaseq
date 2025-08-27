@@ -1,5 +1,4 @@
-#!/usr/bin/env bash
-
+rstudio() {
 
 export SINGULARITYENV_RSTUDIO_SESSION_TIMEOUT=0
 export SINGULARITYENV_USER=$(id -un)
@@ -56,3 +55,4 @@ PID=$!
 server_info rstudio 8787
 
 wait $PID
+}

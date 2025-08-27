@@ -1,5 +1,4 @@
-#!/usr/bin/env bash
-
+shiny() {
 if [ -z "$@" ]; then 
     my_caller R --quiet --no-echo --no-restore -e "cat('✅ Starting app...\n'); shiny::runApp(host='0.0.0.0',port=${PORT})" &
     PID=$!
@@ -12,3 +11,4 @@ fi
 server_info shiny 3838
 
 wait $PID
+}

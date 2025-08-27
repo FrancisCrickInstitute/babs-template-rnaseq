@@ -76,8 +76,10 @@ qmds=$(strip $(foreach section,$(sections),$($(section)_qmds)))
 
 html_reports=$(strip $(foreach section,$(sections),$($(section)_htmls)))
 
-ifeq ($(CONTAINER),)
+ifeq ($(NEED_SBATCH),false)
+    ifeq ($(NEED_CONTAINER),false)
 ##     To be executed directly - no (further) containerisation wrapping needed
+
 .PHONY: run pages scripts
 
 
@@ -150,7 +152,7 @@ renv.lock: resources/_dependencies.R $(wildcard resources/renv/renv.lock) | $(lo
 	  $(R) -e 'library(renv); restore(); install(); snapshot()' ;\
 	else \
 	  $(GIT) stash push -m "Pipeline stashed. Use 'git stash pop' to retrieve it" -- $@ $(call log,renv) ;\
-	  $(R) -e 'library(renv); init(bioconductor=TRUE); snapshot()' ;\
+	  $(R) -e 'library(renv); init(bioconductor=TRUE)' ;\
 	fi
 	$(GIT) add renv.lock renv .Rprofile $(source_dir)
 	$(GIT) add $(wildcard ../makefile ../.gitignore ../readme.md ../.gitignore .pipeline-version)
@@ -164,15 +166,24 @@ resources/_dependencies.R: $(configs)
 	touch $@
 	$(GIT) add $@
 
-else # ie CONTAINER != ""
-
+else
 ##   To be executed by container so prefix the original call to make with the container
 
 run  pages $(html_reports) scripts $(qmds) $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd  extdata/R.bib renv.lock: $(optionalContainer)
-	$(containerPrefix) make $(MAKECMDGOALS) EXECUTOR=make; $(and $(SLURM_JOB_ID),$(call send_notification,Processing))
+	$(containerPrefix) make $@ EXECUTOR=make
+    endif
+else
+
+## To be submitted.  The 'slurm' variable (in 'resources/make/slurm.mk') has the sbatch options, and a possibly
+## containerised call to make
+
+run pages $(html_reports) scripts $(qmds) $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd extdata/R.bib renv.lock: $(optionalContainer)
+	sbatch $(default_sbatch_args) $(sbatch_args) --wrap='$(slurm_wrap)'
+
 endif
 
-## Back outside the container-wrapper
+## Back outside the executor
+
 
 
 # .PHONY: geo

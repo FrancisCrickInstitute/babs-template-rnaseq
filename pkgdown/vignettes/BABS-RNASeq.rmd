@@ -152,7 +152,8 @@ yourself, in accordance with standard nfcore requirements.
 
 ### Whole pipeline
 
-TLDR: `make all` in the `babs` folder will run the whole pipeline. `make sbatch` will do the same but run the final differential stage over slurm.
+TLDR: `make all` in the `babs` folder will run the whole pipeline. `make all sbatch_args=`
+will do the same but run the final differential stage over slurm.
 
 `cd` into the `./babs` folder, and there should be a makefile there,
 along with folders for each 'module' of functionality.  `docs` is the
@@ -169,6 +170,21 @@ intermediate files, processed data objects).
 the endpoint module (currently the `differential` module) and do `make
 run` from there, so the two approaches are equivalent.
 
+The option `sbatch_args` option signals that the differential part of
+the analysis should be submitted to the slurm scheduler. So 
+
+```
+make all sbatch_args=
+make all sbatch_args=--time=01-00
+make all sbatch_args="--time=01-00 --job-name='Hello World'"
+```
+
+if you want to run the job under slurm. The `sbatch_args=` can be
+empty (purely to flag to `make` that sbatch is required, but with
+default parameters), or contain one or more sbatch
+[command-line options](https://slurm.schedmd.com/sbatch.html)
+
+
 ### Just the differential part
 
 If you're using the full bulk RNASeq pipeline, everything should be
@@ -177,8 +193,8 @@ the three main inputs, metadata needs to be transferred from the
 `docs` folder (the original source of experiment table and spec files
 that describe the analysis to be carried out), and data (the aligned
 counts) need to be transferred from the `nfcore` module. Achieving
-that should just be a matter of running `make run` (or `make sbatch
-run`) in the `differential` folder. However:
+that should just be a matter of running `make run` (or `make run sbatch_args=`)
+in the `differential` folder. However:
 
 If you're taking counts etc from different sources, then it's possible
 to join the pipeline just at this `differential` stage by manually
