@@ -264,7 +264,7 @@ The vast majority of work is carried out by:
 # cd babs/differential
 make run
 # or to auto-submit to via slurm
-# make sbatch run --time=04:00:00 # any such '--' flags will override our default slurm parameters
+# make run sbatch_args="--time=04:00:00"
 ```
 
 which will discover all `spec` files in the current directory, and
