@@ -1,8 +1,5 @@
 jupyter() {
-    export SINGULARITYENV_UV_CACHE_DIR=$ldir/uv-cache
-    export SINGULARITYENV_PIP_CACHE_DIR=$ldir/pip-cache
-    export SINGULARITYENV_JUPYTER_DATA_DIR=$ldir/jupyter-share
-    sentinel=$ldir/jupyter-kernel.sentinel
+    sentinel=${launcher_dir}/jupyter-kernel.sentinel
     mkdir -p ${SINGULARITY_UV_CACHE_DIR} ${SINGULARITYENV_PIP_CACHE_DIR} ${SINGULARITYENV_JUPYTER_DATA_DIR}
 
     if [ ! -f "./pyproject.toml" ]; then

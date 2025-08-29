@@ -33,19 +33,23 @@ $(template_dir)/archive:
 ################################################################
 
 .PHONY: infrastructure
-launchers=$(patsubst $(generic_dir)/%,babs/differential/%,$(wildcard $(generic_dir)/resources/shell/*))
-shared=$(patsubst %,babs/%/shared.mk,docs ingress nfcore)
+infra-shell=$(patsubst $(generic_dir)/%,babs/differential/%,$(wildcard $(generic_dir)/resources/shell/*))
+infra-mk=$(patsubst %,babs/%/shared.mk,docs ingress nfcore)
+infra-envs=babs/differential/.env babs/differential/.env.local
 
 infrastructure: ## Transfer latest launch-helpers and shared.mk from the generic template
-infrastructure: $(launchers) $(shared)
+infrastructure: $(infra-shell) $(infra-mk) $(infra-envs)
 
-$(launchers) : babs/differential/% : $(generic_dir)/%
+$(infra-shell) : babs/differential/% : $(generic_dir)/%
 	cp $< $@
-$(shared) : babs/differential/resources/make/shared.mk
+$(infra-mk) : babs/differential/resources/make/shared.mk
 	ln -f $< $@
 babs/differential/resources/make/shared.mk: $(wildcard $(generic_dir)/template/resources/make/shared-rnaseq.mk)
 	cp $< $@
-	for i in $(generic_dir)/template/resources/shell/env*; do [ $$i = "env*" ] || cp $$i babs/differential/.$$(basename $$i); done
+
+
+$(infra-envs) : babs/differential/% : $(generic_dir)/template/%
+	cp $< $@
 
 
 

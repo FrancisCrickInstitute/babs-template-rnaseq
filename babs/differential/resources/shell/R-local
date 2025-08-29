@@ -2,15 +2,11 @@
 #SBATCH --ntasks=1
 #SBATCH --output=slurm-%x.out
 
-export SINGULARITYENV_RENV_PATHS_PREFIX='${envsubst_SINGULARITYENV_RENV_PATHS_PREFIX}'
-docker_image='${envsubst_REGISTRY_URL}'
-SINGULARITY_VERSION='${envsubst_SINGULARITY_VERSION}'
 env_file_name=.env
 
 pdir=$(git rev-parse --show-toplevel 2>/dev/null || echo $(realpath .))
-ldir=.babs-launchers
-if ! (mkdir -p "$ldir" 2>/dev/null && [ -w "$ldir" ]); then
-    ldir=$(mktemp -d) || {
+if ! (mkdir -p "${launcher_dir}" 2>/dev/null && [ -w "${launcher_dir}" ]); then
+    launcher_dir=$(mktemp -d) || {
     echo "Failed to create temp directory" >&2
         exit 1
     }
@@ -36,10 +32,10 @@ fi
 
 if [ -z "${SLURM_JOB_ID}" ]; then
     basename=$(basename $0)
-    NUM_THREADS=2
+    NUM_THREADS=${NUM_THREADS:-2}
 else
     basename=$(scontrol show job $SLURM_JOB_ID | awk -F= '/Command=/{print $2}' | head -n1 | xargs basename)
-    NUM_THREADS=${SLURM_JOB_CPUS_PER_NODE:-2}
+    NUM_THREADS=${SLURM_CPUS_PER_TASK:-${NUM_THREADS:-2}}
     login_node=${__login_node:-login}
 fi
 cmd=${BABS_CMD:-${basename%-*}}
@@ -78,19 +74,21 @@ while :; do
 done
 
 if  ! command -v docker >/dev/null 2>&1; then
-    image="${SINGULARITY_IMAGEDIR:-${SINGULARITY_CACHEDIR:-$HOME/.singularity/cache}/library}/${docker_image/:/_}.sif"
+    image="${SINGULARITY_IMAGEDIR:-${SINGULARITY_CACHEDIR:-$HOME/.singularity/cache}/library}/${sif_file}"
     if [ ! -f "${image}" ]; then
         echo "✅ Creating ${image} from ${docker_image}..."
-        module is-loaded Singularity/${SINGULARITY_VERSION} ||
-        module load Singularity/${SINGULARITY_VERSION} ||
+        module is-loaded ${SINGULARITY_VERSION} ||
+        module load ${SINGULARITY_VERSION} ||
         true
-    mkdir -p $(dirname "$image")
+        mkdir -p $(dirname "$image")
+        export DOCKER_USERNAME="${DOCKER_USERNAME:-${GITHUB_USERNAME:-$(git config --get github.user)}}" || { echo "No GitHub username found"; exit 1; }
+        export DOCKER_PASSWORD=${DOCKER_PASSWORD:-${GITHUB_PAT}}
         singularity pull ${image} docker://${docker_image} || exit
     fi
     container=singularity
     my_caller () {
-    module is-loaded Singularity/${SINGULARITY_VERSION} ||
-        module load Singularity/${SINGULARITY_VERSION} ||
+    module is-loaded ${SINGULARITY_VERSION} ||
+        module load ${SINGULARITY_VERSION} ||
         true
     local singularity_args=(
             ${method:-exec}

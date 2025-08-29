@@ -3,22 +3,22 @@ rstudio() {
     export SINGULARITYENV_USER=$(id -un)
     export SINGULARITYENV_PASSWORD=$PASSWORD
     export SINGULARITY_BIND="${SINGULARITY_BIND},\
-$ldir/${USER}/rsession.conf:/etc/rstudio/rsession.conf,\
-$ldir/${USER}/R:$HOME/.config/R,\
-$ldir/${USER}/rstudio:$HOME/.config/rstudio"
-    mkdir -p  $ldir/${USER}/rstudio $ldir/${USER}/R
+${launcher_dir}/${USER}/rsession.conf:/etc/rstudio/rsession.conf,\
+${launcher_dir}/${USER}/R:$HOME/.config/R,\
+${launcher_dir}/${USER}/rstudio:$HOME/.config/rstudio"
+    mkdir -p  ${launcher_dir}/${USER}/rstudio ${launcher_dir}/${USER}/R
 
     [[ ",${SINGULARITY_BIND}," == *",/etc/ssl/certs/ca-bundle.crt,"* ]] || SINGULARITY_BIND=${SINGULARITY_BIND},/etc/ssl/certs/ca-bundle.crt
     [[ ",${SINGULARITY_BIND}," == *",$HOME/.ssh,"* ]] || SINGULARITY_BIND=${SINGULARITY_BIND},$HOME/.ssh
     [[ ",${SINGULARITY_BIND}," == *",/sys/fs/cgroup,"* ]] || SINGULARITY_BIND=${SINGULARITY_BIND},/sys/fs/cgroup
 
     if [ "$container" = singularity ]; then
-        echo "session-default-working-dir=$pdir" > $ldir/${USER}/rsession.conf
+        echo "session-default-working-dir=$pdir" > ${launcher_dir}/${USER}/rsession.conf
     else
-        echo "session-default-working-dir=/home/rstudio/project" > $ldir/${USER}/rsession.conf
+        echo "session-default-working-dir=/home/rstudio/project" > ${launcher_dir}/${USER}/rsession.conf
     fi
 
-    printf '{\n"knit_working_dir": "current"\n}\n' > $ldir/${USER}/rstudio/rstudio-prefs.json
+    printf '{\n"knit_working_dir": "current"\n}\n' > ${launcher_dir}/${USER}/rstudio/rstudio-prefs.json
 
     rstudio_cmd='env > ~/.Renviron;\
     echo "✅ Starting RStudio...";\

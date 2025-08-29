@@ -14,7 +14,7 @@ metadata_id_column = ID
 name_col = sample_name
 samples_db = samples.db
 
-NEXTFLOW = $(call ml,Nextflow/$(NEXTFLOW_VERSION)); $(call ml,Singularity/$(SINGULARITY_VERSION)); nextflow
+NEXTFLOW = $(call ml,Nextflow/$(NEXTFLOW_VERSION)); $(call ml,$(SINGULARITY_VERSION)); nextflow
 SQLITE = $(call ml,SQLite/3.42.0-GCCcore-12.3.0); sqlite3
 
 
@@ -53,24 +53,8 @@ SELF_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 ################################################################
 # Executables and their versions
 ################################################################
-SINGULARITY_VERSION=3.11.3
 NEXTFLOW_VERSION=23.10.0
-RVERSION=4.5.1
-BIOCONDUCTOR_TAG=3.21-r-4.5.1
-OUR_VERSION=v0.21.3
-OUR_REPO=franciscrickinstitute/babs-wg-environments
 
-################################################################
-# Singularity Images
-################################################################
-
-IMAGE_NAME=bioconductor_docker
-IMAGE_REG=$(if $(OUR_VERSION),ghcr,docker).io/
-IMAGE_REPO=$(or $(OUR_REPO),bioconductor)
-IMAGE_TAG=$(BIOCONDUCTOR_TAG)$(and $(OUR_VERSION),-$(OUR_VERSION))
-IMAGE=$(IMAGE_REPO)/$(IMAGE_NAME)
-REGISTRY_URL=$(IMAGE_REG)$(IMAGE)$(colon)$(IMAGE_TAG)
-export SINGULARITYENV_RENV_PATHS_PREFIX=$(subst /,-,$(IMAGE))
 
 R=R
 QUARTO=quarto
@@ -81,7 +65,9 @@ ml = module is-loaded $1 || module load $1 || true # ie fall back to true (ie re
 chmod = setfacl -m $2:$3 $1 >/dev/null 2>&1 || chmod $2=$3 $1
 
 # Environment Variables
-NUM_THREADS?=$(or ${SLURM_JOB_CPUS_PER_NODE},2)
+include .env.mk
+
+NUM_THREADS:=$(or ${SLURM_CPUS_PER_TASK},$(NUM_THREADS),2)
 data_transfer_filename?=.data-transfer-rules
 export MAKEFLAGS
 export SINGULARITYENV_GITHUB_PAT=${GITHUB_PAT}
@@ -94,7 +80,6 @@ TAG = _$(shell $(GIT) describe --tags --dirty=_altered --always --long 2>/dev/nu
 VERSION := $(shell $(GIT) describe --tags --abbrev=0 2>/dev/null || echo "vX.Y.Z")#e.g. v1.0.2
 git-ignore=touch .gitignore && grep -qxF '$(1)' .gitignore || echo '$(1)' >> .gitignore
 
-include .env.mk
 
 include $(SELF_DIR)secret.mk
 
@@ -123,13 +108,15 @@ ENV_FILES := $(shell \
 	@if [ -n "$(ENV_FILES)" ]; then \
 	  for f in $(ENV_FILES); do \
 	    awk '!/^#/ && NF' $$f | while IFS= read -r line; do \
-	      cleaned=$$(echo "$$line" | sed 's/[[:space:]]*=[[:space:]]*/=/g'); \
+	      cleaned=$$(echo "$$line" | sed 's/[[:space:]]*=[[:space:]]*/=/g' | sed 's/[[:space:]]\+$$//'); \
 	      echo "$$cleaned" >> $@; \
 	    done; \
 	  done; \
 	fi
 
+
 excluded-targets += .env.mk
+
 
 ################################################################
 ## Propagation of docs files
@@ -230,16 +217,17 @@ BIND_DIR = $(shell git rev-parse --show-toplevel 2>/dev/null || echo $(realpath 
 EXECUTOR?=singularity
 renv_root=$(or $(SINGULARITYENV_RENV_PATHS_ROOT),~/.cache/R/renv)
 ifeq ($(EXECUTOR),singularity)
-CONTAINER= $(call ml,Singularity/$(SINGULARITY_VERSION)); singularity 
-CONTAINER_IMAGE=$(or $(SINGULARITY_ROOT),.)/$(IMAGE_REG)$(IMAGE)_$(IMAGE_TAG).sif
+CONTAINER= $(call ml,$(SINGULARITY_VERSION)); singularity
+CONTAINER_IMAGE=$(or $(SINGULARITY_IMAGEDIR),$(or $(SINGULARITY_CACHEDIR),~/.singularity/cache)/library)/$(sif_file)
 CONTAINER_BIND=--bind $(BIND_DIR),/tmp,$(renv_root)
 CONTAINER_ENV=--env SQLITE_TMPDIR=/tmp,$\
   OMP_NUM_THREADS=$(NUM_THREADS),OPENBLAS_NUM_THREADS=$(NUM_THREADS),BIOCPARALLEL_WORKER_NUMBER=$(NUM_THREADS),$\
   SLURM_JOB_ID="$${SLURM_JOB_ID}",SLURM_ARRAY_TASK_ID="$${SLURM_ARRAY_TASK_ID}"
 CONTAINER_OPTIONS= exec $(CONTAINER_BIND) --pwd $$(realpath .) --containall --cleanenv $(CONTAINER_ENV)
-$(CONTAINER_IMAGE): 
-	cd $(dir $(CONTAINER_IMAGE)) ;\
-	$(CONTAINER) pull docker://$(IMAGE_REG)$(IMAGE)$(colon)$(IMAGE_TAG)
+$(CONTAINER_IMAGE):
+	env DOCKER_USERNAME="$(or $(DOCKER_USERNAME),$(GITHUB_USERNAME),$(shell git config --get github.user)" \
+	DOCKER_PASSWORD=$${DOCKER_PASSWORD-$${GITHUB_PAT}} \
+	$(CONTAINER) pull $@ docker://$(docker_image)
 	$(call chmod,$(CONTAINER_IMAGE),g,rwx)
 	$(call chmod,$(CONTAINER_IMAGE),u,rwx)
 
@@ -406,8 +394,8 @@ excluded-targets += R R-local R-$(RVERSION)
 
 R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses).  Also EXECUTOR=docker means the launchers will use docker rather than singularity
 
-R-$(RVERSION): resources/shell/R-local
-	$(call envsubst,SINGULARITYENV_RENV_PATHS_PREFIX REGISTRY_URL SINGULARITY_VERSION) < $< > $@
+R-$(RVERSION): resources/shell/R-local .env.mk
+	cp $< $@
 	@$(call chmod,$@,u,rwx)
 	mkdir -p $(launch_dir)/
 	for i in rstudio shiny jupyter server-info; do sed -i -e "\,source $$i.sh,{" -e "r resources/shell/$$i.sh" -e "d" -e "}" $@; done
@@ -421,12 +409,12 @@ launch-%: R-$(RVERSION) ## launch-R launch-rstudio, launch-jupyter etc
 
 admin-launch-%: ##  admin-launch-R, admin-launch-debug  etc will use a temporary workspace
 	d=$$(mktemp -d) ;\
-	$(call envsubst,SINGULARITYENV_RENV_PATHS_PREFIX REGISTRY_URL SINGULARITY_VERSION) < resources/shell/R-local > $$d/launcher.sh ;\
+	cp  resources/shell/R-local $$d/launcher.sh ;\
 	@$(call chmod,$$d/launcher.sh,u,rwx) ;\
 	mkdir -p $$d/$(launch_dir)/ ;\
 	for i in rstudio shiny jupyter server-info; do sed -i -e "\,source $$i.sh,{" -e "r resources/shell/$$i.sh" -e "d" -e "}" $$d/launcher.sh; done ;\
 	echo "Running in $$d" ;\
-	BABS_CMD=$* BABS_TMP=$$d $$d/launcher.sh >> $$d/report.txt
+	BABS_CMD=$* BABS_TMP=$$d $$d/launcher.sh 2>&1 | tee -a $$d/report.txt
 
 ################################################################
 ## Generate secrets
@@ -437,7 +425,6 @@ admin-launch-%: ##  admin-launch-R, admin-launch-debug  etc will use a temporary
 
 $(SELF_DIR)secret.mk: $(wildcard $(PROJECT_HOME)/.babs)
 	@if [ ! -f "$@" ]; then \
-	echo "SINGULARITY_ROOT=.#where .sif's are stored" > $@ ;\
 	echo "SCRATCH_DIR=/tmp#Somewhere for transient, possibly large, files" >> $@ ;\
 	echo "Created a dummy copy of $@, please edit it" ;\
 	fi
