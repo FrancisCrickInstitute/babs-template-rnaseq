@@ -64,8 +64,24 @@ GIT=git
 ml = module is-loaded $1 || module load $1 || true # ie fall back to true (ie rely on system version if can't load a module)
 chmod = setfacl -m $2:$3 $1 >/dev/null 2>&1 || chmod $2=$3 $1
 
-# Environment Variables
-include .env.mk
+################################################################
+## Environment Variables
+################################################################
+# Scan all our .env files
+ENV_FILES := $(shell \
+    dir=$(realpath .); \
+    while :; do \
+        [ -f "$$dir/.env.local.$(USER)" ] && echo "$$dir/.env.local.$(USER)"; \
+        [ -f "$$dir/.env.$(USER)" ] && echo "$$dir/.env.$(USER)"; \
+	[ -f "$$dir/.env.local" ] && echo "$$dir/.env.local"; \
+        [ -f "$$dir/.env" ] && echo "$$dir/.env"; \
+        [ "$$dir" = "$$PROJECT_HOME" ] || [ "$$dir" = "/" ] && break; \
+        dir=$$(dirname "$$dir"); \
+    done | tac\
+)
+ENV_VARS := $(shell bash ./resources/shell/direnv.sh $(ENV_FILES))
+# evaluate each line
+$(foreach line,$(ENV_VARS),$(eval $(line)))
 
 NUM_THREADS:=$(or ${SLURM_CPUS_PER_TASK},$(NUM_THREADS),2)
 data_transfer_filename?=.data-transfer-rules
@@ -82,41 +98,6 @@ git-ignore=touch .gitignore && grep -qxF '$(1)' .gitignore || echo '$(1)' >> .gi
 
 
 include $(SELF_DIR)secret.mk
-
-################################################################
-# Make .env and .env.local available to make
-################################################################
-
-
-# Find all .env and .env.local files from root down to current dir
-
-ENV_FILES := $(shell \
-    dir=$(realpath .); \
-    while :; do \
-        [ -f "$$dir/.env.local.$(USER)" ] && echo "$$dir/.env.local.$(USER)"; \
-        [ -f "$$dir/.env.$(USER)" ] && echo "$$dir/.env.$(USER)"; \
-	[ -f "$$dir/.env.local" ] && echo "$$dir/.env.local"; \
-        [ -f "$$dir/.env" ] && echo "$$dir/.env"; \
-        [ "$$dir" = "$$PROJECT_HOME" ] || [ "$$dir" = "/" ] && break; \
-        dir=$$(dirname "$$dir"); \
-    done | tac\
-)
-
-# Generate makefile with the .env(.local) variables in it
-.env.mk: $(ENV_FILES)
-	@echo "# Auto-generated from: $(ENV_FILES)" > $@
-	@if [ -n "$(ENV_FILES)" ]; then \
-	  for f in $(ENV_FILES); do \
-	    awk '!/^#/ && NF' $$f | while IFS= read -r line; do \
-	      cleaned=$$(echo "$$line" | sed 's/[[:space:]]*=[[:space:]]*/=/g' | sed 's/[[:space:]]\+$$//'); \
-	      echo "$$cleaned" >> $@; \
-	    done; \
-	  done; \
-	fi
-
-
-excluded-targets += .env.mk
-
 
 ################################################################
 ## Propagation of docs files
@@ -264,20 +245,6 @@ else
   $(error "# Don't recognise '$(EXECUTOR)' as an executor")
 endif
 
-.PHONY: docker
-docker:  ## Generate the recipe to create the dockerfile behind the analysis
-
-docker: docker/build.sh
-	cp resources/docker/devcontainer.json  docker/.devcontainer/
-
-docker/build.sh: resources/docker/build.sh docker/Dockerfile.base
-	< $< $(call envsubst,IMAGE_NAME IMAGE_REG IMAGE IMAGE_TAG) > $@
-
-docker/Dockerfile.base: resources/docker/Dockerfile
-	mkdir -p docker/.devcontainer
-	< $< $(call envsubst,BIOCONDUCTOR_TAG OUR_VERSION IMAGE_REPO) > $@
-
-
 
 ifeq ($(CONTAINER),)
 optionalContainer=
@@ -394,7 +361,7 @@ excluded-targets += R R-local R-$(RVERSION)
 
 R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses).  Also EXECUTOR=docker means the launchers will use docker rather than singularity
 
-R-$(RVERSION): resources/shell/R-local .env.mk
+R-$(RVERSION): resources/shell/R-local 
 	cp $< $@
 	@$(call chmod,$@,u,rwx)
 	mkdir -p $(launch_dir)/

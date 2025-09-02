@@ -1,0 +1,19 @@
+{
+    "name": "BABS Container",
+    "build": {
+	"dockerfile": "../Dockerfile.base"
+    },
+    "features": {
+	"ghcr.io/rocker-org/devcontainer-features/r-packages:1": {
+            "packages": "curl,renv,sf,terra",
+	    "installSystemRequirements": true
+	},
+	"ghcr.io/rocker-org/devcontainer-features/quarto-cli:1": {
+		"version": "1.7.33"
+	},
+	"ghcr.io/iterative/features/dvc": {
+	    "version": "1"
+	},
+        "ghcr.io/jsburckhardt/devcontainer-features/uv:1": {}
+    }
+}

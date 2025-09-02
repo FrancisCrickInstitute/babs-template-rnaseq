@@ -1,8 +1,7 @@
 ## Just use lines such as
 ## export key=value
 ## The 'export' is optional.  'value' can include '$' references to previous variables.
-## Don't use any other shell features such as expansions,substitutions.
-## Unsetting variables will work in shell, but not necessarily in the makefiles.
+## These env files will get source'd by the launchers.
 
 ## You can put things in:
 ##  - .env                  # This file. Anything that _needs_ to be set should be mentioned here at least as a comment so users know to fill it in elsewhere.
@@ -12,32 +11,34 @@
 ##  They're loaded in that order, so things in the last one override everything else.
 
 
-# Conventional name for top-level file that rsync can use to get non-VC'ed files
-data_transfer_filename=.data-transfer-rules
-
-# Path to where jupyter/rstudio runtime files should go (falls back to in /tmp if not writeable)
-launcher_dir=./.babs-launchers
-
 # Location of underlying docker image
 IMAGE_REG=${envsubst_IMAGE_REG}
 IMAGE_NAME=${envsubst_IMAGE_NAME}
 IMAGE_REPO=${envsubst_IMAGE_REPO}
-BIOCONDUCTOR_TAG=${envsubst_BIOCONDUCTOR_TAG}
 IMAGE_TAG=${envsubst_IMAGE_TAG}
-IMAGE=${envsubst_IMAGE}
-RVERSION=${envsubst_RVERSION}
+IMAGE=${IMAGE_REPO}/${IMAGE_NAME}
 
 docker_image=${IMAGE_REG}${IMAGE}:${IMAGE_TAG}
 sif_file=${IMAGE_REG}${IMAGE}_${IMAGE_TAG}.sif
+
+RVERSION=${envsubst_RVERSION}
+BIOCONDUCTOR_TAG=${envsubst_BIOCONDUCTOR_TAG}
+
 # Will look for that in ${SINGULARITY_IMAGEDIR} then ${SINGULARITY_CACHEDIR}/library then ${HOME}/.singularity/cache/library
 # If not found will build from the docker_image, and put it in the first of those directories for which
 # the env-var is not blank.
 
 # Prefix that allows renv packages to be partitioned off for extra protection
-export SINGULARITYENV_RENV_PATHS_PREFIX=${envsubst_SINGULARITYENV_RENV_PATHS_PREFIX}
+export SINGULARITYENV_RENV_PATHS_PREFIX=$(printf "%s" "${IMAGE}" | tr '/' '-');
 
 # Version of singularity for 'module load'
 SINGULARITY_VERSION=${envsubst_SINGULARITY_VERSION}
+
+# Conventional name for top-level file that rsync can use to get non-VC'ed files
+data_transfer_filename=.data-transfer-rules
+
+# Path to where jupyter/rstudio runtime files should go (falls back to in /tmp if not writeable)
+launcher_dir=./.babs-launchers
 
 ################################################################
 ## Jupyter
