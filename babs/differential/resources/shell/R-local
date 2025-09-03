@@ -45,11 +45,16 @@ if [[ -z "$SINGULARITYENV_RENV_PATHS_ROOT" ]] ; then
     echo -e "\033[44;97m i \033[0m Setting SINGULARITYENV_RENV_PATHS_ROOT to : ,${SINGULARITYENV_RENV_PATHS_ROOT}. " 1>&2
     mkdir -p ${SINGULARITYENV_RENV_PATHS_ROOT}
 fi
-export SINGULARITY_BIND="${SINGULARITY_BIND:-/tmp}"
-if [[ ",SINGULARITY_BIND," != *",/tmp,"* ]]; then
-  SINGULARITY_BIND+=",/tmp"
+
+
+if [[ -z "${SINGULARITY_BIND}" ]]; then
+    export SINGULARITY_BIND="/tmp"
+else
+    export SINGULARITY_BIND+=",/tmp"
 fi
-SINGULARITY_BIND=${SINGULARITY_BIND},$SINGULARITYENV_RENV_PATHS_ROOT
+
+SINGULARITY_BIND+="${SINGULARITYENV_RENV_PATHS_ROOT:+,${SINGULARITYENV_RENV_PATHS_ROOT}}"
+SINGULARITY_BIND+="${SINGULARITYENV_SSH_AUTH_SOCK:+,${SINGULARITYENV_SSH_AUTH_SOCK}}"
 
 echo -e "\033[44;97m i \033[0m Extra directories being bound to the container. This might affect reproducibility: ,${SINGULARITY_BIND}"  | tr ',' '\n' 1>&2
 
