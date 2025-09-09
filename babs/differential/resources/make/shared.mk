@@ -79,9 +79,11 @@ ENV_FILES := $(shell \
         dir=$$(dirname "$$dir"); \
     done | tac\
 )
-ENV_VARS := $(shell bash ./resources/shell/direnv.sh $(ENV_FILES))
-# evaluate each line
-$(foreach line,$(ENV_VARS),$(eval $(line)))
+
+
+ENV_VARS := $(shell bash ./resources/shell/direnv.sh $(ENV_FILES) 2>/dev/null || true) 
+$(foreach line,$(ENV_VARS),$(eval $(line))) 
+
 
 NUM_THREADS:=$(or ${SLURM_CPUS_PER_TASK},$(NUM_THREADS),2)
 data_transfer_filename?=.data-transfer-rules

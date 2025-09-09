@@ -30,12 +30,14 @@ if [[ -n "$env_file_name" ]]; then
     done
 fi
 
-if [ -z "${SLURM_JOB_ID}" ]; then
-    basename=$(basename $0)
-    NUM_THREADS=${NUM_THREADS:-2}
-else
-    basename=$(scontrol show job $SLURM_JOB_ID | awk -F= '/Command=/{print $2}' | head -n1 | xargs basename)
-    NUM_THREADS=${SLURM_CPUS_PER_TASK:-${NUM_THREADS:-2}}
+## Work out what command to run in the container
+basename=$(basename "$0")
+NUM_THREADS=${NUM_THREADS:-2}
+if [ -n "${SLURM_JOB_ID}" ]; then
+    if [ "$basename" = "bash" ]; then
+        basename=$(scontrol show job $SLURM_JOB_ID | awk -F= '/Command=/{print $2}' | head -n1 | xargs basename)
+    fi
+    NUM_THREADS=${SLURM_CPUS_PER_TASK:-${NUM_THREADS}}
     login_node=${__login_node:-login}
 fi
 cmd=${BABS_CMD:-${basename%-*}}
@@ -71,7 +73,6 @@ fi
 
 PASSWORD=$(openssl rand -hex 32)
 seed=0
-
 while :; do
     PORT=$(shuf -n 1 -i 49152-65535 --random-source=<(echo "${PWD}${seed}" | openssl dgst -sha256 | cut -d ' ' -f2 ))
     ss -atun sport ":$PORT" | grep -q ":$PORT" || break
@@ -157,19 +158,19 @@ source jupyter.sh
 
 case "$cmd" in
     rstudio|shiny|jupyter)
-        ${cmd}
+        ${cmd} "$@"
         ;;
     debug)
-    [ -e ${BABS_TMP:=.}/report.txt ] && {echo ${BABS_TMP)/report.txt already exists; exit 1;}
-    echo $PWD > ${BABS_TMP}/report.txt
-    echo "## SINGULARITY ENV" >> ${BABS_TMP}/report.txt
-    for var in $(compgen -v | grep SINGULARITYENV); do
-        echo "${var#SINGULARITYENV_}=${!var}"  >> ${BABS_TMP}/report.txt
-    done
-    echo "## SINGULARITY BIND" >> ${BABS_TMP}/report.txt
-    echo ${SINGULARITY_BIND} >>  ${BABS_TMP}/report.txt
-    echo "Please cite $(realpath "$BABS_TMP")/report.txt in any support messages."
-    ;;
+        [ -e ${BABS_TMP:=.}/report.txt ] && {echo ${BABS_TMP)/report.txt already exists; exit 1;}
+        echo $PWD > ${BABS_TMP}/report.txt
+        echo "## SINGULARITY ENV" >> ${BABS_TMP}/report.txt
+        for var in $(compgen -v | grep SINGULARITYENV); do
+            echo "${var#SINGULARITYENV_}=${!var}"  >> ${BABS_TMP}/report.txt
+        done
+        echo "## SINGULARITY BIND" >> ${BABS_TMP}/report.txt
+        echo ${SINGULARITY_BIND} >>  ${BABS_TMP}/report.txt
+        echo "Please cite $(realpath "$BABS_TMP")/report.txt in any support messages."
+        ;;
     shell)
         interactive=${BABS_INTERACTIVE:-true} method=shell my_caller
         ;;
