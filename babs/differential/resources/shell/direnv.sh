@@ -3,7 +3,6 @@
 # direnv.sh — pure bash envrc evaluator for Make
 #
 
-set -euo pipefail
 
 
 # function to dump all variables (exported + unexported) as KEY=VALUE
