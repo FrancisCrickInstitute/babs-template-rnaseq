@@ -10,44 +10,56 @@
 ##  - .env.local.${USER}    # Just you and just on this system.
 ##  They're loaded in that order, so things in the last one override everything else.
 
+## They can `source` env's higher up, but doesn't happen automatically.
+
+BABS_PROJECT_ROOT=${BABS_PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || echo $(realpath .))}
+
+RVERSION=${envsubst_RVERSION}
+BIOCONDUCTOR_TAG=${envsubst_BIOCONDUCTOR_TAG}-${RVERSION}
 
 # Location of underlying docker image
 IMAGE_REG=${envsubst_IMAGE_REG}
-IMAGE_NAME=${envsubst_IMAGE_NAME}
-IMAGE_REPO=${envsubst_IMAGE_REPO}
-IMAGE_TAG=${envsubst_IMAGE_TAG}
-IMAGE=${IMAGE_REPO}/${IMAGE_NAME}
+IMAGE_TAG=${BIOCONDUCTOR_TAG}-${envsubst_IMAGE_TAG}
+IMAGE=${envsubst_IMAGE_REPO}/${envsubst_IMAGE_NAME}
 
 docker_image=${IMAGE_REG}${IMAGE}:${IMAGE_TAG}
 sif_file=${IMAGE_REG}${IMAGE}_${IMAGE_TAG}.sif
+export SINGULARITYENV_RENV_PATHS_PREFIX=$(printf "%s" "${IMAGE}" | tr '/' '-');
 
-RVERSION=${envsubst_RVERSION}
-BIOCONDUCTOR_TAG=${envsubst_BIOCONDUCTOR_TAG}
+# Instead, could do
+#   docker_image=bioconductor/bioconductor_docker:${BIOCONDUCTOR_TAG}
+#   sif-file=docker.io/bioconductor/bioconductor_docker_${BIOCONDUCTOR_TAG}.sif
+#   export SINGULARITYENV_RENV_PATHS_PREFIX=bioconductor-bioconductor_docker
+# or even
+#   biocontainer=fq; ver=0.12.0--h9ee0642_0
+#   docker_image=quay.io/biocontainers/${biocontainer}:${ver}
+#   sif_file=depot.galaxyproject.org-singularity-${biocontainer}-${ver}
+
 
 # Will look for that in ${SINGULARITY_IMAGEDIR} then ${SINGULARITY_CACHEDIR}/library then ${HOME}/.singularity/cache/library
 # If not found will build from the docker_image, and put it in the first of those directories for which
 # the env-var is not blank.
 
-# Prefix that allows renv packages to be partitioned off for extra protection
-export SINGULARITYENV_RENV_PATHS_PREFIX=$(printf "%s" "${IMAGE}" | tr '/' '-');
-
-# Version of singularity for 'module load'
-SINGULARITY_VERSION=${envsubst_SINGULARITY_VERSION}
-
 # Conventional name for top-level file that rsync can use to get non-VC'ed files
 data_transfer_filename=.data-transfer-rules
 
 # Path to where jupyter/rstudio runtime files should go (falls back to in /tmp if not writeable)
-launcher_dir=./.babs-launchers
+launcher_dir=$(realpath .)/.babs-launchers
 
 if [ -n "${SSH_AUTH_SOCK}" ]; then
   export SINGULARITYENV_SSH_AUTH_SOCK=$(realpath "$SSH_AUTH_SOCK")
 fi
 
+export SINGULARITYENV_SQLITE_TMPDIR=/tmp
+
+
 ################################################################
 ## Jupyter
 ################################################################
 export SINGULARITYENV_UV_CACHE_DIR=${launcher_dir}/uv-cache
+export SINGULARITYENV_UV_TOOL_DIR=${launcher_dir}/uv-tool
+export SINGULARITYENV_UV_TOOL_BIN_DIR=${launcher_dir}/uv-bin
+export SINGULARITYENV_UV_LINK_MODE=symlink
 export SINGULARITYENV_PIP_CACHE_DIR=${launcher_dir}/pip-cache
 export SINGULARITYENV_JUPYTER_DATA_DIR=${launcher_dir}/jupyter-share
 export SINGULARITYENV_JUPYTER_ALLOW_INSECURE_WRITES=1
@@ -61,11 +73,18 @@ export SINGULARITYENV_XDG_RUNTIME_DIR=${launcher_dir}/xdg-runtime
 ## Only mentioning here so you know what else might be needed.
 ################################################################
 
-#export SINGULARITY_IMAGEDIR=/place/to/store/singularity/sif/files
-#export SINGULARITYENV_RENV_PATHS_ROOT=${RENV_PATHS_ROOT}
-#export SINGULARITY_BIND=~/.ssh #etc - we automatically bind SINGULARITY_RENV_PATHS_ROOT,/tmp so no need to add those
-#export SINGULARITYENV_DISPLAY="$DISPLAY"
-#export NUM_THREADS=N#SLURM_CPUS_PER_TASK will take precedence. Then N, then '2'
-#export SINGULARITYENV_GITHUB_PAT="${GITHUB_PAT}"
-#export DOCKER_USERNAME=# needed in case you need to be authenticated to  pull the docker image. Falls back to GITHUB_USERNAME or 'git config --get github.user'
-#export DOCKER_PASSWORD=# falls back to ${GITHUB_PAT}. Both of these DOCKER_ vars need to be relevant to the registry (ie ghcr.io usually, hence the github fallback)
+
+# export SINGULARITY_MODULE=Singularity/3.11.3
+# export NEXTFLOW_MODULE=Nextflow/23.10.0
+# export SQLITE_MODULE=SQLite/3.42.0-GCCcore-12.3.0
+
+# export SINGULARITY_IMAGEDIR=/place/to/store/singularity/sif/files
+# export SINGULARITYENV_RENV_PATHS_ROOT=$(realpath ${RENV_PATHS_ROOT})
+# export SINGULARITY_BIND=~/.ssh #etc - we automatically bind SINGULARITY_RENV_PATHS_ROOT,/tmp so no need to add those
+# export SINGULARITYENV_DISPLAY="$DISPLAY"
+# export NUM_THREADS=N#SLURM_CPUS_PER_TASK will take precedence. Then N, then '2'
+# export SINGULARITYENV_GITHUB_PAT="${GITHUB_PAT}"
+# SCRATCH_DIR=/tmp # location for disposable files
+# export SINGULARITYENV_UV_CACHE_DIR=
+# export DOCKER_USERNAME=# needed in case you need to be authenticated to  pull the docker image. Falls back to GITHUB_USERNAME or 'git config --get github.user'
+# export DOCKER_PASSWORD=# falls back to ${GITHUB_PAT}. Both of these DOCKER_ vars need to be relevant to the registry (ie ghcr.io usually, hence the github fallback)

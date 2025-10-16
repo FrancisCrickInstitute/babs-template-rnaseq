@@ -1,7 +1,7 @@
 .DEFAULT_GOAL=help
 
 template_dir := /nemo/stp/babs/working/bioinformatics/templates
-generic_dir := /nemo/stp/babs/working/kellyg/projects/github/FrancisCrickInstitute/templates/template-generic
+generic_dir := /nemo/stp/babs/working/kellyg/projects/github/FrancisCrickInstitute/templates/babs-environments
 type = rnaseq
 
 ifndef version

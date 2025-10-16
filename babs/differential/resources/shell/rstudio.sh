@@ -13,7 +13,7 @@ ${launcher_dir}/${USER}/rstudio:$HOME/.config/rstudio"
     [[ ",${SINGULARITY_BIND}," == *",/sys/fs/cgroup,"* ]] || SINGULARITY_BIND=${SINGULARITY_BIND},/sys/fs/cgroup
 
     if [ "$container" = singularity ]; then
-        echo "session-default-working-dir=$pdir" > ${launcher_dir}/${USER}/rsession.conf
+        echo "session-default-working-dir=$BABS_PROJECT_ROOT" > ${launcher_dir}/${USER}/rsession.conf
     else
         echo "session-default-working-dir=/home/rstudio/project" > ${launcher_dir}/${USER}/rsession.conf
     fi

@@ -2,9 +2,24 @@
 #SBATCH --ntasks=1
 #SBATCH --output=slurm-%x.out
 
-env_file_name=.env
+# Allows the following over-rides
+# BABS_PROJECT_ROOT - the upper limit of the project, for binding purposes. Default in .env is to the git root, or the current path
+# BABS_CMD - What command to call in the container. Overrides inference from basename.
+# BABS_DEV - Redirect stdin/err right until immediately before the singularity/docker call
+# BABS_DOTENV - What the environment files are prefixed with (default .env - set to empty to prevent)
+# BABS_INTERACTIVE - whether to add a '-it' flag for docker, specifically
+# BABS_LOG - where to write a debug report if called with BABS_CMD=debug
 
-pdir=$(git rev-parse --show-toplevel 2>/dev/null || echo $(realpath .))
+export BABS_DOTENV=${BABS_DOTENV-.env}
+## source any .env files
+if [[ -n "$BABS_DOTENV" ]]; then
+    for env_file in $BABS_DOTENV{,.local,.${USER},.local.${USER}}; do
+	[[ -f "${env_file}" ]] && source "${env_file}"
+    done
+fi
+
+source launch-helper.sh
+
 if ! (mkdir -p "${launcher_dir}" 2>/dev/null && [ -w "${launcher_dir}" ]); then
     launcher_dir=$(mktemp -d) || {
     echo "Failed to create temp directory" >&2
@@ -12,42 +27,40 @@ if ! (mkdir -p "${launcher_dir}" 2>/dev/null && [ -w "${launcher_dir}" ]); then
     }
 fi
 
-## source any .env files between this directory and the project-level
-if [[ -n "$env_file_name" ]]; then
-    curdir="$(realpath .)"
-    env_files=()
-    while [[ "$curdir" != "/" ]]; do
-        [[ -f "$curdir/${env_file_name}.local.${USER}" ]] && env_files+=("$curdir/${env_file_name}.local.${USER}")
-        [[ -f "$curdir/${env_file_name}.${USER}" ]] && env_files+=("$curdir/${env_file_name}.${USER}")
-        [[ -f "$curdir/${env_file_name}.local" ]] && env_files+=("$curdir/${env_file_name}.local")
-        [[ -f "$curdir/$env_file_name" ]] && env_files+=("$curdir/$env_file_name")
-        [[ "$curdir" == "$pdir" ]] && break
-        curdir="$(dirname "$curdir")"
-    done
-    # Source from top-most to bottom-most
-    for file in $(printf "%s\n" "${env_files[@]}" | tac); do
-        source "$file"
-    done
+# Only redirect if BABS_DEV has value
+if [ -n "$BABS_DEV" ]; then
+    # Save original stdout and stderr
+    exec 3>&1 4>&2
+    # Redirect stdout and stderr for the bulk of the script
+    exec >"$BABS_DEV" 2>"$BABS_DEV"
+    restore_fds() {
+        exec 1>&3 2>&4
+        exec 3>&- 4>&-
+    }
 fi
 
-## Work out what command to run in the container
-basename=$(basename "$0")
+## slurm-specific customisations
+basename=${SLURM_JOB_NAME:-$(basename "$0")}
+cmd=${BABS_CMD:-${basename%-*}}
 NUM_THREADS=${NUM_THREADS:-2}
+
+## Set number of threads appropriately
 if [ -n "${SLURM_JOB_ID}" ]; then
-    if [ "$basename" = "bash" ]; then
-        basename=$(scontrol show job $SLURM_JOB_ID | awk -F= '/Command=/{print $2}' | head -n1 | xargs basename)
-    fi
     NUM_THREADS=${SLURM_CPUS_PER_TASK:-${NUM_THREADS}}
     login_node=${__login_node:-login}
 fi
-cmd=${BABS_CMD:-${basename%-*}}
+
+export SINGULARITYENV_BIOCPARALLEL_WORKER_NUMBER=${NUM_THREADS}
+export SINGULARITYENV_OMP_NUM_THREADS=${NUM_THREADS}
+export SINGULARITYENV_OPENBLAS_NUM_THREADS=${NUM_THREADS}
+export SINGULARITYENV_IN_BABS_CONTAINER=${docker_image}
+
 
 if [[ -z "$SINGULARITYENV_RENV_PATHS_ROOT" ]] ; then
     export SINGULARITYENV_RENV_PATHS_ROOT="$HOME/.cache/R/renv"
-    echo -e "\033[44;97m i \033[0m Setting SINGULARITYENV_RENV_PATHS_ROOT to : ,${SINGULARITYENV_RENV_PATHS_ROOT}. " 1>&2
     mkdir -p ${SINGULARITYENV_RENV_PATHS_ROOT}
 fi
-
+ 
 
 if [[ -z "${SINGULARITY_BIND}" ]]; then
     export SINGULARITY_BIND="/tmp"
@@ -83,9 +96,11 @@ if  ! command -v docker >/dev/null 2>&1; then
     image="${SINGULARITY_IMAGEDIR:-${SINGULARITY_CACHEDIR:-$HOME/.singularity/cache}/library}/${sif_file}"
     if [ ! -f "${image}" ]; then
         echo "✅ Creating ${image} from ${docker_image}..."
-        module is-loaded ${SINGULARITY_VERSION} ||
-        module load ${SINGULARITY_VERSION} ||
-        true
+	if [ -n "${SINGULARITY_MODULE}" ]; then 
+          module is-loaded ${SINGULARITY_MODULE} ||
+          module load ${SINGULARITY_MODULE} ||
+          echo "Couldn't load singularity module - assuming it's an executible"
+	fi
         mkdir -p $(dirname "$image")
         export DOCKER_USERNAME="${DOCKER_USERNAME:-${GITHUB_USERNAME:-$(git config --get github.user)}}" || { echo "No GitHub username found"; exit 1; }
         export DOCKER_PASSWORD=${DOCKER_PASSWORD:-${GITHUB_PAT}}
@@ -93,20 +108,22 @@ if  ! command -v docker >/dev/null 2>&1; then
     fi
     container=singularity
     my_caller () {
-    module is-loaded ${SINGULARITY_VERSION} ||
-        module load ${SINGULARITY_VERSION} ||
-        true
+    if [ -n "${SINGULARITY_MODULE}" ]; then 
+        module is-loaded ${SINGULARITY_MODULE} ||
+        module load ${SINGULARITY_MODULE} ||
+        echo "Couldn't load singularity module - assuming it's an executible"
+    fi
     local singularity_args=(
             ${method:-exec}
-            --bind ${pdir}
+            --bind ${BABS_PROJECT_ROOT}
             --pwd $(realpath .)
             --containall
             --scratch /run,/var/lib/rstudio-server
             --cleanenv
-            --env SQLITE_TMPDIR=/tmp,BIOCPARALLEL_WORKER_NUMBER=${NUM_THREADS},OMP_NUM_THREADS=${NUM_THREADS},OPENBLAS_NUM_THREADS=${NUM_THREADS}
             ${image}
     )
     singularity_args+=("$@")
+    [ -n "${BABS_DEV}" ] && restore_fds
     singularity "${singularity_args[@]}"
     }
 else
@@ -115,7 +132,7 @@ else
     local docker_args=(
             --rm
             -w /home/rstudio/project
-            -v "${pdir}:/home/rstudio/project"
+            -v "${BABS_PROJECT_ROOT}:/home/rstudio/project"
     )
     IFS=',' read -ra binds <<< "$SINGULARITY_BIND"
     for bind in "${binds[@]}"; do
@@ -128,10 +145,6 @@ else
     docker_args+=(
             -e USERID=$(id -u)
             -e GROUPID=$(id -g)
-            -e SQLITE_TMPDIR=/tmp
-            -e BIOCPARALLEL_WORKER_NUMBER=${NUM_THREADS}
-            -e OMP_NUM_THREADS=${NUM_THREADS}
-            -e OPENBLAS_NUM_THREADS=${NUM_THREADS}
     )
     while IFS='=' read -r name value; do
             if [[ "$name" == SINGULARITYENV_* ]]; then
@@ -139,14 +152,12 @@ else
         docker_args+=("-e" "${varname}=${value}")
             fi
     done < <(env | grep ^SINGULARITYENV_)
-    docker_args+=(-e INSIDE_DOCKER=1)
-    [[ -n "$GITHUB_PAT" ]] && docker_args+=(-e GITHUB_PAT)
-    [[ -n "$GITHUB_TOKEN" ]] && docker_args+=(-e GITHUB_TOKEN)
     [[ "$interactive" == true ]] && docker_args+=(-it) || docker_args+=(-d)
     docker_args+=(-p "$PORT:$PORT")
     docker_args+=("$docker_image")
     [[ "$method" == shell ]] && docker_args+=("bash")
     docker_args+=("$@")
+    [ -n "${BABS_DEV}" ] && restore_fds
     docker run "${docker_args[@]}"
     }
 fi
@@ -155,21 +166,22 @@ source server-info.sh
 source rstudio.sh
 source shiny.sh
 source jupyter.sh
+source http.sh
 
 case "$cmd" in
-    rstudio|shiny|jupyter)
+    rstudio|shiny|jupyter|http)
         ${cmd} "$@"
         ;;
     debug)
-        [ -e ${BABS_TMP:=.}/report.txt ] && {echo ${BABS_TMP)/report.txt already exists; exit 1;}
-        echo $PWD > ${BABS_TMP}/report.txt
-        echo "## SINGULARITY ENV" >> ${BABS_TMP}/report.txt
+        [ -e ${BABS_LOG:=.}/report.txt ] && {echo ${BABS_LOG)/report.txt already exists; exit 1;}
+        echo $PWD > ${BABS_LOG}/report.txt
+        echo "## SINGULARITY ENV" >> ${BABS_LOG}/report.txt
         for var in $(compgen -v | grep SINGULARITYENV); do
-            echo "${var#SINGULARITYENV_}=${!var}"  >> ${BABS_TMP}/report.txt
+            echo "${var#SINGULARITYENV_}=${!var}"  >> ${BABS_LOG}/report.txt
         done
-        echo "## SINGULARITY BIND" >> ${BABS_TMP}/report.txt
-        echo ${SINGULARITY_BIND} >>  ${BABS_TMP}/report.txt
-        echo "Please cite $(realpath "$BABS_TMP")/report.txt in any support messages."
+        echo "## SINGULARITY BIND" >> ${BABS_LOG}/report.txt
+        echo ${SINGULARITY_BIND} >>  ${BABS_LOG}/report.txt
+        echo "Please cite $(realpath "$BABS_LOG")/report.txt in any support messages."
         ;;
     shell)
         interactive=${BABS_INTERACTIVE:-true} method=shell my_caller

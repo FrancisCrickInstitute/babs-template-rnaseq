@@ -3,8 +3,6 @@
 # direnv.sh — pure bash envrc evaluator for Make
 #
 
-
-
 # function to dump all variables (exported + unexported) as KEY=VALUE
 dump_env() {
     # iterate all variables

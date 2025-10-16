@@ -14,8 +14,8 @@ metadata_id_column = ID
 name_col = sample_name
 samples_db = samples.db
 
-NEXTFLOW = $(call ml,Nextflow/$(NEXTFLOW_VERSION)); $(call ml,$(SINGULARITY_VERSION)); nextflow
-SQLITE = $(call ml,SQLite/3.42.0-GCCcore-12.3.0); sqlite3
+NEXTFLOW = $(call ml,$(NEXTFLOW_MODULE)); $(call ml,$(SINGULARITY_MODULE)); nextflow
+SQLITE = $(call ml,$(SQLITE_MODULE)); sqlite3
 
 
 
@@ -41,8 +41,6 @@ staging_dir=staging
 RESULTS_DIR = results
 ## Convenient shortcut for immediate quarto output
 staged_results=$(staging_dir)/$(RESULTS_DIR)/$(VERSION)
-## Where to store scripts necessary to launch rstudio/shiny/jupyter etc
-launch_dir=.babs-launchers
 
 # csv file names (excluding ext)
 log_dir=logs
@@ -53,15 +51,13 @@ SELF_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 ################################################################
 # Executables and their versions
 ################################################################
-NEXTFLOW_VERSION=23.10.0
-
 
 R=R
 QUARTO=quarto
 GIT=git
 
 ## Module loader
-ml = module is-loaded $1 || module load $1 || true # ie fall back to true (ie rely on system version if can't load a module)
+ml = [ -z "$1" ] || module is-loaded $1 || module load $1 || true # ie fall back to true (ie rely on system version if can't load a module)
 chmod = setfacl -m $2:$3 $1 >/dev/null 2>&1 || chmod $2=$3 $1
 
 ################################################################
@@ -200,7 +196,7 @@ BIND_DIR = $(shell git rev-parse --show-toplevel 2>/dev/null || echo $(realpath 
 EXECUTOR?=singularity
 renv_root=$(or $(SINGULARITYENV_RENV_PATHS_ROOT),~/.cache/R/renv)
 ifeq ($(EXECUTOR),singularity)
-CONTAINER= $(call ml,$(SINGULARITY_VERSION)); singularity
+CONTAINER= $(call ml,$(SINGULARITY_MODULE)); singularity
 CONTAINER_IMAGE=$(or $(SINGULARITY_IMAGEDIR),$(or $(SINGULARITY_CACHEDIR),~/.singularity/cache)/library)/$(sif_file)
 CONTAINER_BIND=--bind $(BIND_DIR),/tmp,$(renv_root)
 CONTAINER_ENV=--env SQLITE_TMPDIR=/tmp,$\
@@ -208,7 +204,7 @@ CONTAINER_ENV=--env SQLITE_TMPDIR=/tmp,$\
   SLURM_JOB_ID="$${SLURM_JOB_ID}",SLURM_ARRAY_TASK_ID="$${SLURM_ARRAY_TASK_ID}"
 CONTAINER_OPTIONS= exec $(CONTAINER_BIND) --pwd $$(realpath .) --containall --cleanenv $(CONTAINER_ENV)
 $(CONTAINER_IMAGE):
-	env DOCKER_USERNAME="$(or $(DOCKER_USERNAME),$(GITHUB_USERNAME),$(shell git config --get github.user)" \
+	env DOCKER_USERNAME="$(or $(DOCKER_USERNAME),$(GITHUB_USERNAME),$(shell git config --get github.user))" \
 	DOCKER_PASSWORD=$${DOCKER_PASSWORD-$${GITHUB_PAT}} \
 	$(CONTAINER) pull $@ docker://$(docker_image)
 	$(call chmod,$(CONTAINER_IMAGE),g,rwx)
@@ -361,13 +357,15 @@ excluded-targets += R R-local R-$(RVERSION)
 .PHONY: R R-local R-$(RVERSION)
 
 
-R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses).  Also EXECUTOR=docker means the launchers will use docker rather than singularity
+R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses).
+
+launcher: R-$(RVERSION) ## Create a launcher script that will guide you through the various launcher options
+	ln -sfn $< $@
 
 R-$(RVERSION): resources/shell/R-local 
 	cp $< $@
 	@$(call chmod,$@,u,rwx)
-	mkdir -p $(launch_dir)/
-	for i in rstudio shiny jupyter server-info; do sed -i -e "\,source $$i.sh,{" -e "r resources/shell/$$i.sh" -e "d" -e "}" $@; done
+	for i in rstudio shiny jupyter http server-info read-envs launch-helper; do sed -i -e "\,source $$i.sh,{" -e "r resources/shell/$$i.sh" -e "d" -e "}" $@; done
 
 R:
 	@echo "Starting R $(RVERSION) in container $(CONTAINER_IMAGE) ..."
@@ -380,7 +378,6 @@ admin-launch-%: ##  admin-launch-R, admin-launch-debug  etc will use a temporary
 	d=$$(mktemp -d) ;\
 	cp  resources/shell/R-local $$d/launcher.sh ;\
 	@$(call chmod,$$d/launcher.sh,u,rwx) ;\
-	mkdir -p $$d/$(launch_dir)/ ;\
 	for i in rstudio shiny jupyter server-info; do sed -i -e "\,source $$i.sh,{" -e "r resources/shell/$$i.sh" -e "d" -e "}" $$d/launcher.sh; done ;\
 	echo "Running in $$d" ;\
 	BABS_CMD=$* BABS_TMP=$$d $$d/launcher.sh 2>&1 | tee -a $$d/report.txt
