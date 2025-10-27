@@ -76,6 +76,10 @@ qmds=$(strip $(foreach section,$(sections),$($(section)_qmds)))
 
 html_reports=$(strip $(foreach section,$(sections),$($(section)_htmls)))
 
+css=$(patsubst $(source_dir)/css/%,$(staging_dir)/%,$(wildcard $(source_dir)/css/*.css))
+$(css): $(staging_dir)/% : $(source_dir)/css/%
+	cp $< $@
+
 ifeq ($(NEED_SBATCH),false)
     ifeq ($(NEED_CONTAINER),false)
 ##     To be executed directly - no (further) containerisation wrapping needed
@@ -123,7 +127,8 @@ $(qmds) : $(staging_dir)/%.qmd : $(staging_dir)/$(VERSION).params.yml $(source_d
 	sed -i -e 's#load_params("$(source_dir)/$(section)", extra=TRUE)#load_params("$(staging_dir)/$*")#' $@
 	sed -i -e 's#choose_staging("$(section)")#"$(staging_dir)/$*"#' $@
 
-$(staging_dir)/_quarto.yml: $(source_dir)/_quarto.yml $(qmds)
+
+$(staging_dir)/_quarto.yml: $(source_dir)/_quarto.yml $(qmds) $(css)
 	$(QUARTO) run $(source_dir)/typescript/sidebar.ts\
 	 --sections="$(subst $(space),$(comma),$(sections))"\
 	 --alignments="$(subst $(space),$(comma),$(alignments))"\
@@ -203,7 +208,7 @@ endif
 .PHONY: publish
 publish: $(pubdir)/$(VERSION) ## Copy results to final location. Either 'outputs' folder (default), intranet (`make publish location=intranet`) or internet
 	cp --no-preserve=mode -r $(RESULTS_DIR)/$(VERSION)/. $(extra_files) $(pubdir)/$(VERSION)
-	cp --no-preserve=mode --recursive --dereference --no-clobber $(RESULTS_DIR)/multiqc-* $(pubdir)/
+	cp --no-preserve=mode --recursive --dereference --no-clobber $(RESULTS_DIR)/multiqc-* $(pubdir)/ 2> /dev/null || true
 	ln -sfn $(VERSION) $(pubdir)/latest
 	[ "$(location)" == "outputs" ] || cp --no-preserve=mode -r .htaccess $(pubdir)/ || echo "Warning: no .htaccess files, so unauthorised people may be able to view these results"
 	ln -sfn $$(realpath $(pubdir)/$(VERSION)) $(RESULTS_DIR)/published_$(location)

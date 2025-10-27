@@ -43,10 +43,15 @@ df2colorspace <- function(df, palette) {
 }
   
 
-sym_colour <- function(dat, lo="blue",zero="white", hi="red") {
+sym_colour <- function(dat, lo="blue",zero="white", hi="red", single=FALSE, binary=FALSE) {
   mx <- quantile(abs(dat), 0.9)
-  circlize::colorRamp2(c(-mx, 0, mx), colors=c(lo, zero, hi))
+  if (single) {
+    circlize::colorRamp2(c( 0, mx), colors=c(zero, hi))
+  } else {
+    circlize::colorRamp2(c(-mx, 0, mx), colors=c(lo, zero, hi))
+  }
 }
+
 
 
 get_terms <- function(dds) {
@@ -92,6 +97,14 @@ rename_with_tag <- function(params) {
 plot_tracker <- function(p) {
   script <- tools::file_path_sans_ext(basename(p$script))
   get_tally <- counter() # keeps track of individual labels and running tally of all plots
+  has_interactivity <- function(p) {
+    inherits(p, "ggplot") && any(
+      vapply(p$layers, function(layer) {
+        any(grepl("^geomInteractive", class(layer$geom), ignore.case = TRUE)) ||
+          any(c("tooltip", "data_id", "onclick") %in% names(layer$mapping))
+      }, logical(1))
+    )
+  }
   function(pl, label, caption, height_mult=NA, min_height=0, max_height=Inf, preview=FALSE) {
     if ("Heatmap" %in% class(pl)) {
       fn <- function() {
@@ -184,7 +197,7 @@ separate_legend <- function(dds, vars=unique(unlist(lapply(metadata(dds)$models,
   )
 }
 
-substitute_x_aes <- function(mapping, excludes=c("", "group","column_split")) {
+substitute_x_aes <- function(mapping, excludes=c("", "group")) {
   # x aesthetic about to be used to represent e.g. PC1 so may need to
   # remap what was being represented by x to another
   # aesthetic. There's an implicit hierarchy of importance of
@@ -250,4 +263,26 @@ my_alpha_scale <- function(pl, decay=0.3) {
   alpha_var <- rlang::as_name(mapping)
   fac_levels <- levels(factor(pl$data[[alpha_var]]))
   scale_alpha_manual(values = setNames(rev((decay)^(seq_along(fac_levels)-1)), fac_levels))
+}
+
+facet_aes <- function(pl, mapping) {
+  if ("wrap" %in% names(mapping)) {
+    wrap_var <- mapping$wrap
+    pl <- pl + facet_wrap(vars(!!wrap_var)) 
+  }
+  if (all(c("grid_x", "grid_y") %in% names(mapping))) {
+    grid_x <- mapping$grid_x
+    grid_y <- mapping$grid_y
+    pl <- pl + facet_grid(vars(!!grid_x), vars(!!grid_y)) 
+  }
+  pl
+}
+
+sort_vars <- function(x, target) {
+  targets <- all.vars(target)
+  if (length(targets)!=0) {
+    x[order(match(x, targets))]
+  } else {
+    x
+  }
 }
