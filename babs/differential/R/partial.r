@@ -12,7 +12,7 @@
 ##' @author Gavin Kelly
 ##' @seealso [assemble_partialised()] for how to construct a matrix from the parts
 ##' @export
-partialise <- function(obj) {
+partialise <- function(obj,...) {
   UseMethod("partialise")
 }
 

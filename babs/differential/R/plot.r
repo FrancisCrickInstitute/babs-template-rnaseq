@@ -29,6 +29,7 @@ df2colorspace <- function(df, palette) {
                 }
               }
               )
+  res$Heatmap$.influential <- setNames(c("black", "white"), c(TRUE, FALSE))
   res$ggplot <- purrr::map2(df, start_levels,
               function(column, start_level) {
                 if (is.factor(column)) {
@@ -39,6 +40,7 @@ df2colorspace <- function(df, palette) {
                 }
               }
               )
+  res$ggplot$.influential <- setNames(c("black", "white"), c(TRUE, FALSE))
   res
 }
   
@@ -94,21 +96,57 @@ rename_with_tag <- function(params) {
 ##' @param cap_fn The function that will be called on the caption text
 ##' @return 
 ##' @author Gavin Kelly
-plot_tracker <- function(p) {
-  script <- tools::file_path_sans_ext(basename(p$script))
+plot_tracker <- function(my_params) {
+  script <- tools::file_path_sans_ext(basename(my_params$script))
+  plot_list <- list()
   get_tally <- counter() # keeps track of individual labels and running tally of all plots
-  has_interactivity <- function(p) {
-    inherits(p, "ggplot") && any(
-      vapply(p$layers, function(layer) {
-        any(grepl("^geomInteractive", class(layer$geom), ignore.case = TRUE)) ||
-          any(c("tooltip", "data_id", "onclick") %in% names(layer$mapping))
-      }, logical(1))
+  function(pl, label, caption, height_mult=NA, min_height=0, max_height=Inf, preview=FALSE, plot_meta=list(), interactive=TRUE) {
+    if (nargs()==0) {
+      return(plot_list)
+    }
+    fig_n <- get_tally()
+    label_n <- get_tally(label)
+    chunk_label <- paste0(gsub("[^[:alnum:]]+", "-", label), "-", label_n)
+    chunk_caption <- paste0("[", caption, "](", script, "/","fig-", sprintf("%0.3i",fig_n), "-", chunk_label, my_params$TAG, ".pdf", ")")
+    chunk_caption <- paste0(
+      caption,
+      " [png](", script, "/","fig-", sprintf("%0.3i",fig_n), "-", chunk_label, my_params$TAG, ".png", ")",
+      " [pdf](", script, "/","fig-", sprintf("%0.3i",fig_n), "-", chunk_label, my_params$TAG, ".pdf", ")"
     )
-  }
-  function(pl, label, caption, height_mult=NA, min_height=0, max_height=Inf, preview=FALSE) {
+      
+    if (!is.na(height_mult)) {
+      height_opt <- paste0("#| fig-height: ", max(min(knitr::opts_chunk$get("fig.height") * height_mult,max_height), min_height))
+    } else {
+      height_opt <- ""
+    }
+    has_interactivity <- interactive &&  inherits(pl, "ggplot") &&
+      any(
+        sapply(pl$layers, function(layer) {
+          any(grepl("^geomInteractive", class(layer$geom), ignore.case = TRUE)) ||
+            any(c("tooltip", "data_id", "onclick") %in% names(layer$mapping))
+        })
+      )
+
+#    wrap <- list(header="", footer="")
     if ("Heatmap" %in% class(pl)) {
       fn <- function() {
         draw(pl, heatmap_legend_side = "top")
+      }
+    }  else if (has_interactivity) {
+      fn <- function() {print(pl)}
+      fn_widget <- function() {
+        height_svg <- 5 * if (is.na(height_mult)) 1 else height_mult
+        g <- girafe(ggobj=pl,
+                   width_svg = 7,
+                   height_svg = height_svg,
+                   options = list(
+                     opts_hover_inv(css = "opacity:0.2;"),
+                     opts_hover(css = "stroke-width:2;"),
+                     opts_tooltip(use_fill = TRUE),
+                     opts_sizing(rescale = TRUE)
+                   )
+                   )
+        knitr::knit_print(g)
       }
     } else if ("gtable" %in% class(pl)){
       fn <- function() {
@@ -118,43 +156,61 @@ plot_tracker <- function(p) {
       fn <- function() {
         print(pl)
       }
-    }
-    fig_n <- get_tally()
+    }      
     if (isTRUE(getOption('knitr.in.progress'))) {
-      height_opt <- ""
-      label <- paste0(gsub("[^[:alnum:]]+", "-", label), "-", get_tally(label))
-      if (!is.na(height_mult)) {
-        height_opt <- paste0("#| fig.height: ", max(min(knitr::opts_chunk$get("fig.height") * height_mult,max_height), min_height))
-      }
-      fig_child <- knitr::knit_expand(
-        text=r"(```{r}
-#| label: fig-{{lbl}}
-#| fig.path: "{{script}}/{{fprefix}}-"
-{{height}}
-fn()
-```)",
-lbl=label,
-height=height_opt,
-script=script,
-fprefix=sprintf("%0.3i",fig_n)
-)
-      link <- paste0("fig-", sprintf("%0.3i",fig_n), "-", label, p$TAG, ".pdf")
+      this_plot_meta <- modifyList(
+        plot_meta,
+        list(
+          png=file.path(script, paste0("fig-", sprintf("%0.3i",fig_n), "-", chunk_label, my_params$TAG, ".png")),
+          label=label,
+          ind=label_n
+        )
+      )
+      plot_list <<- c(plot_list, list(this_plot_meta))     
+      widget_chunk <- knitr::knit_expand(
+        text=c('```{r}',
+               '#| label: widget-{{chunk_label}}',
+               'fn_widget()',
+               '```')
+      )
+      fig_chunk <- knitr::knit_expand(
+        text=c("```{r}",
+               '#| label: fig-{{chunk_label}}',
+               '#| fig-path: "{{script}}/{{fprefix}}-"',
+               '{{height_opt}}',
+               'fn()',
+               '```'),
+        fprefix=sprintf("%0.3i",fig_n)
+      )
+      widget_chunk <- knitr::knit_expand(
+        text=c('```{r}',
+               '#| label: widget-{{chunk_label}}',
+               'fn_widget()',
+               '```')
+      )
       out <- knitr::knit_child(
-        text=fig_child,
-        options=list(fig.cap=paste0("[", caption, "](", script, "/", link,")")),
+        options=if (has_interactivity) list(fig.cap=chunk_caption, out.extra='data-interactive="true"') else  list(fig.cap=chunk_caption),
+        text=fig_chunk,
         quiet=TRUE,
         envir=environment())
       if (preview) {
         cat(sub("(.*)(}.*)", "\\1 .preview-image\\2", out))
       } else {
-        cat(out)
+        if (has_interactivity) {
+          widget_out <- knitr::knit_child(
+            text=widget_chunk,
+            quiet=TRUE,
+            envir=environment())
+          cat(widget_out, "\n\n", out)
+        } else {
+          cat(out)
+        }
       }
     } else {
       fn()
     }
   }
 }
-
 
 
 residual_heatmap_transform <- function(mat, cdata, fml) {
@@ -184,7 +240,7 @@ residual_heatmap_transform <- function(mat, cdata, fml) {
 
 separate_legend <- function(dds, vars=unique(unlist(lapply(metadata(dds)$models, function(x) all.vars(x$design))))) {
   lapply(
-    vars,
+    intersect(vars, names(metadata(colData(dds))$palette$Heatmap)),
     function(md_name) {
       md <- metadata(colData(dds))$palette$Heatmap[[md_name]]
       if (is.function(md)) {
@@ -197,46 +253,25 @@ separate_legend <- function(dds, vars=unique(unlist(lapply(metadata(dds)$models,
   )
 }
 
-substitute_x_aes <- function(mapping, excludes=c("", "group")) {
+substitute_x_aes <- function(mapping, excludes=c("", "group", "data_id", "tooltip", "extra")) {
   # x aesthetic about to be used to represent e.g. PC1 so may need to
   # remap what was being represented by x to another
-  # aesthetic. There's an implicit hierarchy of importance of
-  # aesthetics, typically x > colour > shape > size > ...
-  # But we'll use whatever lexical order they're in the aes.
+  # aesthetic. Supplement with x swapped to colour if necessary
   need_alt_x <- !(
-    # need to represent x-aesthetic somewhere else if it's not already
-    # represented in shape or colour
-    all(all.vars(mapping$x) %in% all.vars(mapping$colour)) ||
+      all(all.vars(mapping$x) %in% all.vars(mapping$colour)) ||
       all(all.vars(mapping$x) %in% all.vars(mapping$color)) ||
       all(all.vars(mapping$x) %in% all.vars(mapping$shape))
   )
+  out <- list(orig=mapping)
   if (need_alt_x) {
-    is_aes <- !names(mapping) %in% excludes # the first component is the function itself, we may also have some pseudo-aesthetics  - the rest are the aesthetics
-    is_x <- which(names(mapping)[is_aes]=="x")
-    first_not_x <- seq_along(mapping[is_aes])[-is_x][1]
-    if (is.na(first_not_x)) { # There's no aes other than x, so use colour for what was x
-      new_fml <- mapping
-      mapping$colour <- mapping$x
-      aes_list <- list(mapping)
-    } else {
-      new_fml <- mapping
-      #      names(new_fml)[c(is_x, first_not_x)] <- names(mapping)[c(first_not_x,is_x)]
-      if (is_x == sum(is_aes)) { # x is the last aes, so swap with penultimate - it's a more important aesthetic, but the least bad case
-        names(new_fml)[is_aes][c(is_x, is_x-1)] <- names(new_fml)[is_aes][c(is_x-1, is_x)]
-      } else { # x is a middling aes: each term moves down an aesthetic level - the final one gets assigned 'x' but that will be overwritten and so lost.
-        names(new_fml)[is_aes] <- names(mapping)[is_aes][c(seq(sum(is_aes))[-is_x], is_x)]
-      }
-      ## Use both the old and new mappings - only way to guarantee everything represented somehow
-      aes_list <- list(mapping, new_fml)
-    }
-  } else {
-    aes_list <- list(mapping)
+    mapping$colour <- mapping$x
+    out$x2colour <- mapping
   }
-  aes_list
+  out
 }
   
 aes_caption <- function(ae) {
-  ae <- ae[intersect(c("colour","shape"), names(ae))]
+  ae <- ae[intersect(c("colour","shape", "fill"), names(ae))]
   paste0(names(ae), "\\", as.character(ae), collapse=",")
 }
 
@@ -285,4 +320,67 @@ sort_vars <- function(x, target) {
   } else {
     x
   }
+}
+
+
+modify_mapping <- function(aes_obj) {
+  aes_obj <- handle_flag_aes(aes_obj)
+  if (!is.null(aes_obj$tooltip)) return(aes_obj)
+  vars_used <- unique(unlist(lapply(aes_obj, all.vars)))
+  data_id_var <- if (!is.null(aes_obj$data_id)) all.vars(aes_obj$data_id) else character(0)
+  vars_ordered <- c(data_id_var, setdiff(vars_used, data_id_var))
+  tooltip_expr <- rlang::parse_expr(
+    paste0(
+      "paste(",
+      paste(sprintf('\"%s: \", format(%s, digits=2, scientific=NA)', vars_ordered, vars_ordered), collapse = ', \"\\n\", '),
+      ", sep='')"
+    )
+  )
+  aes_obj$tooltip <- tooltip_expr
+  return(aes_obj)
+}
+
+    
+handle_flag_aes <- function(aes_obj) {
+  has_flag <- "flag" %in% names(aes_obj)
+  if ("fill" %in% names(aes_obj) || !"colour" %in% names(aes_obj)) return(aes_obj)
+  aes_obj <- as.list(aes_obj)  # make editable
+  colour_expr <- aes_obj$colour
+  aes_obj$fill <- colour_expr
+  if (has_flag) {
+    flag_expr <- aes_obj$flag
+    flag_true <- paste(all.vars(eval(plot_fml[[2]])$flag), collapse=",")
+    aes_obj$colour <- expr(factor(ifelse(!!flag_expr, !!flag_true, as.character(!!colour_expr)), levels=c(levels(!!colour_expr), !!flag_true)))
+    aes_obj$flag   <- NULL
+  }
+  do.call(aes, aes_obj)
+}
+
+
+get_colour_scales <- function(dds, mapping, flag_vars=character()) {
+  colour_by <- setdiff(all.vars(eval(mapping)$colour), flag_vars)
+  scale_out <- list()
+  if (length(flag_vars)!=0) {
+    scale_out$legend <- labs(colour=paste(flag_vars, collapse=","))
+  }
+  my_palette <- metadata(colData(dds))$palette$ggplot
+  if (length(colour_by) == 1 && colour_by %in% names(my_palette)) {
+    if (is.numeric(colDat[[colour_by]])) {
+      pal_col <- my_palette[[colour_by]]
+      scale_out$colour <- scale_colour_gradient(low = pal_col[1], high = pal_col[2])
+    } else {
+      flag_true <- paste(flag_vars, collapse=",")
+      scale_out$colour <- scale_colour_manual(values = c(my_palette[[colour_by]], setNames("#000000", flag_true)))
+    }
+  }
+  fill_by <- all.vars(eval(mapping)$fill)
+  if (length(fill_by) == 1 && fill_by %in% names(my_palette)) {
+    if (is.numeric(colDat[[fill_by]])) {
+      pal_col <- my_palette[[fill_by]]
+      scale_out$fill <- scale_fill_gradient(low = pal_col[1], high = pal_col[2])
+    } else {
+      scale_out$fill <- scale_fill_manual(values = my_palette[[fill_by]])
+    }
+  }
+  scale_out
 }

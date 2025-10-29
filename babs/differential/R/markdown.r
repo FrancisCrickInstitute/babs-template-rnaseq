@@ -74,7 +74,7 @@ load_params <- function(script) {
 ##' @param describe Print the description text as the first paragraph of the section?
 ##' @return A markdown string
 ##' @author Gavin Kelly
-dmc_heading <- function(obj, dataset=1, model=NULL, depth="##", numbered=TRUE, describe=TRUE) {
+dmc_heading <- function(obj, dataset=1, model=NULL, plot=NULL, depth="##", numbered=TRUE, describe=TRUE) {
   heading <- paste0("\n\n", depth)
   text <- ""
   is_dmc <- is.list(obj[[dataset]])
@@ -93,26 +93,37 @@ dmc_heading <- function(obj, dataset=1, model=NULL, depth="##", numbered=TRUE, d
       text <- paste0(met$dataset_description, "\n\n")
     }
   } else {
-    ## Doing a model
-    heading <- c(heading, "Model")
-    if (is_dmc) {
-      met <- metadata(obj[[dataset]][[model]][[1]])$dmc
-      heading <- c(heading, met$model)
-      if (!is.null(met$model_name)) {
-        heading <- c(heading, "-", met$model_name)
+    if (!is.null(plot)) {
+      heading <- c(heading, "Plot config")
+      heading <- c(heading, attr(plot, "name"))
+      if (!is.null(attr(plot, "description"))) {
+        text <- paste0(attr(plot, "description"), "\n\n",
+                      profile_to_string(plot), "\n\n")
+      } else {
+        text <- paste0(profile_to_string(plot), "\n\n")
       }
-      if (!is.null(met$model_description)) {
-        text <- paste0(met$model_description, "\n\n")
+    } else {
+      ## Doing a model
+      heading <- c(heading, "Model")
+      if (is_dmc) {
+        met <- metadata(obj[[dataset]][[model]][[1]])$dmc
+        heading <- c(heading, met$model)
+        if (!is.null(met$model_name)) {
+          heading <- c(heading, "-", met$model_name)
+        }
+        if (!is.null(met$model_description)) {
+          text <- paste0(met$model_description, "\n\n")
+        }
       }
-    }
-    else {
-      heading <- c(heading, model)
-      met <- metadata(obj[[dataset]])$models[[model]]
-      if (!is.null(met$name)) {
-        heading <- c(heading, "-", met$name)
-      }
-      if (!is.null(met$description)) {
-        text <- paste0(met$description, "\n\n")
+      else {
+        heading <- c(heading, model)
+        met <- metadata(obj[[dataset]])$models[[model]]
+        if (!is.null(met$name)) {
+          heading <- c(heading, "-", met$name)
+        }
+        if (!is.null(met$description)) {
+          text <- paste0(met$description, "\n\n")
+        }
       }
     }
   }
@@ -121,7 +132,7 @@ dmc_heading <- function(obj, dataset=1, model=NULL, depth="##", numbered=TRUE, d
     heading <- paste0(heading, "{.unnumbered}")
   }
   if (!describe) text=""
-  cat(paste(heading, "\n\n", text))
+  cat(paste0(heading, "\n\n", text))
 }
 
 report_span <- function(id, type, name="", description="" ) {
@@ -138,15 +149,15 @@ dmc_factory <- function(obj, type, report=report_span) {
   if (type=="dataset") {
     function(id) report_span(id, type=type,
                       name=all_datasets[[id]]$name %||% all_datasets[[id]]$dataset,
-                      description=all_datasets[[id]]$description %||% name)
+                      description=all_datasets[[id]]$description)
   } else if (type=="model") {
     function(id)  report_span(id, type=type,
                        name=all_models[[id]]$name %||% all_models[[id]]$model,
-                       description=all_models[[id]]$description %||% name)
+                       description=all_models[[id]]$description)
   } else if (type=="comparison") {
     function(id)  report_span(id, type=type,
                        name=all_comparisons[[id]]$name %||% all_comparisons[[id]]$comparison,
-                       description=all_comparisons[[id]]$description %||% name)
+                       description=all_comparisons[[id]]$description)
   } else {
     function(id)  report_span(id, type=type, name="", description="")
   }
@@ -156,3 +167,26 @@ dmc_factory <- function(obj, type, report=report_span) {
 var_heading <- function(..., depth) {
   paste0('\n\n', strrep("#", depth), " ",  paste0(...), '\n\n')
 }
+
+profile_to_string <- function(fml) {
+  mapping <- eval(fml[[2]])
+  renamer <- setNames(names(mapping), names(mapping))
+  renamer$data_id <- "hover grouping"
+  renamer$group <- "grouping variables"
+  renamer$extra <- "additional variables"
+  renamer$Flag <- "colour flagging"
+  parts <- vapply(names(mapping), function(nm) {
+    expr <- mapping[[nm]]
+    rnm <- renamer[[nm]]
+    paste0(toupper(substr(rnm, 1, 1)), substr(rnm, 2, nchar(rnm)), " = ", rlang::as_label(expr))
+  }, character(1))
+  out <- paste0("Aesthetics:\n\n", paste0("- ", parts, collapse="\n"), "\n\n")
+  recon <- paste(deparse(as.formula(attr(fml, "src"))[[3]]), collapse="")
+  if (recon==".") {
+    out
+    } else {
+      paste(out, "Reconstruction:", recon, "\n\n")
+    }
+}
+
+  

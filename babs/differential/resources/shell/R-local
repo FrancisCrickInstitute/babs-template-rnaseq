@@ -57,7 +57,7 @@ export SINGULARITYENV_IN_BABS_CONTAINER=${docker_image}
 
 
 if [[ -z "$SINGULARITYENV_RENV_PATHS_ROOT" ]] ; then
-    export SINGULARITYENV_RENV_PATHS_ROOT="$HOME/.cache/R/renv"
+    export SINGULARITYENV_RENV_PATHS_ROOT="$(realpath ~/.cache/R/renv)"
     mkdir -p ${SINGULARITYENV_RENV_PATHS_ROOT}
 fi
  

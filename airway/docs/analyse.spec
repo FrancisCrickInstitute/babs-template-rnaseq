@@ -16,7 +16,7 @@ so we have to restrict our model to at most this complexity.",
 		    profile_plots=list(
 			aes(x=cellLine, colour=treatment, group=treatment) ~ .,
 			aes(x=cellLine, colour=treatment, group=treatment) ~ . - treatment,
-			aes(x=cellLine, colour=treatment, group=treatment) ~ . - cellLine,			
+			aes(x=cellLine, colour=treatment, group=treatment) ~ . - cellLine
 		    ),
                     comparisons = list(
                         mult_comp( revpairwise ~ treatment ),
@@ -51,6 +51,7 @@ will not be accounted for, and genes exhibiting a dependencey on line will tend 
         top_n_variable = 500,
         showCategory = 25,
         seed = 1,
-        filterFun = NULL
+        filterFun = NULL,
+	gene_clust = bluster::HclustParam(cut.params = list(k=12))
     )
 )

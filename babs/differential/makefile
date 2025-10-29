@@ -129,14 +129,15 @@ $(qmds) : $(staging_dir)/%.qmd : $(staging_dir)/$(VERSION).params.yml $(source_d
 
 
 $(staging_dir)/_quarto.yml: $(source_dir)/_quarto.yml $(qmds) $(css)
+	echo 'alignment: [$(subst $(space),$(comma)$(space),$(alignments))]' > ${staging_dir}/_sidebar.yml
+	echo 'spec: [null,$(subst $(space),$(comma)$(space),$(specfiles))]' >> ${staging_dir}/_sidebar.yml
+	echo 'section: [$(subst $(space),$(comma)$(space),$(sections))]' >> ${staging_dir}/_sidebar.yml
 	$(QUARTO) run $(source_dir)/typescript/sidebar.ts\
-	 --sections="$(subst $(space),$(comma),$(sections))"\
-	 --alignments="$(subst $(space),$(comma),$(alignments))"\
-	 --specfiles="$(subst $(space),$(comma),$(specfiles))"\
 	 --template=$< \
 	 --staging=$(staging_dir)\
-	 --repo="$(repo)"\
-	 --multiqc="$(subst $(space),$(comma),$(patsubst $(RESULTS_DIR)/multiqc-%,%,$(wildcard $(RESULTS_DIR)/multiqc-*)))" > $@
+	 --repo="$(repo)" > $@
+	rm -f ${staging_dir}/sidebar.json
+
 
 $(staging_dir)/$(VERSION).params.yml:  resources/make/project.mk $(staging_dir)/R.bib
 	echo '{$(foreach p,$(param_names),$p: "$($p)"$(comma))}' > $@

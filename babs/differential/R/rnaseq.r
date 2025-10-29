@@ -33,12 +33,16 @@ load_specs <- function(file="", context) {
     e <- as.environment(df)
     isVarying <- which((sapply(df, function(v) length(unique(v))) %% nrow(df)) > 1)
     assign("Guess", names(df)[isVarying][1], envir=e)
-    list_ok <- function(...) rlang::dots_list(..., .ignore_empty="all")
+    # Alias several spec-file functions to be list-constructors that can have dangling commas
+    list_ok <- function(my_alias, envir) {
+      assign(my_alias, function(...) {out <- rlang::dots_list(..., .ignore_empty="all"); attr(out, "constructor") <- my_alias; out}, envir=envir)
+    }
     parent.env(e) <- environment()
-    assign("list", list_ok, envir=e)
-    assign("sample_set", list_ok, envir=e)
-    assign("model", list_ok, envir=e)
-    assign("specification", list_ok, envir=e)
+    list_ok("list", envir=e)
+    list_ok("sample_set", envir=e)
+    list_ok("model", envir=e)
+    list_ok("specification", envir=e)
+    list_ok("generate_assay", envir=e)
     assign("comparison",
            function(x, name=NULL, description=NULL,...) {
              # Allow for potentially missing mult_comp wrapper around e.g. revpairwise ~ treatment
@@ -54,29 +58,14 @@ load_specs <- function(file="", context) {
            envir=e)
     assign("profile_plot",
            function(x, name=NULL, description=NULL) {
-             attributes(x) <- list(name=name, description=description)
+             attr(x, "name") <- name
+             attr(x, "description") <- description
              x
            },
            envir=e)
     normalise_within <- function(...) {
       norm_within(as.data.frame(colData(context)), ...)}
-    deparser <- function(...) {
-             unev <- as.list( substitute(alist(...)))[-1]
-             ind <- sapply(unev, function(s) !(is.atomic(s) || is.null(s)))
-             mapply(function(a, i, u) {
-               if (i) {
-                 attr(a, "deparse") <- deparse1(u, width.cutoff=500)
-               }
-               a
-             },
-             list(...),
-             ind,
-             unev)
-           }
-    assign("settings",
-           deparser,
-           envir=e
-           )
+    assign("settings", alist, envir=e)
     assign("mutate",
            function(...) {
              substitute(alist(...))
@@ -84,17 +73,29 @@ load_specs <- function(file="", context) {
            envir=e
            )
     specs <- source(file.path("extdata",file), local=e)$value
+    srcs <- expr_to_list(parse(file.path("extdata",file))[[1]])
+    attach_src <- function(spec, src) {
+      if (is.null(spec)) {
+        return(spec)
+      }
+      if (!is.list(src)) {
+        attr(spec, "src") <- src
+        return(spec)
+      }
+      Map(attach_src, spec, src)
+    }
+    specs <- attach_src(specs, srcs)
     assign("sample_set", expression, envir=e) # avoid evaluating any examples sample_sets.
     pkg_defaults <-default_spec_settings()
     new_settings <- setdiff(names(pkg_defaults), names(specs$settings))
     if (length(new_settings)>0) {
       string_rep <- lapply(pkg_defaults[new_settings], deparse1)
       warning("New settings (", paste(new_settings), ") can be set in ", file, ", so please update it. The default values that will be used are:\n", paste(names(string_rep), string_rep, sep=": ", collapse="\n"))
-      specs$settings[new_settings] <- do.call(deparser, pkg_defaults[new_settings])
+      specs$settings[new_settings] <-  pkg_defaults[new_settings]
     }
     rm(list=ls(envir=e), envir=e)
   } else {
-    fml <- paste("~", names(colData(dds))[ncol(colData(dds))])
+    fml <- paste("~", names(colData(context))[ncol(colData(context))])
     specs <- list(
       sample_sets = list(all=TRUE),
       models=list(
@@ -159,27 +160,35 @@ default_namer <- function() {
 ##' @export
 build_dds_list <- function(dds, spec) {
   # Function to recurse down the spec > sample_sets > models > comparisons hierarchy, and cascade down values of a given field as it encounters them.
-  trickle_down <- function(field, to="comparisons", default=NULL, merge_fn=function(x,y) {if (is.null(x)) y else x}, obj=spec, current_level="spec") {
+  trickle_down <- function(field, to="comparisons", default=NULL, merge_fn=function(x,y) {if (is.null(x)) y else x}, obj=spec, current_level="spec"){
+    levels <- c("spec", "sample_sets", "models", "comparisons")
     if (field %in% names(obj)) {
-      mine <- merge_fn(obj[[field]], default)
-    } else {
-      mine <- default
+      default_src <- attr(default, "src")
+      default <- merge_fn(obj[[field]], default)
+      attr(default, "src") <- default_src
+      if ("src" %in% names(attributes(obj[[field]]))) {
+        attr(default, "src") <- c(attr(default, "src"), attr(obj[[field]], "src"))
+      }
     }
     if (current_level==to) {
-      obj[[field]] <- mine
-    } else {
-      next_level=list(spec="sample_sets", sample_sets="models", models="comparisons")[[current_level]]
-      obj[[next_level]] <- lapply(
-        obj[[next_level]],
-        function(x) trickle_down(field=field, to=to, default=mine, merge_fn=merge_fn, obj=x, current_level=next_level))
+      obj[[field]] <- default
+      return(obj)
     }
+    next_level <- levels[match(current_level, levels) + 1] 
+    obj[[next_level]] <- mapply(
+      function(x) trickle_down(field=field, to=to, default=default, merge_fn=merge_fn, obj=x, current_level=next_level),
+      obj[[next_level]],
+      SIMPLIFY=FALSE
+    )
     obj
   }
+  
   # Share any top-level models down to each sample-set
   spec <- trickle_down(field="models", to="sample_sets", merge_fn=c)
   spec <- trickle_down(field="profile_plots", to="models")
   # Conjunct or cascade any top-level subsetting - if missing, use all samples
-  spec <- trickle_down(field="subset", to="sample_sets", default=TRUE, merge_fn=`&`)
+  spec <- trickle_down(field="subset", to="sample_sets", default=rep(TRUE, ncol(dds)), merge_fn=`&`)
+  spec <- trickle_down(field="influential_samples", to="sample_sets", default=rep(TRUE, ncol(dds)), merge_fn=`&`)
   # Cascade any spec-wide transforms
   spec <- trickle_down(field="transform", to="sample_sets")
   # various model parameters that might be shared across datasets/everything
@@ -193,6 +202,7 @@ build_dds_list <- function(dds, spec) {
   spec <- trickle_down(field="impute", to="sample_sets", default=spec$settings$impute)
   spec <- trickle_down(field="normalise", to="sample_sets", default=spec$settings$normalise)
   spec <- trickle_down(field="external_list", to="models", default=NULL)
+  spec <- trickle_down(field="extra_assays", to="sample_sets", default=NULL)
   modelled_terms <- lapply(
     spec$sample_sets,
     function(x) {lapply(
@@ -234,6 +244,13 @@ build_dds_list <- function(dds, spec) {
     }
     dataset_spec <- spec$sample_sets[[dataset_i]]
     obj <- dds
+    # ensure any sample indices take into account dataset subsetting
+    for (lower_level_subset in intersect(names(dataset_spec), c("influential_samples"))) {
+      a <- attr(dataset_spec[[lower_level_subset]], "src")
+      dataset_spec[[lower_level_subset]] <- dataset_spec[[lower_level_subset]][dataset_spec$subset]
+      attr(dataset_spec[[lower_level_subset]], "src") <- a
+    }
+    metadata(obj) <- modifyList(metadata(obj), dataset_spec)
     if ("baseline" %in% names(dataset_spec)) {
       if (!is.list(dataset_spec$baseline$ind)) {
         is_numerator <- !is.na(dataset_spec$baseline$ind)
@@ -247,6 +264,7 @@ build_dds_list <- function(dds, spec) {
     }
     mdlList <- dataset_spec$models
     obj <- obj[, dataset_spec$subset]
+    obj$.influential <- dataset_spec$influential_samples
     colData(obj) <- droplevels(colData(obj))
     if (!is.null(dataset_spec$filterFeatures)) {
       keepFeaturesInd <- eval_dds(obj, dataset_spec$filterFeatures, assays=c(assayNames(obj), "norm", "missing"))
@@ -274,16 +292,22 @@ build_dds_list <- function(dds, spec) {
     for (i in seq_along(mdlList)) {
       if (is_null(section_chooser(mdlList[[i]], "profile_plots", "exploratory_profile_plots", "differential_profile_plots"))) {      
         # default to the set of models removing any terms that will preserve marginality
-        mdlList[[i]]$profile_plots <- find_simpler_models(mdlList[[i]]$design, do_aes=TRUE, type="auto")
+        pp <- find_simpler_models(mdlList[[i]]$design, do_aes=TRUE, type="design")
+        attr(pp[[1]], "src") <- paste0(deparse(pp[[1]]), collapase="")
+        mdlList[[i]]$profile_plots <- pp
       } else {
         for (profiler in c("profile_plots", "exploratory_profile_plots", "differential_profile_plots")) {
           if (!is_null(section_chooser(mdlList[[i]], profiler))) {
-            mdlList[[i]][[profiler]] <- lapply(mdlList[[i]][[profiler]], function(p) update(mdlList[[i]]$design, p))
+            mdlList[[i]][[profiler]] <- lapply(
+              mdlList[[i]][[profiler]],
+              function(p) {
+                o <- update(mdlList[[i]]$design, p)
+                attributes(o) <- attributes(p)
+                attr(o, "src") <- paste0(deparse(p), collapse="")
+                o
+              })
           }
         }
-      }
-      if ("differential_subset" %in% names(mdlList[[i]])) {
-        mdlList[[i]]$differential_subset <- mdlList[[i]]$differential_subset[dataset_spec$subset]
       }
     }
     metadata(obj)$models <- mdlList
@@ -345,8 +369,6 @@ build_dds_list <- function(dds, spec) {
                    do.call(paste, c(unique(mf), sep="\r")))
       obj <- collapseReplicates(obj, groupby=factor(ind), renameCols=FALSE)
     }
-    metadata(obj)$impute <- dataset_spec$impute
-    metadata(obj)$normalise <- dataset_spec$normalise
     ddsList[[names(spec$sample_sets)[dataset_i]]] <- obj
   }
   ddsList <- imap(ddsList,
@@ -360,54 +382,6 @@ build_dds_list <- function(dds, spec) {
                   )
 }
 
-##' Calculate dimension reduction 
-##'
-##' Add a vst transformed assay, and a projection of the samples ont PCA space
-##' @title Store dimension-reduction results in DESeq2 object
-##' @param dds The original DESeq2 object containing all samples
-##' @param n 
-##' @param family 
-##' @param batch 
-##' @param spec The analysis specificiation
-##' @return 
-##' @author Gavin Kelly
-##' @export
-add_dim_reduct  <-  function(dds, n=Inf, family="norm", batch=~1, do_vst=inherits(dds, "DESeqDataSet")) {
-  if (do_vst) {
-    if ("vst" %in% assayNames(dds)) {
-      var_stab <- assay(dds, "vst")
-    } else {
-      var_stab <- assay(vst(dds, nsub=min(1000, nrow(dds))))
-      assay(dds, "vst") <- var_stab
-    }
-  } else {
-    var_stab <- assay(dds)
-  }
-  if (batch != ~1) {
-    var_stab <- residuals(limma::lmFit(var_stab, model.matrix(batch, as.data.frame(colData(dds)))), var_stab)
-  }
-  colnames(var_stab) <- colnames(dds)
-  if (family=="norm") {
-    pc <- prcomp(t(var_stab), scale=FALSE)
-    percentVar <- round(100 * pc$sdev^2 / sum( pc$sdev^2 ))
-    colData(dds)$.PCA <- DataFrame(pc$x)
-    metadata(colData(dds)$.PCA)$percentVar <- setNames(percentVar, colnames(pc$x))
-    mcols(dds)$PCA <-DataFrame(pc$rotation)
-  } else {
-    co <- counts(dds, norm=FALSE)
-    pc_glm <- glmpca::glmpca(Y=co[rowSums(co)!=0,],
-                            L=ncol(co),
-                            fam=family,
-                            X=if(batch == ~1) 
-                              NULL
-                            else
-                              model.matrix(batch, as.data.frame(colData(dds)))
-                            )
-    colData(dds)$.PCA <- DataFrame(pc_glm$factors)
-    metadata(colData(dds)$.PCA)$percentVar <- setNames(rep(0, ncol(co)), colnames(pc$x))
-  }
-  dds
-}
 
 if(!isGeneric("design")) {
   setGeneric("design", function(object,...){standardGeneric("design")})
@@ -441,8 +415,9 @@ setReplaceMethod("design", signature(object="SummarizedExperiment", value="matri
 ##' @author Gavin Kelly
 ##' @export
 fit_models <- function(dds, param, ...) {
+  has_comparisons <- sapply(metadata(dds)$models, function(m) "comparisons" %in% names(m) && length(m$comparisons) > 0)
   model_comp <- lapply(
-    metadata(dds)$models,
+    metadata(dds)$models[has_comparisons],
     function(mdl) {
       fit_model(mdl, dds, ...)
     }
@@ -458,17 +433,21 @@ fit_models <- function(dds, param, ...) {
   model_comp
 }
 
-
+subset_model <- function(model_dds) {
+  if (".influential" %in% names(colData(model_dds))) {
+    model_dds <- model_dds[, model_dds$.influential]
+    colData(model_dds) <- droplevels(colData(model_dds))
+  }
+  model_dds
+}
+  
 
 fit_model <- function(mdl, dds, ...) {
   message("Processing model ", mdl$name)
   model_dds <- dds
   design(model_dds) <- mdl$design
   metadata(model_dds)$model <- mdl
-  if ("differential_subset" %in% names(metadata(model_dds)$model)) {
-    model_dds <- model_dds[, metadata(model_dds)$model$differential_subset]
-    colData(model_dds) <- droplevels(colData(model_dds))
-  } 
+  model_dds <- subset_model(model_dds)
   model_dds <- check_model(model_dds)
   if (any(metadata(model_dds)$model$dropped)) {
     design(model_dds) <- metadata(model_dds)$model$mat
@@ -530,6 +509,7 @@ fit_comparison <- function(comp, model_dds, mdl, ...) {
         mm <- design(model_dds)
       }
       fit <- limma::lmFit(assay(model_dds), mm)
+      metadata(model_dds)$lmfit <- fit
       nb <- apply(!is.na(assay(model_dds)), 1, function(x) estimability::nonest.basis(fit$design[x,]))
       isEst <- apply(do.call(cbind,contrs),2, function(x) {sapply(nb,  function(y) estimability::is.estble(x, y))})
       fit <- limma::contrasts.fit(fit, do.call(cbind, contrs))
@@ -767,6 +747,7 @@ fitLRT <- function(dds, mdl, reduced, ...) {
     } else {
       mm <- model.matrix(design(dds), colData(dds))
       fit <- limma::lmFit(assay(dds), mm)
+      metadata(dds)$lmfit <- fit
       return(
         lapply(
           linfct_by_stratum,
@@ -793,6 +774,7 @@ fitLRT <- function(dds, mdl, reduced, ...) {
       mm <- design(dds)
     }
     fit <- limma::lmFit(assay(dds), mm)
+    metadata(dds)$lmfit <- fit
     if (is_formula(reduced)) {
       reduced <- model.matrix(reduced, colData(dds))
     }
@@ -1126,7 +1108,7 @@ default_spec_settings <- function() {
 	top_n_variable = 500,     ## For PCA
 	showCategory   = 25,      ## For enrichment analyses
 	seed           = 1,       ## random seed gets set at start of script, just in case.
-        gene_clust     = bluster::HclustParam(),   ## When we need to chose clusters of genes, how many?
+        gene_clust     = quote(bluster::HclustParam()),   ## When we need to chose clusters of genes, how many?
 	filterFun      = IHW::ihw,                 ## NULL for standard DESeq2 results, otherwise  functions
 	clustering_distance_rows    = "euclidean", ## for all feature-distances
         stringsAsFactors = FALSE,
@@ -1139,9 +1121,9 @@ default_spec_settings <- function() {
 }
 
 
-add_org_annotation <- function(dds, org, keytype="ENSEMBL", extra_mcols=list(entrez="ENTREZID", symbol="SYMBOL", ensembl="ENSEMBL")) {
+add_org_annotation <- function(dds, org, keytype="ENSEMBL", extra_mcols=list(entrez="ENTREZID", symbol="SYMBOL", ensembl="ENSEMBL"), count_source=NA) {
   metadata(dds)$organism <- list(org=org)
-  metadata(dds)$count_source <- params$count_source
+  metadata(dds)$count_source <- count_source
   if (is.null(org) || system.file(package=org)=="") {
     if (is.null(row.names(dds))) {
       warning("Couldn't load ", org, ", so using row-numbers for feature annotation")
@@ -1264,10 +1246,12 @@ mat_x_terms <- function(mat, fml, fitFrame) {
                             "-",
                             min((covar_x_mat$wrap + 1) * 20, nmat))
   covar_x_mat$column <- sprintf("%02d", covar_x_mat$column)
+  covar_x_mat$wrap <- paste("PCs",covar_x_mat$wrap)
+  covar_x_mat$Assoc[covar_x_mat$pvalue>0.05] <- NA
   covar_x_mat
 }
 
-extract_hits <- function(covar_x_pc, fml) {
+extract_hits <- function(covar_x_pc, pc) {
   pc_hits <- data.frame(
     covar=unique(covar_x_pc$Covariate),
     strongest=NA_character_,
@@ -1323,4 +1307,137 @@ replace_emmc <- function(expr, replacements, prefix="my") {
   }
   # leave constants etc alone
   expr
+}
+
+
+pre_tidy_wrap <- function(dds, meta_list="drop") {
+  if (meta_list=="drop") {
+    rowData(dds) <- rowData(dds)[sapply(rowData(dds), . %>% dim %>% is.null)]
+    colData(dds) <- colData(dds)[sapply(colData(dds), . %>% dim %>% is.null)]
+    dds
+  } else if (meta_list=="expand") {
+  }
+}
+
+removeLow <- function(ddsList, preserve_across=TRUE, baseMeanMin) {
+  is_des <- sapply(ddsList, inherits, "DESeqDataSet")
+  if (preserve_across) {
+    all_zero <- Reduce(f=`&`,
+                      x=lapply(ddsList[is_des], function(x) apply(counts(x)==0,1, all)),
+                      init=TRUE)
+    ddsList[is_des] <- lapply(ddsList[is_des], function(dds) dds[!all_zero,])
+  } else {
+    ddsList[is_des] <- lapply(ddsList[is_des], function(dds) dds[apply(counts(dds)!=0, 1, any),])
+  }
+  if (baseMeanMin>0) {
+    ddsList[is_des] <- lapply(ddsList[is_des],
+                     function(x) x[rowMeans(counts(x, normalized=TRUE)) >= baseMeanMin,]
+                     )
+  }
+  ddsList
+}
+
+
+
+# define a generic
+setGeneric("sample_norm", function(se, ...) standardGeneric("sample_norm"))
+
+# method for DESeqDataSet
+setMethod("sample_norm", "DESeqDataSet", function(se, ...) {
+      if ("controlGenes" %in% names(metadata(se))) {
+        controlGenes <- eval(metadata(se)$controlGenes, transform(rowData(se), ID=row.names(se)))
+        se <- estimateSizeFactors(se, controlGenes=controlGenes)
+      } else {
+        se <- estimateSizeFactors(se)
+      }
+      if ("subsetGenes" %in% names(metadata(se))) {
+        se <- se[eval(metadata(se)$subsetGenes, transform(rowData(se), ID=row.names(se))),]
+      }
+      assay(se, "vst") <- assay(vst(se, nsub=min(1000, nrow(se))))
+
+      return(se)
+})
+
+# fallback method
+setMethod("sample_norm", "ANY", function(se, ...) {
+    assayNames(se)[1] <- noun_to_readout(rowNoun)
+    rowData(se)$nna <- apply(is.na(assay(se)), 1, sum)
+    if ((metadata(se)$normalise %||% "none") =="vsn") {
+      assays(se) <- setFirstAssay(
+        se,
+        vst= vsn::predict(vsn::vsnMatrix(assay(se)), assay(se)))
+    }
+    imp <- metadata(se)$impute
+    if (!is.null(imp)) {
+      assays(se) <- setFirstAssay(
+        se,
+        imputed=MSnbase::exprs(do.call(
+          MSnbase::impute,
+          modifyList(imp,
+                     list(object=as(se, "MSnSet"), differential=NULL)))))
+    }
+    se
+})
+
+
+normalise_assay <- function(dds, normaliser, design) {
+}
+normalise_assay <- function(se, assay_to_norm, model) {
+  df <- as.data.frame(colData(se))
+  df$y <- I(t(assay(se, assay_to_norm)))
+  fit <- lm(update(model, y~.), data=df)
+  baseline <- t(predict(fit,
+                       newdata=df
+                       )
+               )
+  assay(se, assay_to_norm) - baseline
+}
+
+
+
+add_extra_assays <- function(dds) {
+  extras <- metadata(dds)$extra_assays
+  if (is.null(extras)) return(dds)
+  assays(dds) <- c(assays(dds), lapply(extras, generate_assay, dds))
+  dds
+}
+
+
+quiet <- function(expr) {
+  suppressWarnings(
+    suppressMessages({
+      capture.output(out <- expr)
+      out
+    })
+  )
+}
+
+generate_assay <- function(args, dds) {
+  quiet({
+  curAssay <- assay(dds, args$from)
+  if (args$method=="normalise") {
+    curFrame <- as.data.frame(colData(dds))
+    coefs <- limma::lmFit(curAssay, model.matrix(args$design, curFrame))$coefficients
+    baseline_values <- modifyList(args, list(from=NULL, method=NULL, design=NULL))
+    baseFrame <- curFrame
+    baseFrame[names(baseline_values)] <- lapply(
+      names(baseline_values),
+      function(nm) factor(baseline_values[[nm]], levels=levels(curFrame[[nm]]))
+    )
+    baseline_X <- model.matrix(args$design, baseFrame)
+    out <- curAssay - coefs %*% t(baseline_X)
+  }
+  })
+  out
+}
+
+data_key <- function(plot_fml, dds, meta="exploratory_default_assay") {
+  if ("y" %in% names(plot_fml[[2]])) {
+    yvar <- as.character(plot_fml[[2]]$y)
+  } else {
+    yvar <- metadata(dds)[[meta]]
+    if (!is.character(yvar)) yvar <- assayNames(dds)[metadata(dds)[[meta]]]
+  }
+  design_fml <- design(dds)
+  setNames(list(paste(sort(attr(terms(design_fml), "term.labels")), collapse="+")), yvar)
 }

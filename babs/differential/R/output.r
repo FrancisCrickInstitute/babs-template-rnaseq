@@ -18,16 +18,12 @@ p2filename <- function(p, prefix, suffix) {
 ##' @return A list of file paths to the excel files
 ##' @author Gavin Kelly
 ##' @export
-write_assay <- function(ddsList, aname="vst", p,  formula=NULL, terms_to_remove=NULL) {
+write_assay <- function(ddsList, aname="vst", p) {
   out <- list()
   for (i in names(ddsList)) {
     x <- assayPlus(ddsList[[i]], aname)
     if (is.null(x)) {
       next
-    }
-    if (!is.null(formula)) {
-      part_resid <- partialise(x)
-      x <- x - t(apply(part_resid$terms[,,terms_to_keep, drop=FALSE], 1:2,sum))
     }
     content_frame <- cbind(mcols(ddsList[[i]]),x)
     head_frame <- as.data.frame(colData(ddsList[[i]]))
@@ -35,10 +31,10 @@ write_assay <- function(ddsList, aname="vst", p,  formula=NULL, terms_to_remove=
     spacer_frame <- as.data.frame(mcols(ddsList[[i]]))[rep(1, ncol(head_frame)),]
     spacer_frame[] <- ""
     row.names(spacer_frame) <- colnames(head_frame)
-    fname <- p2filename(p, paste0(aname, "_", i), "txt")
+    fname <- p2filename(p, paste0(aname, "_", i), "tsv")
     dir.create(dirname(fname), recursive=TRUE)
     out[[i]] <- fname
-    write.table(cbind(spacer_frame, t(head_frame)), file=fname, quote=FALSE, sep="\t", col.names=NA)
+    write.table(cbind(spacer_frame, t(head_frame)), file=fname, quote=FALSE, sep="\t", col.names=FALSE)
     write.table(content_frame, file=fname,
                 quote=FALSE, sep="\t", append=TRUE, col.names=NA)
   }
@@ -67,7 +63,7 @@ write_clusters <- function(clust, mcols, p, prefix="clusters") {
   } else {
     df <- Reduce(function(x,y) merge(x, y, by="ID", all=TRUE), frames)
   }
-  meta <- as.data.frame(mcols[setdiff(names(mcols), "PCA")])
+  meta <- as.data.frame(mcols)
   df <- merge(meta, df,  by.x=0, by.y="ID")
   names(df)[names(df)=="Row.names"] <- "ID"
   sn <- "Clusterings"
@@ -155,7 +151,7 @@ write_results <- function(ddsList, param, params, assays=NULL) {
           comparison_name_lookup[[alpha_key]] <- sn
           sn <- alpha_key
         }
-        addWorksheet(wb, sn, tabColour=crick_colours$secondary[[(design_ind - 1) %% length(crick_colours$secondary) + 1]])
+        addWorksheet(wb, sn, tabColour=crick_colours$secondary[[design_ind]])
         writeData(wb, sn, dframe, headerStyle=hs1, withFilter=TRUE)
         groupRows(wb, sn, rows=which(!grepl("\\*$", dframe$class))+1, hidden=TRUE)
         filtCol <- match("class", names(dframe))
@@ -306,9 +302,6 @@ export_biologic <- function(result_object, path) {
   
   sample_id_list <- lapply(coldata_list, function(df) data.frame(sampleID=df[[1]], sample.id=row.names(df)))
   definition_frame <- do.call(cbind, sample_id_list[!duplicated(sample_id_list)])
-  coldata_list <- lapply(coldata_list, function(df) {
-    df[!grepl("^\\.PCA\\.PC", names(df))]
-  })
   coldata_frame <- do.call(cbind, coldata_list[!duplicated(coldata_list)])
   n_unique <- sapply(coldata_frame, function(x) length(unique(x)))
   interesting <- (n_unique!=1 & n_unique!=nrow(coldata_frame)) | sapply(coldata_frame, is.numeric)
@@ -435,3 +428,77 @@ decompress_dmc <- function(dmc) {
                   })
          })
 }
+
+
+
+sample_X_dataset_table <- function(dds, ddsList) {
+  samp <- as.data.frame(colData(dds))
+  # Extra columns introduced by datasets
+  extra_meta <- lapply(
+    setNames(names(ddsList), names(ddsList)),
+    function(x) {
+      m <- merge(
+        setNames(data.frame(ifelse(colnames(dds) %in% colnames(ddsList[[x]]), "✓", ""), row.names=row.names(samp)), x),
+        as.data.frame(colData(ddsList[[x]])[, setdiff(names(colData(ddsList[[x]])),  names(samp)),drop=FALSE]),
+        by=0, all.x=TRUE
+      )
+      transform(m, row.names=Row.names, Row.names=NULL, .influential=ifelse(is.na(.influential) | !.influential, "", "✓"))[row.names(samp),,drop=FALSE]
+    }
+  )
+
+  extra_meta <- extra_meta[sapply(extra_meta, function(x) ncol(x)!=0 & nrow(x)!=0)]
+  # Generate tab_spanner parameters for each datasets extra columns
+  ts_extra <- lapply(names(extra_meta),
+                    function(x) list(name=x,
+                              cols=1:ncol(extra_meta[[x]]))
+                    )
+  # Cummulatively offset the columns to be spanned
+  ts_extra <- Reduce(function(ts, x) {
+    x$cols <- x$cols+max(ts$cols)
+    x},
+    ts_extra,
+    accumulate=TRUE)
+
+  df <- cbind(samp, do.call(cbind, unname(extra_meta)))
+  clabel <- setNames(as.list(names(df)), 1:ncol(df))
+  names(df) <- names(clabel)
+  gt(data=df) %>%
+    cols_label(.list=clabel) %>%
+    tab_spanner(label="Metadata",
+                columns=seq_along(samp)) %>%
+    Reduce(f=function(gti, x) tab_spanner(gti, label=x$name,columns=x$cols + ncol(samp)), x=ts_extra, init=.)
+}
+
+src2bullets <- function(meta, fields, model=NULL) {
+  field_titles <- list(
+    subset = "Samples for inclusion in any analysis",
+    influential_samples = "Samples used, out of those already selected for inclusion, to actively inform analysis (differential, heatmap's top genes, principal components)",
+    normalise = "Method for normalising data",
+    impute = "Method for imputing missing values",
+    filterFeatures = "Criteria for keeping features in any analysis",
+    filterQC = "Criteria for keeping features in the exploratory analysis",
+    extra_assays = "Additional generated data matrices"
+  )
+  field_src_substitutes <- list(
+    subset = "All samples",
+    influential_samples = "All included samples",
+    filterFeatures = "No exclusions made",
+    filterQC = "No exclusions beyond the general criterion",
+    extra_assays = "None"
+  )
+  field_src_fns <- list(
+    subset = sum,
+    influential_samples = sum
+  )
+  for (field in intersect(fields, names(meta))) {
+    src <- attr(meta[[field]], "src")
+    agg <- if (field %in% names(field_src_fns)) paste0(" (", field_src_fns[[field]](meta[[field]]), ")") else ""
+    if (!is.null(src)) {
+      cat(paste0(" - ", field_titles[[field]] %||% field, ": ", paste(src, collapse="; "), agg, "\n"))
+    } else if (field %in% names(field_src_substitutes)) {
+      cat(paste0(" - ", field_titles[[field]] %||% field, ": ", field_src_substitutes[[field]], agg, "\n"))
+    }
+  }
+}
+
+    

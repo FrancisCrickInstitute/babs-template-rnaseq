@@ -82,7 +82,7 @@ link2path <- function(lname) {  file.path(knitr::opts_knit$get("output.dir"),lna
 ```{r}
 #| label: read-diff
 data(list=paste0("counts_", params$alignment))
-data(list=paste0("pca_", params$alignment, "_", params$spec))
+data(list=paste0("ddsList_", params$alignment, "_", params$spec))
 
 if (!is.null(metadata(dds)$organism$org)) {
   library(metadata(dds)$organism$org, character.only=TRUE)

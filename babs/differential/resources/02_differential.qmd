@@ -56,6 +56,9 @@ source("R/partial.r", local = knitr::knit_global())
 source("R/output.r", local = knitr::knit_global())
 source("R/helpers.r", local = knitr::knit_global())
 
+for (i in sub("\\.emmc$", "", ls("package:emmeans", pattern="*.emmc")))
+  assign(paste0("my_", i,".emmc"), negate_emmc(paste0(i, ".emmc")))
+
 set.seed(1)
 
 if (!isTRUE(getOption('knitr.in.progress'))) {
@@ -102,7 +105,7 @@ if (isTRUE(getOption('knitr.in.progress'))) {
 
 base_dir <- getwd()
 data(list=paste0("counts_", params$alignment))
-data(list=paste0("pca_", params$alignment, "_", params$spec))
+data(list=paste0("ddsList_", params$alignment, "_", params$spec))
 
 ddsList <- lapply(ddsList, function(dds) {
   imp <- metadata(dds)$impute
@@ -157,8 +160,7 @@ if (interactive() && file.exists(rds_name)) {
 
 
 ## For each dataset, fit all its models
-for (i in sub("\\.emmc$", "", ls("package:emmeans", pattern="*.emmc")))
-  assign(paste0("my_", i,".emmc"), negate_emmc(paste0(i, ".emmc")))
+
 dds_model_comp <- lapply(
   ddsList,
   function(dds) fit_models(
@@ -332,13 +334,15 @@ for (dataset in names(summaries)) {
 
 for (dataset in names(summaries)) {
   for (model in names(pval_frame[[dataset]])) {
+    plot_section <- list(dataset=dataset, model=model)
     pl <- ggplot(pval_frame[[dataset]][[model]], aes(x=pvalue, fill=baseMean<1)) +
       geom_density(alpha=0.5) +
       facet_wrap(~Comparison) +
       theme_bw()
     do_plot(pl,
             label="summaryp",
-            caption=paste("p-Diagnostic for", dataset, model)
+            caption=paste("p-Diagnostic for", dataset, model),
+            plot_meta=plot_section
             )
     cat("\n\n---\n\n")
   }
@@ -362,10 +366,12 @@ potentially several ways, as formulated here:
 for (dataset in names(ddsList)) {
   met <- metadata(ddsList[[dataset]])
   dmc_heading(ddsList, dataset=dataset, model=NULL, depth="##")
-  mdls <- lapply(met$models, function(x) x$design)
-  mdls <- mdls[sapply(met$models, function(x) "comparisons" %in% names(x))]
+  has_comparisons <- sapply(met$models, function(m) "comparisons" %in% names(m) && length(m$comparisons) > 0)
+  mdls <- lapply(met$models[has_comparisons], function(x) x$design)
+  src2bullets(met, c("subset", "extra_assays", "influential_samples"))
   for (mdl in names(mdls)) {
-    dmc_heading(ddsList, dataset=dataset, model=mdl, depth="##")
+    dmc_heading(ddsList, dataset=dataset, model=mdl, depth="###", numbered=FALSE)
+    src2bullets(met$models[[mdl]], c("subset", "extra_assays", "influential_samples"))
     cat("`",
         Reduce(paste, sub("~", paste0(noun_to_readout(RowNoun)," ~ "), deparse(mdls[[mdl]]))),
         "`\n\n"
@@ -411,6 +417,7 @@ for (dataset in names(dds_model_comp)) {
       external_list <- NULL
     }
     for (comp_id in names(this_mdl)) {
+      plot_section <- list(dataset=dataset, model=mdl, comparison_id=comp_id)
       res <- as.data.frame(mcols(this_mdl[[comp_id]])$results)
       md <- metadata(this_mdl[[comp_id]])
       pal <- RColorBrewer::brewer.pal(9, "Set1")
@@ -447,18 +454,19 @@ for (dataset in names(dds_model_comp)) {
         colour_scale$labels <- c(colour_scale$labels, unique(external_list$Comparison))
         colour_scale$breaks <- c(colour_scale$breaks, pal[seq_along(unique(external_list$Comparison))])
         pl <- pl +
-          ggrepel::geom_text_repel(aes(colour=col), size=3, data=res[external_list$ID,], max.overlaps=Inf, show_guide = FALSE) +
+          ggrepel::geom_text_repel(aes(colour=col), size=3, data=res[external_list$ID,], max.overlaps=Inf, show.legend = FALSE) +
           geom_point(aes(colour=col), data=res[external_list$ID,])
         ind <- ind[!row.names(res)[ind] %in% external_list$ID]
       }
-      pl <- pl+ggrepel::geom_text_repel(size=3, data=res[ind,], show_guide = FALSE) 
+      pl <- pl+ggrepel::geom_text_repel(size=3, data=res[ind,], show.legend = FALSE) 
       pl <- pl +
         scale_colour_identity(labels=colour_scale$labels, breaks=colour_scale$breaks, guide = "legend") +
         labs(colour="Class")
       do_plot(pl,
               label="MA",
               caption=paste0("MA plot of differential ",rowNoun,"s ", sub(".*\\t", "", comp_id)),
-              preview=first
+              preview=first,
+              plot_meta=plot_section
               )
       first <- FALSE
       cat("\n\n---\n\n")
@@ -482,6 +490,7 @@ from the QC heatmaps which were blind to the experimental design.
 param$set("clustering_distance_rows", postpone=TRUE)
 param$set("clustering_distance_columns")
 for (dataset in names(dds_model_comp)) {
+  plot_section <- list(dataset=dataset)
   dmc_heading(dds_model_comp, dataset=dataset, model=NULL, depth="##")
   nice_legends <- separate_legend(ddsList[[dataset]])
   pl <- do.call(gridExtra::arrangeGrob,c(
@@ -491,8 +500,11 @@ for (dataset in names(dds_model_comp)) {
           label= "legend-a",
           caption=paste("Metadata colour-codings for",
                         metadata(ddsList[[dataset]])$dmc$dataset_name %||% metadata(ddsList[[dataset]])$dmc$dataset
-                        ))
+                        ),
+          plot_meta=plot_section
+          )
   for (mdl_name in names(dds_model_comp[[dataset]])) {
+    plot_section$model <- mdl_name
     dmc_heading(dds_model_comp, dataset=dataset, model=mdl_name, depth="###")
     this_mdl <- dds_model_comp[[dataset]][[mdl_name]]
     first_done <- FALSE
@@ -502,7 +514,20 @@ for (dataset in names(dds_model_comp)) {
     } else {
       external_list <- NULL
     }
+
+    model_meta <- metadata(dds_model_comp[[dataset]][[mdl_name]][[1]])$model
+    design <- model_meta$design
+    target <- model_meta$variables
+    plot_formulae <- section_chooser(model_meta, "differential_profile_plots", "profile_plots")
+    model_vars <- list(
+      design=sort_vars(all.vars(design), target),
+      plot=sort_vars(unique(unlist(lapply(plot_formulae, all.vars))), target),
+      all=sort_vars(unique(c(all.vars(design),
+                   unique(unlist(lapply(plot_formulae, all.vars)))
+                   )), target)
+    )
     for (comp_id in c(names(this_mdl), unique(external_list$Comparison))) {
+      plot_section$comparison <- comp_id
       this_comp <- this_mdl[[comp_id]]
       comp_name <- sub(".*\\t", "", comp_id)
       is_external <- !(comp_id %in% names(this_mdl))
@@ -536,8 +561,7 @@ for (dataset in names(dds_model_comp)) {
       }
       zweights <- setNames(rep(0, ncol(ddsList[[dataset]])), colnames(ddsList[[dataset]]))
       zweights[colnames(this_comp)] <- weights
-#      tidied_data <- tidy_significant_dds(this_comp, ind, unique(unlist(var_roles)), weights=weights)
-      tidied_data <- tidy_significant_dds(ddsList[[dataset]], ind, unique(unlist(var_roles)), weights=zweights)
+      tidied_data <- tidy_significant_dds(ddsList[[dataset]], ind, model_vars$all, weights=zweights)
       pdat <- tidied_data$pdat
       pdat[sapply(pdat, is.character)] <- lapply(pdat[sapply(pdat, is.character)], 
                                                 as.factor)
@@ -547,7 +571,8 @@ for (dataset in names(dds_model_comp)) {
       } else {
         col_split <- apply(sapply(pdat[, var_roles$by, drop=FALSE], as.character), 1, paste, collapse=" ")
       }
-
+      
+      hheight <- (function(n, small, big, bign) {a <- (big-small)/(bign-1); b <- small-a; min(a*n + b, bign)})(n=nrow(tidied_data$mat), small=0.5, big=40, bign=1000)
       ha <- ComplexHeatmap::HeatmapAnnotation(
         df=pdat,
         col=metadata(colData(this_comp))$palette$Heatmap[names(pdat)],
@@ -561,14 +586,17 @@ for (dataset in names(dds_model_comp)) {
         show_column_names = TRUE,
         clustering_distance_rows=param$get("clustering_distance_rows"),
         column_split = col_split,
+        height=unit(hheight, "cm"),
         top_annotation = ha,
         row_names_gp = gpar(fontsize = 6),
         show_row_names = nrow(tidied_data$mat)<100)
       do_plot(pl,
               label="Heatmap",
               caption=paste0("Heatmap on ", comp_name, comp_type, rowNoun,"s. White for ", baseline_str),
-              height_mult=nrow(tidied_data$mat)/30,
-              max_height=15, min_height=5)
+#              height_mult=nrow(tidied_data$mat)/30,
+#              max_height=15, min_height=5,
+              plot_meta=plot_section
+              )
       cat('\n\n---\n\n')
       if (do_residual_transform <- FALSE) {#length(all.vars(fml))>1) {
         # TODO: Check this works with the zweights above. tidied_data$mat is now possibly larger than this_comp
@@ -590,7 +618,8 @@ for (dataset in names(dds_model_comp)) {
             show_row_names = nrow(tidied_data$mat)<100)
           do_plot(pl,
                   label="focussed",
-                  caption=paste0("Heatmap on differential ",rowNoun,"s ", comp_name, ", ", term_name, "-focussed")
+                  caption=paste0("Heatmap on differential ",rowNoun,"s ", comp_name, ", ", term_name, "-focussed"),
+                  plot_meta=plot_section
                   )
           cat('\n\n---\n\n')
         }
@@ -637,6 +666,7 @@ for (dataset_id in names(dds_model_comp)) {
     }
     
     for (comp_id in c(names(this_mdl), unique(external_list$Comparison))) {
+      plot_section <- list(dataset=dataset_id, model=model_id, comparison=comp_id)
       is_external <- !(comp_id %in% names(this_mdl))
       if (is_external) {
         this_dds <- this_mdl[[1]]
@@ -653,6 +683,7 @@ for (dataset_id in names(dds_model_comp)) {
         as.data.frame(colData(ddsList[[dataset_id]])),
         fml=metadata(this_dds)$model$design)
       for (plot_fml in plot_formulae) {
+        plot_section$plot_config <- attr(plot_fml, "name")
         cdata_df <- as.data.frame(colData(ddsList[[dataset_id]])[, all.vars(plot_fml), drop=FALSE])
         mat <- t(scale(t(
           assemble_partialised(partials, update(plot_fml, NULL ~ .), resids=TRUE)
@@ -704,7 +735,8 @@ for (dataset_id in names(dds_model_comp)) {
         capt <- paste0("Cluster profile for ", comp_id, " ",rowNoun,"s  of ", mtag(model_id), " in ", dtag(dataset_id), removed)
         do_plot(pl,
                 label= "diffClustProfile",
-                caption=capt
+                caption=capt,
+                plot_meta=plot_section
                 )
         if (!is_external) {
           all_clusters[[this_clust]] <- list(
@@ -722,15 +754,6 @@ if (!exists_profile_plot) {
 }
 
       
-
-  ## ind <- which(hclustk=="|7|=927")
-  ## mcols(this_comp)$results[ind,]
-  ## ind <- "ENSG00000005483"
-  ## plotFrame <- colData(this_comp)
-  ## plotFrame$Y <- assay(this_comp, "vst")[ind,]
-  ## ggplot(as.data.frame(plotFrame),
-  ##        aes(x=Ct, y=Y, colour=eventual, group=Participant)) +
-  ##   geom_line()
 
 ```
 

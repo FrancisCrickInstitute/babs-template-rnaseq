@@ -194,10 +194,10 @@ excluded-targets += Dockerfile install_all.sh
 CONTAIN=false#An internal flag
 BIND_DIR = $(shell git rev-parse --show-toplevel 2>/dev/null || echo $(realpath .))
 EXECUTOR?=singularity
-renv_root=$(or $(SINGULARITYENV_RENV_PATHS_ROOT),~/.cache/R/renv)
+renv_root=$(realpath $(or $(SINGULARITYENV_RENV_PATHS_ROOT),$(HOME)/.cache/R/renv))
 ifeq ($(EXECUTOR),singularity)
 CONTAINER= $(call ml,$(SINGULARITY_MODULE)); singularity
-CONTAINER_IMAGE=$(or $(SINGULARITY_IMAGEDIR),$(or $(SINGULARITY_CACHEDIR),~/.singularity/cache)/library)/$(sif_file)
+CONTAINER_IMAGE=$(or $(SINGULARITY_IMAGEDIR),$(or $(SINGULARITY_CACHEDIR),$(HOME)/.singularity/cache)/library)/$(sif_file)
 CONTAINER_BIND=--bind $(BIND_DIR),/tmp,$(renv_root)
 CONTAINER_ENV=--env SQLITE_TMPDIR=/tmp,$\
   OMP_NUM_THREADS=$(NUM_THREADS),OPENBLAS_NUM_THREADS=$(NUM_THREADS),BIOCPARALLEL_WORKER_NUMBER=$(NUM_THREADS),$\
