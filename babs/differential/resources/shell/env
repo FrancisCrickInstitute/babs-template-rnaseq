@@ -80,6 +80,7 @@ export SINGULARITYENV_XDG_RUNTIME_DIR=${launcher_dir}/xdg-runtime
 
 # export SINGULARITY_IMAGEDIR=/place/to/store/singularity/sif/files
 # export SINGULARITYENV_RENV_PATHS_ROOT=$(realpath ${RENV_PATHS_ROOT})
+# export SINGULARITYENV_RENV_PATHS_LIBRARY_ROOT=renv/library
 # export SINGULARITY_BIND=~/.ssh #etc - we automatically bind SINGULARITY_RENV_PATHS_ROOT,/tmp so no need to add those
 # export SINGULARITYENV_DISPLAY="$DISPLAY"
 # export NUM_THREADS=N#SLURM_CPUS_PER_TASK will take precedence. Then N, then '2'

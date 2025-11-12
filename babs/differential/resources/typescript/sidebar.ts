@@ -13,7 +13,7 @@ const counter = (function () {
 })()
 
 const args = get_args(Deno.args, {
-    string: ["template", "staging", "repo"]
+    string: ["template", "staging", "repo", "sections", "alignments", "specfiles"]
 });
 
 const quarto = parse(Deno.readTextFileSync(args.template));
@@ -62,7 +62,7 @@ function expandAxesForNav(axes, staging, prefix = {}) {
 
 	const [currentKey, ...restKeys] = keys;
 	const values = axes[currentKey];
-	const results = [];
+	var results = [];
 
 	for (const val of values) {
 	    const nodePrefix = { ...prefix, [currentKey]: val };
@@ -95,22 +95,38 @@ function expandAxesForNav(axes, staging, prefix = {}) {
 		}
 	    }
 	}
-
+	const sectionNodes = results.filter(item => "section" in item);
+	
+	if (sectionNodes.length === 1 && results.length > 1) {
+	    // mixed case: keep non-section items and flatten the single section
+	    const flattened = [];
+	    for (const item of results) {
+		if (item.section && Array.isArray(item.contents)) {
+		    flattened.push(...item.contents);
+		} else {
+		    flattened.push(item);
+		}
+	    }
+	    results = flattened;
+	} else if (sectionNodes.length === 1 && results.length === 1) {
+	    // single section only: flatten entirely
+	    results = sectionNodes[0].contents;
+	}
+	results.forEach(child => {
+	    delete child.params;
+	});
 	return results;
     }
 
     const navTree = recurse(Object.keys(axes), prefix);
-    if (navTree.length == 1) {
-	return { navTree:navTree[0].contents, flatList };
-    } else {
-	return { navTree, flatList };
-    }
+    return { navTree, flatList };
+
 }
 
 function qmd2nav(fname, staging, param_keys={}) {
     const fpath = `${staging}/${fname}`;
     try {
-	const params = extractYaml(Deno.readTextFileSync(fpath))?.params || {};
+	const params = extractYaml(Deno.readTextFileSync(fpath)).attrs?.params || {};
 	const sectionName = params.section || fname.replace(/\.qmd$/, "");
 	const filteredParams = Object.fromEntries(
 	    param_keys

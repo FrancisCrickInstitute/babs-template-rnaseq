@@ -371,21 +371,18 @@ for (dataset_id in names(ddsList)) {
     section_hierarchy <- list(dataset=dataset_id, model=model_id)
     model_meta <- metadata(this_dds)$models[[model_id]]
     design <- model_meta$design
-    target <- model_meta$variables
     for (new_name in names(model_meta$extra_assays)) {
       assay(thid_dds, new_name) <- normalise_assay(this_dds, model_meta$extra_assays[[new_name]], design)
     }
     plot_formulae <- section_chooser(model_meta, "exploratory_profile_plots", "profile_plots")
-    model_vars <- list(
-      design=sort_vars(all.vars(design), target),
-      plot=sort_vars(unique(unlist(lapply(plot_formulae, all.vars))), target),
-      all=sort_vars(unique(c(all.vars(design),
-                   unique(unlist(lapply(plot_formulae, all.vars)))
-                   )), target)
-    )
+    model_vars <- sort_vars(
+      unique(c(all.vars(design),
+               unique(unlist(lapply(plot_formulae, all.vars)))
+               )),
+      model_meta$variables)
     dmc_heading(ddsList, dataset=dataset_id, model=model_id, depth=strrep("#", length(section_hierarchy)))
     # Show an overall legend
-    nice_legends <- separate_legend(ddsList[[dataset_id]], model_vars$all)
+    nice_legends <- separate_legend(ddsList[[dataset_id]], model_vars)
     pl <- do.call(gridExtra::arrangeGrob, c(
       nice_legends,
       ncol=ceiling(sqrt(length(nice_legends)))))
@@ -481,8 +478,8 @@ for (dataset_id in names(ddsList)) {
         cluster_rows = gene_clust$objects$hclust,
         heatmap_legend_param = list(direction = "horizontal"), 
         top_annotation = ComplexHeatmap::HeatmapAnnotation(
-          df = colDat[model_vars$all], 
-          col = metadata(colData(this_dds))$palette$Heatmap[model_vars$all],
+          df = colDat[model_vars], 
+          col = metadata(colData(this_dds))$palette$Heatmap[model_vars],
           show_legend=FALSE), 
         show_row_names = FALSE, show_column_names = TRUE)
       do_plot(pl,
@@ -501,12 +498,12 @@ for (dataset_id in names(ddsList)) {
         row_title = paste0(RowNoun,"s"),
         col = col_fn,
         cluster_columns = FALSE,
-        column_order=do.call(order, colDat[model_vars$all]),
+        column_order=do.call(order, colDat[model_vars]),
         cluster_rows = gene_clust$objects$hclust,
         heatmap_legend_param = list(direction = "horizontal"),
         top_annotation = ComplexHeatmap::HeatmapAnnotation(
-          df = colDat[,model_vars$all],
-          col = metadata(colData(this_dds))$palette$Heatmap[model_vars$all],
+          df = colDat[,model_vars],
+          col = metadata(colData(this_dds))$palette$Heatmap[model_vars],
           show_legend=FALSE),
         show_row_names = FALSE, show_column_names = TRUE)
       do_plot(pl,
@@ -519,7 +516,7 @@ for (dataset_id in names(ddsList)) {
       cat(var_heading("Cluster centroids",depth=1+length(section_hierarchy)))
       
       cc <- cluster_calc(hmap_data, clusterID=gene_clust$clusters)
-      centroid_df <- cbind(cc, colDat[model_vars$all]) %>%
+      centroid_df <- cbind(cc, colDat[model_vars]) %>%
         pivot_longer(cols=any_of(names(cc)), names_to="babs.name", values_to="babs.value") %>%
         mutate(babs.name=factor(babs.name, levels=names(cc)))
       mapping <- modify_mapping(eval(plot_fml[[2]]))
@@ -531,7 +528,7 @@ for (dataset_id in names(ddsList)) {
         geom_point_interactive(aes(y= babs.value), size = 3, shape = 21) +
         labs(y=noun_to_readout(RowNoun)) 
       if ("group" %in% names(mapping)) {
-        group_df <- cbind(cc, colDat[model_vars$all])  %>%
+        group_df <- cbind(cc, colDat[model_vars])  %>%
           pivot_longer(cols=any_of(names(cc)), names_to="babs.name", values_to="babs.value") %>%
           mutate(babs.name=factor(babs.name, levels=names(cc)))
         pl <- pl +
@@ -606,7 +603,7 @@ for (dataset_id in names(ddsList)) {
 
 #### 1D PC plots
       cat(var_heading("Associated PCs against covariates", depth=1+length(section_hierarchy)))
-      long_dat <- extract_hits(covar_x_pc, proj)
+      long_dat <- extract_hits(covar_x_pc, proj, model_vars)
       pl <- ggplot(long_dat, modifyList(mapping, aes(y=value))) +
         geom_point_interactive(size = 3, shape = 21) +
         facet_wrap(~PC)

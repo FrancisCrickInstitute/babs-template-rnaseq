@@ -48,6 +48,7 @@ library(clusterProfiler)
 library(ReactomePA)
 library(GO.db)
 library(IHW)
+library(ggiraph)
 
 source("R/plot.r", local = knitr::knit_global())
 source("R/markdown.r", local = knitr::knit_global())
@@ -287,37 +288,37 @@ pval_frame <- dds_model_comp %>%
 ## }
 
 
-for (dataset in names(summaries)) {
+for (dataset_id in names(summaries)) {
   res <- knitr::knit_child(
     text = c(
       "```{r}",
       "#| echo: false",
-      paste0("#| label: tbl-summary-",dataset),
-      paste0("#| tbl-cap: ",dataset),
-      "summaries[[dataset]] %>%",
+      paste0("#| label: tbl-summary-",dataset_id),
+      paste0("#| tbl-cap: ",dataset_id),
+      "summaries[[dataset_id]] %>%",
       "subset(!Group %in% c('Zero Count', 'Low Count', 'Outlier')) %>% ",
       "gt(groupname_col=\"Model\") %>%",
       "tab_style(",
       "  style = cell_fill(color = '#bee2e9'),",
       "  locations = cells_row_groups()",
       ") %>% ",
-      paste0("tab_header(title=\"",RowNoun,"List summary\", subtitle=dataset)"),
+      paste0("tab_header(title=\"",RowNoun,"List summary\", subtitle=dataset_id)"),
       "```",
       "",
       ""
     ), envir = environment(), quiet = TRUE)
   cat(res, sep = '\n\n')
 
-  if (nrow(unclassed[[dataset]])>0) {
+  if (nrow(unclassed[[dataset_id]])>0) {
     res <- knitr::knit_child(
       text = c(
         "```{r}",
         "#| echo: false",
-        paste0("#| label: tbl-summaryfit-",dataset),
-        paste0("#| tbl-cap: ",dataset, " model-fit stats"),
-        "unclassed[[dataset]] %>%",
+        paste0("#| label: tbl-summaryfit-",dataset_id),
+        paste0("#| tbl-cap: ",dataset_id, " model-fit stats"),
+        "unclassed[[dataset_id]] %>%",
         "gt() %>%",
-        "tab_header(title=\"Model-fit summary\", subtitle=dataset)",
+        "tab_header(title=\"Model-fit summary\", subtitle=dataset_id)",
         "```",
         "",
         ""
@@ -332,16 +333,16 @@ for (dataset in names(summaries)) {
 ```{r}
 #| label: fig-summaryp
 
-for (dataset in names(summaries)) {
-  for (model in names(pval_frame[[dataset]])) {
-    plot_section <- list(dataset=dataset, model=model)
-    pl <- ggplot(pval_frame[[dataset]][[model]], aes(x=pvalue, fill=baseMean<1)) +
+for (dataset_id in names(summaries)) {
+  for (model_id in names(pval_frame[[dataset_id]])) {
+    plot_section <- list(dataset=dataset_id, model=model_id)
+    pl <- ggplot(pval_frame[[dataset_id]][[model_id]], aes(x=pvalue, fill=baseMean<1)) +
       geom_density(alpha=0.5) +
       facet_wrap(~Comparison) +
       theme_bw()
     do_plot(pl,
             label="summaryp",
-            caption=paste("p-Diagnostic for", dataset, model),
+            caption=paste("p-Diagnostic for", dataset_id, model_id),
             plot_meta=plot_section
             )
     cat("\n\n---\n\n")
@@ -363,17 +364,17 @@ potentially several ways, as formulated here:
 ```{r}
 #| label: formulae
 
-for (dataset in names(ddsList)) {
-  met <- metadata(ddsList[[dataset]])
-  dmc_heading(ddsList, dataset=dataset, model=NULL, depth="##")
+for (dataset_id in names(ddsList)) {
+  met <- metadata(ddsList[[dataset_id]])
+  dmc_heading(ddsList, dataset=dataset_id, model=NULL, depth="##")
   has_comparisons <- sapply(met$models, function(m) "comparisons" %in% names(m) && length(m$comparisons) > 0)
-  mdls <- lapply(met$models[has_comparisons], function(x) x$design)
+  models <- lapply(met$models[has_comparisons], function(x) x$design)
   src2bullets(met, c("subset", "extra_assays", "influential_samples"))
-  for (mdl in names(mdls)) {
-    dmc_heading(ddsList, dataset=dataset, model=mdl, depth="###", numbered=FALSE)
-    src2bullets(met$models[[mdl]], c("subset", "extra_assays", "influential_samples"))
+  for (model_id in names(models)) {
+    dmc_heading(ddsList, dataset=dataset_id, model=model_id, depth="###", numbered=FALSE)
+    src2bullets(met$models[[model_id]], c("subset", "extra_assays", "influential_samples"))
     cat("`",
-        Reduce(paste, sub("~", paste0(noun_to_readout(RowNoun)," ~ "), deparse(mdls[[mdl]]))),
+        Reduce(paste, sub("~", paste0(noun_to_readout(RowNoun)," ~ "), deparse(models[[model_id]]))),
         "`\n\n"
         )
   }
@@ -403,23 +404,23 @@ are sub-tabs for different experimental designs, if any
 ```{r}
 #| label: fig-differential-MA
 first <- TRUE
-for (dataset in names(dds_model_comp)) {
-  dmc_heading(dds_model_comp, dataset=dataset, model=NULL, depth="##")
-  met <- metadata(dds_model_comp[[dataset]][[1]][[1]])$dmc
-  for (mdl in names(dds_model_comp[[dataset]])) {
-    met <- metadata(dds_model_comp[[dataset]][[mdl]][[1]])$dmc
-    dmc_heading(dds_model_comp, dataset=dataset, model=mdl, depth="###")
-    this_mdl <- dds_model_comp[[dataset]][[mdl]]
-    if (!is.null(metadata(this_mdl[[1]])$model$external_list)) {
-      external_list <- read.csv(file.path(base_dir, metadata(this_mdl[[1]])$model$external_list))
-      external_list <- subset(external_list, ID %in% row.names(this_mdl[[1]]))
+for (dataset_id in names(dds_model_comp)) {
+  dmc_heading(dds_model_comp, dataset=dataset_id, model=NULL, depth="##")
+  for (model_id in names(dds_model_comp[[dataset_id]])) {
+    dmc_heading(dds_model_comp, dataset=dataset_id, model=model_id, depth="###")
+    this_model <- dds_model_comp[[dataset_id]][[model_id]]
+    md <- metadata(this_model[[1]])
+    if (!is.null(md$model$external_list)) {
+      external_list <- read.csv(file.path(base_dir, md$model$external_list))
+      external_list <- subset(external_list, ID %in% row.names(this_model[[1]]))
     } else {
       external_list <- NULL
     }
-    for (comp_id in names(this_mdl)) {
-      plot_section <- list(dataset=dataset, model=mdl, comparison_id=comp_id)
-      res <- as.data.frame(mcols(this_mdl[[comp_id]])$results)
-      md <- metadata(this_mdl[[comp_id]])
+    for (comparison_id in names(this_model)) {
+      this_dds <- this_model[[comparison_id]]
+      md <- metadata(this_dds)
+      plot_section <- list(dataset=dataset_id, model=model_id, comparison_id=comparison_id)
+      res <- as.data.frame(mcols(this_dds)$results)
       pal <- RColorBrewer::brewer.pal(9, "Set1")
       res$class <- ifelse(grepl("\\*", res$class), "Sig", "Not")
       if (is_formula(md$comparison)) {
@@ -464,7 +465,7 @@ for (dataset in names(dds_model_comp)) {
         labs(colour="Class")
       do_plot(pl,
               label="MA",
-              caption=paste0("MA plot of differential ",rowNoun,"s ", sub(".*\\t", "", comp_id)),
+              caption=paste0("MA plot of ", tooltip(md, comparison_id), "-differential ", rowNoun,"s for ",mtag(model_id), " in ", dtag(dataset_id)),
               preview=first,
               plot_meta=plot_section
               )
@@ -489,79 +490,72 @@ from the QC heatmaps which were blind to the experimental design.
 
 param$set("clustering_distance_rows", postpone=TRUE)
 param$set("clustering_distance_columns")
-for (dataset in names(dds_model_comp)) {
-  plot_section <- list(dataset=dataset)
-  dmc_heading(dds_model_comp, dataset=dataset, model=NULL, depth="##")
-  nice_legends <- separate_legend(ddsList[[dataset]])
+for (dataset_id in names(dds_model_comp)) {
+  plot_section <- list(dataset=dataset_id)
+  dmc_heading(dds_model_comp, dataset=dataset_id, model=NULL, depth="##")
+  nice_legends <- separate_legend(ddsList[[dataset_id]])
   pl <- do.call(gridExtra::arrangeGrob,c(
     nice_legends,
     ncol=ceiling(sqrt(length(nice_legends)))))
   do_plot(pl,
           label= "legend-a",
           caption=paste("Metadata colour-codings for",
-                        metadata(ddsList[[dataset]])$dmc$dataset_name %||% metadata(ddsList[[dataset]])$dmc$dataset
+                        metadata(ddsList[[dataset_id]])$dmc$dataset_name %||% metadata(ddsList[[dataset_id]])$dmc$dataset
                         ),
           plot_meta=plot_section
           )
-  for (mdl_name in names(dds_model_comp[[dataset]])) {
-    plot_section$model <- mdl_name
-    dmc_heading(dds_model_comp, dataset=dataset, model=mdl_name, depth="###")
-    this_mdl <- dds_model_comp[[dataset]][[mdl_name]]
+  for (model_id in names(dds_model_comp[[dataset_id]])) {
+    plot_section$model <- model_id
+    dmc_heading(dds_model_comp, dataset=dataset_id, model=model_id, depth="###")
+    this_model <- dds_model_comp[[dataset_id]][[model_id]]
+    md <- metadata(this_model[[1]])
     first_done <- FALSE
-    if (!is.null(metadata(this_mdl[[1]])$model$external_list)) {
-      external_list <- read.csv(file.path(base_dir, metadata(this_mdl[[1]])$model$external_list))
-      external_list <- subset(external_list, ID %in% row.names(this_mdl[[1]]))
+    if (!is.null(md$model$external_list)) {
+      external_list <- read.csv(file.path(base_dir, md$model$external_list))
+      external_list <- subset(external_list, ID %in% row.names(this_model[[1]]))
     } else {
       external_list <- NULL
     }
 
-    model_meta <- metadata(dds_model_comp[[dataset]][[mdl_name]][[1]])$model
-    design <- model_meta$design
-    target <- model_meta$variables
-    plot_formulae <- section_chooser(model_meta, "differential_profile_plots", "profile_plots")
-    model_vars <- list(
-      design=sort_vars(all.vars(design), target),
-      plot=sort_vars(unique(unlist(lapply(plot_formulae, all.vars))), target),
-      all=sort_vars(unique(c(all.vars(design),
-                   unique(unlist(lapply(plot_formulae, all.vars)))
-                   )), target)
-    )
-    for (comp_id in c(names(this_mdl), unique(external_list$Comparison))) {
-      plot_section$comparison <- comp_id
-      this_comp <- this_mdl[[comp_id]]
-      comp_name <- sub(".*\\t", "", comp_id)
-      is_external <- !(comp_id %in% names(this_mdl))
+    plot_formulae <- section_chooser(md$model, "differential_profile_plots", "profile_plots")
+    model_vars <- sort_vars(
+      unique(c(all.vars(md$model$design),
+               unique(unlist(lapply(plot_formulae, all.vars)))
+               )),
+      md$model$variables)
+    for (comparison_id in c(names(this_model), unique(external_list$Comparison))) {
+      plot_section$comparison <- comparison_id
+      this_dds <- this_model[[comparison_id]]
+      md <- metadata(this_dds)
+      is_external <- !(comparison_id %in% names(this_model))
       if (is_external) {
-        ind <- row.names(this_mdl[[1]]) %in% external_list$ID[external_list$Comparison==comp_id]
-        this_comp <- this_mdl[[1]]
+        ind <- row.names(this_model[[1]]) %in% external_list$ID[external_list$Comparison==comparison_id]
+        this_dds <- this_model[[1]]
         comp_type <- " "
       } else {
-        ind <- grepl("\\*$", mcols(this_comp)$results$class)
+        ind <- grepl("\\*$", mcols(this_dds)$results$class)
         comp_type <- "-differential "
         if (!any(ind)) {
           next
         }
       }
-      comp <- metadata(this_comp)$comparison
-      fml <- metadata(this_comp)$model$design
-      mdl <- metadata(this_comp)$model
-      if ("mat" %in% names(mdl)) {
-        mmat <- mdl$mat
+      if ("mat" %in% names(md$model)) {
+        mmat <- md$model$mat
       } else {
-        mmat <- model.matrix(mdl$design, colData(this_comp))
+        mmat <- model.matrix(md$model$design, colData(this_dds))
       }
-      var_roles <- list(all.vars(fml))
-      if (!is_external && "baseline_contrast" %in% names(attributes(metadata(this_comp)$comparison))) {
-        var_roles <- c(emmeans:::.parse.by.formula(attr(comp, "spec"))[c("by", "rhs")], var_roles)
-        weights <- t(as.vector(attr(metadata(this_comp)$comparison, "baseline_contrast")) %*% MASS::ginv(mmat))
+      var_roles <- list(all.vars(md$model$design))
+      if (!is_external && "baseline_contrast" %in% names(attributes(md$comparison))) {
+        var_roles <- c(emmeans:::.parse.by.formula(attr(md$comparison, "spec"))[c("by", "rhs")], var_roles)
+        weights <- t(as.vector(attr(md$comparison, "baseline_contrast")) %*% MASS::ginv(mmat))
         baseline_str <- paste("baseline", noun_to_readout(rowNoun))
       } else {
         weights <- rep(1/nrow(mmat), times=nrow(mmat))
         baseline_str <- paste("average", noun_to_readout(rowNoun))
       }
-      zweights <- setNames(rep(0, ncol(ddsList[[dataset]])), colnames(ddsList[[dataset]]))
-      zweights[colnames(this_comp)] <- weights
-      tidied_data <- tidy_significant_dds(ddsList[[dataset]], ind, model_vars$all, weights=zweights)
+      zweights <- setNames(rep(0, ncol(ddsList[[dataset_id]])), colnames(ddsList[[dataset_id]]))
+      zweights[colnames(this_dds)] <- weights
+      tidied_data <- tidy_significant_dds(ddsList[[dataset_id]], ind, model_vars, weights=zweights)
       pdat <- tidied_data$pdat
       pdat[sapply(pdat, is.character)] <- lapply(pdat[sapply(pdat, is.character)], 
                                                 as.factor)
@@ -575,13 +569,13 @@ for (dataset in names(dds_model_comp)) {
       hheight <- (function(n, small, big, bign) {a <- (big-small)/(bign-1); b <- small-a; min(a*n + b, bign)})(n=nrow(tidied_data$mat), small=0.5, big=40, bign=1000)
       ha <- ComplexHeatmap::HeatmapAnnotation(
         df=pdat,
-        col=metadata(colData(this_comp))$palette$Heatmap[names(pdat)],
+        col=metadata(colData(this_dds))$palette$Heatmap[names(pdat)],
         show_legend=FALSE)
       pl <- ComplexHeatmap::Heatmap(
         tidied_data$mat,
         col=sym_colour(na.omit(as.vector(tidied_data$mat))),
         heatmap_legend_param = list(direction = "horizontal" ),
-        name=comp_name,
+        name=comparison_id,
         cluster_columns = FALSE,
         show_column_names = TRUE,
         clustering_distance_rows=param$get("clustering_distance_rows"),
@@ -592,38 +586,12 @@ for (dataset in names(dds_model_comp)) {
         show_row_names = nrow(tidied_data$mat)<100)
       do_plot(pl,
               label="Heatmap",
-              caption=paste0("Heatmap on ", comp_name, comp_type, rowNoun,"s. White for ", baseline_str),
+              caption=paste0("Heatmap on ", tooltip(md, comparison_id), comp_type, rowNoun,"s of ",mtag(model_id), " in ", dtag(dataset_id), ". White for ", baseline_str),
 #              height_mult=nrow(tidied_data$mat)/30,
 #              max_height=15, min_height=5,
               plot_meta=plot_section
               )
       cat('\n\n---\n\n')
-      if (do_residual_transform <- FALSE) {#length(all.vars(fml))>1) {
-        # TODO: Check this works with the zweights above. tidied_data$mat is now possibly larger than this_comp
-        part_resid <- partialise(tidied_data$mat, pdat, fml)
-        term_names <- intersect(dimnames(part_resid$terms)[[3]], var_roles$rhs %||% unique(unlist(var_roles)))
-        for (term_name in term_names) {
-          tdat <- t(part_resid$terms[,,term_name, drop=TRUE]) +part_resid$const + t(part_resid$resid)
-          pl <- ComplexHeatmap::Heatmap(
-            tdat,
-            col=sym_colour(tdat),
-            heatmap_legend_param = list(direction = "horizontal" ),
-            name=paste(comp_name,term_name),
-            cluster_columns = FALSE,
-            show_column_names = TRUE,
-            column_split = col_split,
-            clustering_distance_rows=param$get("clustering_distance_rows"),
-            top_annotation = ha,
-            row_names_gp = gpar(fontsize = 6),
-            show_row_names = nrow(tidied_data$mat)<100)
-          do_plot(pl,
-                  label="focussed",
-                  caption=paste0("Heatmap on differential ",rowNoun,"s ", comp_name, ", ", term_name, "-focussed"),
-                  plot_meta=plot_section
-                  )
-          cat('\n\n---\n\n')
-        }
-      }
     } # next comparison
   } # next model
 } #next dataset
@@ -657,31 +625,35 @@ for (dataset_id in names(dds_model_comp)) {
   dmc_heading(dds_model_comp, dataset=dataset_id, model=NULL, depth="##")
   for (model_id in names(dds_model_comp[[dataset_id]])) {
     dmc_heading(dds_model_comp, dataset=dataset_id, model=model_id, depth="###")
-    this_mdl <- dds_model_comp[[dataset_id]][[model_id]]    
-    if (!is.null(metadata(this_mdl[[1]])$model$external_list)) {
-      external_list <- read.csv(file.path(base_dir, metadata(this_mdl[[1]])$model$external_list))
+    this_model <- dds_model_comp[[dataset_id]][[model_id]]    
+    md <- metadata(this_model[[1]])
+    if (!is.null(md$model$external_list)) {
+      external_list <- read.csv(file.path(base_dir, md$model$external_list))
       external_list$Cluster[is.na(external_list$Cluster)] <- external_list$ID[is.na(external_list$Cluster)]
     } else {
       external_list <- NULL
     }
     
-    for (comp_id in c(names(this_mdl), unique(external_list$Comparison))) {
-      plot_section <- list(dataset=dataset_id, model=model_id, comparison=comp_id)
-      is_external <- !(comp_id %in% names(this_mdl))
+    for (comparison_id in c(names(this_model), unique(external_list$Comparison))) {
+      plot_section <- list(dataset=dataset_id, model=model_id, comparison=comparison_id)
+      is_external <- !(comparison_id %in% names(this_model))
       if (is_external) {
-        this_dds <- this_mdl[[1]]
-        is_diff <- row.names(this_dds) %in% external_list$ID[external_list$Comparison==comp_id]
+        this_dds <- this_model[[1]]
+        is_diff <- row.names(this_dds) %in% external_list$ID[external_list$Comparison==comparison_id]
+        comp_type <- "-differential "
       } else {
-        this_dds <- this_mdl[[comp_id]]
+        this_dds <- this_model[[comparison_id]]
         is_diff <- grepl("^.*\\*", mcols(this_dds)$results$class)
+        comp_type <- " "
       }
-      plot_formulae <- section_chooser(metadata(this_dds)$model, "differential_profile_plots", "profile_plots")
+      md <- metadata(this_dds)
+      plot_formulae <- section_chooser(md$model, "differential_profile_plots", "profile_plots")
       if (is_null(plot_formulae) || !any(is_diff)) next
       exists_profile_plot <- TRUE
       partials <- partialise.matrix(
         assay(ddsList[[dataset_id]][is_diff,,drop=FALSE], ifelse(inherits(this_dds, "DESeqDataSeq"),"vst", 1)),
         as.data.frame(colData(ddsList[[dataset_id]])),
-        fml=metadata(this_dds)$model$design)
+        fml=md$model$design)
       for (plot_fml in plot_formulae) {
         plot_section$plot_config <- attr(plot_fml, "name")
         cdata_df <- as.data.frame(colData(ddsList[[dataset_id]])[, all.vars(plot_fml), drop=FALSE])
@@ -719,20 +691,21 @@ for (dataset_id in names(dds_model_comp)) {
         centroid_df <- cbind(cc, cdata_df) %>%
           pivot_longer(cols=any_of(names(cc)), names_to="babs.name", values_to="babs.value") %>%
           mutate(babs.name=factor(babs.name, levels=names(cc)))
-        pl <- ggplot(centroid_df ,
-                    eval(plot_fml[[2]])) +
+        mapping <- modify_mapping(eval(plot_fml[[2]]))
+        pl <- ggplot(centroid_df, mapping) +
           facet_wrap(~ babs.name) +
           theme_bw() +
           geom_point(aes(y= babs.value)) +
           labs(y=noun_to_readout(RowNoun))
         pl <- pl + my_alpha_scale(pl)
-        if ("group" %in% names(plot_fml[[2]])) {
+        if ("group" %in% names(mapping)) {
           pl <- pl+geom_line(aes(y=babs.value), stat="summary", fun=mean)
         }
         if ("ScaleDiscrete" %in% class(layer_scales(pl)$x)) {
           pl <- pl + scale_x_discrete(guide=guide_axis(n.dodge=2))
         }
-        capt <- paste0("Cluster profile for ", comp_id, " ",rowNoun,"s  of ", mtag(model_id), " in ", dtag(dataset_id), removed)
+        pl <- pl + get_colour_scales(this_dds, mapping, all.vars(eval(plot_fml[[2]])$flag))
+        capt <- paste0("Cluster profile for ", tooltip(md, comparison_id), comp_type, rowNoun,"s  of ", mtag(model_id), " in ", dtag(dataset_id), removed)
         do_plot(pl,
                 label= "diffClustProfile",
                 caption=capt,

@@ -75,11 +75,8 @@ load_specs <- function(file="", context) {
     specs <- source(file.path("extdata",file), local=e)$value
     srcs <- expr_to_list(parse(file.path("extdata",file))[[1]])
     attach_src <- function(spec, src) {
-      if (is.null(spec)) {
-        return(spec)
-      }
-      if (!is.list(src)) {
-        attr(spec, "src") <- src
+      if (!"list" %in% class(spec)) {
+        try(attr(spec, "src") <- src, silent=TRUE)
         return(spec)
       }
       Map(attach_src, spec, src)
@@ -455,17 +452,18 @@ fit_model <- function(mdl, dds, ...) {
   ## Generate a nested list - single comparisons will be singletons, expanded mult_comps may not be.
   out <- list()
   metadata(model_dds)$model_fit_done <- FALSE
+  out <- list()
   for (comp_ind in seq(along=mdl$comparisons)) {
     message("Processing comparison ", comp_ind)
     fit <- fit_comparison(comp=mdl$comparisons[[comp_ind]], model_dds=model_dds, mdl=mdl, ...)
-    out[[comp_ind]] <- fit
+    if (length(fit)>1) {
+      names(fit) <- paste0("(", names(mdl$comparisons)[comp_ind],") '", names(fit), "'")
+      } 
+    out <- c(out, fit)
     if (length(fit)!=0 && metadata(fit[[1]])$model_fit_done && !metadata(model_dds)$model_fit_done) {
       model_dds <- fit[[1]]
     }
   }
-  names(out) <- names(mdl$comparisons)
-  ## Flatten the list, but preserve the original comparison name in the dmc metadata.
-  out <- unlist(out, recursive=FALSE)
   out <- imap(out, function(obj, cname) {
     metadata(obj)$comparison_code <- paste0("res <- results(dds, contrast=",deparse1(metadata(obj)$comparison),")")
     metadata(obj)$dmc$comparison <- cname
@@ -671,21 +669,25 @@ emcontrasts <- function(dds, comp, prefix="my") {
   baseline_mat <- embaseline$contrast@linfct[ind_est, !mdl$dropped, drop=FALSE]
   if (comp$omni) {
     split_idx <- split(which(ind_est), interaction(emc@grid[ind_est, emc@misc$by.vars], drop = TRUE))
+    tooltip <- list()
   } else {
     split_idx <- setNames(
       seq_len(nrow(contr_frame)),
       do.call(paste, c(contr_frame,sep= "|"))
     )
+    tooltip <- do.call(paste, c(mapply(function(a, b) paste0(a," = ", b), names(contr_frame), contr_frame, SIMPLIFY=FALSE), sep="<br/>"))
   }
   contr <- lapply(split_idx, function(i) t(contr_mat[i,,drop=FALSE]))
-  contr <- mapply( function(cont, base) {
+  contr <- mapply( function(cont, base, tip) {
     attr(cont, "spec") <- comp$spec
     if (!comp$omni) {
       attr(cont, "baseline_contrast") <- base
+      attr(cont, "tooltip") <- tip
     }
     cont},
     contr,
     lapply(split_idx, function(i) t(baseline_mat[i,,drop=FALSE])),
+    tooltip,
     SIMPLIFY=FALSE)
   contr  <- contr[comp$keep]
   contr
@@ -1251,7 +1253,7 @@ mat_x_terms <- function(mat, fml, fitFrame) {
   covar_x_mat
 }
 
-extract_hits <- function(covar_x_pc, pc) {
+extract_hits <- function(covar_x_pc, pc, model_vars) {
   pc_hits <- data.frame(
     covar=unique(covar_x_pc$Covariate),
     strongest=NA_character_,
@@ -1268,7 +1270,7 @@ extract_hits <- function(covar_x_pc, pc) {
     pc_hits[covar, "strongest"] <- as.character(max_col)
   }
   hits <- paste0("PC", sort(unique(as.integer(c(pc_hits$strongest, pc_hits$first)))))
-  wide_dat <- cbind(colDat[model_vars$all], pc[,hits,drop=FALSE])
+  wide_dat <- cbind(colDat[model_vars], pc[,hits,drop=FALSE])
   long_dat <- pivot_longer(wide_dat, cols=all_of(hits), names_to="PC")
   long_dat
 }

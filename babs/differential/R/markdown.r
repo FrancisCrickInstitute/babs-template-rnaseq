@@ -190,3 +190,14 @@ profile_to_string <- function(fml) {
 }
 
   
+tooltip <- function(md, text="") {
+  if ("tooltip" %in% names(attributes(md$comparison))) {
+    if (text=="") {
+      tooltip <- paste0(" {{< tooltips tooltip=\"", attributes(md$comparison)$tooltip, "\" >}} ")
+    } else {
+      tooltip <- paste0(" {{< tooltips tooltip=\"", attributes(md$comparison)$tooltip, "\" text=\"", text, "\" >}} ")
+    }
+  } else {
+    tooltip=" "
+  }
+}

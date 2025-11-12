@@ -81,6 +81,9 @@ if (file.exists(preprocessed)) {
     if (length(which(is_ok))>1) warning(preprocessed, " contains many SummarizedExperiment objects, only using ", objnames[is_ok][1])
     dds <- get(objNames[is_ok][1])
     assay(dds)[is.nan(assay(dds))] <- NA
+    if (is.null(assayNames(dds))) {
+      assayNames(dds)[1] <- align_params$rowNoun %||% "assay"
+    }
     if (any(is.na(assay(dds)))) dds$'.percentNA' <- 100 *apply(is.na(assay(dds)), 2, mean)
   }
   if (!"symbol" %in% names(mcols(dds))) {
@@ -109,6 +112,9 @@ if (file.exists(preprocessed)) {
     stop("rds object is neither DESeqDataSet nor SummarizedExperiment")
   }
   assay(dds)[is.nan(assay(dds))] <- NA
+  if (is.null(assayNames(dds))) {
+    assayNames(dds)[1] <- align_params$rowNoun %||% "assay"
+  }
   if (any(is.na(assay(dds)))) dds$'.percentNA' <- 100 *apply(is.na(assay(dds)), 2, mean)
   if (!"symbol" %in% names(mcols(dds))) {
     mcols(dds)$symbol <- mcols(dds)[[align_params$symbolColumn %||% 1]]

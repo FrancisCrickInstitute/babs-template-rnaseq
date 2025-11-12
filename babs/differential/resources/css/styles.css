@@ -1,3 +1,7 @@
 img[data-interactive="true"] {
   display: none !important;
 }
+[data-bs-toggle="tooltip"] {
+  text-decoration: underline dotted;
+  cursor: help; 
+}

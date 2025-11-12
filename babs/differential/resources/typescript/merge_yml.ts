@@ -9,20 +9,34 @@ const flags = flag(Deno.args, {string: [
 
 // From the source yaml
 var perPage
+const align_text=Deno.readTextFileSync(`extdata/${flags.alignment}.config`, "utf-8");
+const amatch = align_text.match(new RegExp(`${flags.alignment}\\.categories\\s*=\\s*(.*)`));
+const align_categories = amatch ? amatch[1].split(" ") : [flags.alignment];
 if ((flags.spec)=="") {
     perPage = {
 	title: " " + flags.alignment,
 	description: " of " + flags.alignment + "-aligned data",
-	categories: [flags.alignment],
+	categories: align_categories,
 	params: {
 	    alignment: flags.alignment,
 	}
     }
 } else {
+    const text = Deno.readTextFileSync(`extdata/${flags.spec}.spec`, "utf-8");
+    const categoryPattern = /^#'\s*@categories\s+(.+)$/gm;
+    let match;
+    const spec_categories: string[] = [];
+    while ((match = categoryPattern.exec(text)) !== null) {
+	const raw = match[1].trim();
+	spec_categories.push(...raw.split(",").map(c => c.trim()));
+    }
+    if (spec_categories.length==0) {
+	spec_categories= [flags.spec];
+    }
     perPage = {
 	title: " " + flags.alignment + " " + flags.spec,
 	description: " of " + flags.alignment + "-aligned data according to plan '" + flags.spec + "'",
-	categories: [flags.alignment, flags.spec],
+	categories: align_categories.concat(spec_categories),
 	params: {
 	    alignment: flags.alignment,
 	    spec: flags.spec

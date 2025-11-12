@@ -11,7 +11,8 @@ website:
     contents: []
 bibliography: R.bib  
 number-sections: true
-    
+filters:
+  - tooltips
 format:
   html:
     theme: cosmo
