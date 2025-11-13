@@ -1,19 +1,22 @@
 {
     "name": "BABS Container",
     "build": {
-	"dockerfile": "../Dockerfile.base"
+        "dockerfile": "../Dockerfile"
     },
     "features": {
-	"ghcr.io/rocker-org/devcontainer-features/r-packages:1": {
-            "packages": "curl,renv,sf,terra",
-	    "installSystemRequirements": true
-	},
-	"ghcr.io/rocker-org/devcontainer-features/quarto-cli:1": {
-		"version": "1.7.33"
-	},
-	"ghcr.io/iterative/features/dvc": {
-	    "version": "1"
-	},
+        "ghcr.io/devcontainers/features/common-utils:2": {
+            "installZsh": false,
+            "installOhMyZsh": false,
+            "installOhMyZshConfig": false,
+            "upgradePackages": false
+        },
+        "ghcr.io/rocker-org/devcontainer-features/r-packages:1": {
+            "packages": "curl,renv,sf,terra,tinytex",
+            "installSystemRequirements": true
+        },
+        "ghcr.io/rocker-org/devcontainer-features/quarto-cli:1": {
+            "version": "1.8.25"
+        },
         "ghcr.io/jsburckhardt/devcontainer-features/uv:1": {}
     }
 }

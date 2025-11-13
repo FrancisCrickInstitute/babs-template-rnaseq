@@ -137,6 +137,8 @@ $(staging_dir)/_quarto.yml: $(source_dir)/_quarto.yml $(qmds) $(css)
 	 --staging=$(staging_dir)\
 	 --repo="$(repo)" > $@
 	rm -f ${staging_dir}/sidebar.json
+	mkdir -p ${staging_dir}/_extensions
+	cp -r  ${source_dir}/_extensions/. ${staging_dir}/_extensions/
 
 
 $(staging_dir)/$(VERSION).params.yml:  resources/make/project.mk $(staging_dir)/R.bib

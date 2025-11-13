@@ -287,6 +287,9 @@ pval_frame <- dds_model_comp %>%
 ##     as_raw_html()
 ## }
 
+param$set("clustering_distance_rows", postpone=TRUE)
+param$set("clustering_distance_columns", postpone=TRUE)
+param$set("gene_clust")
 
 for (dataset_id in names(summaries)) {
   res <- knitr::knit_child(
@@ -308,7 +311,7 @@ for (dataset_id in names(summaries)) {
       ""
     ), envir = environment(), quiet = TRUE)
   cat(res, sep = '\n\n')
-
+  
   if (nrow(unclassed[[dataset_id]])>0) {
     res <- knitr::knit_child(
       text = c(
@@ -325,15 +328,6 @@ for (dataset_id in names(summaries)) {
       ), envir = environment(), quiet = TRUE)
     cat(res, sep = '\n\n')
   }
-}
-
-```
-
-
-```{r}
-#| label: fig-summaryp
-
-for (dataset_id in names(summaries)) {
   for (model_id in names(pval_frame[[dataset_id]])) {
     plot_section <- list(dataset=dataset_id, model=model_id)
     pl <- ggplot(pval_frame[[dataset_id]][[model_id]], aes(x=pvalue, fill=baseMean<1)) +
@@ -347,24 +341,6 @@ for (dataset_id in names(summaries)) {
             )
     cat("\n\n---\n\n")
   }
-}
-```
-
-# Datasets and Models
-
-As in the exploratory analysis, we may examine the samples in different combinations, and leave out
-certain samples.  In the above table, the columns under the 'In
-Subset' group indicate these combinations are listed, and the
-samples' inclusions are indicated.
-
-Each of those combinations may be analysed in
-potentially several ways, as formulated here:
-
-
-```{r}
-#| label: formulae
-
-for (dataset_id in names(ddsList)) {
   met <- metadata(ddsList[[dataset_id]])
   dmc_heading(ddsList, dataset=dataset_id, model=NULL, depth="##")
   has_comparisons <- sapply(met$models, function(m) "comparisons" %in% names(m) && length(m$comparisons) > 0)
@@ -377,36 +353,7 @@ for (dataset_id in names(ddsList)) {
         Reduce(paste, sub("~", paste0(noun_to_readout(RowNoun)," ~ "), deparse(models[[model_id]]))),
         "`\n\n"
         )
-  }
-}
-
-```
-
-
-# Scatterplot of differential `{r} rowNoun`s
-
-Here we plot the fold-change across all `{r} rowNoun`s on the vertical axis,
-against their overall `{r} noun_to_readout(rowNoun)` on the horizontal. Statistically
-significant `{r} rowNoun`s are highlighted in colour, and we attempt to
-auto-label as many `{r} rowNoun` symbols as might be legible.
-
-The fold-changes are regularised ('shrunk') to reflect their
-reliability: `{r} rowNoun`s with large variability between replicates are
-moved towards the horizontal axis, to de-emphasise them and to
-provide a more reliable prediction of behaviour in future
-replications.
-
-Again, select the dataset you wish to examine via the tabs - there
-are sub-tabs for different experimental designs, if any
-(e.g. removing/ignoring batch effects).
-
-
-```{r}
-#| label: fig-differential-MA
-first <- TRUE
-for (dataset_id in names(dds_model_comp)) {
-  dmc_heading(dds_model_comp, dataset=dataset_id, model=NULL, depth="##")
-  for (model_id in names(dds_model_comp[[dataset_id]])) {
+    first <- TRUE
     dmc_heading(dds_model_comp, dataset=dataset_id, model=model_id, depth="###")
     this_model <- dds_model_comp[[dataset_id]][[model_id]]
     md <- metadata(this_model[[1]])
@@ -472,27 +419,7 @@ for (dataset_id in names(dds_model_comp)) {
       first <- FALSE
       cat("\n\n---\n\n")
     } # next comparison
-  }   # next model
-}     # next dataset
-
-```
-
-
-# Differential Heatmaps
-
-Here we present heatmaps of the differential `{r} RowNoun`Lists.  Note
-that these will, by definition, divide the samples along lines
-of the experimental groups, so should be interpreted differently
-from the QC heatmaps which were blind to the experimental design.
-
-```{r}
-#| label: fig-differential-heatmap
-
-param$set("clustering_distance_rows", postpone=TRUE)
-param$set("clustering_distance_columns")
-for (dataset_id in names(dds_model_comp)) {
   plot_section <- list(dataset=dataset_id)
-  dmc_heading(dds_model_comp, dataset=dataset_id, model=NULL, depth="##")
   nice_legends <- separate_legend(ddsList[[dataset_id]])
   pl <- do.call(gridExtra::arrangeGrob,c(
     nice_legends,
@@ -504,7 +431,6 @@ for (dataset_id in names(dds_model_comp)) {
                         ),
           plot_meta=plot_section
           )
-  for (model_id in names(dds_model_comp[[dataset_id]])) {
     plot_section$model <- model_id
     dmc_heading(dds_model_comp, dataset=dataset_id, model=model_id, depth="###")
     this_model <- dds_model_comp[[dataset_id]][[model_id]]
@@ -593,38 +519,12 @@ for (dataset_id in names(dds_model_comp)) {
               )
       cat('\n\n---\n\n')
     } # next comparison
-  } # next model
-} #next dataset
-
-```
-
-
-# Differential Profiles
-
-We can also plot summaries of clusters of differential `{r} rowNoun`s. Here we
-split `{r} noun_to_readout(rowNoun)` data of the differential `{r} rowNoun`s into twelve clusters,
-having first removed the participant-to-participant variability, and
-stochastic noise. We aggregate `{r} noun_to_readout(rowNoun)` within each cluster, and
-then plot the profiles per cluster - the clusters are ordered in
-decreasing number of constituent `{r} rowNoun`s, and their cardinality is
-encoded into the name of the cluster, e.g. `|1|=1000` means this is
-the largest cluster, and represents 1000 `{r} rowNoun`s.
-
-
-```{r}
-#| label: fig-differential-curve
-
-param$set("gene_clust")
-
-
-exists_profile_plot <- FALSE
-all_clusters <- list()
-cluster_ind <- counter(post_fn=to_letter)
-
-for (dataset_id in names(dds_model_comp)) {
-  dmc_heading(dds_model_comp, dataset=dataset_id, model=NULL, depth="##")
-  for (model_id in names(dds_model_comp[[dataset_id]])) {
-    dmc_heading(dds_model_comp, dataset=dataset_id, model=model_id, depth="###")
+    
+    
+    exists_profile_plot <- FALSE
+    all_clusters <- list()
+    cluster_ind <- counter(post_fn=to_letter)
+    
     this_model <- dds_model_comp[[dataset_id]][[model_id]]    
     md <- metadata(this_model[[1]])
     if (!is.null(md$model$external_list)) {

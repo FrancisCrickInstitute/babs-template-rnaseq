@@ -42,12 +42,10 @@ fi
 ## slurm-specific customisations
 basename=${SLURM_JOB_NAME:-$(basename "$0")}
 cmd=${BABS_CMD:-${basename%-*}}
-NUM_THREADS=${NUM_THREADS:-2}
 
 ## Set number of threads appropriately
 if [ -n "${SLURM_JOB_ID}" ]; then
     NUM_THREADS=${SLURM_CPUS_PER_TASK:-${NUM_THREADS}}
-    login_node=${__login_node:-login}
 fi
 
 export SINGULARITYENV_BIOCPARALLEL_WORKER_NUMBER=${NUM_THREADS}
@@ -55,27 +53,26 @@ export SINGULARITYENV_OMP_NUM_THREADS=${NUM_THREADS}
 export SINGULARITYENV_OPENBLAS_NUM_THREADS=${NUM_THREADS}
 export SINGULARITYENV_IN_BABS_CONTAINER=${docker_image}
 
-
 if [[ -z "$SINGULARITYENV_RENV_PATHS_ROOT" ]] ; then
     export SINGULARITYENV_RENV_PATHS_ROOT="$(realpath ~/.cache/R/renv)"
     mkdir -p ${SINGULARITYENV_RENV_PATHS_ROOT}
 fi
- 
 
-if [[ -z "${SINGULARITY_BIND}" ]]; then
-    export SINGULARITY_BIND="/tmp"
-else
-    export SINGULARITY_BIND+=",/tmp"
-fi
+SINGULARITY_BIND+="${SINGULARITY_BIND:+,}/tmp"
 
-SINGULARITY_BIND+="${SINGULARITYENV_RENV_PATHS_ROOT:+,${SINGULARITYENV_RENV_PATHS_ROOT}}"
-SINGULARITY_BIND+="${SINGULARITYENV_SSH_AUTH_SOCK:+,${SINGULARITYENV_SSH_AUTH_SOCK}}"
+bind_dirs="RENV_PATHS_ROOT SSH_AUTH_SOCK TINYTEX_DIR UV_CACHE_DIR"
+for v in ${bind_dirs}; do
+    svar=SINGULARITYENV_${v}
+    my_path="${!svar}"
+    [[ -n $my_path ]] && SINGULARITY_BIND+=",$my_path" && mkdir -p "$my_path"
+done
 
 echo -e "\033[44;97m i \033[0m Extra directories being bound to the container. This might affect reproducibility: ,${SINGULARITY_BIND}"  | tr ',' '\n' 1>&2
 
 if compgen -v | grep SINGULARITYENV 1>&2 > /dev/null; then
     echo -e "\033[44;97m i \033[0m The following environment variables are inherited in the container. Remove the corresponding SINGULARITYENV_* variable (unset) if you don't want the following values to be used:"
     for var in $(compgen -v | grep SINGULARITYENV); do
+
         if [[ "$var" =~ TOKEN|SECRET|KEY|PASSWORD|API|GITHUB_PAT ]]; then
             echo "${var#SINGULARITYENV_}=****"  1>&2
         else

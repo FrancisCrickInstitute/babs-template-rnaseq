@@ -31,7 +31,7 @@ if ((flags.spec)=="") {
 	spec_categories.push(...raw.split(",").map(c => c.trim()));
     }
     if (spec_categories.length==0) {
-	spec_categories= [flags.spec];
+	spec_categories.push(flags.spec);
     }
     perPage = {
 	title: " " + flags.alignment + " " + flags.spec,
