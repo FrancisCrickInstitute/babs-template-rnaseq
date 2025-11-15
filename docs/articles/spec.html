@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RNASeq Template</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -181,17 +181,26 @@ specification(
 
   )
 )</code></pre>
-<p>There’s also a <code>differential_subset</code> field that takes the
+<p>There’s also a <code>influential_samples</code> field that takes the
 same form. This is to allow situations where you want to focus the
 statistical testing to a subset of samples but not limit the
 visualisations of the differential results to those samples. So in the
 above example, the differential heatmaps of the tumour samples wouldn’t
 show the behaviour in the normals. Setting <code>subset = TRUE</code>
 and supplying the restriction of the test as
-<code>differential_subset = condition == "tumour"</code> would visualise
+<code>influential_samples = condition == "tumour"</code> would visualise
 just the differential genes in the tumour subset (same number of
 genes/rows), but show their expression in all samples (larger number of
-samples/columns).</p>
+samples/columns). Samples excluded by an
+<code>influential_samples</code> predicate will <strong>not</strong>
+play a role in any of the following:</p>
+<ul>
+<li>Contributing to the calculation of gene variance when selecting
+variable genes for exploratory heatmaps and cluster centroids</li>
+<li>Calculating the gene:gene distances for the heatmaps</li>
+<li>Calculating the direction of the principal components</li>
+<li>Any part of the DESeq2 processing</li>
+</ul>
 <p>The conditions on which we <code>subset</code> must be defined in the
 experiment table. It is possible to transform some of the predictors
 (columns of <code>colData</code>) using the other main component of a
@@ -840,9 +849,9 @@ hierarchy. We list the expected behaviour of those:</p>
 <code>models</code> can be set at the top <code>specification</code>
 level, and will get pre-pended to any sample-set specific models.</li>
 <li>
-<code>subset</code> can be set at the top <code>specification</code>
-level, and will get boolean-<code>AND</code>ed with sample-set specific
-subsets.</li>
+<code>subset</code> and <code>influential_samples</code> can be set
+at the top <code>specification</code> level, and will get
+boolean-<code>AND</code>ed with sample-set specific subsets.</li>
 <li>
 <code>transform</code> can be set at the top
 <code>specification</code> level, and will only be used when sample-set
