@@ -1,3 +1,23 @@
+# Version 1.2.0
+## Major Changes
+ - Rearrange report sections to put all plots related to a
+   mode/comparison in the same section
+ - Introduce interactive plots
+ - Include the 'influential_samples' functionality
+ - Output estimated means in supplementary csv's
+## Minor Changes
+ - Update launchers (indentation)
+ - Use the .env that specifies the R docker/singularity images
+ - Update infrastructure to v1.2.0 - more/all settings in .env
+ - ssh_auth_sock
+ - Fix missing vars in env
+ - Sync with launcher 1.2.2
+ - Fix SSH_AUTH_SOCK needing to be set
+ - Fix singularity missing from nfcore module
+ - Prep for big import of changes
+ - New data-model-profile=type hierarchy
+ - Improve categories - probably broken the sidebar though
+ - Bring in new template.  Deloop differential partially
 # Version 1.0.1
 ## Major Changes
 ## Minor Changes

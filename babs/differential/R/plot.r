@@ -100,7 +100,7 @@ plot_tracker <- function(my_params) {
   script <- tools::file_path_sans_ext(basename(my_params$script))
   plot_list <- list()
   get_tally <- counter() # keeps track of individual labels and running tally of all plots
-  function(pl, label, caption, height_mult=NA, min_height=0, max_height=Inf, preview=FALSE, plot_meta=list(), interactive=TRUE) {
+  function(pl, label, caption, height_opt="", preview=FALSE, plot_meta=list(), interactive=TRUE, dpi=NULL) {
     if (nargs()==0) {
       return(plot_list)
     }
@@ -113,12 +113,6 @@ plot_tracker <- function(my_params) {
       " [png](", script, "/","fig-", sprintf("%0.3i",fig_n), "-", chunk_label, my_params$TAG, ".png", ")",
       " [pdf](", script, "/","fig-", sprintf("%0.3i",fig_n), "-", chunk_label, my_params$TAG, ".pdf", ")"
     )
-      
-    if (!is.na(height_mult)) {
-      height_opt <- paste0("#| fig-height: ", max(min(knitr::opts_chunk$get("fig.height") * height_mult,max_height), min_height))
-    } else {
-      height_opt <- ""
-    }
     has_interactivity <- interactive &&  inherits(pl, "ggplot") &&
       any(
         sapply(pl$layers, function(layer) {
@@ -126,19 +120,16 @@ plot_tracker <- function(my_params) {
             any(c("tooltip", "data_id", "onclick") %in% names(layer$mapping))
         })
       )
-
-#    wrap <- list(header="", footer="")
     if ("Heatmap" %in% class(pl)) {
       fn <- function() {
         draw(pl, heatmap_legend_side = "top")
       }
     }  else if (has_interactivity) {
-      fn <- function() {print(pl)}
+      fn <- function() {print(rasterize_points(pl, dpi=dpi))}
       fn_widget <- function() {
-        height_svg <- 5 * if (is.na(height_mult)) 1 else height_mult
         g <- girafe(ggobj=pl,
-                   width_svg = 7,
-                   height_svg = height_svg,
+                   width_svg = 14,
+                   height_svg = 10,
                    options = list(
                      opts_hover_inv(css = "opacity:0.2;"),
                      opts_hover(css = "stroke-width:2;"),
@@ -213,6 +204,25 @@ plot_tracker <- function(my_params) {
 }
 
 
+rasterize_points <- function(p, dpi = 150) {
+  if (is_null(dpi)) return(p)
+  p2 <- p
+  # Find point layers that are NOT interactive
+  point_layers <- which(sapply(
+    p2$layers, 
+    function(l) inherits(l$geom, "GeomPoint") &&
+                !inherits(l$geom, "GeomInteractive")
+  ))
+  for (i in point_layers) {
+    p2$layers[[i]] <- ggrastr::rasterise(
+      p2$layers[[i]],
+      dpi  = dpi
+    )
+  }  
+  p2
+}
+
+
 residual_heatmap_transform <- function(mat, cdata, fml) {
   assign("tmat", t(mat), envir=environment(fml))
   fml <- stats::update(fml, tmat ~ .)
@@ -272,7 +282,11 @@ substitute_x_aes <- function(mapping, excludes=c("", "group", "data_id", "toolti
   
 aes_caption <- function(ae) {
   ae <- ae[intersect(c("colour","shape", "fill"), names(ae))]
-  paste0(names(ae), "\\", as.character(ae), collapse=",")
+  if (length(ae)>0) {
+    paste0(names(ae), "\\", as.character(ae), collapse=",")
+  } else {
+    "nothing"
+  }
 }
 
 
@@ -365,7 +379,7 @@ get_colour_scales <- function(dds, mapping, flag_vars=character()) {
   }
   my_palette <- metadata(colData(dds))$palette$ggplot
   if (length(colour_by) == 1 && colour_by %in% names(my_palette)) {
-    if (is.numeric(colDat[[colour_by]])) {
+    if (is.numeric(colData(dds)[[colour_by]])) {
       pal_col <- my_palette[[colour_by]]
       scale_out$colour <- scale_colour_gradient(low = pal_col[1], high = pal_col[2])
     } else {
@@ -375,7 +389,7 @@ get_colour_scales <- function(dds, mapping, flag_vars=character()) {
   }
   fill_by <- all.vars(eval(mapping)$fill)
   if (length(fill_by) == 1 && fill_by %in% names(my_palette)) {
-    if (is.numeric(colDat[[fill_by]])) {
+    if (is.numeric(colData(dds)[[fill_by]])) {
       pal_col <- my_palette[[fill_by]]
       scale_out$fill <- scale_fill_gradient(low = pal_col[1], high = pal_col[2])
     } else {
@@ -383,4 +397,9 @@ get_colour_scales <- function(dds, mapping, flag_vars=character()) {
     }
   }
   scale_out
+}
+
+height_scaler <- function(n, small, big, N) {
+        h <- small +(big-small)*(n-1)/(N-1)
+        min(h, big)
 }

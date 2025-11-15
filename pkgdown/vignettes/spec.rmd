@@ -141,16 +141,24 @@ specification(
 )
 ```
 
-There's also a `differential_subset` field that takes the same form.
+There's also a `influential_samples` field that takes the same form.
 This is to allow situations where you want to focus the statistical
 testing to a subset of samples but not limit the visualisations of the
 differential results to those samples. So in the above example, the
 differential heatmaps of the tumour samples wouldn't show the
 behaviour in the normals. Setting `subset = TRUE` and supplying the
-restriction of the test as `differential_subset = condition ==
+restriction of the test as `influential_samples = condition ==
 "tumour"` would visualise just the differential genes in the tumour
 subset (same number of genes/rows), but show their expression in all
-samples (larger number of samples/columns).
+samples (larger number of samples/columns).  Samples excluded by an
+`influential_samples` predicate will __not__ play a role in any of the
+following:
+
+ - Contributing to the calculation of gene variance when selecting
+   variable genes for exploratory heatmaps and cluster centroids
+ - Calculating the gene:gene distances for the heatmaps
+ - Calculating the direction of the principal components
+ - Any part of the DESeq2 processing
 
 The conditions on which we `subset` must be defined in the experiment
 table. It is possible to transform some of the predictors (columns of
@@ -838,7 +846,7 @@ that will propagate down the `specificiation > sample_sets > models >
 comparisons` hierarchy.  We list the expected behaviour of those:
 
  - `models` can be set at the top `specification` level, and will get pre-pended to any sample-set specific models.
- - `subset` can be set at the top `specification` level, and will get boolean-`AND`ed with  sample-set specific subsets.
+ - `subset` and `influential_samples`  can be set at the top `specification` level, and will get boolean-`AND`ed with sample-set specific subsets.
  - `transform` can be set at the top `specification` level, and will only be used when sample-set doesn't specify its own transform
  - `drop_unsupported_combinations` can be set at the `specification` and/or `sample_set` level, and will only be used when a model doesn't specify this directly.
  - `drop_incomplete` can be set at the `specification` and/or `sample_set` level, and will only be used when a model doesn't specify this directly.

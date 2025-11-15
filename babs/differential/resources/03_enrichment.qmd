@@ -351,8 +351,9 @@ for (approach in names(approach_res_list)) {
     do_plot(pl,
             label=approach,
             caption=capt,
-            height_mult=nlevels(df$ID)/30,
-            min_height=9
+            height_opt=paste0(
+              "#| fig-height: ",
+              height_scaler(n=nlevels(df$ID), small=5, big=20, N=600))
             )
     cat("\n\n")
     tbl <- df %>%

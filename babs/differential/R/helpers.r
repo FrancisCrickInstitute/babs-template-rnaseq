@@ -465,3 +465,14 @@ expr_to_list <- function(x, aliases = c("list", "specification", "sample_set", "
     paste(deparse(x), collapse = "")
   }
 }
+
+top_true <- function(is_in, stat, n, sym=TRUE) {
+      ind <- which(is_in)[order(stat[is_in])]
+      top_ind <- 1:min(n,length(ind))
+      if (sym) {
+        ind[unique(c(top_ind, sum(is_in)+1-top_ind))]
+      } else {
+        ind[top_ind]
+      }
+}
+

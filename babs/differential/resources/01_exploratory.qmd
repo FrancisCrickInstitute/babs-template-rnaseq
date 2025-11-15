@@ -249,9 +249,16 @@ divide into two choices:
    might wish to 'recentre' the data so that one particular
    experimental group is seen as a baseline.
    
-At the beginning of each 'plot config' section we list the respective choice
-made for the plots in that section. Below we give a brief introduction
-to each of the plot-types we show for each configuration.
+At the beginning of each 'plot config' section we list the respective
+choice made for the plots in that section: the 'aesthetic' mapping
+describes how each aspect of the plot (colour, x-coordinate, shape,
+...)  reflects an aspect of the experimental desgin (e.g. treatment);
+and the 'reconstruction' (if present) states which experimental
+factors have been normalised out (e.g. `. - batch` indicates that the
+batch effect has been regressed out of visualisation).
+
+Now we give a brief introduction to each of the plot-types we show for
+each configuration.
 
 ## Overall Heatmaps
 
@@ -544,7 +551,7 @@ for (dataset_id in names(ddsList)) {
       if ("ScaleDiscrete" %in% class(layer_scales(pl)$x)) {
         pl <- pl + scale_x_discrete(guide=guide_axis(n.dodge=2))
       }
-      capt <- paste0("Cluster profiles with ", orig_caption, " in ", dtag(dataset_id), removed)
+      capt <- paste0("Cluster profiles annotated with ", orig_caption, " in ", dtag(dataset_id), removed)
       do_plot(pl,
               label= "clustProfile",
               caption=capt,

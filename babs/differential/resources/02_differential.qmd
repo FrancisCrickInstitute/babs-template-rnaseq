@@ -49,6 +49,7 @@ library(ReactomePA)
 library(GO.db)
 library(IHW)
 library(ggiraph)
+library(ggrastr)
 
 source("R/plot.r", local = knitr::knit_global())
 source("R/markdown.r", local = knitr::knit_global())
@@ -246,8 +247,7 @@ behaviour, and so show an example of what a 'bad' pink trace might
 look like.
 
 ```{r}
-#| label: tbl-summary
-#| tbl-cap: Summaries
+#| label: summary
 
 summaries <- dds_model_comp %>%
   map_dmc(summarise_results) %>%
@@ -275,21 +275,10 @@ pval_frame <- dds_model_comp %>%
   map_dmc(function(x) {bind_rows(x, .id="Comparison")}, depth="model")
 
 
-
-## for (dataset in names(summaries)) {
-##   #options(htmltools.preserve.raw=TRUE)
-##   #cat("### ", dataset, " \n", sep="")
-##   #caption=paste0("Size of gene-lists for ", dataset),
-##   summaries[[dataset]] %>%
-##     gt(groupname_col="Model") %>%
-##     tab_header(title="Genelist summary",
-##                subtitle=dataset) %>%
-##     as_raw_html()
-## }
-
 param$set("clustering_distance_rows", postpone=TRUE)
 param$set("clustering_distance_columns", postpone=TRUE)
 param$set("gene_clust")
+cat("\n\n")
 
 for (dataset_id in names(summaries)) {
   res <- knitr::knit_child(
@@ -329,7 +318,6 @@ for (dataset_id in names(summaries)) {
     cat(res, sep = '\n\n')
   }
   for (model_id in names(pval_frame[[dataset_id]])) {
-    plot_section <- list(dataset=dataset_id, model=model_id)
     pl <- ggplot(pval_frame[[dataset_id]][[model_id]], aes(x=pvalue, fill=baseMean<1)) +
       geom_density(alpha=0.5) +
       facet_wrap(~Comparison) +
@@ -337,36 +325,54 @@ for (dataset_id in names(summaries)) {
     do_plot(pl,
             label="summaryp",
             caption=paste("p-Diagnostic for", dataset_id, model_id),
-            plot_meta=plot_section
+            plot_meta=list(dataset=dataset_id, model=model_id)
             )
     cat("\n\n---\n\n")
   }
+}
+
+```
+
+```{r}
+#| label: results
+for (dataset_id in names(dds_model_comp)) {
+  section_hierarchy <- list(dataset=dataset_id)
   met <- metadata(ddsList[[dataset_id]])
-  dmc_heading(ddsList, dataset=dataset_id, model=NULL, depth="##")
+  dmc_heading(dds_model_comp, dataset=dataset_id, model=NULL, depth=strrep("#", length(section_hierarchy)))
   has_comparisons <- sapply(met$models, function(m) "comparisons" %in% names(m) && length(m$comparisons) > 0)
-  models <- lapply(met$models[has_comparisons], function(x) x$design)
   src2bullets(met, c("subset", "extra_assays", "influential_samples"))
-  for (model_id in names(models)) {
-    dmc_heading(ddsList, dataset=dataset_id, model=model_id, depth="###", numbered=FALSE)
+  for (model_id in names(dds_model_comp[[dataset_id]])) {
+    section_hierarchy <- list(dataset=dataset_id, model=model_id)
+    this_model <- dds_model_comp[[dataset_id]][[model_id]]
+    dmc_heading(ddsList, dataset=dataset_id, model=model_id, depth=strrep("#", length(section_hierarchy)))
     src2bullets(met$models[[model_id]], c("subset", "extra_assays", "influential_samples"))
     cat("`",
-        Reduce(paste, sub("~", paste0(noun_to_readout(RowNoun)," ~ "), deparse(models[[model_id]]))),
+        Reduce(paste, sub("~", paste0(noun_to_readout(RowNoun)," ~ "), deparse(design(this_model[[1]])))),
         "`\n\n"
         )
     first <- TRUE
-    dmc_heading(dds_model_comp, dataset=dataset_id, model=model_id, depth="###")
-    this_model <- dds_model_comp[[dataset_id]][[model_id]]
-    md <- metadata(this_model[[1]])
-    if (!is.null(md$model$external_list)) {
-      external_list <- read.csv(file.path(base_dir, md$model$external_list))
+    external_list <- metadata(this_model[[1]])$model$external_list
+    if (!is.null(external_list)) {
+      external_list <- read.csv(file.path(base_dir, external_list))
       external_list <- subset(external_list, ID %in% row.names(this_model[[1]]))
-    } else {
-      external_list <- NULL
     }
-    for (comparison_id in names(this_model)) {
-      this_dds <- this_model[[comparison_id]]
+    for (comparison_id in c(names(this_model), unique(external_list$Comparison))) {
+      section_hierarchy <- list(dataset=dataset_id, model=model_id, comparison=comparison_id)
+      dmc_heading(dds_model_comp, dataset=dataset_id, model=model_id, comparison=comparison_id, depth=strrep("#", length(section_hierarchy)))
+      is_external <- !(comparison_id %in% names(this_model))
+      if (is_external) {
+        this_dds <- this_model[[1]]
+        is_significant <- row.names(this_dds) %in% external_list$ID[external_list$Comparison==comparison_id]
+        comp_type <- " "
+      } else {
+        this_dds <- this_model[[comparison_id]]
+        is_significant <- grepl("\\*$", mcols(this_dds)$results$class)
+        comp_type <- "-differential "
+        if (!any(is_significant)) {
+          next
+        }
+      }
       md <- metadata(this_dds)
-      plot_section <- list(dataset=dataset_id, model=model_id, comparison_id=comparison_id)
       res <- as.data.frame(mcols(this_dds)$results)
       pal <- RColorBrewer::brewer.pal(9, "Set1")
       res$class <- ifelse(grepl("\\*", res$class), "Sig", "Not")
@@ -384,14 +390,12 @@ for (dataset_id in names(summaries)) {
                       )
                   ) +
         geom_point() +
+        geom_point_interactive(aes(tooltip=symbol), data=res[top_true(is_significant, res$shrunkLFC, n=100),]) +
         scale_x_log10()  + scale_size_identity() +
         labs(x="Mean of normalised counts", y=yax)+ theme_bw()
       colour_scale <- list(labels = c("Not", "Significant"),
                            breaks = c("#aaaaaa", "#000000"))
-      is_sig <- res$class != "Not"
-      ind <- which(is_sig)[order(res$shrunkLFC[is_sig])]
-      top_ind_ind <- 1:min(5,sum(is_sig))
-      ind <- ind[unique(c(top_ind_ind, sum(is_sig)+1-top_ind_ind))]
+      ind <- top_true(is_significant, res$shrunkLFC, n=5)
       if (!is.null(external_list)) {
         dat <- res[external_list$ID,]
         if (length(unique(external_list$Comparison)) <= length(pal)) {
@@ -414,57 +418,29 @@ for (dataset_id in names(summaries)) {
               label="MA",
               caption=paste0("MA plot of ", tooltip(md, comparison_id), "-differential ", rowNoun,"s for ",mtag(model_id), " in ", dtag(dataset_id)),
               preview=first,
-              plot_meta=plot_section
+              plot_meta=section_hierarchy,
+              dpi=300
               )
       first <- FALSE
       cat("\n\n---\n\n")
-    } # next comparison
-  plot_section <- list(dataset=dataset_id)
-  nice_legends <- separate_legend(ddsList[[dataset_id]])
-  pl <- do.call(gridExtra::arrangeGrob,c(
-    nice_legends,
-    ncol=ceiling(sqrt(length(nice_legends)))))
-  do_plot(pl,
-          label= "legend-a",
-          caption=paste("Metadata colour-codings for",
-                        metadata(ddsList[[dataset_id]])$dmc$dataset_name %||% metadata(ddsList[[dataset_id]])$dmc$dataset
-                        ),
-          plot_meta=plot_section
-          )
-    plot_section$model <- model_id
-    dmc_heading(dds_model_comp, dataset=dataset_id, model=model_id, depth="###")
-    this_model <- dds_model_comp[[dataset_id]][[model_id]]
-    md <- metadata(this_model[[1]])
-    first_done <- FALSE
-    if (!is.null(md$model$external_list)) {
-      external_list <- read.csv(file.path(base_dir, md$model$external_list))
-      external_list <- subset(external_list, ID %in% row.names(this_model[[1]]))
-    } else {
-      external_list <- NULL
-    }
-
-    plot_formulae <- section_chooser(md$model, "differential_profile_plots", "profile_plots")
-    model_vars <- sort_vars(
-      unique(c(all.vars(md$model$design),
-               unique(unlist(lapply(plot_formulae, all.vars)))
-               )),
-      md$model$variables)
-    for (comparison_id in c(names(this_model), unique(external_list$Comparison))) {
-      plot_section$comparison <- comparison_id
-      this_dds <- this_model[[comparison_id]]
-      md <- metadata(this_dds)
-      is_external <- !(comparison_id %in% names(this_model))
-      if (is_external) {
-        ind <- row.names(this_model[[1]]) %in% external_list$ID[external_list$Comparison==comparison_id]
-        this_dds <- this_model[[1]]
-        comp_type <- " "
-      } else {
-        ind <- grepl("\\*$", mcols(this_dds)$results$class)
-        comp_type <- "-differential "
-        if (!any(ind)) {
-          next
-        }
-      }
+      nice_legends <- separate_legend(ddsList[[dataset_id]])
+      pl <- do.call(gridExtra::arrangeGrob,c(
+        nice_legends,
+        ncol=ceiling(sqrt(length(nice_legends)))))
+      do_plot(pl,
+              label= "legend-a",
+              caption=paste("Metadata colour-codings for",
+                            metadata(ddsList[[dataset_id]])$dmc$dataset_name %||% metadata(ddsList[[dataset_id]])$dmc$dataset
+                            ),
+              plot_meta=section_hierarchy
+              )
+      cat("\n\n---\n\n")
+      plot_formulae <- section_chooser(md$model, "differential_profile_plots", "profile_plots")
+      model_vars <- sort_vars(
+        unique(c(all.vars(md$model$design),
+                 unique(unlist(lapply(plot_formulae, all.vars)))
+                 )),
+        md$model$variables)
       if ("mat" %in% names(md$model)) {
         mmat <- md$model$mat
       } else {
@@ -481,7 +457,7 @@ for (dataset_id in names(summaries)) {
       }
       zweights <- setNames(rep(0, ncol(ddsList[[dataset_id]])), colnames(ddsList[[dataset_id]]))
       zweights[colnames(this_dds)] <- weights
-      tidied_data <- tidy_significant_dds(ddsList[[dataset_id]], ind, model_vars, weights=zweights)
+      tidied_data <- tidy_significant_dds(ddsList[[dataset_id]], is_significant, model_vars, weights=zweights)
       pdat <- tidied_data$pdat
       pdat[sapply(pdat, is.character)] <- lapply(pdat[sapply(pdat, is.character)], 
                                                 as.factor)
@@ -491,8 +467,6 @@ for (dataset_id in names(summaries)) {
       } else {
         col_split <- apply(sapply(pdat[, var_roles$by, drop=FALSE], as.character), 1, paste, collapse=" ")
       }
-      
-      hheight <- (function(n, small, big, bign) {a <- (big-small)/(bign-1); b <- small-a; min(a*n + b, bign)})(n=nrow(tidied_data$mat), small=0.5, big=40, bign=1000)
       ha <- ComplexHeatmap::HeatmapAnnotation(
         df=pdat,
         col=metadata(colData(this_dds))$palette$Heatmap[names(pdat)],
@@ -506,56 +480,31 @@ for (dataset_id in names(summaries)) {
         show_column_names = TRUE,
         clustering_distance_rows=param$get("clustering_distance_rows"),
         column_split = col_split,
-        height=unit(hheight, "cm"),
         top_annotation = ha,
         row_names_gp = gpar(fontsize = 6),
         show_row_names = nrow(tidied_data$mat)<100)
       do_plot(pl,
               label="Heatmap",
               caption=paste0("Heatmap on ", tooltip(md, comparison_id), comp_type, rowNoun,"s of ",mtag(model_id), " in ", dtag(dataset_id), ". White for ", baseline_str),
-#              height_mult=nrow(tidied_data$mat)/30,
-#              max_height=15, min_height=5,
-              plot_meta=plot_section
+              plot_meta=section_hierarchy,
+              height_opt=paste0(
+                "#| fig-height: ",
+                height_scaler(n=nrow(tidied_data$mat), small=5, big=20, N=1000))
               )
       cat('\n\n---\n\n')
-    } # next comparison
     
-    
-    exists_profile_plot <- FALSE
-    all_clusters <- list()
-    cluster_ind <- counter(post_fn=to_letter)
-    
-    this_model <- dds_model_comp[[dataset_id]][[model_id]]    
-    md <- metadata(this_model[[1]])
-    if (!is.null(md$model$external_list)) {
-      external_list <- read.csv(file.path(base_dir, md$model$external_list))
-      external_list$Cluster[is.na(external_list$Cluster)] <- external_list$ID[is.na(external_list$Cluster)]
-    } else {
-      external_list <- NULL
-    }
-    
-    for (comparison_id in c(names(this_model), unique(external_list$Comparison))) {
-      plot_section <- list(dataset=dataset_id, model=model_id, comparison=comparison_id)
-      is_external <- !(comparison_id %in% names(this_model))
-      if (is_external) {
-        this_dds <- this_model[[1]]
-        is_diff <- row.names(this_dds) %in% external_list$ID[external_list$Comparison==comparison_id]
-        comp_type <- "-differential "
-      } else {
-        this_dds <- this_model[[comparison_id]]
-        is_diff <- grepl("^.*\\*", mcols(this_dds)$results$class)
-        comp_type <- " "
-      }
-      md <- metadata(this_dds)
-      plot_formulae <- section_chooser(md$model, "differential_profile_plots", "profile_plots")
-      if (is_null(plot_formulae) || !any(is_diff)) next
-      exists_profile_plot <- TRUE
+      all_clusters <- list()
+      cluster_ind <- counter(post_fn=to_letter)
+      if (is_null(plot_formulae)) next
       partials <- partialise.matrix(
-        assay(ddsList[[dataset_id]][is_diff,,drop=FALSE], ifelse(inherits(this_dds, "DESeqDataSeq"),"vst", 1)),
+        assay(ddsList[[dataset_id]][is_significant,,drop=FALSE], ifelse(inherits(this_dds, "DESeqDataSeq"),"vst", 1)),
         as.data.frame(colData(ddsList[[dataset_id]])),
         fml=md$model$design)
-      for (plot_fml in plot_formulae) {
-        plot_section$plot_config <- attr(plot_fml, "name")
+      for (plot_id in names(plot_formulae)) {
+        plot_fml <- plot_formulae[[plot_id]]
+        if (! "name" %in% names(attributes(plot_fml))) attr(plot_fml, "name") <- plot_id
+        section_hierarchy$plot_config <- attr(plot_fml, "name")
+        dmc_heading(dds_model_comp, dataset=dataset_id, model=model_id, plot=plot_fml, depth=strrep("#", length(section_hierarchy)))
         cdata_df <- as.data.frame(colData(ddsList[[dataset_id]])[, all.vars(plot_fml), drop=FALSE])
         mat <- t(scale(t(
           assemble_partialised(partials, update(plot_fml, NULL ~ .), resids=TRUE)
@@ -595,7 +544,7 @@ for (dataset_id in names(summaries)) {
         pl <- ggplot(centroid_df, mapping) +
           facet_wrap(~ babs.name) +
           theme_bw() +
-          geom_point(aes(y= babs.value)) +
+          geom_point_interactive(aes(y= babs.value), size = 3, shape = 21) +
           labs(y=noun_to_readout(RowNoun))
         pl <- pl + my_alpha_scale(pl)
         if ("group" %in% names(mapping)) {
@@ -609,7 +558,7 @@ for (dataset_id in names(summaries)) {
         do_plot(pl,
                 label= "diffClustProfile",
                 caption=capt,
-                plot_meta=plot_section
+                plot_meta=section_hierarchy
                 )
         if (!is_external) {
           all_clusters[[this_clust]] <- list(
@@ -621,9 +570,6 @@ for (dataset_id in names(summaries)) {
       }
     }
   }
-}
-if (!exists_profile_plot) {
-  cat('\n\nNo profiles were generated, either because none were specified, or those that were corresponded to comparisons with no statistically significant differential ',rowNoun,'s.\n\n', sep="")
 }
 
       

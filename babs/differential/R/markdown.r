@@ -74,7 +74,7 @@ load_params <- function(script) {
 ##' @param describe Print the description text as the first paragraph of the section?
 ##' @return A markdown string
 ##' @author Gavin Kelly
-dmc_heading <- function(obj, dataset=1, model=NULL, plot=NULL, depth="##", numbered=TRUE, describe=TRUE) {
+dmc_heading <- function(obj, dataset=1, model=NULL, comparison=NULL, plot=NULL, depth="##", numbered=TRUE, describe=TRUE) {
   heading <- paste0("\n\n", depth)
   text <- ""
   is_dmc <- is.list(obj[[dataset]])
@@ -101,6 +101,13 @@ dmc_heading <- function(obj, dataset=1, model=NULL, plot=NULL, depth="##", numbe
                       profile_to_string(plot), "\n\n")
       } else {
         text <- paste0(profile_to_string(plot), "\n\n")
+      }
+    } else if (!is.null(comparison)) {
+      heading <- c(heading, "Comparison -", comparison)
+      if ("tooltip" %in% names(attributes(metadata(obj[[dataset]][[model]][[comparison]])$comparison))) {
+        text <- attr(metadata(obj[[dataset]][[model]][[comparison]])$comparison, "tooltip")
+      } else {
+        text <- ""
       }
     } else {
       ## Doing a model
@@ -132,7 +139,7 @@ dmc_heading <- function(obj, dataset=1, model=NULL, plot=NULL, depth="##", numbe
     heading <- paste0(heading, "{.unnumbered}")
   }
   if (!describe) text=""
-  cat(paste0(heading, "\n\n", text))
+  cat(paste0(heading, "\n\n", text, "\n\n"))
 }
 
 report_span <- function(id, type, name="", description="" ) {
@@ -170,7 +177,7 @@ var_heading <- function(..., depth) {
 
 profile_to_string <- function(fml) {
   mapping <- eval(fml[[2]])
-  renamer <- setNames(names(mapping), names(mapping))
+  renamer <- as.list(setNames(names(mapping), names(mapping)))
   renamer$data_id <- "hover grouping"
   renamer$group <- "grouping variables"
   renamer$extra <- "additional variables"
