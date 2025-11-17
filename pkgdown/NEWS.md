@@ -18,11 +18,13 @@
  - New data-model-profile=type hierarchy
  - Improve categories - probably broken the sidebar though
  - Bring in new template.  Deloop differential partially
+
 # Version 1.0.1
 ## Major Changes
 ## Minor Changes
  - Injecting the demo that got missed
  - Launchers are now single-file scripts
+
 # Version 1.0.0
 ## Major Changes
  - Add differential_subsets functionality
@@ -41,6 +43,7 @@
  - Fix renv calling
  - Document the differential_subset setting
  - Update pkgdown generation
+
 # Version 0.24.0
 ## Major Changes
  - Add external genelists
@@ -67,6 +70,7 @@
  - Provide isolation script and example spec file
  - Refresh the launchers
  - Update to R4.5.0 and new launcher
+
 # Version 0.20.0
 ## Major Changes
  - Rationalise the counter/table/plot tracking system
@@ -79,12 +83,14 @@
  - Fix bug in aesthetic overrides when there's only one aesthetic
  - Fix another edge-case for partials with uni-variable models
  - Move to the generic launcher capability
+
 # Version 0.18.1
 ## Major Changes
 Add the profile plots to the exploratory page
 Add termNames functionality
 ## Minor Changes
  Add name-dodging
+
 # Version 0.18.0
 ## Major Changes
  - Move to the new launchers
@@ -98,6 +104,7 @@ Add termNames functionality
  - Add universal models
  - Add demo of how to run an isolated differential analysis
  - Add a workaround to the polyfill.io unavailability
+
 # Version 0.14.0
 ## Major Changes
  - Refactor the container/submission so that it doesn't rely on intermediate shell scripts.
@@ -105,11 +112,13 @@ Add termNames functionality
  - Fix how `BABS_SINGULARITY_INTERACTIVE_EXTRAS` is sent to IDEs.
  - Fix a regression that put nfcore in the differential container.
  - Make the scratch path more traceable
+
 # Version 0.13.0
 ## Major Changes
  - Add Salmon as an aligner option.  In any config, we can now have an additional `aligner=star_salmon` line (on its own, _not_ as part of the nfcore line)
 ## Minor Changes
  - Rename the test-fast-forwarders
+
 # Version 0.12.2
 ## Major Changes
 ## Minor Changes
@@ -117,11 +126,13 @@ Tighten up the documentation on how to work with pre-existing
 alignments. Split the documentation so that the intro to specfiles is
 separate from the installation/usage docs.
 
+
 # Version 0.12.1
 ## Major Changes
 ## Minor Changes
 - Improve the heading layout in the exploratory plots
 - Fix problem of not picking up babs file
+
 # Version 0.12.0
 ## Major Changes
 - Fix a bug in the "partial" plots of the exploratory analyses, where the design wasn't set so nothing being was removed. Impact was only in lack of visualisations, rather than anything incorrect being produced.

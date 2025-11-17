@@ -419,7 +419,7 @@ for (dataset_id in names(dds_model_comp)) {
               caption=paste0("MA plot of ", tooltip(md, comparison_id), "-differential ", rowNoun,"s for ",mtag(model_id), " in ", dtag(dataset_id)),
               preview=first,
               plot_meta=section_hierarchy,
-              dpi=300
+              dpi=150, interactive=FALSE
               )
       first <- FALSE
       cat("\n\n---\n\n")

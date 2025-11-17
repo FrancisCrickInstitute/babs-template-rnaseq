@@ -11,7 +11,7 @@ navbar:
   components:
     demo:
       text: "Demo"
-      href: /test/index.html
+      href: test/index.html
 reference:
 - title: Utilities
 - subtitle: "Partial Residuals"
@@ -35,7 +35,7 @@ reference:
 home:
   links:
   - text: Demo Results
-    href: /test/index.html
+    href: test/index.html
 repo:
   url:
     home: https://github.com/FrancisCrickInstitute/babs-template-rnaseq
