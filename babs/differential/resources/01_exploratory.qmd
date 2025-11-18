@@ -447,7 +447,9 @@ for (dataset_id in names(ddsList)) {
                          )
       }
       my_caption <- paste0(which_assay, " in ",  dtag(dataset_id), removed)
-      cat(var_heading("Heatmaps",depth=1+length(section_hierarchy)))
+#      cat(var_heading("Heatmaps",depth=1+length(section_hierarchy)))
+      cat('\n\n::: {.panel-tabset .unnumbered group="explot"}\n\n')
+      cat("\n\n", strrep("#", length(section_hierarchy)+1), " Heatmap\n\n", sep="")
       top <- order(
         apply(this_assay[,this_dds$.influential], 1, sd),
         decreasing = TRUE)[1:min(nrow(this_assay),param$get("top_n_variable"))]
@@ -520,8 +522,8 @@ for (dataset_id in names(ddsList)) {
               )
       
       cat("\n\n---\n\n")
-      cat(var_heading("Cluster centroids",depth=1+length(section_hierarchy)))
-      
+#      cat(var_heading("Cluster centroids",depth=1+length(section_hierarchy)))
+      cat("\n\n", strrep("#", length(section_hierarchy)+1), " Profiles\n\n", sep="")     
       cc <- cluster_calc(hmap_data, clusterID=gene_clust$clusters)
       centroid_df <- cbind(cc, colDat[model_vars]) %>%
         pivot_longer(cols=any_of(names(cc)), names_to="babs.name", values_to="babs.value") %>%
@@ -562,8 +564,8 @@ for (dataset_id in names(ddsList)) {
       )
       cat("\n\n---\n\n")
 
-      cat(var_heading("Principal Component",depth=1+length(section_hierarchy)))
-
+#      cat(var_heading("Principal Component",depth=1+length(section_hierarchy)))
+      cat("\n\n", strrep("#", length(section_hierarchy)+1), " 2PC\n\n", sep="")
       my_pc <- prcomp(
         t(this_assay[,this_dds$.influential]),
         scale = FALSE)
@@ -574,18 +576,6 @@ for (dataset_id in names(ddsList)) {
                       PC1 = proj[, param$get("pc_x")],
                       PC2 = proj[, param$get("pc_y")], 
                       sample = rownames(colDat)))
-      covar_x_pc <- mat_x_terms(proj, design, colDat)
-      pl <- ggplot(covar_x_pc, aes(x = column, y = Covariate, fill = Assoc)) + 
-       geom_raster() +
-       facet_wrap(~wrap, scales = "free_x",ncol = 1)  +
-       scale_fill_gradient2(low = "#4575b4",mid = "grey90", high = "#d73027") +
-       theme(aspect.ratio = length(unique(covar_x_pc$Covariate))/min(20, ncol(pc)))
-      do_plot(pl,
-              label="covar",
-              caption=paste("Covariate association in", dtag(dataset_id), removed),
-              plot_meta=section_hierarchy
-              )
-      cat("\n\n---\n\n")
       
       
       aes_list <- lapply(substitute_x_aes(eval(plot_fml[[2]])), modify_mapping)
@@ -609,7 +599,20 @@ for (dataset_id in names(ddsList)) {
       } # Repeat if need to annotate by an overwritten 'x'
 
 #### 1D PC plots
-      cat(var_heading("Associated PCs against covariates", depth=1+length(section_hierarchy)))
+      cat("\n\n", strrep("#", length(section_hierarchy)+1), " 1PC\n\n", sep="")
+#      cat(var_heading("Associated PCs against covariates", depth=1+length(section_hierarchy)))
+      covar_x_pc <- mat_x_terms(proj, design, colDat)
+      pl <- ggplot(covar_x_pc, aes(x = column, y = Covariate, fill = Assoc)) + 
+       geom_raster() +
+       facet_wrap(~wrap, scales = "free_x",ncol = 1)  +
+       scale_fill_gradient2(low = "#4575b4",mid = "grey90", high = "#d73027") +
+       theme(aspect.ratio = length(unique(covar_x_pc$Covariate))/min(20, ncol(pc)))
+      do_plot(pl,
+              label="covar",
+              caption=paste("Covariate association in", dtag(dataset_id), removed),
+              plot_meta=section_hierarchy
+              )
+      cat("\n\n---\n\n")
       long_dat <- extract_hits(covar_x_pc, proj, model_vars)
       pl <- ggplot(long_dat, modifyList(mapping, aes(y=value))) +
         geom_point_interactive(size = 3, shape = 21) +
@@ -628,7 +631,7 @@ for (dataset_id in names(ddsList)) {
               plot_meta=section_hierarchy
               )
       cat("\n\n---\n\n")
-
+      cat(':::\n\n')
     }   # next formula
   }  # next model
 } # next dataset

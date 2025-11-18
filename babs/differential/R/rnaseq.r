@@ -238,6 +238,9 @@ build_dds_list <- function(dds, spec) {
       if ("profile_plots" %in% names(spec$sample_sets[[dataset_i]]$models[[model_i]])) {
         names(spec$sample_sets[[dataset_i]]$models[[model_i]]$profile_plots) <- default_names(spec$sample_sets[[dataset_i]]$models[[model_i]]$profile_plots, prefix="P")
       }
+      if ("differential_profile_plots" %in% names(spec$sample_sets[[dataset_i]]$models[[model_i]])) {
+        names(spec$sample_sets[[dataset_i]]$models[[model_i]]$differential_profile_plots) <- default_names(spec$sample_sets[[dataset_i]]$models[[model_i]]$differential_profile_plots, prefix="DP")
+      }
     }
     dataset_spec <- spec$sample_sets[[dataset_i]]
     obj <- dds
@@ -425,6 +428,8 @@ fit_models <- function(dds, param, ...) {
       metadata(y)$dmc$model <- mname
       metadata(y)$dmc$model_name <- metadata(y)$model$name
       metadata(y)$dmc$model_description <- metadata(y)$model$description
+      metadata(y)$dmc$comparison_name <- attr(metadata(y)$comparison, "name")
+      metadata(y)$dmc$comparison_description <- attr(metadata(y)$comparison, "description")
       y})
   })
   model_comp
@@ -458,7 +463,9 @@ fit_model <- function(mdl, dds, ...) {
     fit <- fit_comparison(comp=mdl$comparisons[[comp_ind]], model_dds=model_dds, mdl=mdl, ...)
     if (length(fit)>1) {
       names(fit) <- paste0("(", names(mdl$comparisons)[comp_ind],") '", names(fit), "'")
-      } 
+    } else {
+      names(fit) <- names(mdl$comparisons)[comp_ind]
+    }
     out <- c(out, fit)
     if (length(fit)!=0 && metadata(fit[[1]])$model_fit_done && !metadata(model_dds)$model_fit_done) {
       model_dds <- fit[[1]]

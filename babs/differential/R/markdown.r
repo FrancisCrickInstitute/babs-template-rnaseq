@@ -103,11 +103,20 @@ dmc_heading <- function(obj, dataset=1, model=NULL, comparison=NULL, plot=NULL, 
         text <- paste0(profile_to_string(plot), "\n\n")
       }
     } else if (!is.null(comparison)) {
-      heading <- c(heading, "Comparison -", comparison)
-      if ("tooltip" %in% names(attributes(metadata(obj[[dataset]][[model]][[comparison]])$comparison))) {
-        text <- attr(metadata(obj[[dataset]][[model]][[comparison]])$comparison, "tooltip")
+      if (comparison %in% names(obj[[dataset]][[model]])) { # otherwise an external list
+        met <- metadata(obj[[dataset]][[model]][[comparison]])$dmc
+        heading <- c(heading, "Comparison", comparison)
+        if (!is.null(met$comparison_name)) {
+          heading <- c(heading, "-", met$comparison_name)
+        }
+        if (!is.null(met$comparison_description)) {
+          text <- paste0(met$comparison_description, "\n\n")
+        }
+        if (comparison %in% names(obj[[dataset]][[model]]) && "tooltip" %in% names(attributes(metadata(obj[[dataset]][[model]][[comparison]])$comparison))) {
+          text <- paste(text, attr(metadata(obj[[dataset]][[model]][[comparison]])$comparison, "tooltip"))
+        }
       } else {
-        text <- ""
+        heading <- c(heading, "List", comparison)
       }
     } else {
       ## Doing a model

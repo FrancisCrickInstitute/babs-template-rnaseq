@@ -355,6 +355,7 @@ for (dataset_id in names(dds_model_comp)) {
     if (!is.null(external_list)) {
       external_list <- read.csv(file.path(base_dir, external_list))
       external_list <- subset(external_list, ID %in% row.names(this_model[[1]]))
+      external_list$Cluster[is.na(external_list$Cluster)] <- external_list$ID[is.na(external_list$Cluster)]
     }
     for (comparison_id in c(names(this_model), unique(external_list$Comparison))) {
       section_hierarchy <- list(dataset=dataset_id, model=model_id, comparison=comparison_id)
@@ -372,61 +373,70 @@ for (dataset_id in names(dds_model_comp)) {
           next
         }
       }
+      cat('\n\n::: {.panel-tabset .unnumbered group="diffplot"}\n\n')
       md <- metadata(this_dds)
       res <- as.data.frame(mcols(this_dds)$results)
       pal <- RColorBrewer::brewer.pal(9, "Set1")
-      res$class <- ifelse(grepl("\\*", res$class), "Sig", "Not")
-      if (is_formula(md$comparison)) {
-        yax <- "Largest fold change"
-      } else {
-        yax <- "Log fold change (shrunk)"
-      }
-      pl <- ggplot(res,
-                  aes(x=baseMean,
-                      y=shrunkLFC,
-                      colour=ifelse(class == "Not", "#aaaaaa","#000000"),
-                      size=ifelse(class == "Not", 0.5 , 2),
-                      label=symbol
-                      )
-                  ) +
-        geom_point() +
-        geom_point_interactive(aes(tooltip=symbol), data=res[top_true(is_significant, res$shrunkLFC, n=100),]) +
-        scale_x_log10()  + scale_size_identity() +
-        labs(x="Mean of normalised counts", y=yax)+ theme_bw()
-      colour_scale <- list(labels = c("Not", "Significant"),
-                           breaks = c("#aaaaaa", "#000000"))
-      ind <- top_true(is_significant, res$shrunkLFC, n=5)
-      if (!is.null(external_list)) {
-        dat <- res[external_list$ID,]
-        if (length(unique(external_list$Comparison)) <= length(pal)) {
-          col <- pal[match(external_list$Comparison, unique(external_list$Comparison))]
+      res$class <- ifelse(is_significant, "Sig", "Not")
+      if (is_external) {
+        cat("\n\n", strrep("#", length(section_hierarchy)+1), " MA\n\n", sep="")
+        cat("For MA plots, external gene-lists are represented in specific comparisons, rather than getting there own plot.\n\n")
+      } else {        
+        if (is_formula(md$comparison)) {
+          yax <- "Largest fold change"
         } else {
-          col <- rep(pal[1], nrow(dat))
+          yax <- "Log fold change (shrunk)"
         }
-        colour_scale$labels <- c(colour_scale$labels, unique(external_list$Comparison))
-        colour_scale$breaks <- c(colour_scale$breaks, pal[seq_along(unique(external_list$Comparison))])
+        pl <- ggplot(res,
+                    aes(x=baseMean,
+                        y=shrunkLFC,
+                        colour=ifelse(class == "Not", "#aaaaaa","#000000"),
+                        size=ifelse(class == "Not", 0.5 , 2),
+                        label=symbol
+                        )
+                    ) +
+          geom_point() +
+          geom_point_interactive(aes(tooltip=symbol), data=res[top_true(is_significant, res$shrunkLFC, n=100),]) +
+          scale_x_log10()  + scale_size_identity() +
+          labs(x="Mean of normalised counts", y=yax)+ theme_bw()
+        colour_scale <- list(labels = c("Not", "Significant"),
+                            breaks = c("#aaaaaa", "#000000"))
+        ind <- top_true(is_significant, res$shrunkLFC, n=5)
+        if (!is.null(external_list)) {
+          ## For MA plots, add external IDs 
+          dat <- res[external_list$ID,]
+          if (length(unique(external_list$Comparison)) <= length(pal)) {
+            col <- pal[match(external_list$Comparison, unique(external_list$Comparison))]
+          } else {
+            col <- rep(pal[1], nrow(dat))
+          }
+          colour_scale$labels <- c(colour_scale$labels, unique(external_list$Comparison))
+          colour_scale$breaks <- c(colour_scale$breaks, pal[seq_along(unique(external_list$Comparison))])
+          pl <- pl +
+            ggrepel::geom_text_repel(aes(colour=col), size=3, data=res[external_list$ID,], max.overlaps=Inf, show.legend = FALSE) +
+            geom_point(aes(colour=col), data=res[external_list$ID,])
+          ind <- ind[!row.names(res)[ind] %in% external_list$ID]
+        }
+        pl <- pl+ggrepel::geom_text_repel(size=3, data=res[ind,], show.legend = FALSE) 
         pl <- pl +
-          ggrepel::geom_text_repel(aes(colour=col), size=3, data=res[external_list$ID,], max.overlaps=Inf, show.legend = FALSE) +
-          geom_point(aes(colour=col), data=res[external_list$ID,])
-        ind <- ind[!row.names(res)[ind] %in% external_list$ID]
+          scale_colour_identity(labels=colour_scale$labels, breaks=colour_scale$breaks, guide = "legend") +
+          labs(colour="Class")
+        cat("\n\n", strrep("#", length(section_hierarchy)+1), " MA\n\n", sep="")
+        do_plot(pl,
+                label="MA",
+                caption=paste0("MA plot of ", tooltip(md, comparison_id), "-differential ", rowNoun,"s for ",mtag(model_id), " in ", dtag(dataset_id)),
+                preview=first,
+                plot_meta=section_hierarchy,
+                dpi=150, interactive=FALSE
+                )
+        first <- FALSE
+        cat("\n\n---\n\n")
       }
-      pl <- pl+ggrepel::geom_text_repel(size=3, data=res[ind,], show.legend = FALSE) 
-      pl <- pl +
-        scale_colour_identity(labels=colour_scale$labels, breaks=colour_scale$breaks, guide = "legend") +
-        labs(colour="Class")
-      do_plot(pl,
-              label="MA",
-              caption=paste0("MA plot of ", tooltip(md, comparison_id), "-differential ", rowNoun,"s for ",mtag(model_id), " in ", dtag(dataset_id)),
-              preview=first,
-              plot_meta=section_hierarchy,
-              dpi=150, interactive=FALSE
-              )
-      first <- FALSE
-      cat("\n\n---\n\n")
       nice_legends <- separate_legend(ddsList[[dataset_id]])
       pl <- do.call(gridExtra::arrangeGrob,c(
         nice_legends,
         ncol=ceiling(sqrt(length(nice_legends)))))
+      cat("\n\n", strrep("#", length(section_hierarchy)+1), " Heatmap\n\n", sep="")
       do_plot(pl,
               label= "legend-a",
               caption=paste("Metadata colour-codings for",
@@ -471,8 +481,37 @@ for (dataset_id in names(dds_model_comp)) {
         df=pdat,
         col=metadata(colData(this_dds))$palette$Heatmap[names(pdat)],
         show_legend=FALSE)
+      colname_annot <- HeatmapAnnotation(
+        labels1 = anno_text(colnames(tidied_data$mat)),
+        height=unit(1, "inches")
+      )
+      mat_height <- height_scaler(n=nrow(tidied_data$mat), small=10, big=20, N=1000)
+      hmap <- function(ind) {
+        ComplexHeatmap::Heatmap(
+        tidied_data$mat[ind,,drop=FALSE],
+        height = unit(5, "mm")*length(ind),
+        col=sym_colour(na.omit(as.vector(tidied_data$mat))),
+        heatmap_legend_param = list(direction = "horizontal" ),
+        name=comparison_id,
+        cluster_columns = FALSE,
+        show_column_names = TRUE,
+        clustering_distance_rows=param$get("clustering_distance_rows"),
+        column_split = col_split,
+        top_annotation = ha,
+        row_names_gp = gpar(fontsize = 6),
+        show_row_names = nrow(tidied_data$mat)<100)
+      }
+      ## hx <- c(1,1000)
+      ## hy <- sapply(hx, function(n) {
+      ##   pdf(NULL)
+      ##   d <- draw(hmap(rep(1,n)))
+      ##   out <- convertHeight(sum(component_height(d)) + unit(4, "mm"), "inch", valueOnly = TRUE)
+      ##   dev.off()
+      ##   out
+      ##   })
       pl <- ComplexHeatmap::Heatmap(
         tidied_data$mat,
+#        height = unit(5, "mm")*nrow(tidied_data$mat),
         col=sym_colour(na.omit(as.vector(tidied_data$mat))),
         heatmap_legend_param = list(direction = "horizontal" ),
         name=comparison_id,
@@ -489,22 +528,27 @@ for (dataset_id in names(dds_model_comp)) {
               plot_meta=section_hierarchy,
               height_opt=paste0(
                 "#| fig-height: ",
-                height_scaler(n=nrow(tidied_data$mat), small=5, big=20, N=1000))
+                mat_height 
+              )
               )
       cat('\n\n---\n\n')
     
       all_clusters <- list()
       cluster_ind <- counter(post_fn=to_letter)
-      if (is_null(plot_formulae)) next
+      if (is_null(plot_formulae)) {
+              cat(':::\n\n')
+              next
+      }
       partials <- partialise.matrix(
         assay(ddsList[[dataset_id]][is_significant,,drop=FALSE], ifelse(inherits(this_dds, "DESeqDataSeq"),"vst", 1)),
         as.data.frame(colData(ddsList[[dataset_id]])),
         fml=md$model$design)
+      cat("\n\n", strrep("#", length(section_hierarchy)+1), " Profile\n\n", sep="")
       for (plot_id in names(plot_formulae)) {
         plot_fml <- plot_formulae[[plot_id]]
         if (! "name" %in% names(attributes(plot_fml))) attr(plot_fml, "name") <- plot_id
         section_hierarchy$plot_config <- attr(plot_fml, "name")
-        dmc_heading(dds_model_comp, dataset=dataset_id, model=model_id, plot=plot_fml, depth=strrep("#", length(section_hierarchy)))
+        dmc_heading(dds_model_comp, dataset=dataset_id, model=model_id, plot=plot_fml, depth=strrep("#", length(section_hierarchy)+2), numbered=FALSE)
         cdata_df <- as.data.frame(colData(ddsList[[dataset_id]])[, all.vars(plot_fml), drop=FALSE])
         mat <- t(scale(t(
           assemble_partialised(partials, update(plot_fml, NULL ~ .), resids=TRUE)
@@ -568,6 +612,7 @@ for (dataset_id in names(dds_model_comp)) {
         }
         cat('\n\n---\n\n')
       }
+      cat(':::\n\n')
     }
   }
 }

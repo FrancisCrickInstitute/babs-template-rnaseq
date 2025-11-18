@@ -1,0 +1,29 @@
+<!-- Wide Mode Toggle Button -->
+<button id="wide-toggle" style="position: fixed; top: 1rem; right: 1rem; z-index: 999;">
+  Toggle wide
+</button>
+
+<!-- Wide Mode JavaScript -->
+<script>
+ window.addEventListener("DOMContentLoaded", function () {
+     const btn = document.getElementById("wide-toggle");
+     if (!btn) return;
+     btn.addEventListener("click", function () {
+	 document.body.classList.toggle("wide-mode");
+     });
+ });
+</script>
+
+<!-- Wide Mode CSS -->
+<style>
+ .wide-mode #quarto-content {
+     max-width: 100% !important;
+     width: 100% !important;
+     margin: 0 auto !important;
+ }
+
+ .wide-mode .sidebar,
+ .wide-mode .margin-sidebar {
+     display: none !important;
+ }
+</style>

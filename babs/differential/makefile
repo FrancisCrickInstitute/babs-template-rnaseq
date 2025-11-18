@@ -79,6 +79,9 @@ html_reports=$(strip $(foreach section,$(sections),$($(section)_htmls)))
 css=$(patsubst $(source_dir)/css/%,$(staging_dir)/%,$(wildcard $(source_dir)/css/*.css))
 $(css): $(staging_dir)/% : $(source_dir)/css/%
 	cp $< $@
+includes=$(patsubst $(source_dir)/html/%,$(staging_dir)/%,$(wildcard $(source_dir)/html/*.html))
+$(includes): $(staging_dir)/% : $(source_dir)/html/%
+	cp $< $@
 
 ifeq ($(NEED_SBATCH),false)
     ifeq ($(NEED_CONTAINER),false)
@@ -128,7 +131,7 @@ $(qmds) : $(staging_dir)/%.qmd : $(staging_dir)/$(VERSION).params.yml $(source_d
 	sed -i -e 's#choose_staging("$(section)")#"$(staging_dir)/$*"#' $@
 
 
-$(staging_dir)/_quarto.yml: $(source_dir)/_quarto.yml $(qmds) $(css)
+$(staging_dir)/_quarto.yml: $(source_dir)/_quarto.yml $(qmds) $(css) $(includes)
 	echo 'alignment: [$(subst $(space),$(comma)$(space),$(alignments))]' > ${staging_dir}/_sidebar.yml
 	echo 'spec: [null,$(subst $(space),$(comma)$(space),$(specfiles))]' >> ${staging_dir}/_sidebar.yml
 	echo 'section: [$(subst $(space),$(comma)$(space),$(sections))]' >> ${staging_dir}/_sidebar.yml
