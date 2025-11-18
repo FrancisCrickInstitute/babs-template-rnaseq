@@ -15,15 +15,38 @@
 </script>
 
 <!-- Wide Mode CSS -->
-<style>
- .wide-mode #quarto-content {
-     max-width: 100% !important;
-     width: 100% !important;
-     margin: 0 auto !important;
+<style> 
+ /* 1. HIDE THE SIDEBARS */
+ /* Target the LEFT navigation sidebar by its ID */
+ .wide-mode #quarto-sidebar {
+     display: none !important;
  }
 
- .wide-mode .sidebar,
- .wide-mode .margin-sidebar {
+ /* Target the RIGHT margin sidebar (Table of Contents) by its ID/Class */
+ .wide-mode #quarto-margin-sidebar {
+     display: none !important;
+ }
+
+ /* 2. MAKE THE MAIN CONTENT FULL WIDTH */
+ /* Target the MAIN content area (the <main> tag) which has the ID #quarto-document-content */
+ .wide-mode #quarto-document-content {
+     /* Remove the max-width restriction applied by Quarto/Bootstrap */
+     max-width: none !important; 
+     width: 100% !important;
+     margin: 0 auto !important; 
+ }
+
+ /* 3. RESET THE MAIN GRID CONTAINER */
+ /* This is crucial. The main container defines the columns. By setting the columns 
+    to 1fr, the sidebars disappear and the content expands. */
+ .wide-mode #quarto-content {
+     grid-template-columns: 1fr !important; /* Force a single column layout */
+     padding-left: 2rem !important;
+     padding-right: 2rem !important;
+ }
+
+ /* Optional: Hide the collapse-item glass that appears when the sidebar collapses */
+ .wide-mode #quarto-sidebar-glass {
      display: none !important;
  }
 </style>
