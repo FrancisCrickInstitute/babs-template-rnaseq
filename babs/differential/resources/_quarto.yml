@@ -16,6 +16,8 @@ filters:
 format:
   html:
     theme: cosmo
+    lightbox: true
     toc: true
     css:
       - styles.css
+    include-before-body: wide-toggle.html
