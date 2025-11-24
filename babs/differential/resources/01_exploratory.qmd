@@ -447,7 +447,6 @@ for (dataset_id in names(ddsList)) {
                          )
       }
       my_caption <- paste0(which_assay, " in ",  dtag(dataset_id), removed)
-#      cat(var_heading("Heatmaps",depth=1+length(section_hierarchy)))
       cat('\n\n::: {.panel-tabset .unnumbered group="explot"}\n\n')
       cat("\n\n", strrep("#", length(section_hierarchy)+1), " Heatmap\n\n", sep="")
       top <- order(
@@ -522,7 +521,6 @@ for (dataset_id in names(ddsList)) {
               )
       
       cat("\n\n---\n\n")
-#      cat(var_heading("Cluster centroids",depth=1+length(section_hierarchy)))
       cat("\n\n", strrep("#", length(section_hierarchy)+1), " Profiles\n\n", sep="")     
       cc <- cluster_calc(hmap_data, clusterID=gene_clust$clusters)
       centroid_df <- cbind(cc, colDat[model_vars]) %>%
@@ -564,7 +562,6 @@ for (dataset_id in names(ddsList)) {
       )
       cat("\n\n---\n\n")
 
-#      cat(var_heading("Principal Component",depth=1+length(section_hierarchy)))
       cat("\n\n", strrep("#", length(section_hierarchy)+1), " 2PC\n\n", sep="")
       my_pc <- prcomp(
         t(this_assay[,this_dds$.influential]),
@@ -600,7 +597,6 @@ for (dataset_id in names(ddsList)) {
 
 #### 1D PC plots
       cat("\n\n", strrep("#", length(section_hierarchy)+1), " 1PC\n\n", sep="")
-#      cat(var_heading("Associated PCs against covariates", depth=1+length(section_hierarchy)))
       covar_x_pc <- mat_x_terms(proj, design, colDat)
       pl <- ggplot(covar_x_pc, aes(x = column, y = Covariate, fill = Assoc)) + 
        geom_raster() +

@@ -137,7 +137,6 @@ map_dmc <- function(data, f, depth="comparison",...) {
 
 
 
-all_identical <- function(obj)  {all(sapply(obj, function(x) identical(x, obj[[1]])))}
 
 #' Descend a result-tree
 #'
@@ -171,7 +170,7 @@ results_apply <- function(object, dataset, model, comparison, fn, depth="compari
           function(comp) results_apply(object, dataset, model, comp, fn, depth)
         )
         if (depth != "comparison") {
-          if (all_identical(ret)) {
+          if (all(sapply(ret, function(x) identical(x, ret[[1]])))) {
             ret <- ret[[1]]
           } else {
             stop("Summarising at the level of ", depth, " but some comparisons are different")
@@ -250,21 +249,6 @@ comparison_name <- function(dds) {
 
 
 
-#' @export
-dmc2frame <- function(dmc) {
-  df_rows <- map_dmc(dmc, function(x) {
-    data.frame(dataset=dataset_name(x),
-               model=model_name(x),
-               comparison=comparison_name(x))
-  })
-  df <- unlist(unlist(df_rows, recursive=FALSE), recursive=FALSE)
-  dds <- unlist(unlist(dmc, recursive=FALSE), recursive=FALSE)[names(df)]
-  df <- do.call(rbind, df)
-  df$dds <- dds
-  df
-}
-
-
 
 
 ##' rbind nested lists of data-frames
@@ -328,15 +312,6 @@ choose_staging <- function(resource, staging="staging") {
   }
 }
 
-nclust <- function(npclust, universe=1) {
-  if (npclust<1) {
-    # gene_clust is proportion of genelist
-    floor(universe * npclust)
-  } else {
-    npclust
-  }
-}
-
 
 
 section_chooser <- function(obj, ...) {
@@ -373,52 +348,7 @@ noun_to_readout <- function(noun) {
   default
 }
 
-## eval_dds <- function(dds, expr, assays=assayNames(dds)) {
-##   df_env <- new.env()
-##   df_env$df <- as.data.frame(colData(dds))
-##   for (a in assays) {
-##     assign(a, function(transform=identity) {
-##       (df_env$df %>% transform)[[a]]
-##     },
-##     envir=df_env)
-##   }
-##   sapply(
-##     1:nrow(dds),
-##     function(i) {
-##       for (a in assays) df_env$df[[a]] <- as.vector(assay(dds[i,], a))
-##       eval_tidy(expr, env=df_env)
-##     }
-##   )
-## }
 
-eval_dds <- function(dds, expr, assays = assayNames(dds)) {
-  df_env <- new.env()
-  df_env$df <- as.data.frame(colData(dds))
-
-  # Cache each assay matrix mentioned in expr in a list
-  assays <- intersect(assays, all.names(expr))
-  assay_mats <- lapply(setNames(assays, assays),function(a) assayPlus(dds, a))
-
-  # Define an accessor function per assay
-  for (a in assays) {
-    assign(a, function(transform = identity) {
-      (df_env$df %>% transform)[[a]]
-    }, envir = df_env)
-  }
-
-  # Preallocate result vector
-  res <- logical(nrow(dds))
-
-  for (i in seq_len(nrow(dds))) {
-    # Set each assay vector directly from the cached matrix
-    for (a in assays) {
-      df_env$df[[a]] <- assay_mats[[a]][i, ]
-    }
-    res[[i]] <- rlang::eval_tidy(expr, env = df_env)
-  }
-
-  res
-}
 
 assayPlus <- function(dds, i) {
   if (is.numeric(i) || i %in% assayNames(dds)) {
@@ -454,17 +384,6 @@ formula_equal <- function(f1, f2) {
   setequal(t1, t2)
 }
 
-expr_to_list <- function(x, aliases = c("list", "specification", "sample_set", "model", "settings", "mutate" )) {
-  if (is.call(x) && deparse(x[[1]]) %in% aliases) {
-    # It's a list-like call → recursively process elements
-    out <- lapply(as.list(x[-1]), expr_to_list, aliases = aliases)
-    names(out) <- names(x)[-1]
-    out
-  } else {
-    # Leaf: deparse to string
-    paste(deparse(x), collapse = "")
-  }
-}
 
 top_true <- function(is_in, stat, n, sym=TRUE) {
       ind <- which(is_in)[order(stat[is_in])]

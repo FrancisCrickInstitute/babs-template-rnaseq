@@ -1319,15 +1319,6 @@ replace_emmc <- function(expr, replacements, prefix="my") {
 }
 
 
-pre_tidy_wrap <- function(dds, meta_list="drop") {
-  if (meta_list=="drop") {
-    rowData(dds) <- rowData(dds)[sapply(rowData(dds), . %>% dim %>% is.null)]
-    colData(dds) <- colData(dds)[sapply(colData(dds), . %>% dim %>% is.null)]
-    dds
-  } else if (meta_list=="expand") {
-  }
-}
-
 removeLow <- function(ddsList, preserve_across=TRUE, baseMeanMin) {
   is_des <- sapply(ddsList, inherits, "DESeqDataSet")
   if (preserve_across) {
@@ -1449,4 +1440,45 @@ data_key <- function(plot_fml, dds, meta="exploratory_default_assay") {
   }
   design_fml <- design(dds)
   setNames(list(paste(sort(attr(terms(design_fml), "term.labels")), collapse="+")), yvar)
+}
+
+expr_to_list <- function(x, aliases = c("list", "specification", "sample_set", "model", "settings", "mutate" )) {
+  if (is.call(x) && deparse(x[[1]]) %in% aliases) {
+    # It's a list-like call → recursively process elements
+    out <- lapply(as.list(x[-1]), expr_to_list, aliases = aliases)
+    names(out) <- names(x)[-1]
+    out
+  } else {
+    # Leaf: deparse to string
+    paste(deparse(x), collapse = "")
+  }
+}
+
+eval_dds <- function(dds, expr, assays = assayNames(dds)) {
+  df_env <- new.env()
+  df_env$df <- as.data.frame(colData(dds))
+
+  # Cache each assay matrix mentioned in expr in a list
+  assays <- intersect(assays, all.names(expr))
+  assay_mats <- lapply(setNames(assays, assays),function(a) assayPlus(dds, a))
+
+  # Define an accessor function per assay
+  for (a in assays) {
+    assign(a, function(transform = identity) {
+      (df_env$df %>% transform)[[a]]
+    }, envir = df_env)
+  }
+
+  # Preallocate result vector
+  res <- logical(nrow(dds))
+
+  for (i in seq_len(nrow(dds))) {
+    # Set each assay vector directly from the cached matrix
+    for (a in assays) {
+      df_env$df[[a]] <- assay_mats[[a]][i, ]
+    }
+    res[[i]] <- rlang::eval_tidy(expr, env = df_env)
+  }
+
+  res
 }

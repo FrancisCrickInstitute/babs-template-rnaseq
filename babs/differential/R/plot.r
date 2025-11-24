@@ -54,25 +54,6 @@ sym_colour <- function(dat, lo="blue",zero="white", hi="red", single=FALSE, bina
   }
 }
 
-
-
-get_terms <- function(dds) {
-  ret <- list(fixed=NULL, groups=NULL)
-  if ("model" %in% names(metadata(dds))) {
-    ret$fixed <- all.vars(metadata(dds)$model$design)
-    return(ret)
-  } else {
-    term_list <- lapply(metadata(dds)$models, function(mdl) {all.vars(mdl$design)})
-    ret$fixed <- unique(unlist(term_list))
-  }
-  return(ret)
-}
-
-part.resid <- function(fit) {
-  pterms <- predict(fit, type="terms")
-  apply(pterms,2,function(x)x+resid(fit))
-}
-  
   
 
 rename_with_tag <- function(params) {
@@ -223,30 +204,6 @@ rasterize_points <- function(p, dpi = 150) {
 }
 
 
-residual_heatmap_transform <- function(mat, cdata, fml) {
-  assign("tmat", t(mat), envir=environment(fml))
-  fml <- stats::update(fml, tmat ~ .)
-  fit <- lm(fml, data=cdata)
-  fit1 <- fit
-  class(fit1) <- "lm"
-  ind <- c("coefficients","residuals","effects","fitted.values")
-  for (i in 1:nrow(mat)) {
-    if (nrow(mat)==1) {
-      fit1 <- fit
-    } else {
-      fit1[ind] <- lapply(fit[ind], function(x) x[,i])
-    }
-    pred <- predict(fit1, type="terms")
-    if (i==1) {
-      out <- array(0, c(rev(dim(mat)), ncol(pred)), dimnames=c(rev(dimnames(mat)), list(colnames(pred))))
-      const <- numeric(dim(out)[2])
-    }
-    out[,i,] <- pred
-    const[i] <- attr(pred, "constant")
-  }
-  list(terms=out, const=const, resid=fit$residuals)
-}
-
 
 separate_legend <- function(dds, vars=unique(unlist(lapply(metadata(dds)$models, function(x) all.vars(x$design))))) {
   lapply(
@@ -314,18 +271,6 @@ my_alpha_scale <- function(pl, decay=0.3) {
   scale_alpha_manual(values = setNames(rev((decay)^(seq_along(fac_levels)-1)), fac_levels))
 }
 
-facet_aes <- function(pl, mapping) {
-  if ("wrap" %in% names(mapping)) {
-    wrap_var <- mapping$wrap
-    pl <- pl + facet_wrap(vars(!!wrap_var)) 
-  }
-  if (all(c("grid_x", "grid_y") %in% names(mapping))) {
-    grid_x <- mapping$grid_x
-    grid_y <- mapping$grid_y
-    pl <- pl + facet_grid(vars(!!grid_x), vars(!!grid_y)) 
-  }
-  pl
-}
 
 sort_vars <- function(x, target) {
   targets <- all.vars(target)

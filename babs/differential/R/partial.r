@@ -120,24 +120,3 @@ assemble_partialised <- function(obj, reduced, extra=NULL, resids=TRUE) {
     rowSums(obj$terms[, , terms, drop=FALSE], na.rm=TRUE, dims=2) +
       (if(resids) obj$resid else 0))
 }
-
-##' Get the 'aesthetic' terms that will be requested from a qc formula
-##'
-##' The LHS of a qc formula lists the aesthetics that will be
-##' highlighted in a plot: this function lists them.
-##' @param fml
-##' @return
-##' @author Gavin Kelly
-get_lhs <- function(fml) {
-  if (is.list(fml)) {
-    unique(unlist(lapply(fml, get_lhs)))
-  } else {
-    lhs <- strsplit(as.character(fml)[[2]], " *\\+ *")[[1]]
-    if (fml[[2]]==0) {
-      attr(lhs, "strategy") <- "retain"
-    } else {
-      attr(lhs, "strategy") <- "regress"
-    }
-    lhs
-  }
-}

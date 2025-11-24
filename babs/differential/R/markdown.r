@@ -1,62 +1,3 @@
-
-
-if (include_from_package <- FALSE) {
-
-##' Link GT tables to a csv file
-##'
-##' To be used in a `GT` pipeline, it will store the underlying table
-##' data in a csv file under the given name, and insert a link in the
-##' table's caption that points to the csv file.
-##' @title Link GT tables to a csv file
-##' @param data The GT object with a caption set
-##' @param name The filename of the csv
-##' @return Th GT object (invisibly)
-##' @author Gavin Kelly
-#' @export
-tab_link_caption <- function(data,name) {
-  if (missing(name)) {
-    heading <- gt:::dt_heading_get(data)
-    name <- paste(heading$title, heading$subtitle)
-  }
-  caption <- gt:::dt_options_get_value(data = data, option = "table_caption")
-  fname <- knitr::fig_path("csv", number=name)
-  if (!file.exists(dirname(fname))) dir.create(dirname(fname), recursive=TRUE)
-  write.csv(gt:::dt_data_get(data), file=fname)
-  data <- gt:::dt_options_set_value(
-    data,
-    "table_caption",
-    paste0("[", caption, "](", fname, ")")
-  )
-  invisible(data)
-}
-
-
-##' Generate multiple captions per chunk
-##'
-##' To be used in a `GT` pipeline. Before the call to `gt` to
-##' suffix the chunk label to make the caption unique, and once after
-##' to reset the chunk label to its default
-##' 
-##' @title Multiple GT tables per chunk
-##' @param data The GT object
-##' @param label The text that uniquely identifies this table amongst others in the chunk
-##' @return Th GT object (invisibly)
-##' @author Gavin Kelly
-#' @export
-bookdown_label <- function(data, label="") {
-  current <- knitr::opts_current$get('label')
-  if ("chunk" %in% names(attributes(data))) {
-    knitr::opts_current$set(label=attr(data, "chunk"))
-  } else {
-    attr(data, "chunk") <- current
-    knitr::opts_current$set(label=paste(current, label, sep="-"))
-  }
-  invisible(data)
-}
-    
-    
-
-}
 load_params <- function(script) {
     script_params <- knitr::knit_params(readLines(paste0(script,".qmd"))) %>%
       {setNames(lapply(., "[[", "value"), sapply(., "[[", "name"))}
@@ -180,9 +121,6 @@ dmc_factory <- function(obj, type, report=report_span) {
 }
 
 
-var_heading <- function(..., depth) {
-  paste0('\n\n', strrep("#", depth), " ",  paste0(...), '\n\n')
-}
 
 profile_to_string <- function(fml) {
   mapping <- eval(fml[[2]])
