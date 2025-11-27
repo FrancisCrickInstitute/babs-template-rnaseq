@@ -1,20 +1,22 @@
+#' @export
 load_params <- function(script) {
     script_params <- knitr::knit_params(readLines(paste0(script,".qmd"))) %>%
       {setNames(lapply(., "[[", "value"), sapply(., "[[", "name"))}
   }
 
-##' Produce quarto headings corresponding to the data/model hierarchy
-##'
-##' Create markdown headings at a given level for either a dataset or
-##' a model. Use the short name, long name, and description as appropriate.
-##' @param obj Either a list of DESeqDataSet objects, or a Data/Model/Comparison hierarchy
-##' @param dataset The name of the dataset to use.
-##' @param model If the model is to be used to generate the heading info, give the name.
-##' @param depth A string denoting the markdown heading prefix
-##' @param numbered Do the headings need to be numbered
-##' @param describe Print the description text as the first paragraph of the section?
-##' @return A markdown string
-##' @author Gavin Kelly
+#' Produce quarto headings corresponding to the data/model hierarchy
+#'
+#' Create markdown headings at a given level for either a dataset or
+#' a model. Use the short name, long name, and description as appropriate.
+#' @param obj Either a list of DESeqDataSet objects, or a Data/Model/Comparison hierarchy
+#' @param dataset The name of the dataset to use.
+#' @param model If the model is to be used to generate the heading info, give the name.
+#' @param depth A string denoting the markdown heading prefix
+#' @param numbered Do the headings need to be numbered
+#' @param describe Print the description text as the first paragraph of the section?
+#' @return A markdown string
+#' @author Gavin Kelly
+#' @export
 dmc_heading <- function(obj, dataset=1, model=NULL, comparison=NULL, plot=NULL, depth="##", numbered=TRUE, describe=TRUE) {
   heading <- paste0("\n\n", depth)
   text <- ""
@@ -92,10 +94,12 @@ dmc_heading <- function(obj, dataset=1, model=NULL, comparison=NULL, plot=NULL, 
   cat(paste0(heading, "\n\n", text, "\n\n"))
 }
 
+#' @export
 report_span <- function(id, type, name="", description="" ) {
   sprintf("%s '%s'", type, id)
   }
 
+#' @export
 dmc_factory <- function(obj, type, report=report_span) {
   is_dmc <- is.list(obj[[1]])
   if (is_dmc) {
@@ -144,6 +148,7 @@ profile_to_string <- function(fml) {
 }
 
   
+#' @export
 tooltip <- function(md, text="") {
   if ("tooltip" %in% names(attributes(md$comparison))) {
     if (text=="") {

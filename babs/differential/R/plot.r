@@ -1,50 +1,4 @@
-##' Heatmap colour-scheme generator
-##'
-##' For each column in a dataframe, generate a sensible colour palette
-##' for each column
-##' @param df data.frame containing the covariates to be colour-encoded
-##' @param palette The baseline palette
-##' @return
-##' @author Gavin Kelly
-df2colorspace <- function(df, palette) {
-  pal <- RColorBrewer::brewer.pal(RColorBrewer::brewer.pal.info[palette, "maxcolors"], palette)
-  if (ncol(df)==0) return(list(Heatmap=list(), ggplot=list()))
-  df <- dplyr::mutate_if(as.data.frame(df), is.character, as.factor)
-  seq_cols <-c("Blues", "Greens", "Oranges", "Purples", "Reds")
-  df <- df[,order(sapply(df, is.numeric)),drop=FALSE] # move factors to the front
-  # for factors, zero-based starting index for colours
-  start_levels <- cumsum(c(0,sapply(df, nlevels)))[1:length(df)] 
-  is_num <- sapply(df, is.numeric)
-  # for numerics, which seq palette shall we use for this factor
-  start_levels[is_num] <- (cumsum(is_num[is_num])-1) %% length(seq_cols) + 1
-  res <- list()
-  res$Heatmap <- purrr::map2(df, start_levels,
-              function(column, start_level) {
-                if (is.factor(column)) {
-                  setNames(pal[(seq(start_level, length=nlevels(column)) %% length(pal)) + 1],
-                                     levels(column))
-                } else {
-                  my_cols <- RColorBrewer::brewer.pal(3, seq_cols[start_level])[-2]
-                  circlize::colorRamp2(range(column, na.rm=TRUE), my_cols)
-                }
-              }
-              )
-  res$Heatmap$.influential <- setNames(c("black", "white"), c(TRUE, FALSE))
-  res$ggplot <- purrr::map2(df, start_levels,
-              function(column, start_level) {
-                if (is.factor(column)) {
-                  setNames(pal[(seq(start_level, length=nlevels(column)) %% length(pal)) + 1],
-                                     levels(column))
-                } else {
-                  RColorBrewer::brewer.pal(3, seq_cols[start_level])[-2]
-                }
-              }
-              )
-  res$ggplot$.influential <- setNames(c("black", "white"), c(TRUE, FALSE))
-  res
-}
-  
-
+#' @export
 sym_colour <- function(dat, lo="blue",zero="white", hi="red", single=FALSE, binary=FALSE) {
   mx <- quantile(abs(dat), 0.9)
   if (single) {
@@ -56,6 +10,7 @@ sym_colour <- function(dat, lo="blue",zero="white", hi="red", single=FALSE, bina
 
   
 
+#' @export
 rename_with_tag <- function(params) {
   function(path, options) {
     path2 <- file.path(dirname(path), gsub("([0-9]+)-fig-(.*)-1\\.(.*)", paste0("fig-\\1-\\2", params$TAG, ".\\3"), basename(path)))
@@ -64,19 +19,20 @@ rename_with_tag <- function(params) {
   }
 }
 
-##' Generate captioned plot
-##'
-##' quarto-compatible plot wrapper
-##'
-##' Either produce a child chunk (labelled so that it can be cross-references),
-##' or open the default graphics device, depending on whether the document is being
-##' rendered or run interactively.
-##' @param pl A plot object, from ggplot, plot or ComplexHeatmap
-##' @param label The candidate chunk label, which will get sanitised
-##' @param caption The caption text
-##' @param cap_fn The function that will be called on the caption text
-##' @return 
-##' @author Gavin Kelly
+#' Generate captioned plot
+#'
+#' quarto-compatible plot wrapper
+#'
+#' Either produce a child chunk (labelled so that it can be cross-references),
+#' or open the default graphics device, depending on whether the document is being
+#' rendered or run interactively.
+#' @param pl A plot object, from ggplot, plot or ComplexHeatmap
+#' @param label The candidate chunk label, which will get sanitised
+#' @param caption The caption text
+#' @param cap_fn The function that will be called on the caption text
+#' @return 
+#' @author Gavin Kelly
+#' @export
 plot_tracker <- function(my_params) {
   script <- tools::file_path_sans_ext(basename(my_params$script))
   plot_list <- list()
@@ -205,6 +161,7 @@ rasterize_points <- function(p, dpi = 150) {
 
 
 
+#' @export
 separate_legend <- function(dds, vars=unique(unlist(lapply(metadata(dds)$models, function(x) all.vars(x$design))))) {
   lapply(
     intersect(vars, names(metadata(colData(dds))$palette$Heatmap)),
@@ -220,6 +177,7 @@ separate_legend <- function(dds, vars=unique(unlist(lapply(metadata(dds)$models,
   )
 }
 
+#' @export
 substitute_x_aes <- function(mapping, excludes=c("", "group", "data_id", "tooltip", "extra")) {
   # x aesthetic about to be used to represent e.g. PC1 so may need to
   # remap what was being represented by x to another
@@ -237,6 +195,7 @@ substitute_x_aes <- function(mapping, excludes=c("", "group", "data_id", "toolti
   out
 }
   
+#' @export
 aes_caption <- function(ae) {
   ae <- ae[intersect(c("colour","shape", "fill"), names(ae))]
   if (length(ae)>0) {
@@ -247,6 +206,7 @@ aes_caption <- function(ae) {
 }
 
 
+#' @export
 cluster_calc <- function(mat, clusterID, relevel=TRUE) {
   if (relevel) {
     tbl <- table(clusterID)
@@ -261,6 +221,7 @@ cluster_calc <- function(mat, clusterID, relevel=TRUE) {
   }
 }
 
+#' @export
 my_alpha_scale <- function(pl, decay=0.3) {
   mapping <- pl$mapping$alpha
   if (is.null(mapping)) {
@@ -272,6 +233,7 @@ my_alpha_scale <- function(pl, decay=0.3) {
 }
 
 
+#' @export
 sort_vars <- function(x, target) {
   targets <- all.vars(target)
   if (length(targets)!=0) {
@@ -282,6 +244,7 @@ sort_vars <- function(x, target) {
 }
 
 
+#' @export
 modify_mapping <- function(aes_obj) {
   aes_obj <- handle_flag_aes(aes_obj)
   if (!is.null(aes_obj$tooltip)) return(aes_obj)
@@ -316,6 +279,7 @@ handle_flag_aes <- function(aes_obj) {
 }
 
 
+#' @export
 get_colour_scales <- function(dds, mapping, flag_vars=character()) {
   colour_by <- setdiff(all.vars(eval(mapping)$colour), flag_vars)
   scale_out <- list()
@@ -344,6 +308,7 @@ get_colour_scales <- function(dds, mapping, flag_vars=character()) {
   scale_out
 }
 
+#' @export
 height_scaler <- function(n, small, big, N) {
         h <- small +(big-small)*(n-1)/(N-1)
         min(h, big)

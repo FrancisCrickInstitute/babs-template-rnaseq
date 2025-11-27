@@ -1,7 +1,6 @@
-## *** Useful Functions
-
 # e.g. set grp=whole_cell, denominator=fraction=="cyt", to implement nuc/cyt
 #     or grp=whole_cell, numerator=fraction!="cyt", to implement nuc/(nuc+cyt)
+
 norm_within <- function(df, grp, denominator, numerator, adj=0.01) {
   ret <- NA
   if (!missing(denominator)) {
@@ -26,7 +25,7 @@ norm_within <- function(df, grp, denominator, numerator, adj=0.01) {
   ret
 }
 
-
+#' @export
 load_specs <- function(file="", context) {
   if (file.exists(file.path("extdata",file))) {
     df <- as.data.frame(colData(context))
@@ -109,16 +108,16 @@ load_specs <- function(file="", context) {
   specs
 }
 
-##' Recode nested factors to avoid matrix-rank problems
-##'
-##' Following the suggestion in the DESeq2 vignette, recode nested factors so that
-##' they take common values in different clusters to avoid rank problems
-##' @title Recode nested factors
-##' @param inner A factor representing the variable to be recoded, e.g. the cell-line
-##' @param ... The parent factors that 'inner' is inside, e.g. the genotype of the cell-line
-##' @return A factor with recoded levels
-##' @author Gavin Kelly
-##' @export
+#' Recode nested factors to avoid matrix-rank problems
+#'
+#' Following the suggestion in the DESeq2 vignette, recode nested factors so that
+#' they take common values in different clusters to avoid rank problems
+#' @title Recode nested factors
+#' @param inner A factor representing the variable to be recoded, e.g. the cell-line
+#' @param ... The parent factors that 'inner' is inside, e.g. the genotype of the cell-line
+#' @return A factor with recoded levels
+#' @author Gavin Kelly
+#' @export
 recode_within <- function(inner, ...) {
   within <- do.call(interaction, alist(...))
   tab <- table(inner, within)!=0 # which batches are in which nest
@@ -131,9 +130,6 @@ recode_within <- function(inner, ...) {
 }
 
 
-## default_names <- function(obj, prefix="", offset=0) {
-##   ifelse(names(obj)=="", paste0(prefix, seq_along(obj)+offset), names(obj))
-##   }
 
 default_namer <- function() {
   offsets <- list() 
@@ -145,16 +141,16 @@ default_namer <- function() {
   }
 }
 
-##' Expand an analysis specification into its corresponding subset list
-##'
-##' Generate a list of DESeq2 objects corresponding to the different
-##' subsets specified
-##' @title Generate subsets of DESeq2 object
-##' @param dds The original DESeq2 object containing all samples
-##' @param spec The analysis specificiation
-##' @return A list of DESeq2 objects
-##' @author Gavin Kelly
-##' @export
+#' Expand an analysis specification into its corresponding subset list
+#'
+#' Generate a list of DESeq2 objects corresponding to the different
+#' subsets specified
+#' @title Generate subsets of DESeq2 object
+#' @param dds The original DESeq2 object containing all samples
+#' @param spec The analysis specificiation
+#' @return A list of DESeq2 objects
+#' @author Gavin Kelly
+#' @export
 build_dds_list <- function(dds, spec) {
   # Function to recurse down the spec > sample_sets > models > comparisons hierarchy, and cascade down values of a given field as it encounters them.
   trickle_down <- function(field, to="comparisons", default=NULL, merge_fn=function(x,y) {if (is.null(x)) y else x}, obj=spec, current_level="spec"){
@@ -383,37 +379,18 @@ build_dds_list <- function(dds, spec) {
 }
 
 
-if(!isGeneric("design")) {
-  setGeneric("design", function(object,...){standardGeneric("design")})
-  setGeneric("design<-", function(object, value, ...){standardGeneric("design")})
-}
 
-#' @importFrom DESeq2 design
-#' @importFrom DESeq2 "design<-"
-setMethod("design", "SummarizedExperiment", function(object) {
-  metadata(object)$design
-})
-setReplaceMethod("design", signature(object="SummarizedExperiment", value="formula"), function(object, value) {
-  metadata(object)$design <- value
-  object
-})
-setReplaceMethod("design", signature(object="SummarizedExperiment", value="matrix"), function(object, value) {
-  metadata(object)$design <- value
-  object
-})
-
-
-##' Fit the models of expression
-##'
-##' Iterate through each model (stored in the 'models' metadata of a
-##' DESeqDataSet) and expand the contrasts so each contrast gets a
-##' separate nested level.
-##' @title Fit the DESeq2 models
-##' @param dds The original DESeq2 object containing all samples
-##' @param ...
-##' @return
-##' @author Gavin Kelly
-##' @export
+#' Fit the models of expression
+#'
+#' Iterate through each model (stored in the 'models' metadata of a
+#' DESeqDataSet) and expand the contrasts so each contrast gets a
+#' separate nested level.
+#' @title Fit the DESeq2 models
+#' @param dds The original DESeq2 object containing all samples
+#' @param ...
+#' @return
+#' @author Gavin Kelly
+#' @export
 fit_models <- function(dds, param, ...) {
   has_comparisons <- sapply(metadata(dds)$models, function(m) "comparisons" %in% names(m) && length(m$comparisons) > 0)
   model_comp <- lapply(
@@ -565,16 +542,16 @@ reduced_design.fit <- function(fit, reduced_design){
   limma::contrasts.fit(fit, contrast = cntrst)
 }
 
-##' Check model
-##'
-##' Run formula through an lm to check it
-##' @title Check model
-##' @param mdl 
-##' @param coldat 
-##' @param dds The original DESeq2 object containing all samples
-##' @return 
-##' @author Gavin Kelly
-##' @export
+#' Check model
+#'
+#' Run formula through an lm to check it
+#' @title Check model
+#' @param mdl 
+#' @param coldat 
+#' @param dds The original DESeq2 object containing all samples
+#' @return 
+#' @author Gavin Kelly
+#' @export
 check_model <- function(dds) {
   mdl <- metadata(dds)$model
   mdl$dropped <- FALSE
@@ -628,16 +605,16 @@ check_model <- function(dds) {
 }
 
 
-##' Post-hoc generator
-##'
-##' Wrap a formula so that emmeans can auto-expand it
-##' @title Mark a formula as a multiple comparison
-##' @param spec 
-##' @param ... 
-##' @param dds The original DESeq2 object containing all samples
-##' @return 
-##' @author Gavin Kelly
-##' @export
+#' Post-hoc generator
+#'
+#' Wrap a formula so that emmeans can auto-expand it
+#' @title Mark a formula as a multiple comparison
+#' @param spec 
+#' @param ... 
+#' @param dds The original DESeq2 object containing all samples
+#' @return 
+#' @author Gavin Kelly
+#' @export
 mult_comp <- function(spec, name=NULL, description=NULL, omnibus=FALSE, keep=TRUE, trend=FALSE, ...) {
   obj <- list(spec=spec, omni=omnibus, keep=keep, trend=trend, ...)
   class(obj) <- "post_hoc"
@@ -645,15 +622,14 @@ mult_comp <- function(spec, name=NULL, description=NULL, omnibus=FALSE, keep=TRU
   obj
 }
 
-##' Expand post-hoc comparisons
-##'
-##' Use emmeans to expand keywords
-##' @title Expand multiple comparisons into their contrasts
-##' @param dds The original DESeq2 object containing all samples
-##' @param spec 
-##' @return 
-##' @author Gavin Kelly
-##' @export
+#' Expand post-hoc comparisons
+#'
+#' Use emmeans to expand keywords
+#' @title Expand multiple comparisons into their contrasts
+#' @param dds The original DESeq2 object containing all samples
+#' @param spec 
+#' @return 
+#' @author Gavin Kelly
 emcontrasts <- function(dds, comp, prefix="my") {
   em_extra <- comp[setdiff(names(comp), c("spec", "keep", "LRT", "omni", "trend"))]
   mdl <- metadata(dds)$model
@@ -722,15 +698,15 @@ fitVoom <- function(model_dds, mdl) {
   fit
 }
 
-##' Fit an LRT model
-##'
-##' Insert the 'comparison' formula into the reduced slot
-##' @title Fit LRT
-##' @param dds The original DESeq2 object containing all samples
-##' @param reduced 
-##' @param ... 
-##' @return 
-##' @author Gavin Kelly
+#' Fit an LRT model
+#'
+#' Insert the 'comparison' formula into the reduced slot
+#' @title Fit LRT
+#' @param dds The original DESeq2 object containing all samples
+#' @param reduced 
+#' @param ... 
+#' @return 
+#' @author Gavin Kelly
 fitLRT <- function(dds, mdl, reduced, ...) {
   mdl <- metadata(dds)$model
   metadata(dds)$comparison <- reduced
@@ -819,18 +795,18 @@ fitContrastLRT <- function(dds, mdl_mat, contr, ...) {
 
 
 ## apply contrast, and transfer across interesting mcols from the dds
-##' Generate results object
-##'
-##' Insert results columns into mcols
-##' @title Generate the results for a model and comparison
-##' @param dds The original DESeq2 object containing all samples
-##' @param mcols 
-##' @param filterFun 
-##' @param lfcThreshold 
-##' @param ... 
-##' @return 
-##' @author Gavin Kelly
-##' @export
+#' Generate results object
+#'
+#' Insert results columns into mcols
+#' @title Generate the results for a model and comparison
+#' @param dds The original DESeq2 object containing all samples
+#' @param mcols 
+#' @param filterFun 
+#' @param lfcThreshold 
+#' @param ... 
+#' @return 
+#' @author Gavin Kelly
+#' @export
 get_result <- function(dds, mcols=c("symbol", "entrez"), filterFun=IHW::ihw, lfcThreshold=0, alpha=0.1, LRT_effect="default", ...) {
   if (is.null(filterFun)) filterFun <- rlang::missing_arg()
   comp <- metadata(dds)$comparison
@@ -974,14 +950,14 @@ get_result <- function(dds, mcols=c("symbol", "entrez"), filterFun=IHW::ihw, lfc
  make.names(names)
 }
 
-##' Tabulate genelists
-##'
-##' Get genelist sizes - up, down and classed
-##' @title Tabulate the size of the differential lists
-##' @param dds 
-##' @return 
-##' @author Gavin Kelly
-##' @export
+#' Tabulate genelists
+#'
+#' Get genelist sizes - up, down and classed
+#' @title Tabulate the size of the differential lists
+#' @param dds 
+#' @return 
+#' @author Gavin Kelly
+#' @export
 summarise_results <- function(dds) {
   res <- mcols(dds)$results
   as.data.frame(table(
@@ -994,7 +970,7 @@ summarise_results <- function(dds) {
     dplyr::arrange(desc(Significant/Total))
 }    
 
-
+#' @export
 tidy_significant_dds <- function(dds, ind = TRUE, columns=NULL, weights=NULL) {
   if (inherits(dds, "DESeqDataSet")) {
     mat <- assay(dds, "vst")[ind,,drop=FALSE]
@@ -1089,17 +1065,17 @@ retrieve_contrast <- function (object, expanded = FALSE, listValues=c(1,-1)) {
   contrast
 }
 
-##' Change a factor's reference level
-##'
-##' Rather than change the order of the levels, this changes the way
-##' the factor is parametrised, so that the levels are in the natural order
-##' but the coefficients can reflect experimental design considerations
-##' @title Rebase a factor's level
-##' @param x A factor to be rebased 
-##' @param lev The level of the factor that is to be regarded as the 'control' to which all others will be compared
-##' @return A factor with a new contrast attribute
-##' @author Gavin Kelly
-##' @export
+#' Change a factor's reference level
+#'
+#' Rather than change the order of the levels, this changes the way
+#' the factor is parametrised, so that the levels are in the natural order
+#' but the coefficients can reflect experimental design considerations
+#' @title Rebase a factor's level
+#' @param x A factor to be rebased 
+#' @param lev The level of the factor that is to be regarded as the 'control' to which all others will be compared
+#' @return A factor with a new contrast attribute
+#' @author Gavin Kelly
+#' @export
 rebase <- function(x, lev) {
   i <- which(levels(x)==lev)
   if (length(i)==0) {
@@ -1109,27 +1085,9 @@ rebase <- function(x, lev) {
   x
  }
 
-default_spec_settings <- function() {
-   list(         ## analysis parameters
-	alpha          = 0.01,    ## p-value cutoff
-	lfcThreshold   = 0,       ## abs lfc threshold
-	baseMeanMin    = 0,       ## discard transcripts with average normalised counts lower than this
-	top_n_variable = 500,     ## For PCA
-	showCategory   = 25,      ## For enrichment analyses
-	seed           = 1,       ## random seed gets set at start of script, just in case.
-        gene_clust     = quote(bluster::HclustParam()),   ## When we need to chose clusters of genes, how many?
-	filterFun      = IHW::ihw,                 ## NULL for standard DESeq2 results, otherwise  functions
-	clustering_distance_rows    = "euclidean", ## for all feature-distances
-        stringsAsFactors = FALSE,
-        normalise=NULL,
-        impute=NULL,
-	clustering_distance_columns = "euclidean",  ## for sample-distances
-	baseline_heuristic = "min",  ## For the "white" colour in differential heatmaps
-	LRT_effect = "default"  ## For the "white" colour in differential heatmaps
-   )
-}
 
 
+#' @export
 add_org_annotation <- function(dds, org, keytype="ENSEMBL", extra_mcols=list(entrez="ENTREZID", symbol="SYMBOL", ensembl="ENSEMBL"), count_source=NA) {
   metadata(dds)$organism <- list(org=org)
   metadata(dds)$count_source <- count_source
@@ -1212,6 +1170,7 @@ find_simpler_models <- function(fml, do_aes=FALSE, type=c("simplest", "drop1", "
   }
 }
 
+#' @export
 translate_terms <- function(txt, obj) {
   tr_list <- metadata(obj)$termNames
   ind <- txt %in% names(tr_list)
@@ -1220,6 +1179,7 @@ translate_terms <- function(txt, obj) {
 }
 
 
+#' @export
 mat_x_terms <- function(mat, fml, fitFrame) {
   yvar <- make.unique(c(colnames(fitFrame), "y", sep = ""))[ncol(fitFrame) + 1]
   fml <- update(fml, paste(yvar, "~ ."))
@@ -1260,6 +1220,7 @@ mat_x_terms <- function(mat, fml, fitFrame) {
   covar_x_mat
 }
 
+#' @export
 extract_hits <- function(covar_x_pc, pc, model_vars) {
   pc_hits <- data.frame(
     covar=unique(covar_x_pc$Covariate),
@@ -1284,6 +1245,7 @@ extract_hits <- function(covar_x_pc, pc, model_vars) {
 
 
 
+#' @export
 negate_emmc <- function(emc) {
   ememmc <- get(emc, "package:emmeans")
   function(...) {
@@ -1294,6 +1256,7 @@ negate_emmc <- function(emc) {
   }
 }
 
+#' @export
 replace_emmc <- function(expr, replacements, prefix="my") {
   # expr: a language object (symbol or call)
   # replacements: named character vector, names = old, values = new
@@ -1319,6 +1282,7 @@ replace_emmc <- function(expr, replacements, prefix="my") {
 }
 
 
+#' @export
 removeLow <- function(ddsList, preserve_across=TRUE, baseMeanMin) {
   is_des <- sapply(ddsList, inherits, "DESeqDataSet")
   if (preserve_across) {
@@ -1338,12 +1302,11 @@ removeLow <- function(ddsList, preserve_across=TRUE, baseMeanMin) {
 }
 
 
+sample_norm <- function(x) UseMethod("sample_norm")
 
-# define a generic
-setGeneric("sample_norm", function(se, ...) standardGeneric("sample_norm"))
 
 # method for DESeqDataSet
-setMethod("sample_norm", "DESeqDataSet", function(se, ...) {
+sample_norm.DESeqDataSet <- function(se) {
       if ("controlGenes" %in% names(metadata(se))) {
         controlGenes <- eval(metadata(se)$controlGenes, transform(rowData(se), ID=row.names(se)))
         se <- estimateSizeFactors(se, controlGenes=controlGenes)
@@ -1356,10 +1319,9 @@ setMethod("sample_norm", "DESeqDataSet", function(se, ...) {
       assay(se, "vst") <- assay(vst(se, nsub=min(1000, nrow(se))))
 
       return(se)
-})
+}
 
-# fallback method
-setMethod("sample_norm", "ANY", function(se, ...) {
+sample_norm.SummarizedExperiment <- function(se) {
     assayNames(se)[1] <- noun_to_readout(rowNoun)
     rowData(se)$nna <- apply(is.na(assay(se)), 1, sum)
     if ((metadata(se)$normalise %||% "none") =="vsn") {
@@ -1377,11 +1339,10 @@ setMethod("sample_norm", "ANY", function(se, ...) {
                      list(object=as(se, "MSnSet"), differential=NULL)))))
     }
     se
-})
-
-
-normalise_assay <- function(dds, normaliser, design) {
 }
+
+
+#' @export
 normalise_assay <- function(se, assay_to_norm, model) {
   df <- as.data.frame(colData(se))
   df$y <- I(t(assay(se, assay_to_norm)))
@@ -1395,6 +1356,7 @@ normalise_assay <- function(se, assay_to_norm, model) {
 
 
 
+#' @export
 add_extra_assays <- function(dds) {
   extras <- metadata(dds)$extra_assays
   if (is.null(extras)) return(dds)
@@ -1431,6 +1393,7 @@ generate_assay <- function(args, dds) {
   out
 }
 
+#' @export
 data_key <- function(plot_fml, dds, meta="exploratory_default_assay") {
   if ("y" %in% names(plot_fml[[2]])) {
     yvar <- as.character(plot_fml[[2]]$y)
@@ -1442,6 +1405,7 @@ data_key <- function(plot_fml, dds, meta="exploratory_default_assay") {
   setNames(list(paste(sort(attr(terms(design_fml), "term.labels")), collapse="+")), yvar)
 }
 
+#' @export
 expr_to_list <- function(x, aliases = c("list", "specification", "sample_set", "model", "settings", "mutate" )) {
   if (is.call(x) && deparse(x[[1]]) %in% aliases) {
     # It's a list-like call → recursively process elements
@@ -1480,5 +1444,52 @@ eval_dds <- function(dds, expr, assays = assayNames(dds)) {
     res[[i]] <- rlang::eval_tidy(expr, env = df_env)
   }
 
+  res
+}
+
+#' Heatmap colour-scheme generator
+#'
+#' For each column in a dataframe, generate a sensible colour palette
+#' for each column
+#' @param df data.frame containing the covariates to be colour-encoded
+#' @param palette The baseline palette
+#' @return
+#' @author Gavin Kelly
+#' @export
+df2colorspace <- function(df, palette) {
+  pal <- RColorBrewer::brewer.pal(RColorBrewer::brewer.pal.info[palette, "maxcolors"], palette)
+  if (ncol(df)==0) return(list(Heatmap=list(), ggplot=list()))
+  df <- dplyr::mutate_if(as.data.frame(df), is.character, as.factor)
+  seq_cols <-c("Blues", "Greens", "Oranges", "Purples", "Reds")
+  df <- df[,order(sapply(df, is.numeric)),drop=FALSE] # move factors to the front
+  # for factors, zero-based starting index for colours
+  start_levels <- cumsum(c(0,sapply(df, nlevels)))[1:length(df)] 
+  is_num <- sapply(df, is.numeric)
+  # for numerics, which seq palette shall we use for this factor
+  start_levels[is_num] <- (cumsum(is_num[is_num])-1) %% length(seq_cols) + 1
+  res <- list()
+  res$Heatmap <- purrr::map2(df, start_levels,
+              function(column, start_level) {
+                if (is.factor(column)) {
+                  setNames(pal[(seq(start_level, length=nlevels(column)) %% length(pal)) + 1],
+                                     levels(column))
+                } else {
+                  my_cols <- RColorBrewer::brewer.pal(3, seq_cols[start_level])[-2]
+                  circlize::colorRamp2(range(column, na.rm=TRUE), my_cols)
+                }
+              }
+              )
+  res$Heatmap$.influential <- setNames(c("black", "white"), c(TRUE, FALSE))
+  res$ggplot <- purrr::map2(df, start_levels,
+              function(column, start_level) {
+                if (is.factor(column)) {
+                  setNames(pal[(seq(start_level, length=nlevels(column)) %% length(pal)) + 1],
+                                     levels(column))
+                } else {
+                  RColorBrewer::brewer.pal(3, seq_cols[start_level])[-2]
+                }
+              }
+              )
+  res$ggplot$.influential <- setNames(c("black", "white"), c(TRUE, FALSE))
   res
 }

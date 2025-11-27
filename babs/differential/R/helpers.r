@@ -113,6 +113,7 @@ ParamList <- R6::R6Class("ParamList",
                         )
                         )
 
+#' @export
 counter <- function(post_fn=identity) {
   inds <- list()
   function(label=".global") {
@@ -125,6 +126,7 @@ counter <- function(post_fn=identity) {
   }
 }
 
+#' @export
 map_dmc <- function(data, f, depth="comparison",...) {
   if (class(data[[1]])!="list" || depth=="dataset") {
     return(map(data,f, ...))
@@ -251,16 +253,16 @@ comparison_name <- function(dds) {
 
 
 
-##' rbind nested lists of data-frames
-##'
-##' Walk through a 3-deep hierarchy of summaries, and join them
-##' into one big summary table
-##' @title rbind nested lists of data-frames
-##' @param x the list of summaries
-##' @param levels The vector of names of the levels of the hierarchy that will be used in the data-frame
-##' @return The big table
-##' @author Gavin Kelly
-##' @export
+#' rbind nested lists of data-frames
+#'
+#' Walk through a 3-deep hierarchy of summaries, and join them
+#' into one big summary table
+#' @title rbind nested lists of data-frames
+#' @param x the list of summaries
+#' @param levels The vector of names of the levels of the hierarchy that will be used in the data-frame
+#' @return The big table
+#' @author Gavin Kelly
+#' @export
 rbind_summary <- function(x, levels=c("Dataset", "Design", "Comparison")) {
   if (class(x[[1]])=="list") {
     do.call(rbind, mapply(function(df, name) {
@@ -281,14 +283,15 @@ rbind_summary <- function(x, levels=c("Dataset", "Design", "Comparison")) {
 
 
 
-##' Convert dataset-model-comparison hierarchy into data.frame
-##'
-##' Create a data.frame with columns for dataset, model, and comparison
-##' alongside a list-column containing the dds object
-##' @title Convert DMC to dataframe
-##' @param dmc A triple-level list
-##' @return A data.frame of the expanded list
-##' @author Gavin Kelly
+#' Convert dataset-model-comparison hierarchy into data.frame
+#'
+#' Create a data.frame with columns for dataset, model, and comparison
+#' alongside a list-column containing the dds object
+#' @title Convert DMC to dataframe
+#' @param dmc A triple-level list
+#' @return A data.frame of the expanded list
+#' @author Gavin Kelly
+#' @export
 dmc2df <- function(dmc) {
   dds <- do.call(c, lapply(dmc, function(d) {do.call(c, lapply(d, function(m) {m}))}))
   list2DF(
@@ -300,6 +303,7 @@ dmc2df <- function(dmc) {
   )
 }
 
+#' @export
 choose_staging <- function(resource, staging="staging") {
   files <- dir(staging, pattern=paste0("^", resource, ".*\\.qmd"))
   if (length(files)==1) {
@@ -314,6 +318,7 @@ choose_staging <- function(resource, staging="staging") {
 
 
 
+#' @export
 section_chooser <- function(obj, ...) {
   has_length <- sapply(list(...), function(x) length(obj[[x]])>0)
   if (any(has_length))
@@ -322,6 +327,7 @@ section_chooser <- function(obj, ...) {
     NULL
 }
 
+#' @export
 get_align_params <- function(name) {
   my_config <- readLines(paste0(file.path("extdata", name), ".config"))
   align_params <- strsplit(sub(paste0("^", name, "\\."),
@@ -349,24 +355,7 @@ noun_to_readout <- function(noun) {
 }
 
 
-
-assayPlus <- function(dds, i) {
-  if (is.numeric(i) || i %in% assayNames(dds)) {
-    out <- assay(dds, i)
-  } else  if (i=="norm") {
-    if (inherits(dds, "DESeqDataSet")) {
-      out <- counts(dds, norm=TRUE)
-    } else {
-      out <- NULL
-    }
-  } else if (i=="missing") {
-    out <- is.na(assay(dds))
-  } else {
-    out <- NULL
-  }
-  out
-}
-
+#' @export
 setFirstAssay <- function(dds, ...) {
   fst <- list(...)[[1]]
   if (is.character(fst)) {
@@ -378,6 +367,7 @@ setFirstAssay <- function(dds, ...) {
     assays(dds)[c(nm, setdiff(assayNames(dds), nm))]
 }
 
+#' @export
 formula_equal <- function(f1, f2) {
   t1 <- attr(terms(f1), "term.labels")
   t2 <- attr(terms(f2), "term.labels")
@@ -385,6 +375,7 @@ formula_equal <- function(f1, f2) {
 }
 
 
+#' @export
 top_true <- function(is_in, stat, n, sym=TRUE) {
       ind <- which(is_in)[order(stat[is_in])]
       top_ind <- 1:min(n,length(ind))
@@ -393,5 +384,53 @@ top_true <- function(is_in, stat, n, sym=TRUE) {
       } else {
         ind[top_ind]
       }
+}
+
+
+#' @export
+default_spec_settings <- function() {
+   list(         ## analysis parameters
+	alpha          = 0.01,    ## p-value cutoff
+	lfcThreshold   = 0,       ## abs lfc threshold
+	baseMeanMin    = 0,       ## discard transcripts with average normalised counts lower than this
+	top_n_variable = 500,     ## For PCA
+	showCategory   = 25,      ## For enrichment analyses
+	seed           = 1,       ## random seed gets set at start of script, just in case.
+        gene_clust     = quote(bluster::HclustParam()),   ## When we need to chose clusters of genes, how many?
+	filterFun      = IHW::ihw,                 ## NULL for standard DESeq2 results, otherwise  functions
+	clustering_distance_rows    = "euclidean", ## for all feature-distances
+        stringsAsFactors = FALSE,
+        normalise=NULL,
+        impute=NULL,
+	clustering_distance_columns = "euclidean",  ## for sample-distances
+	baseline_heuristic = "min",  ## For the "white" colour in differential heatmaps
+	LRT_effect = "default"  ## For the "white" colour in differential heatmaps
+   )
+}
+
+
+
+#' @export
+design <- function(x) {
+  if (methods::is(x, "DESeqDataSet")) {
+    DESeq2::design(x)
+  } else if (inherits(x, "SummarizedExperiment")) {
+    metadata(x)$design
+  } else {
+    stop("design() not defined for this object")
+  }
+}
+
+#' @export
+`design<-` <- function(x, value) {
+  if (methods::is(x, "DESeqDataSet")) {
+    # call DESeq2 S4 setter
+   DESeq2::`design<-`(x, value=value)
+  } else if (inherits(x, "SummarizedExperiment")) {
+    metadata(x)$design <- value
+    x
+  } else {
+    stop("design<- not defined for this object")
+  }
 }
 

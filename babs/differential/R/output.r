@@ -1,3 +1,4 @@
+#' @export
 p2filename <- function(p, prefix, suffix) {
   section <- basename(file.path(tools::file_path_sans_ext(p$script)))
   fname <- file.path(p$res_dir, section,  sprintf("%s%s.%s", prefix, p$TAG, suffix))
@@ -5,19 +6,19 @@ p2filename <- function(p, prefix, suffix) {
   fname
 }
 
-##' Text file of assay data
-##'
-##' Write all sample data, with the colData as a header
-##' @title Text file of assay data
-##' @param ddsList A list of [DESeq2::DESeqDataSet-class()] objects 
-##' @param assay The assay to be output (or 'norm' for normalised counts)
-##' @param path Where to put the text files
-##' @param suffix Additional identifier information for the filename
-##' @param formula The model that will be used to estimate the normalisation offsets
-##' @param terms_to_remove The 'Terms' estimated from the above model that will be removed (subtracted) from values of the assay.
-##' @return A list of file paths to the excel files
-##' @author Gavin Kelly
-##' @export
+#' Text file of assay data
+#'
+#' Write all sample data, with the colData as a header
+#' @title Text file of assay data
+#' @param ddsList A list of [DESeq2::DESeqDataSet-class()] objects 
+#' @param assay The assay to be output (or 'norm' for normalised counts)
+#' @param path Where to put the text files
+#' @param suffix Additional identifier information for the filename
+#' @param formula The model that will be used to estimate the normalisation offsets
+#' @param terms_to_remove The 'Terms' estimated from the above model that will be removed (subtracted) from values of the assay.
+#' @return A list of file paths to the excel files
+#' @author Gavin Kelly
+#' @export
 write_assay <- function(ddsList, aname="vst", p) {
   out <- list()
   for (i in names(ddsList)) {
@@ -41,6 +42,7 @@ write_assay <- function(ddsList, aname="vst", p) {
   out
 }
 
+#' @export
 write_clusters <- function(clust, mcols, p, prefix="clusters") {
   wb <- openxlsx::createWorkbook(title="Differential Analysis",
                                 creator="BABS")
@@ -76,16 +78,16 @@ write_clusters <- function(clust, mcols, p, prefix="clusters") {
   fname
 }
 
-##' Xlsx reporting of results
-##'
-##' Store all the differential gene-lists and supporting materials
-##' in a multi-worksheet spreadsheet
-##' @title XLSX report of results
-##' @param ddsList A depth-3 list of [DESeq2::DESeqDataSet-class()] objects containing results in the mcols slot
-##' @param param The parameter object used to generate the results
-##' @param dir Directory to store the results in
-##' @return A list of file paths to the excel files
-##' @author Gavin Kelly
+#' Xlsx reporting of results
+#'
+#' Store all the differential gene-lists and supporting materials
+#' in a multi-worksheet spreadsheet
+#' @title XLSX report of results
+#' @param ddsList A depth-3 list of [DESeq2::DESeqDataSet-class()] objects containing results in the mcols slot
+#' @param param The parameter object used to generate the results
+#' @param dir Directory to store the results in
+#' @return A list of file paths to the excel files
+#' @author Gavin Kelly
 #' @export
 write_results <- function(ddsList, param, params, assays=NULL) {
   si <- session_info()
@@ -192,14 +194,14 @@ write_results <- function(ddsList, param, params, assays=NULL) {
   out
 }
 
-##' Store results as text files
-##'
-##' Save unfiltered versions of the results in text files
-##' @title Store results as text files
-##' @param ddsList A depth-3 list of [DESeq2::DESeqDataSet-class()] objects containing results in the [S4Vectors::mcols()] slot
-##' @param dir Directory to store the results in
-##' @return 
-##' @author Gavin Kelly
+#' Store results as text files
+#'
+#' Save unfiltered versions of the results in text files
+#' @title Store results as text files
+#' @param ddsList A depth-3 list of [DESeq2::DESeqDataSet-class()] objects containing results in the [S4Vectors::mcols()] slot
+#' @param dir Directory to store the results in
+#' @return 
+#' @author Gavin Kelly
 #' @export
 write_all_results <- function(ddsList, dir=".") {
   for (i in names(ddsList)) {
@@ -214,7 +216,7 @@ write_all_results <- function(ddsList, dir=".") {
 }
 
 
-
+#' @export
 to_letter <- function(i, so_far="") {
   if (i<27)
     paste0(LETTERS[i], so_far)
@@ -224,18 +226,18 @@ to_letter <- function(i, so_far="") {
 
 
 
-##' Generate text files require for Biologic
-##'
-##' The visualisation part of 'Biologic' requires a set of text files
-##' which represent the differential results and the models and
-##' contrasts that were used to derive the results.  This function
-##' generates them from a previous run of the pipeline.
-##' 
-##' @title Export Biologic files
-##' @param result_object Path to the rds of the  result object
-##' @param path Where to write the files for Biologic to read
-##' @return nothing
-##' @author Gavin Kelly
+#' Generate text files require for Biologic
+#'
+#' The visualisation part of 'Biologic' requires a set of text files
+#' which represent the differential results and the models and
+#' contrasts that were used to derive the results.  This function
+#' generates them from a previous run of the pipeline.
+#' 
+#' @title Export Biologic files
+#' @param result_object Path to the rds of the  result object
+#' @param path Where to write the files for Biologic to read
+#' @return nothing
+#' @author Gavin Kelly
 #' @export
 export_biologic <- function(result_object, path) {
   obj <- readRDS(result_object)
@@ -318,8 +320,10 @@ export_biologic <- function(result_object, path) {
 
 }
 
+#' @export
 name_sanitizer <- function(str) {  gsub("[^a-zA-Z0-9\\._]", "_", str) }
 
+#' @export
 table_tracker <- function(p) {
   get_tally <- counter() # keeps track of individual labels and running tally of all tables
   function(tbl, label, caption) {
@@ -356,19 +360,19 @@ fname=fname
 #| tbl-cap: "{{caption}}"
 
 
-##' Generate captioned table
-##'
-##' quarto-compatible plot wrapper
-##'
-##' Either produce a child chunk (labelled so that it can be cross-references),
-##' or print the table, depending on whether the document is being
-##' rendered or run interactively.
-##' @param tbl A gt object
-##' @param label The candidate chunk label, which will get sanitised
-##' @param caption The caption text
-##' @param cap_fn The function that will be called on the caption text
-##' @return 
-##' @author Gavin Kelly
+#' Generate captioned table
+#'
+#' quarto-compatible plot wrapper
+#'
+#' Either produce a child chunk (labelled so that it can be cross-references),
+#' or print the table, depending on whether the document is being
+#' rendered or run interactively.
+#' @param tbl A gt object
+#' @param label The candidate chunk label, which will get sanitised
+#' @param caption The caption text
+#' @param cap_fn The function that will be called on the caption text
+#' @return 
+#' @author Gavin Kelly
 ## do_tbl <- function(tbl, label, caption, path) {
 ##   if (isTRUE(getOption('knitr.in.progress'))) {
 ##     tbl_child <- knitr::knit_expand(
@@ -414,6 +418,7 @@ compress_dmc <-function(dmc) {
 }
 
 
+#' @export
 decompress_dmc <- function(dmc) {
   lapply(dmc,
          function(d) {
@@ -431,6 +436,7 @@ decompress_dmc <- function(dmc) {
 
 
 
+#' @export
 sample_X_dataset_table <- function(dds, ddsList) {
   samp <- as.data.frame(colData(dds))
   # Extra columns introduced by datasets
@@ -469,6 +475,7 @@ sample_X_dataset_table <- function(dds, ddsList) {
     Reduce(f=function(gti, x) tab_spanner(gti, label=x$name,columns=x$cols + ncol(samp)), x=ts_extra, init=.)
 }
 
+#' @export
 src2bullets <- function(meta, fields, model=NULL) {
   field_titles <- list(
     subset = "Samples for inclusion in any analysis",
@@ -502,3 +509,20 @@ src2bullets <- function(meta, fields, model=NULL) {
 }
 
     
+#' @export
+assayPlus <- function(dds, i) {
+  if (is.numeric(i) || i %in% assayNames(dds)) {
+    out <- assay(dds, i)
+  } else  if (i=="norm") {
+    if (inherits(dds, "DESeqDataSet")) {
+      out <- counts(dds, norm=TRUE)
+    } else {
+      out <- NULL
+    }
+  } else if (i=="missing") {
+    out <- is.na(assay(dds))
+  } else {
+    out <- NULL
+  }
+  out
+}

@@ -22,7 +22,7 @@ if [[ -z "$1" ]]; then
     mkdir -p extdata
     
     if ! compgen -G "extdata/*.spec" > /dev/null; then
-	cp R/example-spec.r extdata/example.spec
+	cp resources/examples/example.spec extdata/example.spec
 	echo "  No spec-file found"
 	echo -e "  \x1B[31mPlease check the spec-file in the extdata/example.spec\x1B[0m"
 	exit -1

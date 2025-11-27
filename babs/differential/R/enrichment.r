@@ -1,14 +1,15 @@
-##' Common interface to enrichment/over-representation
-##'
-##' Give a unified interface to all the supported functional
-##' methods, and all the databases
-##' @title Orchestrate functional analyses
-##' @param dds a DESeq2 object with thre results stored in the mcols
-##' @param method 'or' for over-representation, or 'enrichment' for geneset enrichment
-##' @param source 'GO' or 'Reactome'
-##' @param ... extra arguments for the analysis
-##' @return The clusterProfiler object
-##' @author Gavin Kelly
+#' Common interface to enrichment/over-representation
+#'
+#' Give a unified interface to all the supported functional
+#' methods, and all the databases
+#' @title Orchestrate functional analyses
+#' @param dds a DESeq2 object with thre results stored in the mcols
+#' @param method 'or' for over-representation, or 'enrichment' for geneset enrichment
+#' @param source 'GO' or 'Reactome'
+#' @param ... extra arguments for the analysis
+#' @return The clusterProfiler object
+#' @author Gavin Kelly
+#' @export
 functional_api <- function (dds, method, source,  ...) {
   org <- metadata(dds)$organism$org
   res <- mcols(dds)$results
@@ -45,6 +46,7 @@ functional_api <- function (dds, method, source,  ...) {
 }
 
 
+#' @export
 default_post_process <- function(alpha=0.05, n=100, threshold=-Inf, method=NA) {
   ret <- list(
     OR = function(x) {
@@ -70,6 +72,7 @@ default_post_process <- function(alpha=0.05, n=100, threshold=-Inf, method=NA) {
 #arrange GO terms so that those that appear in
 # the same comparisons are together, 
 
+#' @export
 order_enrichments <- function(df) {
   ord <- df %>%
     group_by(ID) %>%
@@ -90,6 +93,7 @@ order_enrichments <- function(df) {
 ## will produce sections at the 'method' level, subsections at the 'source'
 ## level and then iterate through datasets and models and produce plots
 ## across comparisons(omitted)
+#' @export
 destruct <- function(df, struct, sub_procedure, n=1) {
   if (is.list(struct[[1]])) { # Still a hierarchy below
     loop_vals <- df[[struct[[1]]]]
