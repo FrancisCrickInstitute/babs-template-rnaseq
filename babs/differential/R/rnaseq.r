@@ -580,19 +580,28 @@ check_model <- function(dds) {
       }
     }
   }
+  
   if (any(mdl$dropped)) {
-    mm <- model.matrix(mdl$design, as.data.frame(colData(dds)))[,!mdl$dropped]
-    colnames(mm) <- .resNames(colnames(mm))
-    mdl$mat <- mm
+    X <- model.matrix(mdl$design, as.data.frame(colData(dds)))[,!mdl$dropped, drop=FALSE]
+    colnames(X) <- .resNames(colnames(X))
+    if ("constraint" %in% names(mdl)) {
+      X <- X %*% Null(mdl$constraint)
+    }
+    mdl$mat <- X
     metadata(dds)$model_code <-c(
       "# Warning - creates long lines.  May be necessary to chunk it into smaller continuation lines in R console",
       paste0("df <- eval(parse(text='", deparse1(as.data.frame(colData(dds)), collapse="\n"),"'))"),
-      paste0("mm <- model.matrix(",deparse1(mdl$design),",df)[,-c(",paste(which(mdl$dropped), collapse=", "),")]"),
-      "colnames(mm)[colnames(mm)==\"(Intercept)\"] <- \"Intercept\"",
-      "colnames(mm) <- make.names(colnames(mm))",
+      paste0("X <- model.matrix(",deparse1(mdl$design),",df)[,-c(",paste(which(mdl$dropped), collapse=", "),")]"),
+      "colnames(X)[colnames(X)==\"(Intercept)\"] <- \"Intercept\"",
+      "colnames(X) <- make.names(colnames(X))",
       "colData(dds) <- df",
-      "design(dds) <- mm"
+      "design(dds) <- X"
     ) 
+  } else if  ("constraint" %in% names(mdl)) {
+    X <- model.matrix(mdl$design, as.data.frame(colData(dds)))
+    colnames(X) <- .resNames(colnames(X))
+    mdl$mat <- X %*% Null(mdl$constraint)
+    metadata(dds)$model_code <- "TODO"
   } else {
     metadata(dds)$model_code <- c(
       paste0("df <- eval(parse(text='", deparse1(as.data.frame(colData(dds))),"'))"),
@@ -638,6 +647,7 @@ emcontrasts <- function(dds, comp, prefix="my") {
   } else {
     em_fn <- emmeans::emmeans
   }
+  #TODO - add the constraint handling (and make sure the $lm that reaches here also does so)
   emc <- do.call(em_fn, c(list(object=mdl$lm, specs= comp$spec), em_extra))$contrasts
   contr_frame <- as.data.frame(summary(emc))
   ind_est <- !is.na(contr_frame$estimate)
