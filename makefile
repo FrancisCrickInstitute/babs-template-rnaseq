@@ -33,7 +33,7 @@ $(template_dir)/archive:
 ################################################################
 
 .PHONY: infrastructure
-infra-shell=$(patsubst $(generic_dir)/%,babs/differential/%,$(wildcard $(generic_dir)/resources/shell/*))
+infra-shell=$(patsubst $(generic_dir)/%,babs/differential/%,$(wildcard $(generic_dir)/resources/shell/*.sh))
 infra-mk=$(patsubst %,babs/%/shared.mk,docs ingress nfcore)
 infra-envs=babs/differential/.env babs/differential/.env.local
 infra-docker=babs/differential/resources/docker

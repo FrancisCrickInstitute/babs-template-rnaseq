@@ -15,12 +15,6 @@ include $(patsubst %,$(staging_dir)/.make-%,$(sections))
 endif
 
 
-samplesheets = $(patsubst %,$(my_metadata)_%.csv,$(alignments))
-configs = $(patsubst %,extdata/%.config,$(alignments))
-genes_results = $(patsubst %,$(my_counts_dir)/%,$(alignments))
-
-file.spec = $(patsubst %,extdata/%.spec,$(specfiles))
-
 ## Create a makefile per section. It will set up target-specific
 ## variables to inform subsequent targets of the alignment, spec-file,
 ## and section for each alignment:spec combo. It will also set up the
@@ -42,8 +36,8 @@ $(mk): $(staging_dir)/.make-% : $(file.spec) $(samplesheets) | $(staging_dir)
 	   '$(qmd_path): spec=$(ispec)'\
 	   '$(qmd_path): script=$*_$(ispec)_$(ialign)'\
 	   '$(qmd_path): section=$*'\
-	   '$(qmd_path): cat1=$(shell sed -n "s/^#$(squote)[[:space:]]*@categories[[:space:]]\+\(.*\)/\1/p" extdata/$(ispec).spec | head -n1)'\
-	   '$(qmd_path): cat2=$($(ialign).categories)'\
+	   '$(qmd_path): cat1=$(or $(shell sed -n "s/^#$(squote)[[:space:]]*@categories[[:space:]]\+\(.*\)/\1/p" extdata/$(ispec).spec | head -n1),$(ispec))'\
+	   '$(qmd_path): cat2=$(or $($(ialign).categories), $(ialign))'\
 	   '$(qmd_path): $(source_dir)/$*.qmd'\
 	   '$(staged_results)/$*_$(ispec)_$(ialign).html: $(my_counts_dir)/$(ialign) $(ispec).spec $(my_metadata)_$(ialign).csv $(qmd_path) $(staged_results)/$($*_parent).html'\
 	)) > $@
@@ -122,7 +116,7 @@ html-%: $(staged_results)/%.html ## Create a single html file to be placed in th
 
 scripts: $(qmds) ## Generate all the parametrised scripts, into the staging directory. But don't render
 
-$(qmds) : $(staging_dir)/%.qmd : $(staging_dir)/%.yml $(staging_dir)/$(VERSION).params.yml $(source_dir)/params.yml 
+$(qmds) : $(staging_dir)/%.qmd : $(staging_dir)/%.yml $(staging_dir)/$(VERSION).params.yml $(source_dir)/params.yml
 	$(QUARTO) run $(source_dir)/typescript/merge_yml.ts\
 	 --script=$(source_dir)/$(section).qmd\
 	 --fixed=$(source_dir)/params.yml\

@@ -76,10 +76,11 @@ ENV_FILES := $(shell \
     done | tac\
 )
 
-
-ENV_VARS := $(shell bash ./resources/shell/direnv.sh $(ENV_FILES) 2>/dev/null || true) 
-$(foreach line,$(ENV_VARS),$(eval $(line))) 
-
+ifneq ($(wildcard ./resources/shell/direnv.sh),)
+.env.mk: $(ENV_FILES)
+	bash ./resources/shell/direnv.sh $(ENV_FILES) > $@
+include .env.mk
+endif
 
 NUM_THREADS:=$(or ${SLURM_CPUS_PER_TASK},$(NUM_THREADS),2)
 data_transfer_filename?=.data-transfer-rules
@@ -304,11 +305,11 @@ else
 send_notification= [ $$? -eq 0 ] && echo "$1 completed (${MAKECMDGOALS})" || echo "$@ failed (${MAKECMDGOALS})"
 endif
 
-
 comma:= ,
 colon:= :
 space:= $() $()
 empty:= $()
+
 define newline
 
 $(empty)
@@ -363,7 +364,7 @@ R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional,
 launcher: R-$(RVERSION) ## Create a launcher script that will guide you through the various launcher options
 	ln -sfn $< $@
 
-R-$(RVERSION): resources/shell/R-local 
+R-$(RVERSION): resources/shell/R-local.sh 
 	cp $< $@
 	@$(call chmod,$@,u,rwx)
 	for i in rstudio shiny jupyter http server-info read-envs launch-helper; do sed -i -e "\,source $$i.sh,{" -e "r resources/shell/$$i.sh" -e "d" -e "}" $@; done
@@ -377,7 +378,7 @@ launch-%: R-$(RVERSION) ## launch-R launch-rstudio, launch-jupyter etc
 
 admin-launch-%: ##  admin-launch-R, admin-launch-debug  etc will use a temporary workspace
 	d=$$(mktemp -d) ;\
-	cp  resources/shell/R-local $$d/launcher.sh ;\
+	cp  resources/shell/R-local.sh $$d/launcher.sh ;\
 	@$(call chmod,$$d/launcher.sh,u,rwx) ;\
 	for i in rstudio shiny jupyter server-info; do sed -i -e "\,source $$i.sh,{" -e "r resources/shell/$$i.sh" -e "d" -e "}" $$d/launcher.sh; done ;\
 	echo "Running in $$d" ;\

@@ -13,7 +13,7 @@ const counter = (function () {
 })()
 
 const args = get_args(Deno.args, {
-    string: ["template", "staging", "repo", "sections", "alignments", "specfiles"]
+    string: ["template", "staging", "repo"]
 });
 
 const quarto = parse(Deno.readTextFileSync(args.template));

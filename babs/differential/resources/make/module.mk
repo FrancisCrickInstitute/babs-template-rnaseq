@@ -21,6 +21,12 @@ staged_results=$(staging_dir)/$(RESULTS_DIR)/$(VERSION)
 my_counts_dir=extdata/genes.results
 my_metadata=extdata/metadata
 
+
+samplesheets = $(patsubst %,$(my_metadata)_%.csv,$(alignments))
+configs = $(patsubst %,extdata/%.config,$(alignments))
+genes_results = $(patsubst %,$(my_counts_dir)/%,$(alignments))
+file.spec = $(patsubst %,extdata/%.spec,$(specfiles))
+
 ################################################################
 ## GEO settings
 ################################################################
