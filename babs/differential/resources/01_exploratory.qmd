@@ -1,11 +1,14 @@
 ---
-title: Exploratory analysis 
+title: Exploratory analysis ${title}
 description: >-
-  Exploratory analysis 
+  Exploratory analysis of ${description}
 categories: [Exploratory]
-author:
+author: 
   - name: Gavin Kelly
-    affiliations: BABS - Francis Crick Institute
+    affiliations:
+      name: Francis Crick Institute
+      department: Bioinformatics & Biostatistcs
+    role: [Developer, Statistical Methodology]
 format:
   html:
     theme: cerulean

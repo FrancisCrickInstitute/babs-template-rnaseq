@@ -1,2 +1,3 @@
-# Universal parameters that will be embedded in every qmd
-# Currently, there are none
+# Universal quarto frontmatter
+
+{author: [{name: BABS, affiliations: Francis Crick Institute}]}

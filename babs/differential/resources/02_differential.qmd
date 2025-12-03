@@ -1,10 +1,13 @@
 ---
-title: Differential analysis
-description: Differential analysis
+title: Differential analysis ${title}
+description: Differential analysis of ${description}
 categories: [Differential]
 author: 
   - name: Gavin Kelly
-    affiliations: BABS - Francis Crick Institute
+    affiliations:
+      name: Francis Crick Institute
+      department: Bioinformatics & Biostatistcs
+    role: [Developer, Statistical Methodology]
 format:
   html:
     theme: cerulean

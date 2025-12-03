@@ -284,6 +284,7 @@ default_sbatch_args=\
  --output=slurm-%x-%A_%a.out
 
 slurm_wrap=$(subst ','\'',$(containerPrefix) make $@ EXECUTOR=make; $(call send_notification,SLURM submission))
+squote:='
 
 ################################################################
 #Standard makefile hacks

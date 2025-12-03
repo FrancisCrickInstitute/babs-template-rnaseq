@@ -1,10 +1,13 @@
 ---
-title: MultiQC & Initialisation
-description: Preparing DESeq2 dataset
+title: "{{< meta multiqc >}}Initialisation of ${title}"
+description: Preparing ${description} for analysis
 categories: [Init]
 author: 
   - name: Gavin Kelly
-    affiliations: BABS - Francis Crick Institute
+    affiliations:
+      name: Francis Crick Institute
+      department: Bioinformatics & Biostatistcs
+    role: [Developer, Statistical Methodology]
 format:
   html:
     theme: cerulean
@@ -16,7 +19,8 @@ execute:
   echo: false
 code-summary: "Show the code"
 params:
-  section: MultiQC & Initialisation
+  section: Initialisation
+
 ---
 
 ```{r}
