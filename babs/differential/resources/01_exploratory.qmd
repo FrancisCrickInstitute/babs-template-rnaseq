@@ -3,22 +3,6 @@ title: Exploratory analysis ${title}
 description: >-
   Exploratory analysis of ${description}
 categories: [Exploratory]
-author: 
-  - name: Gavin Kelly
-    affiliations:
-      name: Francis Crick Institute
-      department: Bioinformatics & Biostatistcs
-    role: [Developer, Statistical Methodology]
-format:
-  html:
-    theme: cerulean
-    fontsize: 1.1em
-    linestretch: 1.7
-code-fold: true
-execute:
-  output: asis
-  echo: false
-code-summary: Show the code
 params:
   section: Exploratory analysis
 ---

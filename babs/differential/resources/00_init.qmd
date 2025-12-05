@@ -2,25 +2,8 @@
 title: "{{< meta multiqc >}}Initialisation of ${title}"
 description: Preparing ${description} for analysis
 categories: [Init]
-author: 
-  - name: Gavin Kelly
-    affiliations:
-      name: Francis Crick Institute
-      department: Bioinformatics & Biostatistcs
-    role: [Developer, Statistical Methodology]
-format:
-  html:
-    theme: cerulean
-    fontsize: 1.1em
-    linestretch: 1.7
-code-fold: true
-execute:
-  output: asis
-  echo: false
-code-summary: "Show the code"
 params:
   section: Initialisation
-
 ---
 
 ```{r}

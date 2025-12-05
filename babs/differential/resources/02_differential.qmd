@@ -2,25 +2,8 @@
 title: Differential analysis ${title}
 description: Differential analysis of ${description}
 categories: [Differential]
-author: 
-  - name: Gavin Kelly
-    affiliations:
-      name: Francis Crick Institute
-      department: Bioinformatics & Biostatistcs
-    role: [Developer, Statistical Methodology]
-format:
-  html:
-    theme: cerulean
-    fontsize: 1.1em
-    linestretch: 1.7
-code-fold: true
-execute:
-  output: asis
-  echo: false
-code-summary: "Show the code"
 params:
   section: Differential analysis
-
 ---
 
 

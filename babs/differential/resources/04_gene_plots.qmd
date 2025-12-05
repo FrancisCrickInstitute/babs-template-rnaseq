@@ -2,22 +2,8 @@
 title: Gene-level plots
 description: Plots of expression profiles
 categories: [Differential]
-author: 
-  - name: Gavin Kelly
-    affiliations: BABS - Francis Crick Institute
-format:
-  html:
-    theme: cerulean
-    fontsize: 1.1em
-    linestretch: 1.7
-code-fold: true
-execute:
-  output: asis
-  echo: false
-code-summary: "Show the code"
 params:
   section: Gene plots
-
 ---
 
 

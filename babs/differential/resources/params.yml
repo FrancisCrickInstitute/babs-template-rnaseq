@@ -1,3 +1,22 @@
-# Universal quarto frontmatter
-
-{author: [{name: BABS, affiliations: Francis Crick Institute}]}
+author:
+ - name: BABS
+   affiliation:
+     - ref: babs
+   roles:
+    - Development
+ - name: Gavin Kelly
+   id: kellyg
+   affiliation:
+    - ref: babs
+   roles:
+    - Developer
+    - Statistical Metholodogy
+affiliations:
+  - id: babs
+    name: Francis Crick Institute
+    group: Bioinformatics & Biostatistics
+    url: https://intranet.crick.ac.uk/our-crick/bioinformatics-biostatistics
+  - id: fci
+    name: Francis Crick Institute
+    url: https://www.crick.ac.uk
+ 

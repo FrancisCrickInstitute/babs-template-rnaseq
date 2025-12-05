@@ -14,7 +14,6 @@ metadata_id_column = ID
 name_col = sample_name
 samples_db = samples.db
 
-NEXTFLOW = $(call ml,$(NEXTFLOW_MODULE)); $(call ml,$(SINGULARITY_MODULE)); nextflow
 SQLITE = $(call ml,$(SQLITE_MODULE)); sqlite3
 
 
@@ -104,8 +103,6 @@ include $(SELF_DIR)secret.mk
 ################################################################
 early_spec_dir=$(firstword $(wildcard $(docs_dir) $(diff_dir)/extdata))
 specfiles=$(patsubst $(early_spec_dir)/%.spec,%,$(wildcard $(early_spec_dir)/*.spec))
-
-#early_align=$(firstword $(wildcard $(docs_dir) $(ingress_dir) $(nfcore_dir) $(diff_dir)/extdata))
 
 ifneq ($(diff_dir),)
 alignments=$(patsubst $(diff_dir)/extdata/%.config,%,$(wildcard $(diff_dir)/extdata/*.config))

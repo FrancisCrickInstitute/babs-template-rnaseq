@@ -2,23 +2,6 @@
 title: Enrichment analysis ${title}
 description: Enrichment and over-representation analysis of ${description}
 categories: [Enrichment]
-author: 
-  - name: Gavin Kelly
-    affiliations:
-      name: Francis Crick Institute
-      department: Bioinformatics & Biostatistcs
-    role: [Developer, Statistical Methodology]
-format:
-  html:
-    theme: cerulean
-    fontsize: 1.1em
-    linestretch: 1.7
-code-fold: true
-execute:
-  output: asis
-  echo: false
-  error: true
-code-summary: "Show the code"
 params:
   section: Enrichment analysis
 ---
