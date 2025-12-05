@@ -33,29 +33,12 @@ $(template_dir)/archive:
 ################################################################
 
 .PHONY: infrastructure
-infra-shell=$(patsubst $(generic_dir)/%,babs/differential/%,$(wildcard $(generic_dir)/resources/shell/*.sh))
-infra-mk=$(patsubst %,babs/%/shared.mk,docs ingress nfcore)
-infra-envs=babs/differential/.env babs/differential/.env.local
-infra-docker=babs/differential/resources/docker
 
-infrastructure: ## Transfer latest launch-helpers and shared.mk from the generic template
-infrastructure: $(infra-shell) $(infra-mk) $(infra-envs) $(infra-docker)
-
-$(infra-shell) : babs/differential/% : $(generic_dir)/%
-	cp $< $@
-$(infra-mk) : babs/differential/resources/make/shared.mk
-	ln -f $< $@
-babs/differential/resources/make/shared.mk: $(wildcard $(generic_dir)/template/resources/make/shared-rnaseq.mk)
-	cp $< $@
-
-$(infra-docker): $(generic_dir)/template/resources/docker
-	mkdir -p $@
-	rsync -ar $</ $@/
-
-$(infra-envs) : babs/differential/% : $(generic_dir)/template/%
-	cp $< $@
-
-
+infrastructure: ## Transfer differential code from template
+infrastructure: $(generic_dir)/rnaseq
+	rsync -ar $(generic_dir)/rnaseq/ babs/differential/
+$(generic_dir)/rnaseq:
+	cd $(generic_dir) && make rnaseq
 
 ################################################################
 #### Testing the pipeline

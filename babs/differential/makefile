@@ -147,7 +147,7 @@ $(staging_dir)/_quarto.yml: $(source_dir)/_quarto.yml $(qmds) $(css) $(includes)
 	cp -r  ${source_dir}/_extensions/. ${staging_dir}/_extensions/
 
 $(staging_dir)/$(VERSION).params.yml:  resources/make/project.mk $(staging_dir)/R.bib
-	echo 'author: [{name: "$(or $(FULLNAME),$(shell whoami))", id: $(shell whoami), roles: Analyst, affiliation: $(or "$(MY_AFFILIATION)",{ref: [fci]})}]' > $@
+	echo 'author: [{name: "$(or $(FULLNAME),$(shell whoami))", id: $(shell whoami), roles: Analyst, affiliation: $(or $(MY_AFFILIATION),{ref: [fci]})}]' > $@
 	echo 'params: {$(foreach p,$(param_names),$p: "$($p)"$(comma))}' >> $@
 
 $(staging_dir)/index.qmd : $(source_dir)/index.qmd $(qmds)

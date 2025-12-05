@@ -1,22 +1,3 @@
-# The following are system paths. Please set them to agree with your
-# local system. Watch out for trailing spaces, makefiles are very
-# 'literal' so a trailing space can get included value
-
-# where .sif's are stored:
-SINGULARITY_ROOT=/flask/apps/containers/all-singularity-images
-# local renv cache:
-RENV_PATHS_ROOT=/nemo/stp/babs/working/software/renv
-# your chosen prefix (e.g.'rocker') to keep the pipeline somewhat isolated:
-RENV_PATHS_PREFIX=$(subst /,-,$(IMAGE))
-# working space for large disposable files:
-# Use either the hash set in the .babs file, or the project part of the path
-SCRATCH_DIR=/flask/scratch/babs/$(USER)/projects/$(or $(setting_Hash),$(word 9,$(subst /, ,$(CURDIR))))
-# Nextflow cache:
-NXF_SINGULARITY_CACHEDIR=/flask/apps/containers/all-singularity-images/
-# Path to where singularity overlay files are put and retrieved from
-BABS_SINGULARITY_OVERLAYS=/nemo/stp/babs/working/bioinformatics/software/singularity/overlays
-
-
 ## BABS-specific stuff
 
 TEMPLATE_DIR=/nemo/stp/babs/working/bioinformatics/templates
