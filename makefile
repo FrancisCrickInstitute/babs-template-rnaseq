@@ -37,6 +37,8 @@ $(template_dir)/archive:
 infrastructure: ## Transfer differential code from template
 infrastructure: $(generic_dir)/rnaseq
 	rsync -ar $(generic_dir)/rnaseq/ babs/differential/
+	for i in docs ingress nfcore; do cp babs/differential/resources/make/{secret,shared}.mk babs/$$i/; done
+
 $(generic_dir)/rnaseq:
 	cd $(generic_dir) && make rnaseq
 

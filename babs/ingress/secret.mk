@@ -1,29 +1,10 @@
-# The following are system paths. Please set them to agree with your
-# local system. Watch out for trailing spaces, makefiles are very
-# 'literal' so a trailing space can get included value
-
-# where .sif's are stored:
-SINGULARITY_ROOT=/flask/apps/containers/all-singularity-images
-# local renv cache:
-RENV_PATHS_ROOT=/nemo/stp/babs/working/software/renv
-# your chosen prefix (e.g.'rocker') to keep the pipeline somewhat isolated:
-RENV_PATHS_PREFIX=$(subst /,-,$(IMAGE))
-# working space for large disposable files:
-# Use either the hash set in the .babs file, or the project part of the path
-SCRATCH_DIR=/flask/scratch/babs/$(USER)/projects/$(or $(setting_Hash),$(word 9,$(subst /, ,$(CURDIR))))
-# Nextflow cache:
-NXF_SINGULARITY_CACHEDIR=/flask/apps/containers/all-singularity-images/
-# Path to where singularity overlay files are put and retrieved from
-BABS_SINGULARITY_OVERLAYS=/nemo/stp/babs/working/bioinformatics/software/singularity/overlays
-
-
 ## BABS-specific stuff
 
 TEMPLATE_DIR=/nemo/stp/babs/working/bioinformatics/templates
 
-.bp = $(subst /, ,$(setting_Path))
+.bp = $(subst /, ,$(or $(setting_Path),$(CURDIR)))
 .myname = $(firstword $(subst @,$(space),$(shell $(GIT) config --global user.email || echo $(USER))))
-babs_userpath = $(patsubst /camp%,/nemo%,$(subst /working/bioinformatics/,/working/$(USER)/,$(setting_Path)))
+babs_userpath = $(patsubst /camp%,/nemo%,$(subst /working/bioinformatics/,/working/$(USER)/,$(or $(setting_Path),$(CURDIR))))
 
 redirect_outputs = /nemo/stp/babs/outputs/$(word 7, $(.bp))/$(word 8,$(.bp))/$(.myname)/$(word 9, $(.bp))
 redirect_intranet = $(subst /working/,/www/html/internal/users/,$(babs_userpath))
