@@ -364,13 +364,12 @@ for (dataset_id in names(ddsList)) {
   for (model_id in names(mdls[mdls])) {
     section_hierarchy <- list(dataset=dataset_id, model=model_id)
     model_meta <- metadata(this_dds)$models[[model_id]]
-    design <- model_meta$design
     for (new_name in names(model_meta$extra_assays)) {
-      assay(thid_dds, new_name) <- normalise_assay(this_dds, model_meta$extra_assays[[new_name]], design)
+      assay(thid_dds, new_name) <- normalise_assay(this_dds, model_meta$extra_assays[[new_name]], model_meta$design)
     }
     plot_formulae <- section_chooser(model_meta, "exploratory_profile_plots", "profile_plots")
     model_vars <- sort_vars(
-      unique(c(all.vars(design),
+      unique(c(all.vars(model_meta$design),
                unique(unlist(lapply(plot_formulae, all.vars)))
                )),
       model_meta$variables)
@@ -386,7 +385,7 @@ for (dataset_id in names(ddsList)) {
             plot_meta=section_hierarchy
             )
     
-    design(this_dds) <- design
+    design(this_dds) <- model_meta$design
     done_partials <- list()
     ## Loop through plot configurations
     for (plot_id in names(plot_formulae)) {
@@ -422,7 +421,7 @@ for (dataset_id in names(ddsList)) {
         )
 
       }
-      if (formula_equal(design, plot_fml)) {
+      if (formula_equal(model_meta$design, plot_fml)) {
         removed <- ""
       } else {
         partials <- done_partials[[which_assay]][[design_key]]
@@ -584,7 +583,7 @@ for (dataset_id in names(ddsList)) {
 
 #### 1D PC plots
       cat("\n\n", strrep("#", length(section_hierarchy)+1), " 1PC\n\n", sep="")
-      covar_x_pc <- mat_x_terms(proj, design, colDat)
+      covar_x_pc <- mat_x_terms(proj, model_meta$design, colDat)
       pl <- ggplot(covar_x_pc, aes(x = column, y = Covariate, fill = Assoc)) + 
        geom_raster() +
        facet_wrap(~wrap, scales = "free_x",ncol = 1)  +
