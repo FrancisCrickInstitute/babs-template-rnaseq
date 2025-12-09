@@ -62,6 +62,7 @@ load_specs <- function(file="", context) {
              x
            },
            envir=e)
+    assign("constrain", expression, envir=e)
     normalise_within <- function(...) {
       norm_within(as.data.frame(colData(context)), ...)}
     assign("settings", alist, envir=e)
@@ -572,6 +573,11 @@ check_model <- function(dds) {
     fml <- update(mdl$design, .x ~ .)
     fit <- lm(fml, data=df)
     mdl$lm <- fit
+    if ("constraint" %in% names(mdl)) {
+      if (is.expression(mdl$constraint)) {
+        mdl$constraint <- em_constraint(fit, mdl$constraint)
+      }
+    }
     if ("drop_unsupported_combinations" %in% names(mdl) && mdl$drop_unsupported_combinations==TRUE) {
       mdl$dropped <- is.na(coef(fit))
     } else {
@@ -585,7 +591,7 @@ check_model <- function(dds) {
     X <- model.matrix(mdl$design, as.data.frame(colData(dds)))[,!mdl$dropped, drop=FALSE]
     colnames(X) <- .resNames(colnames(X))
     if ("constraint" %in% names(mdl)) {
-      X <- X %*% Null(mdl$constraint)
+      X <- X %*% MASS::Null(mdl$constraint)
     }
     mdl$mat <- X
     metadata(dds)$model_code <-c(
@@ -600,7 +606,7 @@ check_model <- function(dds) {
   } else if  ("constraint" %in% names(mdl)) {
     X <- model.matrix(mdl$design, as.data.frame(colData(dds)))
     colnames(X) <- .resNames(colnames(X))
-    mdl$mat <- X %*% Null(mdl$constraint)
+    mdl$mat <- X %*% MASS::Null(mdl$constraint)
     metadata(dds)$model_code <- "TODO"
   } else {
     metadata(dds)$model_code <- c(
@@ -1502,4 +1508,10 @@ df2colorspace <- function(df, palette) {
               )
   res$ggplot$.influential <- setNames(c("black", "white"), c(TRUE, FALSE))
   res
+}
+
+em_constraint <- function(fit, constraint) {
+  rg <- emmeans::ref_grid(fit)
+  em <- emmeans::emmeans(subset(rg, eval(constraint[[2]])), update(eval(constraint[[1]]), revpairwise ~ .))
+  em$contrasts@linfct
 }
