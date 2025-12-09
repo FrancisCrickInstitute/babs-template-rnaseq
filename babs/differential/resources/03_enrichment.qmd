@@ -239,7 +239,7 @@ broadly similar magnitudes but opposite directions...)
 #param$set("showCategory")
 
 # Get a data.frame with the dds objects in a column
-dds_df <- tibble::as_tibble(dmc2df(dds_model_comp))
+dds_df <- dmc2df(dds_model_comp)
 
 # Enumerate all functional-approach x dds combos
 approach_df <- cross_join(

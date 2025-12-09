@@ -294,13 +294,13 @@ rbind_summary <- function(x, levels=c("Dataset", "Design", "Comparison")) {
 #' @export
 dmc2df <- function(dmc) {
   dds <- do.call(c, lapply(dmc, function(d) {do.call(c, lapply(d, function(m) {m}))}))
-  list2DF(
-    list(dataset=sapply(dds, function(x) metadata(x)$dmc$dataset),
+  df <- tibble::tibble(
+    dataset=sapply(dds, function(x) metadata(x)$dmc$dataset),
     model=sapply(dds, function(x) metadata(x)$dmc$model),
     comparison=make.unique(sapply(dds, function(x) metadata(x)$dmc$comparison)),
-    dds=dds
-    )
+    dds=I(dds)
   )
+  df
 }
 
 #' @export
