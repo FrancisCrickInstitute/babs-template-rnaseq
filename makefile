@@ -41,7 +41,7 @@ infrastructure: $(generic_dir)/differential
 
 .PHONY: $(generic_dir)/differential
 $(generic_dir)/differential:
-	cd $(generic_dir) && make rnaseq
+	cd $(generic_dir) && make differential
 
 ################################################################
 #### Testing the pipeline
