@@ -1,3 +1,28 @@
+# Version 1.3.0
+## Major Changes
+ - Improve plots by z-scoring
+ - Improve the merge_yml functionality
+ - Reimplement partials for speed
+## Minor Changes
+ - Improve documentation procedure
+ - Bring tabs to the exploratory page
+ - Improve the page resize toggle
+ - Add lightbox
+ - Add env files back in
+ - Remove some unneeded functions
+ - Tidy up roxygen tags
+ - Start the model-constraint handler
+ - Better handling of env-vars with spaces, eg fullname
+ - Refactor for author roles, and move meta to the _quarto.yml
+ - Delegate differential module to separate template
+ - Auto-generate the secret and shared mks from the central differential one
+ - Partial implementation of model constraints
+ - Work-around for an R bug
+ - Don't over-write the 'design' function with a variable.
+ - Fix typo
+ - Add facet wrapper
+ - Better handling of org packages
+ - Tidy up git inclusion
 # Version 1.2.0
 ## Major Changes
  - Rearrange report sections to put all plots related to a
