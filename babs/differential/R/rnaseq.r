@@ -987,28 +987,41 @@ summarise_results <- function(dds) {
 }    
 
 #' @export
-tidy_significant_dds <- function(dds, ind = TRUE, columns=NULL, weights=NULL) {
-  if (inherits(dds, "DESeqDataSet")) {
-    mat <- assay(dds, "vst")[ind,,drop=FALSE]
-  } else {
-    mat <- assay(dds)[ind,,drop=FALSE]
-  }
-  pdat <- as.data.frame(colData(dds))
+tidy_significant_se <- function(se, ind = TRUE, weights=NULL, assay= (if (inherits(se, "DESeqDataSet")) "vst" else 1)) {
+  mat <- assay(se, assay)[ind,,drop=FALSE]
   if (!is.null(weights) && is.numeric(weights)) {
     if (any(is.na(mat))) {
-      offset <- assay(dds, "imputed")[ind,,drop=FALSE] %*%  weights
+      offset <- assay(se, "imputed")[ind,,drop=FALSE] %*%  weights
     } else {
       offset <- mat %*%  weights
     }
     mat <- mat - as.vector(offset)
   }
-  if (is.null(columns)) {
-    return(list(mat=mat, pdat=pdat))
-  } else {
-    cols <- intersect(unique(unlist(columns)), colnames(pdat))
-    ord <- do.call(order, as.list(pdat[,cols, drop=FALSE]))
-    return(list(mat=mat[,ord, drop=FALSE], pdat=pdat[ord, cols, drop=FALSE]))
-  }
+  SummarizedExperiment(mat, colData = colData(se))
+}
+
+#' @export
+scale_se <- function(se, ind=TRUE, centre=TRUE, scale=TRUE) {
+  if (centre) assay(se) <- assay(se)-rowMeans(assay(se)[, ind, drop=FALSE])
+  if (scale) assay(se) <- assay(se)/rowSds(assay(se)[, ind, drop=FALSE])
+  se
+}
+
+
+#' @export
+colDF <- function(se) {
+  as.data.frame(colData(se))
+}
+
+
+#' @export
+reorder_samples <- function(se, columns) {
+  cols <- intersect(unique(unlist(columns)), colnames(colData(se)))
+  colData(se) <- colData(se)[,cols,drop=FALSE]
+  colData(se)[] <- lapply(colData(se), function(x) {
+    if (is.character(x)) factor(x) else x
+  })
+  se[,do.call(order, as.list(colData(se)))]
 }
 
 
@@ -1410,7 +1423,7 @@ generate_assay <- function(args, dds) {
 }
 
 #' @export
-data_key <- function(plot_fml, dds, meta="exploratory_default_assay") {
+data_key <- function(plot_fml, dds, meta="default_assay") {
   if ("y" %in% names(plot_fml[[2]])) {
     yvar <- as.character(plot_fml[[2]]$y)
   } else {

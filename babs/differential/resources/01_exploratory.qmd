@@ -88,7 +88,7 @@ if (isTRUE(getOption('knitr.in.progress'))) {
 
 data(list=paste0("counts_", params$alignment))
 is_des <- inherits(dds, "DESeqDataSet")
-metadata(dds)$exploratory_default_assay <- ifelse(is_des, "vst", 1)
+metadata(dds)$default_assay <- ifelse(is_des, "vst", 1)
 
 if (!is.null(metadata(dds)$organism$org)) {
   library(metadata(dds)$organism$org, character.only=TRUE)
@@ -368,11 +368,13 @@ for (dataset_id in names(ddsList)) {
       assay(thid_dds, new_name) <- normalise_assay(this_dds, model_meta$extra_assays[[new_name]], model_meta$design)
     }
     plot_formulae <- section_chooser(model_meta, "exploratory_profile_plots", "profile_plots")
+    colDat <- colDF(this_dds)
     model_vars <- sort_vars(
       unique(c(all.vars(model_meta$design),
                unique(unlist(lapply(plot_formulae, all.vars)))
                )),
       model_meta$variables)
+    model_vars <- intersect(model_vars, names(colDat))
     dmc_heading(ddsList, dataset=dataset_id, model=model_id, depth=strrep("#", length(section_hierarchy)))
     # Show an overall legend
     nice_legends <- separate_legend(ddsList[[dataset_id]], model_vars)
@@ -397,7 +399,6 @@ for (dataset_id in names(ddsList)) {
       which_assay <- names(design_key)
       design_key <- design_key[[which_assay]]
       this_assay <- assay(this_dds, which_assay)
-      colDat <- as.data.frame(colData(this_dds))
       if ("filterQC" %in%  names(mcols(this_dds))) {
         this_assay <- this_assay[mcols(this_dds)$filterQC,]
       }
@@ -408,7 +409,7 @@ for (dataset_id in names(ddsList)) {
         done_partials[[which_assay]][[design_key]] <- partialise(this_dds, assay=which_assay)
         expected_assay <- assemble_partialised(done_partials[[which_assay]][[design_key]], design(this_dds), resids=FALSE)
         ind <- !duplicated(model.matrix(design(this_dds), colDat))
-        head_frame <- as.data.frame(colDat[ind,])
+        head_frame <- colDat[ind, , drop=FALSE]
         head_frame[] <- sapply(head_frame, as.character)
         fname <- p2filename(params, paste("expected", which_assay, gsub("+","-",design_key,fixed=TRUE), sep="_"), "tsv")
         dir.create(dirname(fname), recursive=TRUE)
@@ -445,15 +446,16 @@ for (dataset_id in names(ddsList)) {
       if (param$get("clustering_distance_columns") != "binary") {
           if (is_already_relative) {
             measure_name <- paste(noun_to_readout(RowNoun), "relative to group")
-            col_fn <- sym_colour(hmap_data)
+            col_fn <- sym_colour(hmap_data[,this_dds$.influential])
           } else {
             if (attr(terms(plot_fml), "intercept") == 1) {# abuse of notation. For intercept-less plot formulae, don't mean-centre
-              hmap_data <- hmap_data - rowMeans(hmap_data[,this_dds$.influential])
-              measure_name <- paste("Mean-centred", noun_to_readout(rowNoun))
-              col_fn <- sym_colour(hmap_data)
+              hmap_data <- hmap_data - rowMeans(hmap_data[,this_dds$.influential, drop=FALSE])
+              hmap_data <- hmap_data / rowSds(hmap_data[,this_dds$.influential, drop=FALSE])
+              measure_name <- paste("Mean-centred, scaled", noun_to_readout(rowNoun))
+              col_fn <- sym_colour(hmap_data[,this_dds$.influential])
             } else {
               measure_name <- paste("Absolute", noun_to_readout(rowNoun))
-              col_fn <- sym_colour(hmap_data, single=TRUE)
+              col_fn <- sym_colour(hmap_data[,this_dds$.influential], single=TRUE)
             }
           }
       } else {
@@ -462,12 +464,18 @@ for (dataset_id in names(ddsList)) {
       gene_clust <- bluster::clusterRows(hmap_data[,this_dds$.influential], param$get("gene_clust"), full=TRUE)
       this_clust <- cluster_ind()
       levels(gene_clust$clusters) <- paste0(this_clust, levels(gene_clust$clusters))
+      if ("cols" %in% names(plot_fml[[2]])) {
+        col_split <- rlang::eval_tidy(eval(plot_fml[[2]])$cols, colDat)
+      } else {
+        col_split <- NULL
+      }
       pl <- ComplexHeatmap::Heatmap(
         hmap_data,
         name = measure_name,
         column_title = "Samples",
         row_title = paste0(RowNoun,"s"),
         col = col_fn,
+        column_split = col_split,        
         clustering_distance_columns = param$get("clustering_distance_columns"), 
         cluster_rows = gene_clust$objects$hclust,
         heatmap_legend_param = list(direction = "horizontal"), 
@@ -493,6 +501,7 @@ for (dataset_id in names(ddsList)) {
         col = col_fn,
         cluster_columns = FALSE,
         column_order=do.call(order, colDat[model_vars]),
+        column_split = col_split,        
         cluster_rows = gene_clust$objects$hclust,
         heatmap_legend_param = list(direction = "horizontal"),
         top_annotation = ComplexHeatmap::HeatmapAnnotation(
@@ -510,25 +519,25 @@ for (dataset_id in names(ddsList)) {
       cat("\n\n", strrep("#", length(section_hierarchy)+1), " Profiles\n\n", sep="")     
       cc <- cluster_calc(hmap_data, clusterID=gene_clust$clusters)
       centroid_df <- cbind(cc, colDat[model_vars]) %>%
-        pivot_longer(cols=any_of(names(cc)), names_to="babs.name", values_to="babs.value") %>%
-        mutate(babs.name=factor(babs.name, levels=names(cc)))
+        pivot_longer(cols=any_of(names(cc)), names_to=".derived", values_to=".derived.value") %>%
+        mutate(.derived=factor(.derived, levels=names(cc)))
       mapping <- modify_mapping(eval(plot_fml[[2]]))
       flag_vars <- all.vars(eval(plot_fml[[2]])$flag)
       colour_aes <- eval(plot_fml[[2]])["colour"]
       orig_caption <- aes_caption(eval(plot_fml[[2]]))
       pl <- ggplot(centroid_df, mapping) +
-        facet_wrap(~ babs.name) +
-        geom_point_interactive(aes(y= babs.value), size = 3, shape = 21) +
+        facet_wrapper(mapping, default=aes(facets = .derived), scales="free_y") + 
+        geom_point_interactive(aes(y= .derived.value), size = 3, shape = 21) +
         labs(y=noun_to_readout(RowNoun)) 
       if ("group" %in% names(mapping)) {
         group_df <- cbind(cc, colDat[model_vars])  %>%
-          pivot_longer(cols=any_of(names(cc)), names_to="babs.name", values_to="babs.value") %>%
-          mutate(babs.name=factor(babs.name, levels=names(cc)))
+          pivot_longer(cols=any_of(names(cc)), names_to=".derived", values_to=".derived.value") %>%
+          mutate(.derived=factor(.derived, levels=names(cc)))
         pl <- pl +
-          geom_line(modifyList(colour_aes, aes(y=babs.value)), linewidth=0.25, alpha=0.2,
+          geom_line(modifyList(colour_aes, aes(y=.derived.value)), linewidth=0.25, alpha=0.2,
                     stat="summary",
                     fun=mean) +
-          geom_line(modifyList(colour_aes, aes(y=babs.value)), data=group_df, alpha=0.2,
+          geom_line(modifyList(colour_aes, aes(y=.derived.value)), data=group_df, alpha=0.2,
                     stat="summary",
                     fun=mean)
       }
@@ -563,9 +572,10 @@ for (dataset_id in names(ddsList)) {
       
       aes_list <- lapply(substitute_x_aes(eval(plot_fml[[2]])), modify_mapping)
       for (this_aes in aes_list) {
-        pl <- ggplot(pc.df,
+        pl <- ggplot(transform(pc.df,.derived="", .derived.value=""),
                     modifyList(this_aes, aes(x=PC1, y=PC2))) + 
-          geom_point_interactive(size = 5, shape = 21) + 
+          geom_point_interactive(size = 5, shape = 21) +
+          facet_wrapper(mapping, this_aes) + 
           xlab(paste0("PC ", param$get("pc_x"), ": ", my_percent[param$get("pc_x")], "% variance")) +
           ylab(paste0("PC ", param$get("pc_y"), ": ", my_percent[param$get("pc_y")], "% variance"))
         if (do_labels) {
@@ -595,10 +605,10 @@ for (dataset_id in names(ddsList)) {
               plot_meta=section_hierarchy
               )
       cat("\n\n---\n\n")
-      long_dat <- extract_hits(covar_x_pc, proj, model_vars)
-      pl <- ggplot(long_dat, modifyList(mapping, aes(y=value))) +
+      long_dat <- transform(extract_hits(covar_x_pc, proj, model_vars), .derived=PC, .derived.value=value)
+      pl <- ggplot(long_dat, modifyList(mapping, aes(y=.derived.value))) +
         geom_point_interactive(size = 3, shape = 21) +
-        facet_wrap(~PC)
+        facet_wrapper(mapping, default=aes(facets = .derived), scales="free_y") 
       if ("group" %in% names(mapping)){
         pl <- pl+geom_line(colour_aes, stat="summary", alpha=0.2,
                           fun=mean)

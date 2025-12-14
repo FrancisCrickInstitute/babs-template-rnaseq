@@ -136,7 +136,10 @@ to ensure reported fold-changes are more robust.
 param$set("alpha", postpone=TRUE)
 param$set("lfcThreshold", postpone=TRUE)
 param$set("filterFun", postpone=TRUE)
-param$set("LRT_effect")
+param$set("LRT_effect", postpone=TRUE)
+param$set("clustering_distance_rows", postpone=TRUE)
+param$set("clustering_distance_columns", postpone=TRUE)
+param$set("gene_clust")
 
 rds_name <- file.path("data", paste0(basename(params$spec),"_x_", params$alignment, ".rds"))
 
@@ -260,10 +263,6 @@ pval_frame <- dds_model_comp %>%
   map_dmc(~as.data.frame(mcols(.x)$results)) %>%
   map_dmc(function(x) {bind_rows(x, .id="Comparison")}, depth="model")
 
-
-param$set("clustering_distance_rows", postpone=TRUE)
-param$set("clustering_distance_columns", postpone=TRUE)
-param$set("gene_clust")
 cat("\n\n")
 
 for (dataset_id in names(summaries)) {
@@ -321,9 +320,11 @@ for (dataset_id in names(summaries)) {
 
 ```{r}
 #| label: results
+all_clusters <- list()
 for (dataset_id in names(dds_model_comp)) {
   section_hierarchy <- list(dataset=dataset_id)
-  met <- metadata(ddsList[[dataset_id]])
+  dataset_se <- ddsList[[dataset_id]]
+  met <- metadata(dataset_se)
   dmc_heading(dds_model_comp, dataset=dataset_id, model=NULL, depth=strrep("#", length(section_hierarchy)))
   has_comparisons <- sapply(met$models, function(m) "comparisons" %in% names(m) && length(m$comparisons) > 0)
   src2bullets(met, c("subset", "extra_assays", "influential_samples"))
@@ -344,6 +345,7 @@ for (dataset_id in names(dds_model_comp)) {
       external_list$Cluster[is.na(external_list$Cluster)] <- external_list$ID[is.na(external_list$Cluster)]
     }
     for (comparison_id in c(names(this_model), unique(external_list$Comparison))) {
+      cluster_ind <- counter(post_fn=to_letter)      
       section_hierarchy <- list(dataset=dataset_id, model=model_id, comparison=comparison_id)
       dmc_heading(dds_model_comp, dataset=dataset_id, model=model_id, comparison=comparison_id, depth=strrep("#", length(section_hierarchy)))
       is_external <- !(comparison_id %in% names(this_model))
@@ -418,7 +420,7 @@ for (dataset_id in names(dds_model_comp)) {
         first <- FALSE
         cat("\n\n---\n\n")
       }
-      nice_legends <- separate_legend(ddsList[[dataset_id]])
+      nice_legends <- separate_legend(dataset_se)
       pl <- do.call(gridExtra::arrangeGrob,c(
         nice_legends,
         ncol=ceiling(sqrt(length(nice_legends)))))
@@ -426,7 +428,7 @@ for (dataset_id in names(dds_model_comp)) {
       do_plot(pl,
               label= "legend-a",
               caption=paste("Metadata colour-codings for",
-                            metadata(ddsList[[dataset_id]])$dmc$dataset_name %||% metadata(ddsList[[dataset_id]])$dmc$dataset
+                            metadata(dataset_se)$dmc$dataset_name %||% metadata(dataset_se)$dmc$dataset
                             ),
               plot_meta=section_hierarchy
               )
@@ -437,6 +439,7 @@ for (dataset_id in names(dds_model_comp)) {
                  unique(unlist(lapply(plot_formulae, all.vars)))
                  )),
         md$model$variables)
+      model_vars <- intersect(model_vars, names(colData(this_dds)))
       if ("mat" %in% names(md$model)) {
         mmat <- md$model$mat
       } else {
@@ -451,151 +454,126 @@ for (dataset_id in names(dds_model_comp)) {
         weights <- rep(1/nrow(mmat), times=nrow(mmat))
         baseline_str <- paste("average", noun_to_readout(rowNoun))
       }
-      zweights <- setNames(rep(0, ncol(ddsList[[dataset_id]])), colnames(ddsList[[dataset_id]]))
+      zweights <- setNames(rep(0, ncol(dataset_se)), colnames(dataset_se))
       zweights[colnames(this_dds)] <- weights
-      tidied_data <- tidy_significant_dds(ddsList[[dataset_id]], is_significant, model_vars, weights=zweights)
-      pdat <- tidied_data$pdat
-      pdat[sapply(pdat, is.character)] <- lapply(pdat[sapply(pdat, is.character)], 
-                                                as.factor)
-      colnames(tidied_data$mat) <- rownames(pdat)
-      if (length(var_roles$by)==0) {
-        col_split <- NULL
-      } else {
-        col_split <- apply(sapply(pdat[, var_roles$by, drop=FALSE], as.character), 1, paste, collapse=" ")
-      }
-      ha <- ComplexHeatmap::HeatmapAnnotation(
-        df=pdat,
-        col=metadata(colData(this_dds))$palette$Heatmap[names(pdat)],
-        show_legend=FALSE)
-      colname_annot <- HeatmapAnnotation(
-        labels1 = anno_text(colnames(tidied_data$mat)),
-        height=unit(1, "inches")
-      )
-      mat_height <- height_scaler(n=nrow(tidied_data$mat), small=10, big=20, N=1000)
-      hmap <- function(ind) {
-        ComplexHeatmap::Heatmap(
-        tidied_data$mat[ind,,drop=FALSE],
-        height = unit(5, "mm")*length(ind),
-        col=sym_colour(na.omit(as.vector(tidied_data$mat))),
-        heatmap_legend_param = list(direction = "horizontal" ),
-        name=comparison_id,
-        cluster_columns = FALSE,
-        show_column_names = TRUE,
-        clustering_distance_rows=param$get("clustering_distance_rows"),
-        column_split = col_split,
-        top_annotation = ha,
-        row_names_gp = gpar(fontsize = 6),
-        show_row_names = nrow(tidied_data$mat)<100)
-      }
-      ## hx <- c(1,1000)
-      ## hy <- sapply(hx, function(n) {
-      ##   pdf(NULL)
-      ##   d <- draw(hmap(rep(1,n)))
-      ##   out <- convertHeight(sum(component_height(d)) + unit(4, "mm"), "inch", valueOnly = TRUE)
-      ##   dev.off()
-      ##   out
-      ##   })
-      pl <- ComplexHeatmap::Heatmap(
-        tidied_data$mat,
-#        height = unit(5, "mm")*nrow(tidied_data$mat),
-        col=sym_colour(na.omit(as.vector(tidied_data$mat))),
-        heatmap_legend_param = list(direction = "horizontal" ),
-        name=comparison_id,
-        cluster_columns = FALSE,
-        show_column_names = TRUE,
-        clustering_distance_rows=param$get("clustering_distance_rows"),
-        column_split = col_split,
-        top_annotation = ha,
-        row_names_gp = gpar(fontsize = 6),
-        show_row_names = nrow(tidied_data$mat)<100)
-      do_plot(pl,
-              label="Heatmap",
-              caption=paste0("Heatmap on ", tooltip(md, comparison_id), comp_type, rowNoun,"s of ",mtag(model_id), " in ", dtag(dataset_id), ". White for ", baseline_str),
-              plot_meta=section_hierarchy,
-              height_opt=paste0(
-                "#| fig-height: ",
-                mat_height 
-              )
-              )
-      cat('\n\n---\n\n')
-    
-      all_clusters <- list()
-      cluster_ind <- counter(post_fn=to_letter)
-      if (is_null(plot_formulae)) {
-              cat(':::\n\n')
-              next
-      }
-      partials <- partialise.matrix(
-        assay(ddsList[[dataset_id]][is_significant,,drop=FALSE], ifelse(inherits(this_dds, "DESeqDataSeq"),"vst", 1)),
-        as.data.frame(colData(ddsList[[dataset_id]])),
-        fml=md$model$design)
-      cat("\n\n", strrep("#", length(section_hierarchy)+1), " Profile\n\n", sep="")
-      for (plot_id in names(plot_formulae)) {
+      centroid_df <- list()
+      for (plot_id in distinct_formulae(plot_formulae)) {
         plot_fml <- plot_formulae[[plot_id]]
-        if (! "name" %in% names(attributes(plot_fml))) attr(plot_fml, "name") <- plot_id
-        section_hierarchy$plot_config <- attr(plot_fml, "name")
-        dmc_heading(dds_model_comp, dataset=dataset_id, model=model_id, plot=plot_fml, depth=strrep("#", length(section_hierarchy)+2), numbered=FALSE)
-        cdata_df <- as.data.frame(colData(ddsList[[dataset_id]])[, all.vars(plot_fml), drop=FALSE])
-        mat <- t(scale(t(
-          assemble_partialised(partials, update(plot_fml, NULL ~ .), resids=TRUE)
-        )))
+        if ("y" %in% names(plot_fml[[2]])) {
+          tidied_se <- tidy_significant_se(dataset_se, is_significant, weights=zweights, assay=as.character(as.character(plot_fml[[2]]$y)))
+        } else {
+          tidied_se <- tidy_significant_se(dataset_se, is_significant, weights=zweights)
+        }
+        tidied_se <- reorder_samples(tidied_se,model_vars)
+        assay(tidied_se) <- assay(tidied_se) / rowSds(assay(tidied_se)[,colnames(this_dds),drop=FALSE])
+        partials <- partialise(tidied_se, fml=md$model$design, influence=colnames(this_dds))
+        assay(tidied_se) <- assemble_partialised(partials, update(plot_fml, NULL ~ .), resids=TRUE)
+        tidied_se <- scale_se(tidied_se, ind=colnames(this_dds), centre=FALSE, scale=TRUE)
+        if ("cols" %in% names(plot_fml[[2]])) {
+          col_split <- rlang::eval_tidy(eval(plot_fml[[2]])$cols, colDF(tidied_se))
+        } else {
+          col_split <- NULL
+        }
+        ha <- ComplexHeatmap::HeatmapAnnotation(
+          df=colDF(tidied_se),
+          col=metadata(colData(this_dds))$palette$Heatmap[names(colData(tidied_se))],
+          show_legend=FALSE)
+        colname_annot <- HeatmapAnnotation(
+          labels1 = anno_text(colnames(tidied_se)),
+          height=unit(1, "inches")
+        )
+        mat_height <- height_scaler(n=nrow(tidied_se), small=10, big=20, N=1000)
+        hc <- param$get("gene_clust")
+        if ("cut.params" %in% slotNames(hc) && "k" %in% names(slot(hc, "cut.params")) && slot(hc, "cut.params")$k >= nrow(tidied_se)) {
+          slot(hc, "cut.params") <- modifyList(slot(hc, "cut.params"), list(k=ceiling(nrow(tidied_se)/3)))
+        }
+        if (nrow(tidied_se)>1) {
+          gene_clust <- bluster::clusterRows(assay(tidied_se)[,colnames(this_dds), drop=FALSE], hc, full=TRUE)
+          if (is_external) {
+            gene_clust$clusters <- match(names(gene_clust$clusters), external_list$ID)
+          }
+        } else {
+          gene_clust <- list(
+            clusters=setNames(factor(1), row.names(tidied_se)),
+            objects=list(hclust=FALSE))
+        }
+        if (!is_external) {
+          this_clust <- cluster_ind()
+          gene_clust$clusters <- cluster_cardinality(gene_clust$clusters, this_clust)
+        }
         removed <- paste(
-          translate_terms(dropped_terms(partials, update(plot_fml, NULL ~ .)),ddsList[[dataset_id]]),
+          translate_terms(dropped_terms(partials, update(plot_fml, NULL ~ .)), dataset_se),
           sep=", ", collapse=", ")
         if (length(removed)==0 || removed=="") {
           removed <- ""
         } else {
           removed <- paste0(" having removed effect of ", removed)
         }
-        hc <- param$get("gene_clust")
-        if ("cut.params" %in% slotNames(hc) && "k" %in% names(slot(hc, "cut.params")) && slot(hc, "cut.params")$k >= nrow(mat)) {
-          slot(hc, "cut.params") <- modifyList(slot(hc, "cut.params"), list(k=ceiling(nrow(mat)/3)))
-        }
-        if (is_external) {
-          gene_clust <- list(clusters=setNames(
-            factor(external_list$Cluster[match(row.names(mat), external_list$ID)]),
-            row.names(mat)))
-        } else {
-          if (nrow(mat)>1) {
-          gene_clust <- bluster::clusterRows(mat, hc, full=TRUE)
-          } else {
-            gene_clust <- list(
-              clusters=setNames(factor(1), row.names(mat))
-            )
-          }
-          this_clust <- cluster_ind()
-          levels(gene_clust$clusters) <- paste0(this_clust, levels(gene_clust$clusters))
-        }
-        cc <- cluster_calc(mat, clusterID=gene_clust$clusters, relevel=!is_external)
-        centroid_df <- cbind(cc, cdata_df) %>%
-          pivot_longer(cols=any_of(names(cc)), names_to="babs.name", values_to="babs.value") %>%
-          mutate(babs.name=factor(babs.name, levels=names(cc)))
-        mapping <- modify_mapping(eval(plot_fml[[2]]))
-        pl <- ggplot(centroid_df, mapping) +
-          facet_wrap(~ babs.name) +
-          theme_bw() +
-          geom_point_interactive(aes(y= babs.value), size = 3, shape = 21) +
-          labs(y=noun_to_readout(RowNoun))
-        pl <- pl + my_alpha_scale(pl)
-        if ("group" %in% names(mapping)) {
-          pl <- pl+geom_line(aes(y=babs.value), stat="summary", fun=mean)
-        }
-        if ("ScaleDiscrete" %in% class(layer_scales(pl)$x)) {
-          pl <- pl + scale_x_discrete(guide=guide_axis(n.dodge=2))
-        }
-        pl <- pl + get_colour_scales(this_dds, mapping, all.vars(eval(plot_fml[[2]])$flag))
-        capt <- paste0("Cluster profile for ", tooltip(md, comparison_id), comp_type, rowNoun,"s  of ", mtag(model_id), " in ", dtag(dataset_id), removed)
+        capt <- paste0(tooltip(md, comparison_id), comp_type, rowNoun,"s  of ", mtag(model_id), " in ", dtag(dataset_id), removed)
+        pl <- ComplexHeatmap::Heatmap(
+          assay(tidied_se),
+          col=sym_colour(na.omit(as.vector(assay(tidied_se)[,colnames(this_dds)]))),
+          heatmap_legend_param = list(direction = "horizontal" ),
+          name=comparison_id,
+          cluster_columns = FALSE,
+          show_column_names = TRUE,
+          cluster_rows = gene_clust$objects$hclust,
+          column_split = col_split,
+          top_annotation = ha,
+          row_names_gp = gpar(fontsize = 6),
+          show_row_names = nrow(tidied_se)<100)
         do_plot(pl,
-                label= "diffClustProfile",
-                caption=capt,
-                plot_meta=section_hierarchy
+                label="Heatmap",
+                caption=paste0("Heatmap on ", capt,  ". White for ", baseline_str),
+                plot_meta=section_hierarchy,
+                height_opt=paste0(
+                  "#| fig-height: ",
+                  mat_height 
                 )
+                )
+        cc <- cluster_calc(assay(tidied_se), clusterID=gene_clust$clusters)
+        centroid_df[[plot_id]] <- cbind(cc, colDF(tidied_se)) %>%
+          pivot_longer(cols=any_of(names(cc)), names_to=".derived", values_to=".derived.value") %>%
+          mutate(.derived=factor(.derived, levels=names(cc)))
+        attr(centroid_df[[plot_id]], "caption") <- capt
         if (!is_external) {
           all_clusters[[this_clust]] <- list(
             id=gene_clust$clusters,
             description=capt
           )
         }
+        cat('\n\n---\n\n')
+      }
+      if (is_null(plot_formulae)) {
+        cat(':::\n\n')
+        next
+      }
+      cat("\n\n", strrep("#", length(section_hierarchy)+1), " Profile\n\n", sep="")
+      for (plot_id in names(plot_formulae)) {
+        plot_fml <- plot_formulae[[plot_id]]
+        if (! "name" %in% names(attributes(plot_fml))) attr(plot_fml, "name") <- plot_id
+        section_hierarchy$plot_config <- attr(plot_fml, "name")
+        dmc_heading(dds_model_comp, dataset=dataset_id, model=model_id, plot=plot_fml, depth=strrep("#", length(section_hierarchy)+2), numbered=FALSE)
+
+        mapping <- modify_mapping(eval(plot_fml[[2]]))
+        pl <- ggplot(centroid_df[[plot_id]], mapping) +
+          facet_wrapper(mapping, default=aes(facets = .derived), scales="free_y") + 
+          theme_bw() +
+          geom_point_interactive(aes(y= .derived.value), size = 3, shape = 21) +
+          labs(y=noun_to_readout(RowNoun))
+        pl <- pl + my_alpha_scale(pl)
+        if ("group" %in% names(mapping)) {
+          pl <- pl+geom_line(aes(y=.derived.value), stat="summary", fun=mean)
+        }
+        if ("ScaleDiscrete" %in% class(layer_scales(pl)$x)) {
+          pl <- pl + scale_x_discrete(guide=guide_axis(n.dodge=2))
+        }
+        pl <- pl + get_colour_scales(this_dds, mapping, all.vars(eval(plot_fml[[2]])$flag))
+        do_plot(pl,
+                label= "diffClustProfile",
+                caption=paste0("Cluster profile for ", attr(centroid_df[[plot_id]], "caption")),
+                plot_meta=section_hierarchy
+                )
         cat('\n\n---\n\n')
       }
       cat(':::\n\n')
