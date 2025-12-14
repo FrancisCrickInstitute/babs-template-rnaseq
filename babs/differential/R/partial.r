@@ -22,36 +22,53 @@ partialise <- function(obj,...) {
 #' @param fml A one-sided formula to predict each row of obj given the metadata
 #' @family partial
 #' @export
-partialise.matrix <- function(obj, cdata, fml) {
-  assign("tmat", t(obj), envir=environment(fml))
-  fml <- stats::update(fml, tmat ~ .)
-  fit <- lm(fml, data=cdata)
-  fit1 <- fit
-  class(fit1) <- "lm"
-  newdata <- cdata
-  if ("xlevels" %in% names(fit)) {
-    for (i in names(fit$xlevels)) {
-      levels(newdata[[i]])[!(levels(newdata[[i]]) %in% fit$xlevels[[i]])] <- NA
+partialise.matrix <- function(obj, cdata, fml, influence = TRUE) {
+  # obj: response matrix, rows = responses, cols = observations
+  # cdata: covariate data frame
+  # fml: formula with single response (will be replaced by tmat)
+  # influence: optional vector of column indices of obj to use for fitting
+  nresp <- nrow(obj)
+  nobs <- ncol(obj)
+  cdata_full <- cdata
+  cdata <- cdata[influence, , drop = FALSE]
+  obj_influence <- obj[, influence, drop = FALSE]
+  cdata$tmat <- t(obj_influence)
+  fml <- update(fml, tmat ~ .)
+  mf <- model.frame(fml, data = cdata)
+  X <- as.matrix(model.matrix(fml, mf))
+  storage.mode(X) <- "double"
+  QR <- qr(X)
+  X_center <- drop(colMeans(X))
+  assign <- attr(X, "assign")
+  terms <- attr(terms(fml), "term.labels")
+  nterms <- length(terms)
+  termcols <- lapply(seq_len(nterms), function(t) which(assign == t))
+  cdata_full$tmat <- t(obj)
+  mf_full <- model.frame(fml, data = cdata_full)
+  X_full <- as.matrix(model.matrix(fml, mf_full))
+  storage.mode(X_full) <- "double"
+  Xc_full <- sweep(X_full, 2, X_center, FUN = "-")  # center using influence means
+  # preallocate outputs
+  out <- array(0, c(nobs, nresp, nterms),
+               dimnames = list(colnames(obj), rownames(obj), terms))
+  resid <- matrix(0, nobs, nresp, dimnames = list(colnames(obj), rownames(obj)))
+  const <- numeric(nresp)
+  for (i in seq_len(nresp)) {
+    beta <- qr.coef(QR, obj_influence[i, ])
+    term_mat <- matrix(0, nterms, nobs)
+    for (t in seq_len(nterms)) {
+      cols <- termcols[[t]]
+      term_mat[t, ] <- Xc_full[, cols, drop = FALSE] %*% beta[cols]
     }
+    out[, i, ] <- t(term_mat)
+    const[i] <- beta[1] + sum(X_center[-1] * beta[-1], na.rm = TRUE)
+    resid[, i] <- obj[i, ] - (colSums(term_mat) + const[i])
   }
-  ind <- c("coefficients","residuals","effects","fitted.values")
-  for (i in 1:nrow(obj)) {
-    if (nrow(obj)==1) {
-      fit1 <- fit
-    } else {
-      fit1[ind] <- lapply(fit[ind], function(x) x[,i])
-    }
-    pred <- predict(fit1, type="terms", newdata=newdata)
-    if (i==1) {
-      out <- array(0, c(rev(dim(obj)), ncol(pred)), dimnames=c(rev(dimnames(obj)), list(colnames(pred))))
-      const <- numeric(dim(out)[2])
-    }
-    out[,i,] <- pred
-    const[i] <- attr(pred, "constant")
-  }
-  ret <- list(terms=out, const=const, resid=fit$residuals, data=list(mat=obj, cdata=cdata, fml=fml))
-  pred <- apply(out, 1:2, sum, na.rm=TRUE)
-  ret$resid <- t(obj - const - t(pred))
+  ret <- list(
+    terms = out,
+    const = const,
+    resid = resid
+  )
   class(ret) <- "partialised"
   ret
 }
@@ -60,7 +77,7 @@ partialise.matrix <- function(obj, cdata, fml) {
 #' @param obj A DESeqDataSet object, where the design formula and colData will be used
 #' @family partial
 #' @export
-partialise.DESeqDataSet <- function(obj, assay="vst") {
+partialise.DESeqDataSet <- function(obj, assay="vst", influence=TRUE) {
   if (assay %in% assayNames(obj)) {
     mat <- assay(obj, assay)
   } else {
@@ -73,12 +90,12 @@ partialise.DESeqDataSet <- function(obj, assay="vst") {
   )
 }
 
-partialise.SummarizedExperiment <- function(obj, assay=1) {
+partialise.SummarizedExperiment <- function(obj, assay=1, fml=design(obj), influence=TRUE) {
   mat <- assay(obj, assay)
   partialise.matrix(
     obj=mat,
     cdata=as.data.frame(colData(obj)),
-    fml=design(obj)
+    fml=fml
   )
 }
 
@@ -118,5 +135,7 @@ assemble_partialised <- function(obj, reduced, extra=NULL, resids=TRUE) {
   )
   t(
     rowSums(obj$terms[, , terms, drop=FALSE], na.rm=TRUE, dims=2) +
-      (if(resids) obj$resid else 0))
+      (if(resids) obj$resid else 0)) + obj$const
 }
+
+
