@@ -207,18 +207,21 @@ aes_caption <- function(ae) {
 
 
 #' @export
-cluster_calc <- function(mat, clusterID, relevel=TRUE) {
-  if (relevel) {
-    tbl <- table(clusterID)
-    levels(clusterID) <- paste0("|", sub("[0-9]+", "", names(tbl)[1]), rank(-tbl, ties="first"), "|=", tbl) # change the labels
-    clusterID <- factor(clusterID, levels=levels(clusterID)[rev(order(tbl))])
-  }
+cluster_calc <- function(mat, clusterID) {
   if (length(levels(clusterID))==1) {
     setNames(data.frame(apply(mat, 2, mean)), levels(clusterID))
   } else {
     centres <- apply(mat, 2, function(samp) tapply(samp, clusterID, mean))
     as.data.frame(t(centres))
   }
+}
+
+#' @export
+cluster_cardinality <- function(clusterID, prefix="") {
+  tbl <- table(clusterID)
+  ordered_clusters <- names(sort(tbl, decreasing = TRUE))
+  new_labels <- paste0("|", prefix, seq_along(ordered_clusters), "| = ", tbl[ordered_clusters])
+  factor(clusterID, levels = ordered_clusters, labels = new_labels)
 }
 
 #' @export
@@ -312,4 +315,43 @@ get_colour_scales <- function(dds, mapping, flag_vars=character()) {
 height_scaler <- function(n, small, big, N) {
         h <- small +(big-small)*(n-1)/(N-1)
         min(h, big)
+}
+
+#' @export
+facet_wrapper <- function(mapping, default=aes(), ...) {
+  mapping <- modifyList(as.list( default), as.list(mapping))
+  if ("rows" %in% names(mapping) && "cols" %in% names(mapping)) {
+    facet_grid(
+      rows = vars(!!mapping$rows),
+      cols = vars(!!mapping$cols),
+      ...
+    )
+  } else if ("rows" %in% names(mapping) ) {
+    facet_grid(
+      rows = vars(!!mapping$rows),
+      ...
+    )
+  } else if ("cols" %in% names(mapping) ) {
+    facet_grid(
+      cols = vars(!!mapping$cols),
+      ...
+    )
+  } else if ("facets" %in% names(mapping)) {
+    facet_wrap(
+      facets = vars(!!mapping$facets),
+      ...
+    )
+  } else {
+    facet_null()
+  }
+}
+
+#' @export
+distinct_formulae <- function(flist) {
+  keys <- lapply(flist, function(fml) c(
+    as.character(eval(fml[[2]])$y %||% "NULL"),
+    as_label(fml[[3]])
+  ))
+  first_of_kind <- !duplicated(do.call(rbind, keys))
+  names(flist)[first_of_kind]
 }
