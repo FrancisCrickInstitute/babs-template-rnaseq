@@ -159,26 +159,21 @@ $(staging_dir)/R.bib: extdata/R.bib
 extdata/R.bib: renv.lock
 	$(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")' $(call log,bib)
 
-renv.lock: resources/_dependencies.R $(wildcard resources/renv/renv.lock) | $(log_dir)
+renv.lock: orgs=$(foreach align,$(alignments),$($(align).org.db))
+renv.lock: $(wildcard resources/renv/renv.lock) | $(log_dir)
 	if [ -f resources/renv/renv.lock ] ; then \
 	  $(GIT) mv resources/renv/renv.lock renv.lock 2>/dev/null || mv resources/renv/renv.lock renv.lock;\
 	  $(R) -e 'library(renv); activate()' ;\
-	  $(R) -e 'library(renv); restore(); install(); snapshot()' ;\
+	  export orgs="$(orgs)"; $(R) -e 'library(renv); restore(); install(); install(strsplit(Sys.getenv("ORGS"), " ")[[1]]);snapshot(type="all")' ;\
 	else \
 	  $(GIT) stash push -m "Pipeline stashed. Use 'git stash pop' to retrieve it" -- $@ $(call log,renv) ;\
 	  $(R) -e 'library(renv); init(bioconductor=TRUE)' ;\
+	  export orgs="$(orgs)"; $(R) -e 'library(renv); install(strsplit(Sys.getenv("ORGS"), " ")[[1]]); snapshot(type="all")' ;\
 	fi
 	$(GIT) add renv.lock renv .Rprofile $(source_dir)
 	$(GIT) add $(wildcard ../makefile ../.gitignore ../readme.md ../.gitignore .pipeline-version)
-	$(GIT) add $(wildcard makefile R .Rbuildignore .gitignore)
+	$(GIT) add $(wildcard makefile R .Rbuildignore .gitignore) resources/_dependencies.R
 	$(GIT) commit -m 'Renv initialised by pipeline\n\n' || echo "No initialisation files need commiting" $(call log,renv,-a) 
-
-
-resources/_dependencies.R: orgs=$(foreach align,$(alignments),$($(align).org.db))
-resources/_dependencies.R: $(configs)
-	for o in $(orgs); do grep -F -q $$o $@ || echo "library($$o)" >> $@; done
-	touch $@
-	$(GIT) add $@
 
 else
 ##   To be executed by container so prefix the original call to make with the container

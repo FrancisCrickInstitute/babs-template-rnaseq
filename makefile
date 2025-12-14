@@ -39,7 +39,6 @@ infrastructure: $(generic_dir)/differential
 	rsync -ar $(generic_dir)/differential/ babs/differential/
 	for i in docs ingress nfcore; do cp babs/differential/resources/make/{secret,shared}.mk babs/$$i/; done
 
-.PHONY: $(generic_dir)/differential
 $(generic_dir)/differential:
 	cd $(generic_dir) && make differential
 
