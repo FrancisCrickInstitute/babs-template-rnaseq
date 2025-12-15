@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RNASeq Template</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -39,7 +39,7 @@
     <li><a class="dropdown-item" href="../articles/spec.html">Spec-files for differential analysis</a></li>
   </ul>
 </li>
-<li class="nav-item"><a class="nav-link" href="..//test/index.html">Demo</a></li>
+<li class="nav-item"><a class="nav-link" href="../test/index.html">Demo</a></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul>
 <ul class="navbar-nav">
@@ -492,14 +492,19 @@ that treatment group.</p>
 <p>The second type of question, where we want to investigate a
 ‘difference of differences’, is achieved by the following grammar:</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/mult_comp.html">mult_comp</a></span><span class="op">(</span><span class="va">revpairwise</span><span class="op">+</span><span class="va">revpairwise</span> <span class="op">~</span> <span class="va">treatment</span> <span class="op">+</span> <span class="va">genotype</span>, interaction<span class="op">=</span><span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/mult_comp.html">mult_comp</a></span><span class="op">(</span><span class="va">revpairwise</span> <span class="op">~</span> <span class="va">treatment</span> <span class="op">+</span> <span class="va">genotype</span>, interaction<span class="op">=</span><span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
 <p>The terms on the right hand side of the formula enumerate the
-predictors we’re concerned in (there’s no need to have their interaction
-- that’s already known because of the <code>design</code>), and the left
-hand side specifies the contrasts that are going to be considered (so
-any of the keywords from the previous section) - there needs to be
-either one (which will be applied to all predictors), or one per factor
-on the other side of the formula (as here) in the respective order.</p>
+predictors we’re concerned in, and the left hand side specifies the
+contrasts that are going to be considered (so any of the keywords from
+the previous section) - there needs to be just one, applied to all
+factors. If we omit the <code>interaction=TRUE</code> argument then it
+will enumerate all possible combinations of treatment and genotype, and
+then contrast every combination against every other combination -
+probably not what is wanted (e.g. treated KO vs untreated WT); keeping
+the <code>interaction=TRUE</code> term is more usual, and builds a
+contrast that represents the differences of differences, e.g. treatment
+effect in KO - treatment effect in WT (where treatment effect in KO is
+treated KO - untreated KO.)</p>
 <p>The above is probably quite intimidating, so please ask for help on
 this - I’ll try to write something a bit more friendly.</p>
 </div>

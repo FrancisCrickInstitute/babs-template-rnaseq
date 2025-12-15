@@ -24,7 +24,6 @@
 <url><loc>https://bioinformatics.thecrick.org/resources/info/babs-rnaseq/reference/fitLRT.html</loc></url>
 <url><loc>https://bioinformatics.thecrick.org/resources/info/babs-rnaseq/reference/fit_models.html</loc></url>
 <url><loc>https://bioinformatics.thecrick.org/resources/info/babs-rnaseq/reference/functional_api.html</loc></url>
-<url><loc>https://bioinformatics.thecrick.org/resources/info/babs-rnaseq/reference/get_lhs.html</loc></url>
 <url><loc>https://bioinformatics.thecrick.org/resources/info/babs-rnaseq/reference/get_result.html</loc></url>
 <url><loc>https://bioinformatics.thecrick.org/resources/info/babs-rnaseq/reference/index.html</loc></url>
 <url><loc>https://bioinformatics.thecrick.org/resources/info/babs-rnaseq/reference/mult_comp.html</loc></url>
@@ -43,5 +42,10 @@
 <url><loc>https://bioinformatics.thecrick.org/resources/info/babs-rnaseq/test/02_differential_analyse_GRCh38.html</loc></url>
 <url><loc>https://bioinformatics.thecrick.org/resources/info/babs-rnaseq/test/03_enrichment_analyse_GRCh38.html</loc></url>
 <url><loc>https://bioinformatics.thecrick.org/resources/info/babs-rnaseq/test/index.html</loc></url>
+<url><loc>https://bioinformatics.thecrick.org/resources/info/babs-rnaseq/test/latest/00_init_GRCh38.html</loc></url>
+<url><loc>https://bioinformatics.thecrick.org/resources/info/babs-rnaseq/test/latest/01_exploratory_analyse_GRCh38.html</loc></url>
+<url><loc>https://bioinformatics.thecrick.org/resources/info/babs-rnaseq/test/latest/02_differential_analyse_GRCh38.html</loc></url>
+<url><loc>https://bioinformatics.thecrick.org/resources/info/babs-rnaseq/test/latest/03_enrichment_analyse_GRCh38.html</loc></url>
+<url><loc>https://bioinformatics.thecrick.org/resources/info/babs-rnaseq/test/latest/index.html</loc></url>
 </urlset>
 

@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RNASeq Template</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -23,7 +23,7 @@
     <li><a class="dropdown-item" href="../articles/pipeline-infrastructure.html">The Pipeline</a></li>
     <li><a class="dropdown-item" href="../articles/spec.html">Spec-files for differential analysis</a></li>
   </ul></li>
-<li class="nav-item"><a class="nav-link" href="..//test/index.html">Demo</a></li>
+<li class="nav-item"><a class="nav-link" href="../test/index.html">Demo</a></li>
 <li class="active nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
@@ -41,10 +41,32 @@
     </div>
 
     <div class="section level2">
-<h2 class="pkg-version" data-toc-text="1.2.0" id="version-120">Version 1.2.0<a class="anchor" aria-label="anchor" href="#version-120"></a></h2>
+<h2 class="pkg-version" data-toc-text="1.3.0" id="version-130">Version 1.3.0<a class="anchor" aria-label="anchor" href="#version-130"></a></h2>
 <div class="section level3">
-<h3 id="major-changes-1-2-0">Major Changes<a class="anchor" aria-label="anchor" href="#major-changes-1-2-0"></a></h3>
-<ul><li>Rearrange report sections to put all plots related to a mode/comparison in the same section</li>
+<h3 id="major-changes-1-3-0">Major Changes<a class="anchor" aria-label="anchor" href="#major-changes-1-3-0"></a></h3>
+<ul><li>Improve plots by z-scoring</li>
+<li>Improve the merge_yml functionality</li>
+<li>Reimplement partials for speed ## Minor Changes</li>
+<li>Improve documentation procedure</li>
+<li>Bring tabs to the exploratory page</li>
+<li>Improve the page resize toggle</li>
+<li>Add lightbox</li>
+<li>Add env files back in</li>
+<li>Remove some unneeded functions</li>
+<li>Tidy up roxygen tags</li>
+<li>Start the model-constraint handler</li>
+<li>Better handling of env-vars with spaces, eg fullname</li>
+<li>Refactor for author roles, and move meta to the _quarto.yml</li>
+<li>Delegate differential module to separate template</li>
+<li>Auto-generate the secret and shared mks from the central differential one</li>
+<li>Partial implementation of model constraints</li>
+<li>Work-around for an R bug</li>
+<li>Don’t over-write the ‘design’ function with a variable.</li>
+<li>Fix typo</li>
+<li>Add facet wrapper</li>
+<li>Better handling of org packages</li>
+<li>Tidy up git inclusion # Version 1.2.0 ## Major Changes</li>
+<li>Rearrange report sections to put all plots related to a mode/comparison in the same section</li>
 <li>Introduce interactive plots</li>
 <li>Include the ‘influential_samples’ functionality</li>
 <li>Output estimated means in supplementary csv’s ## Minor Changes</li>
@@ -59,10 +81,25 @@
 <li>Prep for big import of changes</li>
 <li>New data-model-profile=type hierarchy</li>
 <li>Improve categories - probably broken the sidebar though</li>
-<li>Bring in new template. Deloop differential partially # Version 1.0.1 ## Major Changes ## Minor Changes</li>
-<li>Injecting the demo that got missed</li>
-<li>Launchers are now single-file scripts # Version 1.0.0 ## Major Changes</li>
-<li>Add differential_subsets functionality</li>
+<li>Bring in new template. Deloop differential partially</li>
+</ul></div>
+</div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="1.0.1" id="version-101">Version 1.0.1<a class="anchor" aria-label="anchor" href="#version-101"></a></h2>
+<div class="section level3">
+<h3 id="major-changes-1-0-1">Major Changes<a class="anchor" aria-label="anchor" href="#major-changes-1-0-1"></a></h3>
+</div>
+<div class="section level3">
+<h3 id="minor-changes-1-0-1">Minor Changes<a class="anchor" aria-label="anchor" href="#minor-changes-1-0-1"></a></h3>
+<ul><li>Injecting the demo that got missed</li>
+<li>Launchers are now single-file scripts</li>
+</ul></div>
+</div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="1.0.0" id="version-100">Version 1.0.0<a class="anchor" aria-label="anchor" href="#version-100"></a></h2>
+<div class="section level3">
+<h3 id="major-changes-1-0-0">Major Changes<a class="anchor" aria-label="anchor" href="#major-changes-1-0-0"></a></h3>
+<ul><li>Add differential_subsets functionality</li>
 <li>Update to v1.0.1 of generic template</li>
 <li>Slurm refactor - ‘make sbatch run’ instead of ‘make run SUBMIT=true’ ## Minor Changes</li>
 <li>Ensure percentNA is available where applicable</li>
@@ -76,8 +113,14 @@
 <li>Update launchers. Fix edge-cases in pipeline</li>
 <li>Fix renv calling</li>
 <li>Document the differential_subset setting</li>
-<li>Update pkgdown generation # Version 0.24.0 ## Major Changes</li>
-<li>Add external genelists ## Minor Changes</li>
+<li>Update pkgdown generation</li>
+</ul></div>
+</div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.24.0" id="version-0240">Version 0.24.0<a class="anchor" aria-label="anchor" href="#version-0240"></a></h2>
+<div class="section level3">
+<h3 id="major-changes-0-24-0">Major Changes<a class="anchor" aria-label="anchor" href="#major-changes-0-24-0"></a></h3>
+<ul><li>Add external genelists ## Minor Changes</li>
 <li>Add documentation on external genelists</li>
 <li>Better handling of impute and normalise.</li>
 <li>Fix long-standing bug symbol-labelling of MA plots</li>
@@ -102,8 +145,14 @@
 <h3 id="minor-changes-0-22-0">Minor Changes<a class="anchor" aria-label="anchor" href="#minor-changes-0-22-0"></a></h3>
 <ul><li>Provide isolation script and example spec file</li>
 <li>Refresh the launchers</li>
-<li>Update to R4.5.0 and new launcher # Version 0.20.0 ## Major Changes</li>
-<li>Rationalise the counter/table/plot tracking system</li>
+<li>Update to R4.5.0 and new launcher</li>
+</ul></div>
+</div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.20.0" id="version-0200">Version 0.20.0<a class="anchor" aria-label="anchor" href="#version-0200"></a></h2>
+<div class="section level3">
+<h3 id="major-changes-0-20-0">Major Changes<a class="anchor" aria-label="anchor" href="#major-changes-0-20-0"></a></h3>
+<ul><li>Rationalise the counter/table/plot tracking system</li>
 <li>Refactor so shared+secret are in all modules</li>
 <li>Tidy up unneeded packages from renv.lock</li>
 <li>Switch to generic launchers ## Minor Changes</li>
@@ -111,8 +160,21 @@
 <li>Fix skipping default profile_plot</li>
 <li>Fix bug in aesthetic overrides when there’s only one aesthetic</li>
 <li>Fix another edge-case for partials with uni-variable models</li>
-<li>Move to the generic launcher capability # Version 0.18.1 ## Major Changes Add the profile plots to the exploratory page Add termNames functionality ## Minor Changes Add name-dodging # Version 0.18.0 ## Major Changes</li>
-<li>Move to the new launchers</li>
+<li>Move to the generic launcher capability</li>
+</ul></div>
+</div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.18.1" id="version-0181">Version 0.18.1<a class="anchor" aria-label="anchor" href="#version-0181"></a></h2>
+<div class="section level3">
+<h3 id="major-changes-0-18-1">Major Changes<a class="anchor" aria-label="anchor" href="#major-changes-0-18-1"></a></h3>
+<p>Add the profile plots to the exploratory page Add termNames functionality ## Minor Changes Add name-dodging</p>
+</div>
+</div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.18.0" id="version-0180">Version 0.18.0<a class="anchor" aria-label="anchor" href="#version-0180"></a></h2>
+<div class="section level3">
+<h3 id="major-changes-0-18-0">Major Changes<a class="anchor" aria-label="anchor" href="#major-changes-0-18-0"></a></h3>
+<ul><li>Move to the new launchers</li>
 <li>Add ability to cascade spec features down the spec &gt; dataset &gt; model &gt; comparison hierarchy</li>
 <li>Add profile-plots to the differential results</li>
 <li>Add ability to run ‘differential’ entirely isolated ## Minor Changes</li>
@@ -121,14 +183,36 @@
 <li>Make nfcore responsible for making filepaths that are aligner-invariant</li>
 <li>Add universal models</li>
 <li>Add demo of how to run an isolated differential analysis</li>
-<li>Add a workaround to the polyfill.io unavailability # Version 0.14.0 ## Major Changes</li>
-<li>Refactor the container/submission so that it doesn’t rely on intermediate shell scripts. ## Minor Changes</li>
+<li>Add a workaround to the polyfill.io unavailability</li>
+</ul></div>
+</div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.14.0" id="version-0140">Version 0.14.0<a class="anchor" aria-label="anchor" href="#version-0140"></a></h2>
+<div class="section level3">
+<h3 id="major-changes-0-14-0">Major Changes<a class="anchor" aria-label="anchor" href="#major-changes-0-14-0"></a></h3>
+<ul><li>Refactor the container/submission so that it doesn’t rely on intermediate shell scripts. ## Minor Changes</li>
 <li>Fix how <code>BABS_SINGULARITY_INTERACTIVE_EXTRAS</code> is sent to IDEs.</li>
 <li>Fix a regression that put nfcore in the differential container.</li>
-<li>Make the scratch path more traceable # Version 0.13.0 ## Major Changes</li>
-<li>Add Salmon as an aligner option. In any config, we can now have an additional <code>aligner=star_salmon</code> line (on its own, <em>not</em> as part of the nfcore line) ## Minor Changes</li>
-<li>Rename the test-fast-forwarders # Version 0.12.2 ## Major Changes ## Minor Changes Tighten up the documentation on how to work with pre-existing alignments. Split the documentation so that the intro to specfiles is separate from the installation/usage docs.</li>
+<li>Make the scratch path more traceable</li>
 </ul></div>
+</div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.13.0" id="version-0130">Version 0.13.0<a class="anchor" aria-label="anchor" href="#version-0130"></a></h2>
+<div class="section level3">
+<h3 id="major-changes-0-13-0">Major Changes<a class="anchor" aria-label="anchor" href="#major-changes-0-13-0"></a></h3>
+<ul><li>Add Salmon as an aligner option. In any config, we can now have an additional <code>aligner=star_salmon</code> line (on its own, <em>not</em> as part of the nfcore line) ## Minor Changes</li>
+<li>Rename the test-fast-forwarders</li>
+</ul></div>
+</div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.12.2" id="version-0122">Version 0.12.2<a class="anchor" aria-label="anchor" href="#version-0122"></a></h2>
+<div class="section level3">
+<h3 id="major-changes-0-12-2">Major Changes<a class="anchor" aria-label="anchor" href="#major-changes-0-12-2"></a></h3>
+</div>
+<div class="section level3">
+<h3 id="minor-changes-0-12-2">Minor Changes<a class="anchor" aria-label="anchor" href="#minor-changes-0-12-2"></a></h3>
+<p>Tighten up the documentation on how to work with pre-existing alignments. Split the documentation so that the intro to specfiles is separate from the installation/usage docs.</p>
+</div>
 </div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.12.1" id="version-0121">Version 0.12.1<a class="anchor" aria-label="anchor" href="#version-0121"></a></h2>
@@ -138,8 +222,14 @@
 <div class="section level3">
 <h3 id="minor-changes-0-12-1">Minor Changes<a class="anchor" aria-label="anchor" href="#minor-changes-0-12-1"></a></h3>
 <ul><li>Improve the heading layout in the exploratory plots</li>
-<li>Fix problem of not picking up babs file # Version 0.12.0 ## Major Changes</li>
-<li>Fix a bug in the “partial” plots of the exploratory analyses, where the design wasn’t set so nothing being was removed. Impact was only in lack of visualisations, rather than anything incorrect being produced. ## Minor Changes</li>
+<li>Fix problem of not picking up babs file</li>
+</ul></div>
+</div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.12.0" id="version-0120">Version 0.12.0<a class="anchor" aria-label="anchor" href="#version-0120"></a></h2>
+<div class="section level3">
+<h3 id="major-changes-0-12-0">Major Changes<a class="anchor" aria-label="anchor" href="#major-changes-0-12-0"></a></h3>
+<ul><li>Fix a bug in the “partial” plots of the exploratory analyses, where the design wasn’t set so nothing being was removed. Impact was only in lack of visualisations, rather than anything incorrect being produced. ## Minor Changes</li>
 </ul></div>
 </div>
     <div class="section level2">
