@@ -55,6 +55,7 @@ partialise.matrix <- function(obj, cdata, fml, influence = TRUE) {
   const <- numeric(nresp)
   for (i in seq_len(nresp)) {
     beta <- qr.coef(QR, obj_influence[i, ])
+    beta[is.na(beta)] <- 0
     term_mat <- matrix(0, nterms, nobs)
     for (t in seq_len(nterms)) {
       cols <- termcols[[t]]

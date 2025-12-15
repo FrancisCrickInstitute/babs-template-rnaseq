@@ -477,17 +477,21 @@ The second type of question, where we want to investigate a
 'difference of differences', is achieved by the following grammar:
 
 ```{r, eval = FALSE}
-mult_comp(revpairwise+revpairwise ~ treatment + genotype, interaction=TRUE)
+mult_comp(revpairwise ~ treatment + genotype, interaction=TRUE)
 ```
 
 The terms on the right hand side of the formula enumerate the
-predictors we're concerned in (there's no need to have their
-interaction - that's already known because of the `design`), and the
-left hand side specifies the contrasts that are going to be considered
-(so any of the keywords from the previous section) - there needs to
-be either one (which will be applied to all predictors), or one per
-factor on the other side of the formula (as here) in the respective
-order.
+predictors we're concerned in, and the left hand side specifies the
+contrasts that are going to be considered (so any of the keywords from
+the previous section) - there needs to be just one, applied to all
+factors. If we omit the `interaction=TRUE` argument then it will
+enumerate all possible combinations of treatment and genotype, and
+then contrast every combination against every other combination -
+probably not what is wanted (e.g. treated KO vs untreated WT); keeping
+the `interaction=TRUE` term is more usual, and builds a contrast that
+represents the differences of differences, e.g. treatment effect in KO
+- treatment effect in WT (where treatment effect in KO is treated KO -
+untreated KO.)
 
 The above is probably quite intimidating, so please ask for help on
 this - I'll try to write something a bit more friendly.

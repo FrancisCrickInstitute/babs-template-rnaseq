@@ -5,8 +5,6 @@
 /rstudio
 /database.conf
 /rsession.conf
-/env
-/env.local
 
 /jupyter-kernel.sentinel
 /jupyter-share/
