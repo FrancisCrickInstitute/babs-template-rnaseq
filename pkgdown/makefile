@@ -7,8 +7,6 @@ include secret.mk
 
 shared.mk: ../babs/docs/shared.mk
 	cp $< $@
-	cp -lr ../babs/differential/R .
-	cp -lr ../babs/differential/resources .
 secret.mk: ../babs/docs/secret.mk
 	cp $< $@
 
@@ -21,6 +19,8 @@ ifeq ($(CONTAINER),)
 ##     To be executed directly - no (further) containerisation wrapping needed
 
 site: renv.lock | ../test/babs/differential/results/latest ## Create pkgdown site in ./docs
+	rsync -ar ../babs/differential/R/ R/
+	rsync -ar ../babs/differential/resources/ resources/
 	rm R/example-spec.r || true
 	mkdir -p pkgdown/assets
 	if [ -d ../test/babs/differential/results/latest ]; then \
