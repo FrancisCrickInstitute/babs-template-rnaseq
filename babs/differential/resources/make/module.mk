@@ -22,6 +22,18 @@ my_counts_dir=extdata/genes.results
 my_metadata=extdata/metadata
 
 
+# The following can be set to singularity|docker|shell
+# and determines the environment in which quarto/R processes
+# will be run in.
+EXECUTOR = singularity
+
+################################################################
+## Propagation of docs files
+## 'Earliest' presence of a propagated file is taken as definitive.
+################################################################
+early_spec_dir=$(firstword $(wildcard $(docs_dir) $(diff_dir)/extdata))
+specfiles=$(patsubst $(early_spec_dir)/%.spec,%,$(wildcard $(early_spec_dir)/*.spec))
+
 samplesheets = $(patsubst %,$(my_metadata)_%.csv,$(alignments))
 configs = $(patsubst %,extdata/%.config,$(alignments))
 genes_results = $(patsubst %,$(my_counts_dir)/%,$(alignments))
@@ -36,3 +48,5 @@ file.spec = $(patsubst %,extdata/%.spec,$(specfiles))
 geo: version=latest
 geo: alignment=$(firstword $(alignments))
 geo: spec=$(firstword $(specfiles))
+
+excluded-targets += check-isolated

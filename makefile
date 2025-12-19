@@ -35,12 +35,13 @@ $(template_dir)/archive:
 .PHONY: infrastructure
 
 infrastructure: ## Transfer differential code from template
-infrastructure: $(generic_dir)/differential
-	rsync -ar $(generic_dir)/differential/ babs/differential/
+infrastructure: $(generic_dir)/template
+	rsync -ar --exclude-from protected.txt $</  babs/differential/
+	cd babs/differential/resources/make && cat pipeline.mk shared.mk > tmp.mk && mv tmp.mk shared.mk
 	for i in docs ingress nfcore; do cp babs/differential/resources/make/{secret,shared}.mk babs/$$i/; done
 
-$(generic_dir)/differential:
-	cd $(generic_dir) && make differential
+$(generic_dir)/template:
+	cd $(generic_dir) && make template
 
 ################################################################
 #### Testing the pipeline

@@ -1,4 +1,26 @@
-.DEFAULT_GOAL=help
+docs_dir?=$(wildcard ../docs)
+ingress_dir?=$(wildcard ../ingress)
+nfcore_dir?=$(wildcard ../nfcore)
+diff_dir?=$(wildcard ../differential)
+
+samplesheet_fname=samplesheet
+experiment_table = experiment_table
+samplesheet_id_column = sample
+metadata_id_column = ID
+name_col = sample_name
+
+ifneq ($(diff_dir),)
+alignments=$(patsubst $(diff_dir)/extdata/%.config,%,$(wildcard $(diff_dir)/extdata/*.config))
+endif
+ifneq ($(nfcore_dir),)
+alignments=$(patsubst $(nfcore_dir)/results/%,%,$(wildcard $(nfcore_dir)/results/*))
+endif
+ifneq ($(ingress_dir),)
+alignments=$(patsubst $(ingress_dir)/%.config,%,$(wildcard $(ingress_dir)/*.config))
+endif
+ifneq ($(docs_dir),)
+alignments=$(patsubst $(docs_dir)/%.config,%,$(wildcard $(docs_dir)/*.config))
+endif
 ################################################################
 ## Things here are typically shared across all phases of the
 ## analysis. There's originally one gold-reference copy of this file
@@ -7,21 +29,7 @@
 ## that any necessary phase-specific changes are put into module.mk,
 ## which will override things in shared.mk and secret.mk
 ################################################################
-samplesheet_fname=samplesheet
-experiment_table = experiment_table
-samplesheet_id_column = sample
-metadata_id_column = ID
-name_col = sample_name
-samples_db = samples.db
-
-SQLITE = $(call ml,$(SQLITE_MODULE)); sqlite3
-
-
-
-docs_dir?=$(wildcard ../docs)
-ingress_dir?=$(wildcard ../ingress)
-nfcore_dir?=$(wildcard ../nfcore)
-diff_dir?=$(wildcard ../differential)
+.DEFAULT_GOAL=help
 
 # The following can be set to singularity|docker|shell
 # and determines the environment in which quarto/R processes
@@ -54,6 +62,7 @@ SELF_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 R=R
 QUARTO=quarto
 GIT=git
+SQLITE = $(call ml,$(SQLITE_MODULE)); sqlite3
 
 ## Module loader
 ml = [ -z "$1" ] || module is-loaded $1 || module load $1 || true # ie fall back to true (ie rely on system version if can't load a module)
@@ -96,26 +105,6 @@ git-ignore=touch .gitignore && grep -qxF '$(1)' .gitignore || echo '$(1)' >> .gi
 
 
 include $(SELF_DIR)secret.mk
-
-################################################################
-## Propagation of docs files
-## 'Earliest' presence of a propagated file is taken as definitive.
-################################################################
-early_spec_dir=$(firstword $(wildcard $(docs_dir) $(diff_dir)/extdata))
-specfiles=$(patsubst $(early_spec_dir)/%.spec,%,$(wildcard $(early_spec_dir)/*.spec))
-
-ifneq ($(diff_dir),)
-alignments=$(patsubst $(diff_dir)/extdata/%.config,%,$(wildcard $(diff_dir)/extdata/*.config))
-endif
-ifneq ($(nfcore_dir),)
-alignments=$(patsubst $(nfcore_dir)/results/%,%,$(wildcard $(nfcore_dir)/results/*))
-endif
-ifneq ($(ingress_dir),)
-alignments=$(patsubst $(ingress_dir)/%.config,%,$(wildcard $(ingress_dir)/*.config))
-endif
-ifneq ($(docs_dir),)
-alignments=$(patsubst $(docs_dir)/%.config,%,$(wildcard $(docs_dir)/*.config))
-endif
 
 ################################################################
 ## Publishing (moving) generated results and providing shortcuts
@@ -397,5 +386,3 @@ $(SELF_DIR)secret.mk: $(wildcard $(PROJECT_HOME)/.babs)
 	  sed  -i '/^setting_/d' $@ ;\
 	  sed -r -n 's/^(\s*)(.*)\s*:\s*(.*$$)/setting_\2=\3/p' $< >> $@ ;\
 	fi
-
-excluded-targets += check-isolated

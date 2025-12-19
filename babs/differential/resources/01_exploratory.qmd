@@ -90,9 +90,7 @@ data(list=paste0("counts_", params$alignment))
 is_des <- inherits(dds, "DESeqDataSet")
 metadata(dds)$default_assay <- ifelse(is_des, "vst", 1)
 
-if (!is.null(metadata(dds)$organism$org)) {
-  library(metadata(dds)$organism$org, character.only=TRUE)
-}
+library(metadata(dds)$organism$org, character.only=TRUE)
 
 specs   <- load_specs(file=paste0(params$spec, ".spec"), context=dds)
 param <- ParamList$new(defaults=specs$settings)

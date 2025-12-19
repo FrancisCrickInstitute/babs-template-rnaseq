@@ -1,0 +1,6 @@
+makefile
+resources/_dependencies.R
+resources/make/module.mk
+resources/make/project.mk
+resources/make/secret.mk
+resources/params.yml

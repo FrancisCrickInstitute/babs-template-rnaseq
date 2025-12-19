@@ -40,6 +40,10 @@ align_params <- get_align_params(params$alignment)
 align_params$keytype <- align_params$keytype %||% "ENSEMBL"
 
 organism <- list(org=align_params$org.db)
+if (!is.null(organism$org)) {
+  if (!requireNamespace(organism$org, quietly=TRUE)) renv::install(paste0("bioc::", organism$org), lock=TRUE)
+}
+
 if (file.exists(file.path("results", paste0("multiqc-", params$alignment)))) {
   cat("\n\n## MultiQC\n\n")
   cat('\n\n[MultiQC report for ', params$alignment, '](../multiqc-', params$alignment, '/multiqc_report.html){target="_blank"}\n\n', sep="")
