@@ -1,30 +1,3 @@
-# e.g. set grp=whole_cell, denominator=fraction=="cyt", to implement nuc/cyt
-#     or grp=whole_cell, numerator=fraction!="cyt", to implement nuc/(nuc+cyt)
-
-norm_within <- function(df, grp, denominator, numerator, adj=0.01) {
-  ret <- NA
-  if (!missing(denominator)) {
-    ret <- list(
-      adj=adj,
-      ind=df |>
-        mutate(.ind=1:n()) |>
-        group_by({{grp}}) |>
-        mutate(.ind=ifelse({{denominator}}, NA, .ind[{{denominator}}])) |>
-        pull(.ind)
-    )
-  } else if (!missing(numerator)) {
-    ret <- list(
-      adj=adj,
-      ind=df |>
-        mutate(.ind=1:n()) |>
-        group_by({{grp}}) |>
-        mutate(.ind= ifelse({{numerator}}, NA, list(unique(.ind)))) |>
-        pull(.ind)
-    )
-  }
-  ret
-}
-
 #' @export
 load_specs <- function(file="", context) {
   if (file.exists(file.path("extdata",file))) {
@@ -63,8 +36,6 @@ load_specs <- function(file="", context) {
            },
            envir=e)
     assign("constrain", expression, envir=e)
-    normalise_within <- function(...) {
-      norm_within(as.data.frame(colData(context)), ...)}
     assign("settings", alist, envir=e)
     assign("mutate",
            function(...) {
@@ -182,6 +153,7 @@ build_dds_list <- function(dds, spec) {
   spec <- trickle_down(field="profile_plots", to="models")
   # Conjunct or cascade any top-level subsetting - if missing, use all samples
   spec <- trickle_down(field="subset", to="sample_sets", default=rep(TRUE, ncol(dds)), merge_fn=`&`)
+  spec <- trickle_down(field="visualise", to="sample_sets", default=rep(TRUE, ncol(dds)), merge_fn=`&`)
   spec <- trickle_down(field="influential_samples", to="sample_sets", default=rep(TRUE, ncol(dds)), merge_fn=`&`)
   # Cascade any spec-wide transforms
   spec <- trickle_down(field="transform", to="sample_sets")
@@ -242,7 +214,7 @@ build_dds_list <- function(dds, spec) {
     dataset_spec <- spec$sample_sets[[dataset_i]]
     obj <- dds
     # ensure any sample indices take into account dataset subsetting
-    for (lower_level_subset in intersect(names(dataset_spec), c("influential_samples"))) {
+    for (lower_level_subset in intersect(names(dataset_spec), c("influential_samples", "visualise"))) {
       a <- attr(dataset_spec[[lower_level_subset]], "src")
       dataset_spec[[lower_level_subset]] <- dataset_spec[[lower_level_subset]][dataset_spec$subset]
       attr(dataset_spec[[lower_level_subset]], "src") <- a
@@ -1250,7 +1222,7 @@ mat_x_terms <- function(mat, fml, fitFrame) {
 }
 
 #' @export
-extract_hits <- function(covar_x_pc, pc, model_vars) {
+extract_hits <- function(covar_x_pc, pc, coldat) {
   pc_hits <- data.frame(
     covar=unique(covar_x_pc$Covariate),
     strongest=NA_character_,
@@ -1267,7 +1239,7 @@ extract_hits <- function(covar_x_pc, pc, model_vars) {
     pc_hits[covar, "strongest"] <- as.character(max_col)
   }
   hits <- paste0("PC", sort(unique(as.integer(c(pc_hits$strongest, pc_hits$first)))))
-  wide_dat <- cbind(colDat[model_vars], pc[,hits,drop=FALSE])
+  wide_dat <- cbind(coldat, pc[,hits,drop=FALSE])
   long_dat <- pivot_longer(wide_dat, cols=all_of(hits), names_to="PC")
   long_dat
 }
@@ -1371,54 +1343,36 @@ sample_norm.SummarizedExperiment <- function(se) {
 }
 
 
-#' @export
-normalise_assay <- function(se, assay_to_norm, model) {
-  df <- as.data.frame(colData(se))
-  df$y <- I(t(assay(se, assay_to_norm)))
-  fit <- lm(update(model, y~.), data=df)
-  baseline <- t(predict(fit,
-                       newdata=df
-                       )
-               )
-  assay(se, assay_to_norm) - baseline
-}
-
 
 
 #' @export
 add_extra_assays <- function(dds) {
   extras <- metadata(dds)$extra_assays
-  if (is.null(extras)) return(dds)
-  assays(dds) <- c(assays(dds), lapply(extras, generate_assay, dds))
+  for (i in names(extras)) {
+    assay(dds,i) <-  generate_assay(extras[[i]], dds)
+  }
   dds
 }
 
-
-quiet <- function(expr) {
-  suppressWarnings(
-    suppressMessages({
-      capture.output(out <- expr)
-      out
-    })
-  )
-}
-
+#' @export
 generate_assay <- function(args, dds) {
-  quiet({
   curAssay <- assay(dds, args$from)
   if (args$method=="normalise") {
     curFrame <- as.data.frame(colData(dds))
-    coefs <- limma::lmFit(curAssay, model.matrix(args$design, curFrame))$coefficients
-    baseline_values <- modifyList(args, list(from=NULL, method=NULL, design=NULL))
-    baseFrame <- curFrame
-    baseFrame[names(baseline_values)] <- lapply(
-      names(baseline_values),
-      function(nm) factor(baseline_values[[nm]], levels=levels(curFrame[[nm]]))
-    )
-    baseline_X <- model.matrix(args$design, baseFrame)
+    X <- model.matrix(args$design, curFrame)
+    storage.mode(X) <- "double"
+    QR <- qr(X)
+    coefs <- t(qr.coef(QR, t(curAssay)))
+    coefs[is.na(coefs)] <- 0
+    baseFrame <-do.call(
+      transform,
+      modifyList(args, list(from=NULL, method=NULL, design=NULL, recentre=NULL, rescale=NULL, `_data`=curFrame)))
+    mf <- model.frame(args$design, curFrame)
+    baseline_X <- model.matrix(args$design, baseFrame, xlev=.getXlevels(terms(mf), mf), contrasts.arg=attr(model.matrix(args$design, mf), "contrasts"))
     out <- curAssay - coefs %*% t(baseline_X)
+  } else if(args$method == "identity") {
+    out <- curAssay
   }
-  })
   out
 }
 

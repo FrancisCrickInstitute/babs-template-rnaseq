@@ -88,7 +88,7 @@ ifeq ($(NEED_SBATCH),false)
 .PHONY: run pages scripts
 
 
-quarto_opts=--output-dir $(RESULTS_DIR)/$(VERSION) --execute-dir $(CURDIR) -M multiqc='$(if $(wildcard $(RESULTS_DIR)/multiqc-*),MultiQC and ,)'
+quarto_opts=--output-dir $(RESULTS_DIR)/$(VERSION) --execute-dir $(CURDIR)
 
 ## Render the qmds to html in one quarto call
 run: $(qmds) $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(samplesheets)| $(log_dir) data $(RESULTS_DIR)/$(VERSION)  $(genes_results)  ## Create objects in `data` that store the results of applying each spec file, along with a versioned html report in `results`.
@@ -142,6 +142,8 @@ $(staging_dir)/_quarto.yml: $(source_dir)/_quarto.yml $(qmds) $(css) $(includes)
 	 --template=$< \
 	 --staging=$(staging_dir)\
 	 --repo="$(repo)" > $@
+	echo 'multiqc: "$(if $(wildcard $(RESULTS_DIR)/multiqc-*),MultiQC and,)"' >> $@
+	cp $(source_dir)/_quarto-*.yml $(staging_dir)/
 	rm -f ${staging_dir}/_sidebar.yml
 	mkdir -p ${staging_dir}/_extensions
 	cp -r  ${source_dir}/_extensions/. ${staging_dir}/_extensions/

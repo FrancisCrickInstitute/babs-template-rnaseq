@@ -27,7 +27,7 @@ const gh=quarto.website.navbar.right.findIndex(s => s.text=="Github repository")
 if (gh != -1) {
     quarto.website.navbar.right[gh].href = args.repo;
 }
-console.log(stringify(quarto, {lineWidth: -1}));
+console.log(stringify(quarto, {lineWidth: -1}).replace(/\n$/, ''));
 
 
 ////////////////////////////////////////////////////////////////
@@ -83,15 +83,17 @@ function expandAxesForNav(axes, staging, prefix = {}) {
 		    children.forEach(child => {
 			delete child.params;
 		    });
-		    if (children.length == 1) {
-			results.push({...children[0], params:filteredParams});
-		    } else {
+// TODO: Used to have this conditional to 'promote' singleton's,
+// But if we only have 00_init and 01_exploratory, it doesn't work
+//		    if (children.length == 1) { 
+//			results.push({...children[0], params:filteredParams});
+//		    } else {
 			results.push({
 			    section: label + ":",
 			    contents: children,
 			    params: filteredParams
 			});
-		    }
+//		    }
 		}
 	    }
 	}

@@ -7,3 +7,4 @@ SQLITE_MODULE=SQLite/3.42.0-GCCcore-12.3.0
 NEXTFLOW = $(call ml,$(NEXTFLOW_MODULE)); $(call ml,$(SINGULARITY_MODULE)); nextflow
 
 NXF_SINGULARITY_CACHEDIR=/flask/apps/containers/all-singularity-images/
+SCRATCH_DIR=/flask/scratch/babs/$(or ${USER},$(shell whoami))/projects
