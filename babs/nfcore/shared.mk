@@ -27,7 +27,7 @@ endif
 ## that gets copied into each subdirectory (in case the subdirectory
 ## gets shared by itself some time in the future), so it's recommended
 ## that any necessary phase-specific changes are put into module.mk,
-## which will override things in shared.mk and secret.mk
+## which will override things in shared.mk
 ################################################################
 .DEFAULT_GOAL=help
 
@@ -62,7 +62,6 @@ SELF_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 R=R
 QUARTO=quarto
 GIT=git
-SQLITE = $(call ml,$(SQLITE_MODULE)); sqlite3
 
 ## Module loader
 ml = [ -z "$1" ] || module is-loaded $1 || module load $1 || true # ie fall back to true (ie rely on system version if can't load a module)
@@ -104,39 +103,24 @@ VERSION := $(shell $(GIT) describe --tags --abbrev=0 2>/dev/null || echo "vX.Y.Z
 git-ignore=touch .gitignore && grep -qxF '$(1)' .gitignore || echo '$(1)' >> .gitignore
 
 
-include $(SELF_DIR)secret.mk
-
 ################################################################
 ## Publishing (moving) generated results and providing shortcuts
 ################################################################
-
-excluded-targets += $(pubdir)/$(VERSION)
 
 publish_intranet=www_internal
 publish_internet=www_external
 publish_outputs=outputs
 location=outputs
 
-shortcut=$()
-ifdef redirect_$(location)
-shortcut=shortcuts/
-endif
-pubdir = $(shortcut)$(publish_$(location))
-ifeq ($(pubdir),)
-pubdir = published
-endif
+shortcut=$(if redirect_$(location),shortcuts/,)
+pubdir = $(shortcut)$(or $(publish_$(location)),published_$(location))
 
 $(pubdir)/$(VERSION):
 ifdef redirect_$(location)
 	mkdir -p $(redirect_$(location))
 	mkdir -p $(shortcut)
-ifdef url_$(location)
-	echo "<!doctype html>" > $(shortcut)$(location).html
-	echo "<script>" >> $(shortcut)$(location).html
-	echo "window.location.replace('$(url_$(location))/$(VERSION)')" >> $(shortcut)$(location).html
-	echo "</script>"  >> $(shortcut)$(location).html
-endif
 	ln -sfn $(redirect_$(location)) $(pubdir)
+	[ -z "url_$(location)" ] || echo "<!doctype html><script>window.location.replace('$(url_$(location))/$(VERSION)')</script>" > $(shortcut)$(location).html
 endif
 	mkdir -p $@
 	ln -sfn $(VERSION) $(pubdir)/latest
@@ -370,19 +354,3 @@ admin-launch-%: ##  admin-launch-R, admin-launch-debug  etc will use a temporary
 	echo "Running in $$d" ;\
 	BABS_CMD=$* BABS_TMP=$$d $$d/launcher.sh 2>&1 | tee -a $$d/report.txt
 
-################################################################
-## Generate secrets
-################################################################
-# If a secret.mk file can't be found anywhere, create a dummy
-# one out of a template. If there's a .babs file, ensure changes in that
-# are reflected in the secrets file.
-
-$(SELF_DIR)secret.mk: $(wildcard $(PROJECT_HOME)/.babs)
-	@if [ ! -f "$@" ]; then \
-	echo "SCRATCH_DIR=/tmp#Somewhere for transient, possibly large, files" >> $@ ;\
-	echo "Created a dummy copy of $@, please edit it" ;\
-	fi
-	@if [ -n "$<" ]; then \
-	  sed  -i '/^setting_/d' $@ ;\
-	  sed -r -n 's/^(\s*)(.*)\s*:\s*(.*$$)/setting_\2=\3/p' $< >> $@ ;\
-	fi

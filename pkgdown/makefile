@@ -3,13 +3,9 @@
 staging_dir=.
 
 include shared.mk
-include secret.mk
 
 shared.mk: ../babs/docs/shared.mk
 	cp $< $@
-secret.mk: ../babs/docs/secret.mk
-	cp $< $@
-
 
 .PHONY: site
 

@@ -1,7 +1,7 @@
 ################################################################
 ## Settings specific for this phase of the analysis
 ################################################################
-## Most things will already have been set in shared/secret.mk -
+## Most things will already have been set in shared.mk -
 ## if you want to over-ride them, it is best to do so here
 ################################################################
 
@@ -21,11 +21,13 @@ staged_results=$(staging_dir)/$(RESULTS_DIR)/$(VERSION)
 my_counts_dir=extdata/genes.results
 my_metadata=extdata/metadata
 
-
 # The following can be set to singularity|docker|shell
 # and determines the environment in which quarto/R processes
 # will be run in.
 EXECUTOR = singularity
+
+SQLITE_MODULE=SQLite/3.42.0-GCCcore-12.3.0
+SQLITE = $(call ml,$(SQLITE_MODULE)); sqlite3
 
 ################################################################
 ## Propagation of docs files
