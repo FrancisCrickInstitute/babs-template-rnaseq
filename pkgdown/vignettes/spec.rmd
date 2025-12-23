@@ -102,7 +102,7 @@ the estimates of dispersion that hold for the other set. Of course it
 then becomes impossible to _statistically test_ between the two
 cohorts, but we can have a third set that still combines them:
 
-```r{r, eval = FALSE}
+```{r, eval = FALSE}
 specification(
   sample_sets =list( 
     all = sample_set(
@@ -120,7 +120,7 @@ specification(
 ```
 
 It's possible for `sample_set`s to inherit subsets from the
-`specification` level.  We discuss [this concept later on]{#cascade#}, but a simple
+`specification` level.  We discuss this concept [later on](#cascade), but a simple
 example should suffice to illustrate how we can refine a 'global' subset:
 
 ```{r, eval = FALSE}
@@ -168,15 +168,16 @@ table. It is possible to transform some of the predictors (columns of
 #### Transform
 
 Each specification can have a single `transform` which is a
-`dplyr::mutate` clause, but with no need for the initial data object:
+`dplyr::mutate` clause that will operate on the sample metadata (but
+with no need for the initial data object):
 
 ```{r, eval = FALSE}
 specification(
     transform=mutate(
                treatement=relevel(factor(treatment), "control"),
                patient_id=factor(patient_id),
-	       number_of_visits=table(patient_id)[as.character(patient_id)],
-	       .include=number_of_visits>1
+           number_of_visits=table(patient_id)[as.character(patient_id)],
+           .include=number_of_visits>1
     ),...
 ```
 
@@ -195,6 +196,57 @@ the global `transform` will not be applied at all to `sample_set`s
 with their own `transform`, and it will simply be used in
 `sample_set`s which don't have their own `transform`.
 
+
+#### Extra Assays
+
+In some situations it is necessary to add extra assays that represent
+additional pre-processing steps - for instance in strongly paired data
+(for example where each biological sample is split into, say,
+cytoplasmic and nuclear subsamples) it might be preferable to look at
+one of the pair normalised against it's pair-mate. This is purely for
+visualisation purposes: for differential analysis it is always worth
+sticking with the primary assay (counts). This can be achieved by a
+setting `extra_assays` in a dataset as alist of `generate_assay`
+calls:
+
+```
+  subset = ...,
+  extra_assays = list(
+      to_nuclear=generate_assay(
+      method="normalise", from="vst",
+      compartment="nuclear",
+      design=~compartment:treatment:replicate,
+      recentre=FALSE, rescale=FALSE)
+  ),
+  visualise = compartment != "nuclear",
+  ...
+```
+
+Currently there are only two methods implemented: `normalise` and
+`identity`. `normalise` takes:
+
+ - a `design` argument that identifies the groups within which to
+normalise
+ - an assay `from` to use as the base assay
+ - options to `recentre` and `rescale` the data (these default to `TRUE`
+   for our visualisations)
+ - other arguments set the baseline value against which everything in
+   a group (defined by the `design`) will be normalised to
+
+This clearly leaves, in this case, the _nuclear_ samples normalised to
+themselves (so identically zero across all genes). To avoid this
+disrupting the visual picture, we have a third dataset-specific
+predicate `visualise` (alongside `subset` and `influential_samples`)
+that will remove these samples from plots.
+
+The `method="identity"` allows us to create assays identical to the
+`from` assay, but allow us to switch off the centring and/or scaling.
+
+We'll see out to use the extra assays in the [plotting
+section](#profile-formulae). But a reminder: these extra assays are
+ignored in the differential testing, as the inferences and estimations
+are always done on the primary assay. You'll need to model the pairing
+explicitly.
 
 ### Models
 
@@ -229,8 +281,8 @@ specification(
         ),
         powerful = model(
           design = ~treatment,
-	  name = "Just Treatment",
-	  description = "Account for treatment, ignore batch - if there is a batch effect it'll increase the noise, though"
+      name = "Just Treatment",
+      description = "Account for treatment, ignore batch - if there is a batch effect it'll increase the noise, though"
         )
       )
     )
@@ -281,7 +333,7 @@ from the top of the spec file, and a specific one), whereas the
 
 There are other similar patterns for other parts of the spec file,
 that certain properties 'cascade' down to other parts of the hierarchy
-- see the [this section]{#cascade} for a list of behaviours.
+- see [here](#cascade) for a list of behaviours.
 
 ### Comparisons
 
@@ -304,7 +356,7 @@ specification(
             comp3 = list(c("treat_vs_ctrl"), c("vehicle_vs_ctrl"), listValues=c(1,-1))
             comp4 = c(1,0,-0.5,-0.5),
             comp5 = ~batch,
-	    comp6 = comparison(c("treatment", "treat", "ctrl"), name="Treat-control", description="Treatment vs Control")
+        comp6 = comparison(c("treatment", "treat", "ctrl"), name="Treat-control", description="Treatment vs Control")
           )
         )
       )
@@ -429,7 +481,7 @@ mult_comp(revpairwise ~ Infection, var="time")
 is the correct formulation within the `mult_comp` framework to
 estimate the per-participant rate of change of expression over `time`,
 and then see if that differs between pairs of groups of patients that
-are distinguished by their `Infection` 	   .
+are distinguished by their `Infection`.
 
 #### Interaction terms
 
@@ -571,7 +623,7 @@ specification(
     all = sample_set(
       subset = TRUE,
       transform = mutate(unit = recode_within(unit, genotype),
-	                     time = as.numeric(sub("^t", "", timepoint))),
+                         time = as.numeric(sub("^t", "", timepoint))),
       models = list(
         nested = model(
           design = ~timepoint *  genotype + person:genotype,
@@ -636,11 +688,13 @@ necessary to add descriptions of the profiles to be plotted explicitly:
         nested = model(
           design = ~treatment * time + batch,
           profile_plots = list(
-	    aes(x=time, colour=batch, shape=treatment)  ~ treatment + time + timepoint * time + batch,
-	    aes(x=time, colour=treatment)  ~ treatment + time + timepoint * time,
-	    aes(x=time, colour=treatment) ~ . - batch
-	  )
-	  ...
+            aes(x=time, colour=batch, shape=treatment)  ~ treatment + time + timepoint * time + batch,
+            aes(x=time, colour=treatment)  ~ treatment + time + timepoint * time,
+            aes(y=vs_t0, x=time, colour=treatment) ~ . - batch
+          )
+        )
+      )
+    )
 ```
 
 Everything on the LHS is used as an aesthetic mapping for any given
@@ -670,6 +724,11 @@ represents the design, and the `-` is the standard Wilkinson notation
 to _remove_ an effect, so the third example is a different way of
 phrasing the second instance: regress out the effect of batch.
 
+The third example also illustrates how to access `extra_assay` as
+defined [here](#extra-assays) - simply setting the `y` aesthetic to
+map to the name of the extra assay will replace the default assay
+(vst-transformed normalised counts) in the plots.
+
 #### Sample swaps
 
 If there have been a pair of samples swapped, this can be corrected in
@@ -678,7 +737,7 @@ the spec file.
 ```{r, eval = FALSE}
     all = sample_set(
       subset = TRUE,
-	  swap=list("A"="B")
+      swap=list("A"="B")
 ```
 
 This will swap the _metadata_ of sample with ID `A` with that of
@@ -734,8 +793,8 @@ example:
 ```{r, eval = FALSE}
     all = sample_set(
       subset = TRUE,
-	  collapse=~treatment + biological_replicate + timepoint + batch,
-	  ...
+      collapse=~treatment + biological_replicate + timepoint + batch,
+      ...
 ```
 
 The collapse formula should identify the distinct experimental groups,
@@ -759,8 +818,8 @@ calculate size factors:
     all = sample_set(
       subset = TRUE,
       controlGenes=expression(grepl("^ercc", ID)),
-	  subsetGenes=expression(symbol!=""),
-	  ...
+      subsetGenes=expression(symbol!=""),
+      ...
 ```
 
 `controlGenes` and `subsetGenes` both take an R expression that should
@@ -804,7 +863,7 @@ symbol will be plotted as its own singleton cluster.
 #### Imputation
 
 For `limma`-like analyses, (see [this vignette on running just the
-'differential' phase of the analysis]{isolated.html} ), it is possible
+'differential' phase of the analysis](isolated.html) ), it is possible
 to define different imputation strategies:
 
 ```{r, eval = FALSE}
@@ -838,10 +897,11 @@ specification(
    top_n_variable = 500,     ## For PCA
    showCategory   = 25,      ## For enrichment analyses
    seed           = 1,       ## random seed gets set at start of script, just in case.
-   filterFun      = IHW::ihw ## NULL for standard DESeq2 results, otherwise  functions
-    )
+   filterFun      = IHW::ihw ## NULL for standard DESeq2 results, otherwise  functions,
+   gene_clust     = bluster::HclustParam(cut.params = list(k=12))    )
 )
 ```
+
 
 ### Cascading properties of a spec file {#cascade}
 
@@ -854,6 +914,6 @@ comparisons` hierarchy.  We list the expected behaviour of those:
  - `transform` can be set at the top `specification` level, and will only be used when sample-set doesn't specify its own transform
  - `drop_unsupported_combinations` can be set at the `specification` and/or `sample_set` level, and will only be used when a model doesn't specify this directly.
  - `drop_incomplete` can be set at the `specification` and/or `sample_set` level, and will only be used when a model doesn't specify this directly.
- - `profile_plots` can be set at the `specification` and/or `sample_set` level, and will be added to thos of any model-specific plot profiles
+ - `profile_plots` can be set at the `specification` and/or `sample_set` level, and will be added to those of any model-specific plot profiles
 
 These are intended to 'do what I mean' for the most typical situations.

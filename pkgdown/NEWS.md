@@ -1,3 +1,13 @@
+# Version 1.4.0
+## Major Changes
+ - Allow `extra_assays` so that data can be per-feature normalised and
+   rescaling/recentring can be customised for the plots.
+ - Upgrade to Bioconductor 3.22
+## Minor Changes
+ - Update documentation metadata
+ - Refactor the way the template files are merged
+ - Refactor so that local stuff contained in env, not secrets
+ - Update the renv lock file
 # Version 1.3.0
 ## Major Changes
  - Improve plots by z-scoring
