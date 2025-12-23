@@ -10,7 +10,7 @@ include resources/make/project.mk  ## Describe analysis structure of the qmds et
 # Dynamically created makefiles might trigger computationally
 # intensive operations, so don't do them for targets specified in
 # `excluded-targets`
-ifneq (,$(filter-out $(or $(excluded-targets),$(MAKECMDGOALS)),$(MAKECMDGOALS)))
+ifneq (,$(filter-out $(excluded-targets),$(MAKECMDGOALS)))
 include $(patsubst %,$(staging_dir)/.make-%,$(sections))
 endif
 
