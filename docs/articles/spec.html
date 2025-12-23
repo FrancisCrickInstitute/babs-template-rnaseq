@@ -171,9 +171,8 @@ cohorts, but we can have a third set that still combines them:</p>
 <span>  <span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>It’s possible for <code>sample_set</code>s to inherit subsets from
-the <code>specification</code> level. We discuss this concept later on
-@ref(cascade), but a simple example should suffice to illustrate how we
-can refine a ‘global’ subset:</p>
+the <code>specification</code> level. We discuss this concept <a href="#cascade">later on</a>, but a simple example should suffice to
+illustrate how we can refine a ‘global’ subset:</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">specification</span><span class="op">(</span></span>
 <span>  subset <span class="op">=</span> <span class="op">!</span> <span class="va">sample_id</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"bad1"</span>,<span class="st">"bad2"</span><span class="op">)</span>, <span class="co"># get rid of two samples that failed qc</span></span>
@@ -287,11 +286,10 @@ remove these samples from plots.</p>
 <p>The <code>method="identity"</code> allows us to create assays
 identical to the <code>from</code> assay, but allow us to switch off the
 centring and/or scaling.</p>
-<p>We’ll see out to use the extra assays in the plotting section
-@ref(profile-formulae). But a reminder: these extra assays are ignored
-in the differential testing, as the inferences and estimations are
-always done on the primary assay. You’ll need to model the pairing
-explicitly.</p>
+<p>We’ll see out to use the extra assays in the <a href="#profile-formulae">plotting section</a>. But a reminder: these
+extra assays are ignored in the differential testing, as the inferences
+and estimations are always done on the primary assay. You’ll need to
+model the pairing explicitly.</p>
 </div>
 </div>
 <div class="section level3">
@@ -374,7 +372,7 @@ whereas the <code>batch</code> dataset will have only the universal
 one.</p>
 <p>There are other similar patterns for other parts of the spec file,
 that certain properties ‘cascade’ down to other parts of the hierarchy -
-see @ref(cascade) for a list of behaviours.</p>
+see <a href="#cascade">here</a> for a list of behaviours.</p>
 </div>
 </div>
 <div class="section level3">
@@ -731,10 +729,10 @@ standard Wilkinson notation to <em>remove</em> an effect, so the third
 example is a different way of phrasing the second instance: regress out
 the effect of batch.</p>
 <p>The third example also illustrates how to access
-<code>extra_assay</code> as defined in @ref(extra-assays) - simply
-setting the <code>y</code> aesthetic to map to the name of the extra
-assay will replace the default assay (vst-transformed normalised counts)
-in the plots.</p>
+<code>extra_assay</code> as defined <a href="#extra-assays">here</a> -
+simply setting the <code>y</code> aesthetic to map to the name of the
+extra assay will replace the default assay (vst-transformed normalised
+counts) in the plots.</p>
 </div>
 <div class="section level4">
 <h4 id="sample-swaps">Sample swaps<a class="anchor" aria-label="anchor" href="#sample-swaps"></a>
