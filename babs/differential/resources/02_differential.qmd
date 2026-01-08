@@ -556,7 +556,7 @@ for (dataset_id in names(dataset_model_comp)) {
         section_hierarchy$plot_config <- attr(plot_fml, "name")
         dmc_heading(dataset_model_comp, dataset=dataset_id, model=model_id, plot=plot_fml, depth=strrep("#", length(section_hierarchy)+2), numbered=FALSE)
 
-        mapping <- modify_mapping(eval(plot_fml[[2]]))
+        mapping <- modify_mapping(modifyList(eval(plot_fml[[2]]), aes(mask=NULL)))
         pl <- ggplot(centroid_df[[plot_id]], mapping) +
           facet_wrapper(mapping, default=aes(facets = .derived), scales="free_y") + 
           theme_bw() +

@@ -531,7 +531,7 @@ for (dataset_id in names(ddsList)) {
       centroid_df <- cbind(cc, colDat[model_vars])[vis_sample,] %>%
         pivot_longer(cols=any_of(names(cc)), names_to=".derived", values_to=".derived.value") %>%
         mutate(.derived=factor(.derived, levels=names(cc)))
-      mapping <- modify_mapping(modifyList(eval(plot_fml[[2]]), aes(y=.derived.value)))
+      mapping <- modify_mapping(modifyList(eval(plot_fml[[2]]), aes(y=.derived.value, mask=NULL)))
       flag_vars <- all.vars(eval(plot_fml[[2]])$flag)
       colour_aes <- eval(plot_fml[[2]])["colour"]
       orig_caption <- aes_caption(eval(plot_fml[[2]]))
@@ -582,7 +582,7 @@ for (dataset_id in names(ddsList)) {
                       sample = rownames(colDat)))
       
       
-      aes_list <- lapply(substitute_x_aes(eval(plot_fml[[2]])),function(m)  modify_mapping(modifyList(m, aes(y=.derived.value))))
+      aes_list <- lapply(substitute_x_aes(eval(plot_fml[[2]])),function(m)  modify_mapping(modifyList(m, aes(y=.derived.value, mask=NULL))))
       for (this_aes in aes_list) {
         pl <- ggplot(transform(pc.df[vis_sample,],.derived="", .derived.value=""),
                     modifyList(this_aes, aes(x=PC1, y=PC2))) + 
