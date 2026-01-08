@@ -10,6 +10,8 @@ metadata = $(wildcard $(experiment_table).csv)
 
 .PHONY: build run clean
 
+include settings.mk
+
 build: run
 	echo "WARNING: 'build' is deprecated - `make run` has been invoked for you, instead. In future, there's no need to build"
 
@@ -66,6 +68,12 @@ $(configs) :
 	[[ -s "$@" ]] || { echo "$@ is empty" | tee -a tmp.err; }
 endif
 
+
+settings.mk:
+	if [ -f ../../.babs ];\
+	then sed '1d; s/^[[:space:]]*/setting_/; s/: /=/' ../../.babs > $@ ;\
+	else touch settings.mk ;\
+	fi
 
 ifneq ($(metadata),)
 $(metadata) :

@@ -1,7 +1,6 @@
 .DEFAULT_GOAL=help
 
-template_dir := /nemo/stp/babs/working/bioinformatics/templates
-generic_dir := /nemo/stp/babs/working/kellyg/projects/github/FrancisCrickInstitute/templates/babs-environments
+template_dir=/nemo/stp/babs/working/bioinformatics/templates
 type = rnaseq
 
 ifndef version
@@ -35,13 +34,11 @@ $(template_dir)/archive:
 .PHONY: infrastructure
 
 infrastructure: ## Transfer differential code from template
-infrastructure: $(generic_dir)/template
-	rsync -ar --exclude-from protected.txt $</  babs/differential/
+infrastructure: $(template_dir)/generic.tar.gz
+	tar -xzf $< --exclude-from=protected.txt -C babs/differential/
 	cd babs/differential/resources/make && cat pipeline.mk shared.mk > tmp.mk && mv tmp.mk shared.mk
 	for i in docs ingress nfcore; do cp babs/differential/resources/make/shared.mk babs/$$i/; done
 
-$(generic_dir)/template:
-	cd $(generic_dir) && make template
 
 ################################################################
 #### Testing the pipeline
