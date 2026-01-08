@@ -959,17 +959,19 @@ summarise_results <- function(dds) {
 }    
 
 #' @export
-tidy_significant_se <- function(se, ind = TRUE, weights=NULL, assay= (if (inherits(se, "DESeqDataSet")) "vst" else 1)) {
-  mat <- assay(se, assay)[ind,,drop=FALSE]
+tidy_significant_se <- function(se, ind = TRUE, weights=NULL, assay= (if (inherits(se, "DESeqDataSet")) "vst" else assayNames(se)[1])) {
+  se <- se[ind,,drop=FALSE]
+  if (any(is.na(assay(se, assay)))) assay <- "imputed"
+  mat <- assay(se, assay)
   if (!is.null(weights) && is.numeric(weights)) {
-    if (any(is.na(mat))) {
-      offset <- assay(se, "imputed")[ind,,drop=FALSE] %*%  weights
-    } else {
       offset <- mat %*%  weights
-    }
-    mat <- mat - as.vector(offset)
+      assays(se) <- list(
+        weighted = mat - as.vector(offset)
+      )
+  } else {
+    assays(se) <- list(weighted=mat)
   }
-  SummarizedExperiment(mat, colData = colData(se))
+  se
 }
 
 #' @export
@@ -1332,6 +1334,7 @@ sample_norm.SummarizedExperiment <- function(se) {
     }
     imp <- metadata(se)$impute
     if (!is.null(imp)) {
+      assay(se, "na") <- is.na(assay(se))
       assays(se) <- setFirstAssay(
         se,
         imputed=MSnbase::exprs(do.call(
@@ -1376,17 +1379,6 @@ generate_assay <- function(args, dds) {
   out
 }
 
-#' @export
-data_key <- function(plot_fml, dds, meta="default_assay") {
-  if ("y" %in% names(plot_fml[[2]])) {
-    yvar <- as.character(plot_fml[[2]]$y)
-  } else {
-    yvar <- metadata(dds)[[meta]]
-    if (!is.character(yvar)) yvar <- assayNames(dds)[metadata(dds)[[meta]]]
-  }
-  design_fml <- design(dds)
-  setNames(list(paste(sort(attr(terms(design_fml), "term.labels")), collapse="+")), yvar)
-}
 
 #' @export
 expr_to_list <- function(x, aliases = c("list", "specification", "sample_set", "model", "settings", "mutate" )) {

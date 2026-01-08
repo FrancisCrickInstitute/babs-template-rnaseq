@@ -144,7 +144,7 @@ param$set("gene_clust")
 rds_name <- file.path("data", paste0(basename(params$spec),"_x_", params$alignment, ".rds"))
 
 if (interactive() && file.exists(rds_name)) {
-  dds_model_comp <- decompress_dmc(readRDS(rds_name))
+  dataset_model_comp <- decompress_dmc(readRDS(rds_name))
   # In an interactive session, you may want to skip the rest of this code chunk if you are
   # sure that the saved rds object represents the latest analysis.
 }
@@ -152,7 +152,7 @@ if (interactive() && file.exists(rds_name)) {
 
 ## For each dataset, fit all its models
 
-dds_model_comp <- lapply(
+dataset_model_comp <- lapply(
   ddsList,
   function(dds) fit_models(
     dds=dds,
@@ -163,8 +163,8 @@ dds_model_comp <- lapply(
 
 
 ## Now put results in each 3rd level mcols(dds)$results
-dds_model_comp <- map_depth(
-  dds_model_comp,
+dataset_model_comp <- map_depth(
+  dataset_model_comp,
   .depth=3,
   function(dds) get_result(dds,
                          filterFun=param$get("filterFun"),
@@ -177,13 +177,13 @@ dds_model_comp <- map_depth(
 
 
 local({
-  dds_model_comp <- compress_dmc(dds_model_comp)
-  saveRDS(dds_model_comp, file=rds_name)
-  save(dds_model_comp, file=sub("rds$", "rda", rds_name))
+  dataset_model_comp <- compress_dmc(dataset_model_comp)
+  saveRDS(dataset_model_comp, file=rds_name)
+  save(dataset_model_comp, file=sub("rds$", "rda", rds_name))
 })
 
 
-xl_files <- write_results(dds_model_comp,
+xl_files <- write_results(dataset_model_comp,
                          param,
                          params
                          )
@@ -191,7 +191,7 @@ iwalk(xl_files,
      ~cat("\n\n<a class=\"download-excel btn btn-primary\" href=\"", attr(.x, "link"), "\"> Open Spreadsheet '", .y,"'</a>", sep="")
      )
 
-#write_all_results(dds_model_comp, dir=params$res_dir)
+#write_all_results(dataset_model_comp, dir=params$res_dir)
 
 ```
 
@@ -238,7 +238,7 @@ look like.
 ```{r}
 #| label: summary
 
-summaries <- dds_model_comp %>%
+summaries <- dataset_model_comp %>%
   map_dmc(summarise_results) %>%
   map_dmc(function(x) {bind_rows(x, .id="Comparison")}, depth="model") %>%
   map_dmc(function(x) {bind_rows(x, .id="Model")}, depth="dataset") %>%
@@ -259,7 +259,7 @@ unclassed <- lapply(summaries,
                         pivot_wider(id_cols=Model, names_from=Group, values_from=N)
                       })
 
-pval_frame <- dds_model_comp %>%
+pval_frame <- dataset_model_comp %>%
   map_dmc(~as.data.frame(mcols(.x)$results)) %>%
   map_dmc(function(x) {bind_rows(x, .id="Comparison")}, depth="model")
 
@@ -321,16 +321,16 @@ for (dataset_id in names(summaries)) {
 ```{r}
 #| label: results
 all_clusters <- list()
-for (dataset_id in names(dds_model_comp)) {
+for (dataset_id in names(dataset_model_comp)) {
   section_hierarchy <- list(dataset=dataset_id)
   dataset_se <- ddsList[[dataset_id]]
   met <- metadata(dataset_se)
-  dmc_heading(dds_model_comp, dataset=dataset_id, model=NULL, depth=strrep("#", length(section_hierarchy)))
+  dmc_heading(dataset_model_comp, dataset=dataset_id, model=NULL, depth=strrep("#", length(section_hierarchy)))
   has_comparisons <- sapply(met$models, function(m) "comparisons" %in% names(m) && length(m$comparisons) > 0)
   src2bullets(met, c("subset", "extra_assays", "influential_samples"))
-  for (model_id in names(dds_model_comp[[dataset_id]])) {
+  for (model_id in names(dataset_model_comp[[dataset_id]])) {
     section_hierarchy <- list(dataset=dataset_id, model=model_id)
-    this_model <- dds_model_comp[[dataset_id]][[model_id]]
+    this_model <- dataset_model_comp[[dataset_id]][[model_id]]
     dmc_heading(ddsList, dataset=dataset_id, model=model_id, depth=strrep("#", length(section_hierarchy)))
     src2bullets(met$models[[model_id]], c("subset", "extra_assays", "influential_samples"))
     cat("`",
@@ -347,7 +347,7 @@ for (dataset_id in names(dds_model_comp)) {
     for (comparison_id in c(names(this_model), unique(external_list$Comparison))) {
       cluster_ind <- counter(post_fn=to_letter)      
       section_hierarchy <- list(dataset=dataset_id, model=model_id, comparison=comparison_id)
-      dmc_heading(dds_model_comp, dataset=dataset_id, model=model_id, comparison=comparison_id, depth=strrep("#", length(section_hierarchy)))
+      dmc_heading(dataset_model_comp, dataset=dataset_id, model=model_id, comparison=comparison_id, depth=strrep("#", length(section_hierarchy)))
       is_external <- !(comparison_id %in% names(this_model))
       if (is_external) {
         this_dds <- this_model[[1]]
@@ -361,6 +361,7 @@ for (dataset_id in names(dds_model_comp)) {
           next
         }
       }
+      ## MA Plot
       cat('\n\n::: {.panel-tabset .unnumbered group="diffplot"}\n\n')
       md <- metadata(this_dds)
       res <- as.data.frame(mcols(this_dds)$results)
@@ -391,7 +392,7 @@ for (dataset_id in names(dds_model_comp)) {
                             breaks = c("#aaaaaa", "#000000"))
         ind <- top_true(is_significant, res$shrunkLFC, n=5)
         if (!is.null(external_list)) {
-          ## For MA plots, add external IDs 
+          ## add external IDs 
           dat <- res[external_list$ID,]
           if (length(unique(external_list$Comparison)) <= length(pal)) {
             col <- pal[match(external_list$Comparison, unique(external_list$Comparison))]
@@ -420,6 +421,7 @@ for (dataset_id in names(dds_model_comp)) {
         first <- FALSE
         cat("\n\n---\n\n")
       }
+      ## Heatmap
       nice_legends <- separate_legend(dataset_se)
       pl <- do.call(gridExtra::arrangeGrob,c(
         nice_legends,
@@ -445,9 +447,7 @@ for (dataset_id in names(dds_model_comp)) {
       } else {
         mmat <- model.matrix(md$model$design, colData(this_dds))
       }
-      var_roles <- list(all.vars(md$model$design))
       if (!is_external && "baseline_contrast" %in% names(attributes(md$comparison))) {
-        var_roles <- c(emmeans:::.parse.by.formula(attr(md$comparison, "spec"))[c("by", "rhs")], var_roles)
         weights <- t(as.vector(attr(md$comparison, "baseline_contrast")) %*% MASS::ginv(mmat))
         baseline_str <- paste("baseline", noun_to_readout(rowNoun))
       } else {
@@ -457,6 +457,7 @@ for (dataset_id in names(dds_model_comp)) {
       zweights <- setNames(rep(0, ncol(dataset_se)), colnames(dataset_se))
       zweights[colnames(this_dds)] <- weights
       centroid_df <- list()
+      reconstruct <- cached_partial(dataset=dataset_id, model=model_id) # This memo-ised function performs model-based removal of random and/or systematic effects
       for (plot_id in distinct_formulae(plot_formulae)) {
         plot_fml <- plot_formulae[[plot_id]]
         if ("y" %in% names(plot_fml[[2]])) {
@@ -464,10 +465,10 @@ for (dataset_id in names(dds_model_comp)) {
         } else {
           tidied_se <- tidy_significant_se(dataset_se, is_significant, weights=zweights)
         }
+        design(tidied_se) <- design(this_dds)
         tidied_se <- reorder_samples(tidied_se,model_vars)
         assay(tidied_se) <- assay(tidied_se) / rowSds(assay(tidied_se)[,colnames(this_dds),drop=FALSE])
-        partials <- partialise(tidied_se, fml=md$model$design, influence=colnames(this_dds))
-        assay(tidied_se) <- assemble_partialised(partials, update(plot_fml, NULL ~ .), resids=TRUE)
+        assay(tidied_se) <- reconstruct(tidied_se, plot_fml, influence=tidied_se$.influential)
         tidied_se <- scale_se(tidied_se, ind=colnames(this_dds), centre=FALSE, scale=TRUE)
         if ("cols" %in% names(plot_fml[[2]])) {
           col_split <- rlang::eval_tidy(eval(plot_fml[[2]])$cols, colDF(tidied_se))
@@ -501,18 +502,18 @@ for (dataset_id in names(dds_model_comp)) {
           this_clust <- cluster_ind()
           gene_clust$clusters <- cluster_cardinality(gene_clust$clusters, this_clust)
         }
-        removed <- paste(
-          translate_terms(dropped_terms(partials, update(plot_fml, NULL ~ .)), dataset_se),
-          sep=", ", collapse=", ")
-        if (length(removed)==0 || removed=="") {
-          removed <- ""
-        } else {
-          removed <- paste0(" having removed effect of ", removed)
-        }
+        removed <- attr(assay(tidied_se), "removed")
         capt <- paste0(tooltip(md, comparison_id), comp_type, rowNoun,"s  of ", mtag(model_id), " in ", dtag(dataset_id), removed)
+        cc <- cluster_calc(assay(tidied_se), clusterID=gene_clust$clusters)
+        hmap_data <- assay(tidied_se)
+        col_fn <- sym_colour(hmap_data[,tidied_se$.influential], single=diff(sign(range(hmap_data)))==1)
+        mask <- all.vars(plot_fml[[2]]$mask)[1]
+        if (!is.na(mask) && mask %in% assayNames(tidied_se)) {
+          hmap_data[assay(tidied_se, mask)[row.names(hmap_data), colnames(hmap_data)]] <- NA
+        }
         pl <- ComplexHeatmap::Heatmap(
-          assay(tidied_se),
-          col=sym_colour(na.omit(as.vector(assay(tidied_se)[,colnames(this_dds)]))),
+          hmap_data,
+          col=col_fn,
           heatmap_legend_param = list(direction = "horizontal" ),
           name=comparison_id,
           cluster_columns = FALSE,
@@ -531,7 +532,6 @@ for (dataset_id in names(dds_model_comp)) {
                   mat_height 
                 )
                 )
-        cc <- cluster_calc(assay(tidied_se), clusterID=gene_clust$clusters)
         centroid_df[[plot_id]] <- cbind(cc, colDF(tidied_se)) %>%
           pivot_longer(cols=any_of(names(cc)), names_to=".derived", values_to=".derived.value") %>%
           mutate(.derived=factor(.derived, levels=names(cc)))
@@ -548,12 +548,13 @@ for (dataset_id in names(dds_model_comp)) {
         cat(':::\n\n')
         next
       }
+      ## Profile plots
       cat("\n\n", strrep("#", length(section_hierarchy)+1), " Profile\n\n", sep="")
       for (plot_id in names(plot_formulae)) {
         plot_fml <- plot_formulae[[plot_id]]
         if (! "name" %in% names(attributes(plot_fml))) attr(plot_fml, "name") <- plot_id
         section_hierarchy$plot_config <- attr(plot_fml, "name")
-        dmc_heading(dds_model_comp, dataset=dataset_id, model=model_id, plot=plot_fml, depth=strrep("#", length(section_hierarchy)+2), numbered=FALSE)
+        dmc_heading(dataset_model_comp, dataset=dataset_id, model=model_id, plot=plot_fml, depth=strrep("#", length(section_hierarchy)+2), numbered=FALSE)
 
         mapping <- modify_mapping(eval(plot_fml[[2]]))
         pl <- ggplot(centroid_df[[plot_id]], mapping) +

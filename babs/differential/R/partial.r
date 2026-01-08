@@ -108,14 +108,13 @@ partialise.SummarizedExperiment <- function(obj, assay=1, fml=design(obj), influ
 #' @title dropped_terms: Compare terms in full and reduced models
 #' @param obj The result of a previous 'partialise'
 #' @param reduced A formula, the right-hand-side of which contains the terms that will be used to predict the response
-#' @param extra A character vector of any extra terms that the formula didn't contain
 #' @return A character vector of terms that will have been 'dropped'
 #' @author Gavin Kelly
 #' @family partial
 #' @export
-dropped_terms <- function(obj, reduced, extra=NULL) {
+dropped_terms <- function(obj, reduced) {
   setdiff(dimnames(obj$terms)[[3]],
-          c(labels(terms(reduced)), extra)
+          labels(terms(reduced))
           )
 }
 #' Reconstruct a matrix from (some of) the parts of a partialised object
@@ -123,16 +122,15 @@ dropped_terms <- function(obj, reduced, extra=NULL) {
 #' .. content for \details{} ..
 #' @param obj The result of a previous 'partialise'
 #' @param reduced A formula, the right-hand-side of which contains the terms that will be used to predict the response
-#' @param extra A character vector of any extra terms that the formula didn't contain
 #' @param resids Boolean indicating whether to include the residuals (default) or not
 #' @return A matrix of the same dimensions as the original input to 'partialise'
 #' @author Gavin Kelly
 #' @family partial
 #' @export
-assemble_partialised <- function(obj, reduced, extra=NULL, resids=TRUE) {
+assemble_partialised <- function(obj, reduced, resids=TRUE) {
   terms <-intersect(
     dimnames(obj$terms)[[3]],
-    c(labels(terms(reduced)), extra)
+    labels(terms(reduced))
   )
   t(
     rowSums(obj$terms[, , terms, drop=FALSE], na.rm=TRUE, dims=2) +
@@ -140,3 +138,64 @@ assemble_partialised <- function(obj, reduced, extra=NULL, resids=TRUE) {
 }
 
 
+cached_partial <- function(...) {
+  dots <- list(...)
+  defaults <- dots[names(dots) != ""]
+  dynamic_keys <- vapply(dots[names(dots) == ""], as.character, "")
+  cache <- new.env(parent = emptyenv())
+
+  function(obj, plot_fml, resids=TRUE, influence=TRUE, ...) {
+    #design_key=paste(sort(attr(terms(design(obj)), "term.labels")), collapse="+")
+
+    if ("y" %in% names(plot_fml[[2]])) {
+      assay <- as.character(plot_fml[[2]]$y)
+    } else {
+      assay <- ifelse(inherits(obj, "DESeqDataSet"), "vst", assayNames(obj)[1])
+    }
+
+    call_args <- list(...)
+    args <- modifyList(defaults, call_args)
+    
+    # extract cache keys
+    missing <- setdiff(dynamic_keys, names(args))
+    if (length(missing)) {
+      stop("Missing required arguments: ", paste(missing, collapse = ", "))
+    }
+
+    # walk/create nested environments
+    node <- cache
+    for (k in dynamic_keys) {
+      k <- as.character(k)
+      if (!exists(k, envir = node, inherits = FALSE)) {
+        node[[k]] <- new.env(parent = emptyenv())
+      }
+      node <- node[[k]]
+    }
+
+    # memoised value stored under "assay"
+    if (!exists(assay, envir = node, inherits = FALSE)) {
+      node[[assay]] <- partialise(obj, assay=assay, influence=influence)
+      node$.removed <- character()
+    }
+
+    if (formula_equal(design(obj), plot_fml)) {
+      removed <- if (resids) "" else " having removed noise"
+    } else {
+      txt <- dropped_terms(node[[assay]], update(plot_fml, NULL ~ .))
+      tr_list <- modifyList(setNames(as.list(txt), txt),  metadata(obj)$termNames)
+      removed <- paste0(" having removed effect of ",
+                       if (resids) "" else "noise and ",
+                       paste(unlist(tr_list), collapse=", ")
+                       )
+    }
+    node$.removed <- c(node$.removed, removed)
+    structure(
+      assemble_partialised(node[[assay]], reduced=update(plot_fml, NULL ~ .),  resids=resids),
+      which_assay=assay,
+      removed=removed,
+      defaults=defaults,
+      call_args=call_args,
+      ind=!duplicated(model.matrix(design(obj), colDF(obj)))
+    )
+  }
+}

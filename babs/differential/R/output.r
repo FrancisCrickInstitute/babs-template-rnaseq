@@ -1,5 +1,6 @@
 #' @export
 p2filename <- function(p, prefix, suffix) {
+  prefix <- gsub(" ", "-", prefix)
   section <- basename(file.path(tools::file_path_sans_ext(p$script)))
   fname <- file.path(p$res_dir, section,  sprintf("%s%s.%s", prefix, p$TAG, suffix))
   attr(fname, "link") <- file.path(section, sprintf("%s%s.%s", prefix, p$TAG, suffix))
@@ -525,4 +526,23 @@ assayPlus <- function(dds, i) {
     out <- NULL
   }
   out
+}
+
+save_expected <- function(mat, df, params){
+  which_assay <- attr(mat, "which_assay")
+  defaults <- attr(mat, "defaults")
+  ind <- attr(mat, "ind")
+  head_frame <- df[ind, , drop=FALSE]
+  head_frame[] <- sapply(head_frame, as.character)
+  fname <- p2filename(params,
+                     paste(
+                       "expected",
+                       which_assay, defaults$dataset, defaults$model,
+                       sep="_"),
+                     "tsv")
+  dir.create(dirname(fname), recursive=TRUE)
+  write.table(t(head_frame), file=fname, quote=FALSE, sep="\t", col.names=FALSE)
+  write.table(mat[,ind], file=fname,
+              quote=FALSE, sep="\t", append=TRUE, col.names=FALSE)
+  paste0("<a class=\"download-excel btn btn-primary\" href=\"", attr(fname, "link"), "\">Expected ", which_assay, " modeled as ", defaults$model, " in ", defaults$dataset, "</a>", sep="")
 }

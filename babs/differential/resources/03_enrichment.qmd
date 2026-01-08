@@ -85,7 +85,7 @@ set.seed(param$set("seed", postpone=TRUE))
 param$set("spec",  params$spec, "Using analysis plan '{}'.", postpone=TRUE)
 param$set("alignment", params$alignment, "Using alignment settings '{}'")
 data(list=paste0(params$spec, "_x_", params$alignment))
-dds_model_comp <-  decompress_dmc(dds_model_comp)
+dataset_model_comp <-  decompress_dmc(dataset_model_comp)
 
 if  ("symbol_source" %in% names(metadata(dds)) && metadata(dds)$symbol_source== "row.names") {
   cat('\n\n::: {.callout-warning title="No annotation"}\nSkipping enrichment analysis as we could not find an R package with the required organism transcript mappings.\n:::\n\n')
@@ -239,7 +239,7 @@ broadly similar magnitudes but opposite directions...)
 #param$set("showCategory")
 
 # Get a data.frame with the dds objects in a column
-dds_df <- dmc2df(dds_model_comp)
+dds_df <- dmc2df(dataset_model_comp)
 
 # Enumerate all functional-approach x dds combos
 approach_df <- cross_join(

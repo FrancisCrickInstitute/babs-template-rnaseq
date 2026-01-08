@@ -88,7 +88,7 @@ if (isTRUE(getOption('knitr.in.progress'))) {
 
 data(list=paste0("counts_", params$alignment))
 is_des <- inherits(dds, "DESeqDataSet")
-metadata(dds)$default_assay <- ifelse(is_des, "vst", 1)
+
 
 if (!is.null(metadata(dds)$organism$org)) {
   library(metadata(dds)$organism$org, character.only=TRUE)
@@ -365,8 +365,10 @@ param$set("gene_clust", postpone=TRUE)
 param$set("pc_x", 1, postpone=TRUE)
 param$set("pc_y", 2)
 first <- TRUE
-all_clusters <- list()
-all_expecteds <- character()
+links <- list(
+  clusters=list(),
+  expecteds=character()
+)
 cluster_ind <- counter(post_fn=to_letter)
 girafe_ind <- counter()
 
@@ -408,51 +410,25 @@ for (dataset_id in names(ddsList)) {
             )
     
     design(this_dds) <- model_meta$design
-    done_partials <- list()
+    reconstruct <- cached_partial(dataset=dataset_id, model=model_id) # This memo-ised function performs model-based removal of random and/or systematic effects
+    # Save the expected values across the designs reference-grid
+    expected_assay <- reconstruct(this_dds, design(this_dds), resids=FALSE, influence=this_dds$.influential)
+    links$expecteds <- c(links$expecteds, save_expected(expected_assay, colDat, params))
     ## Loop through plot configurations
     for (plot_id in names(plot_formulae)) {
       plot_fml <- plot_formulae[[plot_id]]
       if (! "name" %in% names(attributes(plot_fml))) attr(plot_fml, "name") <- plot_id
       section_hierarchy <- list(dataset=dataset_id, model=model_id, plot_config=attr(plot_fml, "name"))
       dmc_heading(ddsList, dataset=dataset_id, model=model_id, plot=plot_fml, depth=strrep("#", length(section_hierarchy)))
-      design_key <- data_key(plot_fml, this_dds)
-      which_assay <- names(design_key)
-      design_key <- design_key[[which_assay]]
-      this_assay <- assay(this_dds, which_assay)
+      # Do any regressing-out for the plots
+      this_assay <- reconstruct(this_dds, plot_fml, influence=this_dds$.influential)
+      removed <- attr(this_assay, "removed")
+      which_assay <- attr(this_assay, "which_assay")
       if ("filterQC" %in%  names(mcols(this_dds))) {
         this_assay <- this_assay[mcols(this_dds)$filterQC,]
       }
-      if (! which_assay %in% names(done_partials)) {
-        done_partials[[which_assay]] <- list()
-      }
-      if (!design_key %in% names(done_partials[[which_assay]])) {
-        done_partials[[which_assay]][[design_key]] <- partialise(this_dds, assay=which_assay, influence=this_dds$.influential)
-        expected_assay <- assemble_partialised(done_partials[[which_assay]][[design_key]], design(this_dds), resids=FALSE)
-        ind <- !duplicated(model.matrix(design(this_dds), colDat))
-        head_frame <- colDat[ind, , drop=FALSE]
-        head_frame[] <- sapply(head_frame, as.character)
-        fname <- p2filename(params, paste("expected", which_assay, gsub("+","-",design_key,fixed=TRUE), sep="_"), "tsv")
-        dir.create(dirname(fname), recursive=TRUE)
-        write.table(t(head_frame), file=fname, quote=FALSE, sep="\t", col.names=FALSE)
-        write.table(expected_assay[,ind], file=fname,
-                    quote=FALSE, sep="\t", append=TRUE, col.names=FALSE)
-        all_expecteds <- c(
-          all_expecteds,
-          paste0("<a class=\"download-excel btn btn-primary\" href=\"", attr(fname, "link"), "\">Expected ", which_assay, " accounting for ", design_key, " in ", dataset_id, "</a>", sep="")
-        )
 
-      }
-      if (formula_equal(model_meta$design, plot_fml)) {
-        removed <- ""
-      } else {
-        partials <- done_partials[[which_assay]][[design_key]]
-        this_assay <- assemble_partialised(partials, update(plot_fml, NULL ~ .))
-        removed <- paste0(" having removed effect of ",
-                         paste(
-                           translate_terms(dropped_terms(partials, update(plot_fml, NULL ~ .)), this_dds),
-                           sep=", ", collapse=", ")
-                         )
-      }
+      ## Heatmaps
       cat('\n\n::: {.panel-tabset .unnumbered group="explot"}\n\n')
       cat("\n\n", strrep("#", length(section_hierarchy)+1), " Heatmap\n\n", sep="")
       top <- order(
@@ -488,6 +464,12 @@ for (dataset_id in names(ddsList)) {
       }
       cluster_size <- table(gene_clust$cluster)
       cluster_size_per_row <- cluster_size[gene_clust$cluster]
+      cc <- cluster_calc(hmap_data, clusterID=gene_clust$clusters)
+      mask <- all.vars(plot_fml[[2]]$mask)[1]
+      if (!is.na(mask) && mask %in% assayNames(this_dds)) {
+        hmap_data[assay(this_dds,mask)[row.names(hmap_data), colnames(hmap_data)]] <- NA
+      }
+      ### Empirically column-ordered heatmap
       pl <- ComplexHeatmap::Heatmap(
         hmap_data[,vis_sample],
         name = measure_name,
@@ -518,7 +500,7 @@ for (dataset_id in names(ddsList)) {
               plot_meta=section_hierarchy
               )
       first <- FALSE
-
+      ### Design-based column ordering of  heatmap
       cat("\n\n---\n\n")
       pl <- ComplexHeatmap::Heatmap(
         hmap_data[,vis_sample],
@@ -544,8 +526,8 @@ for (dataset_id in names(ddsList)) {
               )
       
       cat("\n\n---\n\n")
+      ## Feature-cluster aggregate profile plots
       cat("\n\n", strrep("#", length(section_hierarchy)+1), " Profiles\n\n", sep="")     
-      cc <- cluster_calc(hmap_data, clusterID=gene_clust$clusters)
       centroid_df <- cbind(cc, colDat[model_vars])[vis_sample,] %>%
         pivot_longer(cols=any_of(names(cc)), names_to=".derived", values_to=".derived.value") %>%
         mutate(.derived=factor(.derived, levels=names(cc)))
@@ -579,12 +561,13 @@ for (dataset_id in names(ddsList)) {
               label= "clustProfile",
               caption=capt,
               plot_meta=section_hierarchy)
-      all_clusters[[this_clust]] <- list(
+      links$clusters[[this_clust]] <- list(
         id=gene_clust$clusters,
         description=capt
       )
       cat("\n\n---\n\n")
 
+      ## Two-dimensional PC plots
       cat("\n\n", strrep("#", length(section_hierarchy)+1), " 2PC\n\n", sep="")
       my_pc <- prcomp(
         t(this_assay[,this_dds$.influential]),
@@ -620,7 +603,7 @@ for (dataset_id in names(ddsList)) {
         
       } # Repeat if need to annotate by an overwritten 'x'
 
-#### 1D PC plots
+      ## 1D PC plots
       cat("\n\n", strrep("#", length(section_hierarchy)+1), " 1PC\n\n", sep="")
       covar_x_pc <- mat_x_terms(proj, model_meta$design, colDat)
       pl <- ggplot(covar_x_pc, aes(x = column, y = Covariate, fill = Assoc)) + 
@@ -675,11 +658,11 @@ for (i in names(assay_files)) {
 
 cat("\n\n## Experimental Group Averages\n\n")
 
-cat(all_expecteds, sep="\n\n")
+cat(links$expecteds, sep="\n\n")
 
 cat("\n\n## Cluster Composition\n\n")
 
-fname <- write_clusters(all_clusters,
+fname <- write_clusters(links$clusters,
                        mcols(ddsList[[1]]),
                        p=params,
                        prefix="exploratory-clusters")
