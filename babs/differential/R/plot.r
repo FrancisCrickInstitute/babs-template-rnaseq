@@ -1,13 +1,16 @@
 #' @export
-sym_colour <- function(dat, lo="blue",zero="white", hi="red", single=FALSE, binary=FALSE) {
-  mx <- quantile(abs(dat), 0.9)
-  if (single) {
-    circlize::colorRamp2(c( 0, mx), colors=c(zero, hi))
-  } else {
+sym_colour <- function(dat, lo="blue",zero="white", hi="red") {
+  mx <- quantile(abs(dat), 0.9, na.rm=TRUE)
+  lowest <- min(dat, na.rm=TRUE)
+  highest <- max(dat, na.rm=TRUE)
+  if (lowest < 0 && highest > 0) {
     circlize::colorRamp2(c(-mx, 0, mx), colors=c(lo, zero, hi))
-  }
+  } else if (lowest < 0) {
+    circlize::colorRamp2(c(-mx, 0), colors=c(lo, zero))
+  } else {
+    circlize::colorRamp2(c(0, mx), colors=c(zero, hi))
+  }    
 }
-
   
 
 #' @export
@@ -59,7 +62,7 @@ plot_tracker <- function(my_params) {
       )
     if ("Heatmap" %in% class(pl)) {
       fn <- function() {
-        draw(pl, heatmap_legend_side = "top")
+        draw(pl, heatmap_legend_side = "bottom")
       }
     }  else if (has_interactivity) {
       fn <- function() {print(rasterize_points(pl, dpi=dpi))}
@@ -355,3 +358,80 @@ distinct_formulae <- function(flist) {
   first_of_kind <- !duplicated(do.call(rbind, keys))
   names(flist)[first_of_kind]
 }
+
+
+adapt_hclust_param <- function(param) {
+  metric <- param@metric %||% "default"
+  if (metric %in% c("pearson", "kendall", "spearman")) {
+    # Replace metric with a custom distfun
+    param@dist.fun <- function(x, method) {
+      as.dist(1 - cor(t(x), method = metric))
+    }
+    # Clear the metric slot since distfun is now used
+    param@metric <- NULL
+  }
+  return(param)
+}
+
+
+heatmap_fn_factory <- function() {
+  rowNoun <- rowNoun
+  cluster_transform <- cluster_transform
+  param <- param
+  gene_clust <- gene_clust
+  model_vars <- model_vars
+  function(ind=TRUE, mat, first=TRUE, last=TRUE, dds, ...) {
+    masked <- mat
+    mask <- all.vars(plot_fml[[2]]$mask)[1]
+    if (!is.na(mask) && mask %in% assayNames(dds)) {
+      masked[assay(dds, mask)[row.names(masked), colnames(masked)]] <- NA
+    }
+    col_fn <- sym_colour(masked[,colData(dds)$.influential])
+    cluster_size_per_row <- (table(gene_clust$cluster))[gene_clust$cluster]
+    if (first) {
+      left_annotation <- ComplexHeatmap::rowAnnotation(
+        size = anno_barplot(
+          as.vector(cluster_size_per_row),
+          bar_width=0.6,
+          width = unit(1, "cm")),
+        show_legend=FALSE)
+    } else {
+      left_annotation <- NULL
+    }
+    defaults <- list(
+      matrix=masked[,ind],
+      name = measure_name,
+      column_title = "Samples",
+      row_title = paste0(RowNoun,"s"),
+      col = col_fn,
+      cluster_columns = bluster::clusterRows(
+        t(cluster_transform(mat[,ind,drop=FALSE])),
+        adapt_hclust_param(param$get("sample_clust")), full=TRUE)$objects$hclust,
+      cluster_rows = gene_clust$objects$hclust,
+      heatmap_legend_param = list(direction = "horizontal"),
+      left_annotation=left_annotation,
+      top_annotation = ComplexHeatmap::HeatmapAnnotation(
+        df = as.data.frame(colData(dds))[ind, model_vars, drop=FALSE], 
+        col = metadata(colData(dds))$palette$Heatmap[model_vars],
+        show_legend=FALSE,
+        show_annotation_name=last
+      ), 
+      show_row_names = FALSE,
+      show_column_names = TRUE)
+    do.call(ComplexHeatmap::Heatmap, modifyList(defaults, list(...)))
+  }
+}
+
+#To change what the clustering operates on
+make_clusterer <- function(dds, fml) {
+  cluster <- all.vars(fml[[2]]$cluster)[1]
+  if (!is.na(cluster) && cluster %in% assayNames(dds)) {
+      function(mat) {
+        mat[] <- assay(dds, cluster)[row.names(mat), colnames(mat)]
+        mat
+      }
+  } else {
+    identity
+  }
+}
+

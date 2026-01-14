@@ -137,9 +137,8 @@ param$set("alpha", postpone=TRUE)
 param$set("lfcThreshold", postpone=TRUE)
 param$set("filterFun", postpone=TRUE)
 param$set("LRT_effect", postpone=TRUE)
-param$set("clustering_distance_rows", postpone=TRUE)
-param$set("clustering_distance_columns", postpone=TRUE)
-param$set("gene_clust")
+param$set("gene_clust", postpone=TRUE)
+param$set("sample_clust")
 
 rds_name <- file.path("data", paste0(basename(params$spec),"_x_", params$alignment, ".rds"))
 
@@ -506,24 +505,28 @@ for (dataset_id in names(dataset_model_comp)) {
         capt <- paste0(tooltip(md, comparison_id), comp_type, rowNoun,"s  of ", mtag(model_id), " in ", dtag(dataset_id), removed)
         cc <- cluster_calc(assay(tidied_se), clusterID=gene_clust$clusters)
         hmap_data <- assay(tidied_se)
-        col_fn <- sym_colour(hmap_data[,tidied_se$.influential], single=diff(sign(range(hmap_data)))==1)
-        mask <- all.vars(plot_fml[[2]]$mask)[1]
-        if (!is.na(mask) && mask %in% assayNames(tidied_se)) {
-          hmap_data[assay(tidied_se, mask)[row.names(hmap_data), colnames(hmap_data)]] <- NA
+        cluster_transform <- identity
+        measure_name <- "Assay"
+        hmap_fn <- heatmap_fn_factory()      
+        if ("cols" %in% names(plot_fml[[2]])) {
+          col_split <- rlang::eval_tidy(eval(plot_fml[[2]])$cols, colDF(tidied_se))
+          splits <- split(seq_along(col_split), col_split)
+        } else {
+          splits <- setNames(TRUE, "Samples")
         }
-        pl <- ComplexHeatmap::Heatmap(
-          hmap_data,
-          col=col_fn,
-          heatmap_legend_param = list(direction = "horizontal" ),
-          name=comparison_id,
-          cluster_columns = FALSE,
-          show_column_names = TRUE,
-          cluster_rows = gene_clust$objects$hclust,
-          column_split = col_split,
-          top_annotation = ha,
-          row_names_gp = gpar(fontsize = 6),
-          show_row_names = nrow(tidied_se)<100)
-        do_plot(pl,
+        pls <- mapply(hmap_fn,
+                     ind=splits,
+                     first=c(TRUE, rep(FALSE, length(splits)-1)),
+                     last=c(rep(FALSE, length(splits)-1),TRUE),
+                     column_title=names(splits),
+                     MoreArgs=list(mat=hmap_data,
+                                   cluster_columns=FALSE,
+                                   name=comparison_id,
+                                   dds=tidied_se,
+                                   show_column_names=TRUE
+                                   )
+                     )
+        do_plot(Reduce(`+`, pls),
                 label="Heatmap",
                 caption=paste0("Heatmap on ", capt,  ". White for ", baseline_str),
                 plot_meta=section_hierarchy,
@@ -556,7 +559,7 @@ for (dataset_id in names(dataset_model_comp)) {
         section_hierarchy$plot_config <- attr(plot_fml, "name")
         dmc_heading(dataset_model_comp, dataset=dataset_id, model=model_id, plot=plot_fml, depth=strrep("#", length(section_hierarchy)+2), numbered=FALSE)
 
-        mapping <- modify_mapping(modifyList(eval(plot_fml[[2]]), aes(mask=NULL)))
+        mapping <- modify_mapping(modifyList(eval(plot_fml[[2]]), aes(mask=NULL, cluster=NULL)))
         pl <- ggplot(centroid_df[[plot_id]], mapping) +
           facet_wrapper(mapping, default=aes(facets = .derived), scales="free_y") + 
           theme_bw() +

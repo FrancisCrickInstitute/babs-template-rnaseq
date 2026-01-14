@@ -132,7 +132,10 @@ profile_to_string <- function(fml) {
   renamer$data_id <- "hover grouping"
   renamer$group <- "grouping variables"
   renamer$extra <- "additional variables"
-  renamer$Flag <- "colour flagging"
+  renamer$flag <- "sample highlighter"
+  renamer$cols <- "column splitter"
+  renamer$mask <- "assay for masking"
+  renamer$cluster <- "assay to base clusters on"
   parts <- vapply(names(mapping), function(nm) {
     expr <- mapping[[nm]]
     rnm <- renamer[[nm]]

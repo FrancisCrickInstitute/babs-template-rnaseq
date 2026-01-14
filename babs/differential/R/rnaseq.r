@@ -45,13 +45,6 @@ load_specs <- function(file="", context) {
            )
     specs <- source(file.path("extdata",file), local=e)$value
     srcs <- expr_to_list(parse(file.path("extdata",file))[[1]])
-    attach_src <- function(spec, src) {
-      if (!"list" %in% class(spec)) {
-        try(attr(spec, "src") <- src, silent=TRUE)
-        return(spec)
-      }
-      Map(attach_src, spec, src)
-    }
     specs <- attach_src(specs, srcs)
     assign("sample_set", expression, envir=e) # avoid evaluating any examples sample_sets.
     pkg_defaults <-default_spec_settings()
@@ -153,7 +146,6 @@ build_dds_list <- function(dds, spec) {
   spec <- trickle_down(field="profile_plots", to="models")
   # Conjunct or cascade any top-level subsetting - if missing, use all samples
   spec <- trickle_down(field="subset", to="sample_sets", default=rep(TRUE, ncol(dds)), merge_fn=`&`)
-  spec <- trickle_down(field="visualise", to="sample_sets", default=rep(TRUE, ncol(dds)), merge_fn=`&`)
   spec <- trickle_down(field="influential_samples", to="sample_sets", default=rep(TRUE, ncol(dds)), merge_fn=`&`)
   # Cascade any spec-wide transforms
   spec <- trickle_down(field="transform", to="sample_sets")
@@ -214,7 +206,7 @@ build_dds_list <- function(dds, spec) {
     dataset_spec <- spec$sample_sets[[dataset_i]]
     obj <- dds
     # ensure any sample indices take into account dataset subsetting
-    for (lower_level_subset in intersect(names(dataset_spec), c("influential_samples", "visualise"))) {
+    for (lower_level_subset in intersect(names(dataset_spec), c("influential_samples"))) {
       a <- attr(dataset_spec[[lower_level_subset]], "src")
       dataset_spec[[lower_level_subset]] <- dataset_spec[[lower_level_subset]][dataset_spec$subset]
       attr(dataset_spec[[lower_level_subset]], "src") <- a

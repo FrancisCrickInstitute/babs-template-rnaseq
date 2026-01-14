@@ -359,9 +359,8 @@ multi-dimensionality as possible.
 #| label: fig-qc-visualisation
 
 param$set("top_n_variable", postpone=TRUE)
-param$set("clustering_distance_rows", postpone=TRUE)
-param$set("clustering_distance_columns", postpone=TRUE)
 param$set("gene_clust", postpone=TRUE)
+param$set("sample_clust", postpone=TRUE)
 param$set("pc_x", 1, postpone=TRUE)
 param$set("pc_y", 2)
 first <- TRUE
@@ -383,7 +382,6 @@ for (dataset_id in names(ddsList)) {
   for (model_id in names(mdls[mdls])) {
     section_hierarchy <- list(dataset=dataset_id, model=model_id)
     model_meta <- metadata(this_dds)$models[[model_id]]
-    vis_sample <- metadata(this_dds)$visualise
     for (new_name in names(metadata(this_dds)$extra_assays)) {
       assay(this_dds, new_name) <- generate_assay(
         args=modifyList(list(from="imputed", design=model_meta$design), metadata(this_dds)$extra_assays[[new_name]]),
@@ -431,8 +429,9 @@ for (dataset_id in names(ddsList)) {
       ## Heatmaps
       cat('\n\n::: {.panel-tabset .unnumbered group="explot"}\n\n')
       cat("\n\n", strrep("#", length(section_hierarchy)+1), " Heatmap\n\n", sep="")
+      cluster_transform <- make_clusterer(this_dds, plot_fml)
       top <- order(
-        apply(this_assay[,this_dds$.influential], 1, sd),
+        apply(cluster_transform(this_assay[,this_dds$.influential]), 1, sd),
         decreasing = TRUE)[1:min(nrow(this_assay),param$get("top_n_variable"))]
       hmap_data <- this_assay[top, ]
       colnames(hmap_data) <- rownames(colDat)
@@ -440,7 +439,9 @@ for (dataset_id in names(ddsList)) {
       do_z <- attr(terms(plot_fml), "intercept") == 1
       do_rescale <- metadata(this_dds)$extra_assays[[which_assay]]$rescale %||% do_z
       do_recentre <- metadata(this_dds)$extra_assays[[which_assay]]$recentre %||% do_z
-      if (param$get("clustering_distance_columns") != "binary") {
+      if (param$get("sample_clust")@metric %in% c("binary")) {
+        measure_name <- paste("Binary", noun_to_readout(RowNoun))
+      } else {
         measure_name <- paste0(
           ifelse(do_recentre, "Centred ", ""),
           ifelse(do_rescale, "Scaled ", ""),
@@ -449,51 +450,36 @@ for (dataset_id in names(ddsList)) {
         )
         if (do_recentre) hmap_data <- hmap_data - rowMeans(hmap_data[,this_dds$.influential, drop=FALSE])
         if (do_rescale) hmap_data <- hmap_data / rowSds(hmap_data[,this_dds$.influential, drop=FALSE])
-        col_fn <- sym_colour(hmap_data[,this_dds$.influential], single=diff(sign(range(hmap_data)))==1)
-      } else {
-        measure_name <- paste("Binary", noun_to_readout(RowNoun))
       }
       my_caption <- paste0(measure_name, " in ",  dtag(dataset_id), removed)
-      gene_clust <- bluster::clusterRows(hmap_data[,this_dds$.influential], param$get("gene_clust"), full=TRUE)
+      gene_clust <- bluster::clusterRows(cluster_transform(hmap_data[,this_dds$.influential]), adapt_hclust_param(param$get("gene_clust")), full=TRUE)
       this_clust <- cluster_ind()
       levels(gene_clust$clusters) <- paste0(this_clust, levels(gene_clust$clusters))
-      if ("cols" %in% names(plot_fml[[2]])) {
-        col_split <- rlang::eval_tidy(eval(plot_fml[[2]])$cols, colDat)
-      } else {
-        col_split <- NULL
-      }
-      cluster_size <- table(gene_clust$cluster)
-      cluster_size_per_row <- cluster_size[gene_clust$cluster]
       cc <- cluster_calc(hmap_data, clusterID=gene_clust$clusters)
-      mask <- all.vars(plot_fml[[2]]$mask)[1]
-      if (!is.na(mask) && mask %in% assayNames(this_dds)) {
-        hmap_data[assay(this_dds,mask)[row.names(hmap_data), colnames(hmap_data)]] <- NA
+      vis <- all.vars(plot_fml[[2]]$visible)[1]
+      if (!is.na(vis)) {
+        vis_sample <- eval(plot_fml[[2]]$visible, colDat)
+      } else {
+        vis_sample <- TRUE
       }
       ### Empirically column-ordered heatmap
-      pl <- ComplexHeatmap::Heatmap(
-        hmap_data[,vis_sample],
-        name = measure_name,
-        column_title = "Samples",
-        row_title = paste0(RowNoun,"s"),
-        col = col_fn,
-        column_split = col_split[vis_sample],
-        cluster_column_slices = FALSE,
-        clustering_distance_columns = param$get("clustering_distance_columns"), 
-        cluster_rows = gene_clust$objects$hclust,
-        heatmap_legend_param = list(direction = "horizontal"), 
-        top_annotation = ComplexHeatmap::HeatmapAnnotation(
-          df = colDat[vis_sample, model_vars, drop=FALSE], 
-          col = metadata(colData(this_dds))$palette$Heatmap[model_vars],
-          show_legend=FALSE), 
-        left_annotation = ComplexHeatmap::rowAnnotation(
-          size = anno_barplot(
-            as.vector(cluster_size_per_row),
-            bar_width=0.6,
-            width = unit(1, "cm")),
-          show_legend=FALSE), 
-        show_row_names = FALSE,
-        show_column_names = TRUE)
-      do_plot(pl,
+      hmap_fn <- heatmap_fn_factory()      
+      if ("cols" %in% names(plot_fml[[2]])) {
+        col_split <- rlang::eval_tidy(eval(plot_fml[[2]])$cols, colDat[vis_sample, , drop=FALSE])
+        splits <- split(seq_along(col_split), col_split)
+      } else {
+        splits <- setNames(TRUE, "Samples")
+      }
+      pls <- mapply(hmap_fn,
+                   ind=splits,
+                   first=c(TRUE, rep(FALSE, length(splits)-1)),
+                   last=c(rep(FALSE, length(splits)-1),TRUE),
+                   column_title=names(splits),
+                   MoreArgs=list(mat=hmap_data[, vis_sample, drop=FALSE],
+                                 dds=this_dds[,vis_sample,drop=FALSE]
+                                 )
+                   )
+      do_plot(Reduce(`+`, pls),
               label= "Heatmap",
               caption=my_caption,
               preview=first,
@@ -502,36 +488,32 @@ for (dataset_id in names(ddsList)) {
       first <- FALSE
       ### Design-based column ordering of  heatmap
       cat("\n\n---\n\n")
-      pl <- ComplexHeatmap::Heatmap(
-        hmap_data[,vis_sample],
-        name = measure_name,
-        column_title = "Samples",
-        row_title = paste0(RowNoun,"s"),
-        col = col_fn,
-        cluster_columns = FALSE,
-        column_order=do.call(order, colDat[vis_sample, model_vars, drop=FALSE]),
-        column_split = col_split[vis_sample],        
-        cluster_column_slices = FALSE,
-        cluster_rows = gene_clust$objects$hclust,
-        heatmap_legend_param = list(direction = "horizontal"),
-        top_annotation = ComplexHeatmap::HeatmapAnnotation(
-          df = colDat[vis_sample, model_vars, drop=FALSE],
-          col = metadata(colData(this_dds))$palette$Heatmap[model_vars],
-          show_legend=FALSE),
-        show_row_names = FALSE, show_column_names = TRUE)
-      do_plot(pl,
-              label= "SuperV-Heatmap",
-              caption=paste0("Supervised Heatmap of ", my_caption),
+      pls <- mapply(hmap_fn,
+                   ind=splits,
+                   first=c(TRUE, rep(FALSE, length(splits)-1)),
+                   last=c(rep(FALSE, length(splits)-1),TRUE),
+                   column_title=names(splits),
+                   column_order=tapply(seq_along(col_split), col_split, function(ind) do.call(order, colDat[vis_sample, , drop=FALSE][ind, model_vars, drop=FALSE])),
+                   MoreArgs=list(
+                     mat=hmap_data[, vis_sample, drop=FALSE],
+                     dds=this_dds[, vis_sample,drop=FALSE],
+                     cluster_columns = FALSE)
+                   )
+
+      do_plot(Reduce(`+`, pls),
+              label= "Heatmap",
+              caption=my_caption,
+              preview=first,
               plot_meta=section_hierarchy
               )
       
       cat("\n\n---\n\n")
       ## Feature-cluster aggregate profile plots
       cat("\n\n", strrep("#", length(section_hierarchy)+1), " Profiles\n\n", sep="")     
-      centroid_df <- cbind(cc, colDat[model_vars])[vis_sample,] %>%
+      centroid_df <- cbind(cc, colDat[model_vars])[vis_sample,,drop=FALSE] %>%
         pivot_longer(cols=any_of(names(cc)), names_to=".derived", values_to=".derived.value") %>%
         mutate(.derived=factor(.derived, levels=names(cc)))
-      mapping <- modify_mapping(modifyList(eval(plot_fml[[2]]), aes(y=.derived.value, mask=NULL)))
+      mapping <- modify_mapping(modifyList(eval(plot_fml[[2]]), aes(y=.derived.value, mask=NULL, cluster=NULL)))
       flag_vars <- all.vars(eval(plot_fml[[2]])$flag)
       colour_aes <- eval(plot_fml[[2]])["colour"]
       orig_caption <- aes_caption(eval(plot_fml[[2]]))
@@ -540,7 +522,7 @@ for (dataset_id in names(ddsList)) {
         geom_point_interactive(size = 3, shape = 21) +
         labs(y=noun_to_readout(RowNoun)) 
       if ("group" %in% names(mapping)) {
-        group_df <- cbind(cc, colDat[model_vars])  %>%
+        group_df <- cbind(cc, colDat[model_vars])[vis_sample,,drop=FALSE]  %>%
           pivot_longer(cols=any_of(names(cc)), names_to=".derived", values_to=".derived.value") %>%
           mutate(.derived=factor(.derived, levels=names(cc)))
         pl <- pl +
@@ -582,7 +564,7 @@ for (dataset_id in names(ddsList)) {
                       sample = rownames(colDat)))
       
       
-      aes_list <- lapply(substitute_x_aes(eval(plot_fml[[2]])),function(m)  modify_mapping(modifyList(m, aes(y=.derived.value, mask=NULL))))
+      aes_list <- lapply(substitute_x_aes(eval(plot_fml[[2]])),function(m)  modify_mapping(modifyList(m, aes(y=.derived.value, mask=NULL, cluster=NULL))))
       for (this_aes in aes_list) {
         pl <- ggplot(transform(pc.df[vis_sample,],.derived="", .derived.value=""),
                     modifyList(this_aes, aes(x=PC1, y=PC2))) + 

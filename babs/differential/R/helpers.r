@@ -115,12 +115,12 @@ ParamList <- R6::R6Class("ParamList",
 
 #' @export
 counter <- function(post_fn=identity) {
-  inds <- list()
+  inds <- new.env(parent = emptyenv())
   function(label=".global") {
-    if (label %in% names(inds)) {
-      inds[[label]] <<- inds[[label]] + 1
+    if (exists(label, envir=inds, inherits=FALSE)) {
+      inds[[label]] <- inds[[label]] + 1
     } else {
-      inds[[label]] <<- 1
+      inds[[label]] <- 1
     }
     post_fn(inds[[label]])
   }
@@ -386,26 +386,33 @@ top_true <- function(is_in, stat, n, sym=TRUE) {
       }
 }
 
+attach_src <- function(spec, src) {
+  if (!"list" %in% class(spec)) {
+    try(attr(spec, "src") <- src, silent=TRUE)
+    return(spec)
+  }
+  Map(attach_src, spec, src)
+}
 
-#' @export
+
 default_spec_settings <- function() {
-   list(         ## analysis parameters
-	alpha          = 0.01,    ## p-value cutoff
-	lfcThreshold   = 0,       ## abs lfc threshold
-	baseMeanMin    = 0,       ## discard transcripts with average normalised counts lower than this
-	top_n_variable = 500,     ## For PCA
-	showCategory   = 25,      ## For enrichment analyses
-	seed           = 1,       ## random seed gets set at start of script, just in case.
-        gene_clust     = quote(bluster::HclustParam()),   ## When we need to chose clusters of genes, how many?
-	filterFun      = IHW::ihw,                 ## NULL for standard DESeq2 results, otherwise  functions
-	clustering_distance_rows    = "euclidean", ## for all feature-distances
-        stringsAsFactors = FALSE,
-        normalise=NULL,
-        impute=NULL,
-	clustering_distance_columns = "euclidean",  ## for sample-distances
-	baseline_heuristic = "min",  ## For the "white" colour in differential heatmaps
-	LRT_effect = "default"  ## For the "white" colour in differential heatmaps
-   )
+  ex <- alist(         ## analysis parameters
+    alpha          = 0.01,    ## p-value cutoff
+    lfcThreshold   = 0,       ## abs lfc threshold
+    baseMeanMin    = 0,       ## discard transcripts with average normalised counts lower than this
+    top_n_variable = 500,     ## For PCA
+    showCategory   = 25,      ## For enrichment analyses
+    seed           = 1,       ## random seed gets set at start of script, just in case.
+    gene_clust     = bluster::HclustParam(cut.params = list(k = 12)),   ## When we need to chose clusters of genes, how many?
+    sample_clust   = bluster::HclustParam(metric="pearson"),
+    filterFun      = IHW::ihw,                 ## NULL for standard DESeq2 results, otherwise  functions
+    stringsAsFactors = FALSE,
+    normalise=NULL,
+    impute=NULL,
+    baseline_heuristic = "min",  ## For the "white" colour in differential heatmaps
+    LRT_effect = "default"  ## For the "white" colour in differential heatmaps
+  )
+  attach_src(lapply(ex, eval), lapply(ex, function(x) paste(deparse(x), collapse="")))
 }
 
 

@@ -34,7 +34,7 @@ $(template_dir)/archive:
 .PHONY: infrastructure
 
 infrastructure: ## Transfer differential code from template
-infrastructure: $(template_dir)/generic.tar.gz
+infrastructure: $(template_dir)/environment.tar.gz
 	tar -xzf $< --exclude-from=protected.txt -C babs/differential/
 	cd babs/differential/resources/make && cat pipeline.mk shared.mk > tmp.mk && mv tmp.mk shared.mk
 	for i in docs ingress nfcore; do cp babs/differential/resources/make/shared.mk babs/$$i/; done
