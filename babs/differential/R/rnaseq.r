@@ -955,13 +955,20 @@ tidy_significant_se <- function(se, ind = TRUE, weights=NULL, assay= (if (inheri
   se <- se[ind,,drop=FALSE]
   if (any(is.na(assay(se, assay)))) assay <- "imputed"
   mat <- assay(se, assay)
+  counts_assay <- list()
+  if ("counts" %in% assayNames(se)) {
+    counts_assay$counts <- assay(se, "counts")
+  }
   if (!is.null(weights) && is.numeric(weights)) {
       offset <- mat %*%  weights
-      assays(se) <- list(
-        weighted = mat - as.vector(offset)
+      assays(se) <- c(
+        list(weighted = mat - as.vector(offset)),
+        counts_assay
       )
   } else {
-    assays(se) <- list(weighted=mat)
+    assays(se) <- c(
+      list(weighted=mat),
+      counts_assay)
   }
   se
 }

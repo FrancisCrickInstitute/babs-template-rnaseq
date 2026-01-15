@@ -465,30 +465,17 @@ for (dataset_id in names(dataset_model_comp)) {
           tidied_se <- tidy_significant_se(dataset_se, is_significant, weights=zweights)
         }
         design(tidied_se) <- design(this_dds)
+        colData(tidied_se) <- colData(this_dds)
         tidied_se <- reorder_samples(tidied_se,model_vars)
         assay(tidied_se) <- assay(tidied_se) / rowSds(assay(tidied_se)[,colnames(this_dds),drop=FALSE])
-        assay(tidied_se) <- reconstruct(tidied_se, plot_fml, influence=tidied_se$.influential)
-        tidied_se <- scale_se(tidied_se, ind=colnames(this_dds), centre=FALSE, scale=TRUE)
-        if ("cols" %in% names(plot_fml[[2]])) {
-          col_split <- rlang::eval_tidy(eval(plot_fml[[2]])$cols, colDF(tidied_se))
-        } else {
-          col_split <- NULL
-        }
-        ha <- ComplexHeatmap::HeatmapAnnotation(
-          df=colDF(tidied_se),
-          col=metadata(colData(this_dds))$palette$Heatmap[names(colData(tidied_se))],
-          show_legend=FALSE)
-        colname_annot <- HeatmapAnnotation(
-          labels1 = anno_text(colnames(tidied_se)),
-          height=unit(1, "inches")
-        )
+        #assay(tidied_se) <- reconstruct(tidied_se, plot_fml, influence=tidied_se$.influential)
+        #tidied_se <- scale_se(tidied_se, ind=colnames(this_dds), centre=FALSE, scale=TRUE)
         mat_height <- height_scaler(n=nrow(tidied_se), small=10, big=20, N=1000)
-        hc <- param$get("gene_clust")
-        if ("cut.params" %in% slotNames(hc) && "k" %in% names(slot(hc, "cut.params")) && slot(hc, "cut.params")$k >= nrow(tidied_se)) {
-          slot(hc, "cut.params") <- modifyList(slot(hc, "cut.params"), list(k=ceiling(nrow(tidied_se)/3)))
-        }
+        cluster_transform <- identity
         if (nrow(tidied_se)>1) {
-          gene_clust <- bluster::clusterRows(assay(tidied_se)[,colnames(this_dds), drop=FALSE], hc, full=TRUE)
+          tidied_columns <- assay(tidied_se)[,colnames(this_dds), drop=FALSE]
+          gene_clust <- bluster::clusterRows(cluster_transform(tidied_columns[,this_dds$.influential]), adapt_hclust_param(param$get("gene_clust")), full=TRUE)
+#          gene_clust <- bluster::clusterRows(assay(tidied_se)[,colnames(this_dds), drop=FALSE], hc, full=TRUE)
           if (is_external) {
             gene_clust$clusters <- match(names(gene_clust$clusters), external_list$ID)
           }
@@ -505,7 +492,6 @@ for (dataset_id in names(dataset_model_comp)) {
         capt <- paste0(tooltip(md, comparison_id), comp_type, rowNoun,"s  of ", mtag(model_id), " in ", dtag(dataset_id), removed)
         cc <- cluster_calc(assay(tidied_se), clusterID=gene_clust$clusters)
         hmap_data <- assay(tidied_se)
-        cluster_transform <- identity
         measure_name <- "Assay"
         hmap_fn <- heatmap_fn_factory()      
         if ("cols" %in% names(plot_fml[[2]])) {

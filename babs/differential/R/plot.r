@@ -386,7 +386,7 @@ heatmap_fn_factory <- function() {
     if (!is.na(mask) && mask %in% assayNames(dds)) {
       masked[assay(dds, mask)[row.names(masked), colnames(masked)]] <- NA
     }
-    col_fn <- sym_colour(masked[,colData(dds)$.influential])
+    col_fn <- sym_colour(masked[,colData(dds)$.influential %||% TRUE])
     cluster_size_per_row <- (table(gene_clust$cluster))[gene_clust$cluster]
     if (first) {
       left_annotation <- ComplexHeatmap::rowAnnotation(
