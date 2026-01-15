@@ -22,6 +22,8 @@ dump_env() {
 
 before=$(mktemp)
 after=$(mktemp)
+#So references to HOME won't get truly expanded until the arrive in a recipe shell:
+export HOME='${HOME}'
 dump_env >"$before"
 
 # run a subshell with .envrc and snapshot after

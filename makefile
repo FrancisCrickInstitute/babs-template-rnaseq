@@ -68,6 +68,9 @@ test: airway/fastq infrastructure ## Generate a test folder setup for the airway
 
 .PHONY: test-ff-nfcore test-differential
 test-ff-nfcore: test/babs/nfcore/results ## Fast-forward to before the differential analysis, by using a cached run of nfcore
+	echo "[env]" > test/babs/differential/.mise.toml
+	echo "source_dir = '$(CURDIR)/babs/differential'" >> test/babs/differential/.mise.toml
+	echo "sync_src = 'resources/ R/ makefile'" >> test/babs/differential/.mise.toml
 
 test-differential: test/babs/nfcore/results airway/preprocessed.rda
 airway/preprocessed.rda:
