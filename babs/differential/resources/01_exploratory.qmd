@@ -493,7 +493,6 @@ for (dataset_id in names(ddsList)) {
                    first=c(TRUE, rep(FALSE, length(splits)-1)),
                    last=c(rep(FALSE, length(splits)-1),TRUE),
                    column_title=names(splits),
-                   column_order=lapply(splits, function(ind) do.call(order, colDat[vis_sample, , drop=FALSE][ind, model_vars, drop=FALSE])),
                    MoreArgs=list(
                      mat=hmap_data[, vis_sample, drop=FALSE],
                      dds=this_dds[, vis_sample,drop=FALSE],

@@ -144,13 +144,14 @@ cached_partial <- function(...) {
   dynamic_keys <- vapply(dots[names(dots) == ""], as.character, "")
   cache <- new.env(parent = emptyenv())
 
-  function(obj, plot_fml, resids=TRUE, influence=TRUE, ...) {
+  function(obj, plot_fml, resids=TRUE, influence=TRUE, assay=NULL, ...) {
     #design_key=paste(sort(attr(terms(design(obj)), "term.labels")), collapse="+")
-
-    if ("y" %in% names(plot_fml[[2]])) {
-      assay <- as.character(plot_fml[[2]]$y)
-    } else {
-      assay <- ifelse(inherits(obj, "DESeqDataSet"), "vst", assayNames(obj)[1])
+    if (is.null(assay)) {
+      if ("y" %in% names(plot_fml[[2]])) {
+        assay <- as.character(plot_fml[[2]]$y)
+      } else {
+        assay <- ifelse(inherits(obj, "DESeqDataSet"), "vst", assayNames(obj)[1])
+      }
     }
 
     call_args <- list(...)

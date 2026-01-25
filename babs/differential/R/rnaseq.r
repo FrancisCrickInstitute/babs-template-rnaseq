@@ -149,6 +149,7 @@ build_dds_list <- function(dds, spec) {
   spec <- trickle_down(field="influential_samples", to="sample_sets", default=rep(TRUE, ncol(dds)), merge_fn=`&`)
   # Cascade any spec-wide transforms
   spec <- trickle_down(field="transform", to="sample_sets")
+  spec <- trickle_down(field="strata", to="sample_sets")
   # various model parameters that might be shared across datasets/everything
   spec <- trickle_down(field="drop_unsupported_combinations", to="models")
   spec <- trickle_down(field="drop_incomplete", to="models")
@@ -955,20 +956,11 @@ tidy_significant_se <- function(se, ind = TRUE, weights=NULL, assay= (if (inheri
   se <- se[ind,,drop=FALSE]
   if (any(is.na(assay(se, assay)))) assay <- "imputed"
   mat <- assay(se, assay)
-  counts_assay <- list()
-  if ("counts" %in% assayNames(se)) {
-    counts_assay$counts <- assay(se, "counts")
-  }
   if (!is.null(weights) && is.numeric(weights)) {
       offset <- mat %*%  weights
-      assays(se) <- c(
-        list(weighted = mat - as.vector(offset)),
-        counts_assay
-      )
+      assays(se) <- setFirstAssay(se, weighted=mat - as.vector(offset))
   } else {
-    assays(se) <- c(
-      list(weighted=mat),
-      counts_assay)
+    assays(se) <- setFirstAssay(se, weighted=mat)
   }
   se
 }
@@ -1326,20 +1318,32 @@ sample_norm.DESeqDataSet <- function(se) {
 sample_norm.SummarizedExperiment <- function(se) {
     assayNames(se)[1] <- noun_to_readout(rowNoun)
     rowData(se)$nna <- apply(is.na(assay(se)), 1, sum)
+    fml <- metadata(se)$strata
+    if (is.null(fml)) {
+      grp <- list(a=1:ncol(se))
+    } else {
+      strata <- interaction(model.frame(fml, colData(se)))
+      grp <- split(seq_along(strata), strata)
+    }
     if ((metadata(se)$normalise %||% "none") =="vsn") {
-      assays(se) <- setFirstAssay(
-        se,
-        vst= vsn::predict(vsn::vsnMatrix(assay(se)), assay(se)))
+      out <- assay(se)
+      for (i in grp) {
+        out[, i] <- vsn::predict(vsn::vsnMatrix(assay(se)[, i, drop = FALSE]), assay(se)[, i, drop = FALSE])
+      }
+      assays(se) <- setFirstAssay(se, vst= out)
     }
     imp <- metadata(se)$impute
     if (!is.null(imp)) {
       assay(se, "na") <- is.na(assay(se))
-      assays(se) <- setFirstAssay(
-        se,
-        imputed=MSnbase::exprs(do.call(
+      for (i in grp) {
+        out[, i] <- MSnbase::exprs(do.call(
           MSnbase::impute,
           modifyList(imp,
-                     list(object=as(se, "MSnSet"), differential=NULL)))))
+                     list(object=as(se[, i, drop = FALSE], "MSnSet"), differential=NULL))))
+      }
+      assays(se) <- setFirstAssay(
+        se,
+        imputed=out)
     }
     se
 }
