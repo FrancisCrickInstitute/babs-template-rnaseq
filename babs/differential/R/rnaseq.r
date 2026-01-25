@@ -403,7 +403,7 @@ fit_model <- function(mdl, dds, ...) {
   for (comp_ind in seq(along=mdl$comparisons)) {
     message("Processing comparison ", comp_ind)
     fit <- fit_comparison(comp=mdl$comparisons[[comp_ind]], model_dds=model_dds, mdl=mdl, ...)
-    if (length(fit)>1) {
+    if (class(mdl$comparisons[[comp_ind]])=="post_hoc") {
       names(fit) <- paste0("(", names(mdl$comparisons)[comp_ind],") '", names(fit), "'")
     } else {
       names(fit) <- names(mdl$comparisons)[comp_ind]
