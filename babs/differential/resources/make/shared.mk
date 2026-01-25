@@ -97,9 +97,10 @@ export SINGULARITYENV_GITHUB_PAT=${GITHUB_PAT}
 ################################################################
 # Git-derived variables
 ################################################################
-PROJECT_HOME:=$(shell $(GIT) rev-parse --show-toplevel 2>/dev/null || echo $(dir $(abspath $(firstword $(MAKEFILE_LIST)))))
 TAG = _$(shell $(GIT) describe --tags --dirty=_altered --always --long 2>/dev/null || echo "uncontrolled")# e.g. v1.0.2-2-ace1729a
-VERSION := $(shell $(GIT) describe --tags --abbrev=0 2>/dev/null || echo "vX.Y.Z")#e.g. v1.0.2
+PROJECT_HOME:=$(shell $(GIT) rev-parse --show-toplevel 2>/dev/null || echo $(dir $(abspath $(firstword $(MAKEFILE_LIST)))))
+GIT_BRANCH := $(shell git branch --show-current | sed 's/^main$$//')
+VERSION := $(and $(GIT_BRANCH),$(GIT_BRANCH)/)$(shell $(GIT) describe --tags --abbrev=0 2>/dev/null || echo "vX.Y.Z")#e.g. v1.0.2
 git-ignore=touch .gitignore && grep -qxF '$(1)' .gitignore || echo '$(1)' >> .gitignore
 
 

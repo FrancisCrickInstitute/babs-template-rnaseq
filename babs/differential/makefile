@@ -97,6 +97,7 @@ run: $(qmds) $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(samplesheets)
 	$(QUARTO) render '$(staging_dir)' $(quarto_opts) $(call log,render)
 	cp -rT $(staged_results) $(RESULTS_DIR)/$(VERSION)
 	ln -sfn  $(VERSION) $(RESULTS_DIR)/latest
+	echo "GIT_REF=$(TAG)" > $(RESULTS_DIR)/latest/.latest
 
 
 ## Alternative is to render pages individually
@@ -149,6 +150,7 @@ $(staging_dir)/_quarto.yml: $(source_dir)/_quarto.yml $(qmds) $(css) $(includes)
 	cp -r  ${source_dir}/_extensions/. ${staging_dir}/_extensions/
 
 $(staging_dir)/$(VERSION).params.yml:  resources/make/project.mk $(staging_dir)/R.bib
+	mkdir -p $(dir $@)
 	echo 'author: [{name: "$(or $(FULLNAME),$(shell whoami))", id: $(shell whoami), roles: Analyst, affiliation: $(or $(MY_AFFILIATION),{ref: [fci]})}]' > $@
 	echo 'params: {$(foreach p,$(param_names),$p: "$($p)"$(comma))}' >> $@
 
@@ -220,6 +222,22 @@ publish: $(pubdir)/$(VERSION) ## Copy results to final location. Either 'outputs
 	ln -sfn $(VERSION) $(pubdir)/latest
 	[ "$(location)" == "outputs" ] || cp --no-preserve=mode -r .htaccess $(pubdir)/ || echo "Warning: no .htaccess files, so unauthorised people may be able to view these results"
 	ln -sfn $$(realpath $(pubdir)/$(VERSION)) $(RESULTS_DIR)/published_$(location)
+
+-include $(RESULTS_DIR)/latest/.latest
+retag: ## If you've changed the git tag for the source code, reflect that in the most-recently run results if they refer to the same commit (check over-ridden if force-retag is non-empty)
+	[ "$(lastword $(subst -g, ,$(TAG)))" = "$(lastword $(subst -g, ,$(GIT_REF)))" ] || [ -n "$(force-retag)" ] || { echo "Error: Not same commit"; exit 1; }
+	for f in $(RESULTS_DIR)/latest/*/*$(GIT_REF).*; do \
+	  [ -e "$$f" ] || continue ;\
+	  newf=$$(echo "$$f" | sed "s|$(GIT_REF)|$(TAG)|") ;\
+	  mv "$$f" "$$newf" ;\
+	done
+	find $(RESULTS_DIR)/latest/ -name '*.html' -exec sed -i "s|$(GIT_REF)|$(TAG)|g" {} +
+	find $(RESULTS_DIR)/latest/ -name '*.html' -exec sed -i "s|>$$(readlink $(RESULTS_DIR)/latest)</td>|>$(VERSION)</td>|g" {} +
+	find $(RESULTS_DIR)/latest/ -name '*.html' -exec sed -i "s|>$(RESULTS_DIR)/$$(readlink $(RESULTS_DIR)/latest)</td>|>$(RESULTS_DIR)/$(VERSION)</td>|g" {} +
+	mv $(RESULTS_DIR)/$$(readlink $(RESULTS_DIR)/latest)  $(RESULTS_DIR)/$(VERSION)
+	ln -sfn  $(VERSION) $(RESULTS_DIR)/latest
+	echo "GIT_REF=$(TAG)" > $(RESULTS_DIR)/latest/.latest
+
 
 ## TODO - won't work when we do a group-as of alignments
 
@@ -307,7 +325,6 @@ maintainer-clean: clean ## Remove the results and data directories, in addition 
 clean-geo:  ## Remove the GEO files from scratch
 	rm -f shortcuts/geo
 	rm -rf $(SCRATCH_DIR)geo
-
 
 
 MAKEFLAGS += --no-builtin-rules
