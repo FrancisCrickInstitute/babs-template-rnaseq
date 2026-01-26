@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RNASeq Template</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.4.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.6.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -282,14 +282,19 @@ normalised to themselves (so identically zero across all genes). To
 avoid this disrupting the visual picture, we have a third
 dataset-specific predicate <code>visualise</code> (alongside
 <code>subset</code> and <code>influential_samples</code>) that will
-remove these samples from plots.</p>
+remove these samples from plots (this is optional, but if you dislike
+seeing a primarily white set of columns in your heatmaps, this is the
+way to eradicate them.)</p>
 <p>The <code>method="identity"</code> allows us to create assays
 identical to the <code>from</code> assay, but allow us to switch off the
 centring and/or scaling.</p>
-<p>We’ll see out to use the extra assays in the <a href="#profile-formulae">plotting section</a>. But a reminder: these
+<p>We’ll see how to use the extra assays in the <a href="#profile-formulae">plotting section</a>. But a reminder: these
 extra assays are ignored in the differential testing, as the inferences
 and estimations are always done on the primary assay. You’ll need to
 model the pairing explicitly.</p>
+<p>The extra assays accumulate, so you can have a later
+<code>to_T0</code> that could be generated
+<code>from="to_nulcear"</code>, for instance.</p>
 </div>
 </div>
 <div class="section level3">
@@ -735,13 +740,28 @@ extra assay will replace the default assay (vst-transformed normalised
 counts) in the plots.</p>
 </div>
 <div class="section level4">
+<h4 id="clustering">Clustering<a class="anchor" aria-label="anchor" href="#clustering"></a>
+</h4>
+<p>We use the <code>bluster</code> package to cluster samples and
+features in our heatmaps, via the <code>gene_clust</code> and
+<code>sample_clust</code> settings. The defaults are:</p>
+<pre><code>settings( ...
+  gene_clust     = bluster::HclustParam(cut.params = list(k = 12)),   ## When we need to chose clusters of genes, how many?
+  sample_clust   = bluster::HclustParam(metric="pearson"),...
+  )</code></pre>
+<p>The <code>k</code> there determines the number of feature clusters
+that a heatmap is broken into (which are then used in the profile-plots,
+so we’ll be plotting e.g. 12 centroids). The metric can be any
+<code>dist</code> metric, or <code>cor</code> method.</p>
+</div>
+<div class="section level4">
 <h4 id="sample-swaps">Sample swaps<a class="anchor" aria-label="anchor" href="#sample-swaps"></a>
 </h4>
 <p>If there have been a pair of samples swapped, this can be corrected
 in the spec file.</p>
-<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a>    all <span class="ot">=</span> <span class="fu">sample_set</span>(</span>
-<span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a>      <span class="at">subset =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb17-3"><a href="#cb17-3" tabindex="-1"></a>      <span class="at">swap=</span><span class="fu">list</span>(<span class="st">"A"</span><span class="ot">=</span><span class="st">"B"</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a>    all <span class="ot">=</span> <span class="fu">sample_set</span>(</span>
+<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a>      <span class="at">subset =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb18-3"><a href="#cb18-3" tabindex="-1"></a>      <span class="at">swap=</span><span class="fu">list</span>(<span class="st">"A"</span><span class="ot">=</span><span class="st">"B"</span>)</span></code></pre></div>
 <p>This will swap the <em>metadata</em> of sample with ID <code>A</code>
 with that of sample ID <code>B</code>. <strong>Every</strong> column of
 the metadata will be exchanged: this is generally what is required
@@ -778,10 +798,10 @@ counter-intuitive).</p>
 these should be concatenated at the nfcore level, but sometimes they get
 kept separate. We can correct for this in the spec file, for
 example:</p>
-<div class="sourceCode" id="cb22"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a>    all <span class="ot">=</span> <span class="fu">sample_set</span>(</span>
-<span id="cb22-2"><a href="#cb22-2" tabindex="-1"></a>      <span class="at">subset =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb22-3"><a href="#cb22-3" tabindex="-1"></a>      <span class="at">collapse=</span><span class="sc">~</span>treatment <span class="sc">+</span> biological_replicate <span class="sc">+</span> timepoint <span class="sc">+</span> batch,</span>
-<span id="cb22-4"><a href="#cb22-4" tabindex="-1"></a>      ...</span></code></pre></div>
+<div class="sourceCode" id="cb23"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" tabindex="-1"></a>    all <span class="ot">=</span> <span class="fu">sample_set</span>(</span>
+<span id="cb23-2"><a href="#cb23-2" tabindex="-1"></a>      <span class="at">subset =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb23-3"><a href="#cb23-3" tabindex="-1"></a>      <span class="at">collapse=</span><span class="sc">~</span>treatment <span class="sc">+</span> biological_replicate <span class="sc">+</span> timepoint <span class="sc">+</span> batch,</span>
+<span id="cb23-4"><a href="#cb23-4" tabindex="-1"></a>      ...</span></code></pre></div>
 <p>The collapse formula should identify the distinct experimental
 groups, so in the above formula we might expect that there are multiple
 samples (rows in the experiment_table) with the same values for each of
@@ -798,11 +818,11 @@ almost always bad, as the standard errors are badly miscalculated.</p>
 </h4>
 <p>We can fine-tune which genes are analysed and which genes are used to
 calculate size factors:</p>
-<div class="sourceCode" id="cb23"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" tabindex="-1"></a>    all <span class="ot">=</span> <span class="fu">sample_set</span>(</span>
-<span id="cb23-2"><a href="#cb23-2" tabindex="-1"></a>      <span class="at">subset =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb23-3"><a href="#cb23-3" tabindex="-1"></a>      <span class="at">controlGenes=</span><span class="fu">expression</span>(<span class="fu">grepl</span>(<span class="st">"^ercc"</span>, ID)),</span>
-<span id="cb23-4"><a href="#cb23-4" tabindex="-1"></a>      <span class="at">subsetGenes=</span><span class="fu">expression</span>(symbol<span class="sc">!=</span><span class="st">""</span>),</span>
-<span id="cb23-5"><a href="#cb23-5" tabindex="-1"></a>      ...</span></code></pre></div>
+<div class="sourceCode" id="cb24"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" tabindex="-1"></a>    all <span class="ot">=</span> <span class="fu">sample_set</span>(</span>
+<span id="cb24-2"><a href="#cb24-2" tabindex="-1"></a>      <span class="at">subset =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb24-3"><a href="#cb24-3" tabindex="-1"></a>      <span class="at">controlGenes=</span><span class="fu">expression</span>(<span class="fu">grepl</span>(<span class="st">"^ercc"</span>, ID)),</span>
+<span id="cb24-4"><a href="#cb24-4" tabindex="-1"></a>      <span class="at">subsetGenes=</span><span class="fu">expression</span>(symbol<span class="sc">!=</span><span class="st">""</span>),</span>
+<span id="cb24-5"><a href="#cb24-5" tabindex="-1"></a>      ...</span></code></pre></div>
 <p><code>controlGenes</code> and <code>subsetGenes</code> both take an R
 expression that should evaluate to a boolean of the featureData of the
 dataset (traditionally, <code>symbol</code> and <code>entrez</code> get
@@ -811,6 +831,12 @@ set, and <code>ID</code> is my convention for accessing the row.names
 that pass the controlGenes filter, and then the subset filter is applied
 to all the original rows (so one can calculate on the spike-ins, and
 then drop them out.)</p>
+<p>For <code>SummarizedExperiment</code> objects (e.g. proteomics or
+metabolomics analysis, but not <em>yet</em> DESeq2 RNASeq analyses), we
+have the capability to stratify the normalisation process: adding a
+<code>strata = ~ batch</code> to a <code>sample_set</code> definition
+will separately calculate the imputation and vst transformations for
+each stratum defined by the formula.</p>
 </div>
 <div class="section level4">
 <h4 id="external-genelists">External genelists<a class="anchor" aria-label="anchor" href="#external-genelists"></a>
@@ -818,7 +844,7 @@ then drop them out.)</p>
 <p>If there are lists of <em>a priori</em> interesting genes, the
 analysis can be informed of these via an additional csv file, the
 location of which is supplied with a line in the spec-file:</p>
-<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span>  <span class="va">external_list</span><span class="op">=</span><span class="st">"extdata/lists.csv"</span></span></code></pre></div>
 <p>This can either be an element of the <code>settings</code>, or the
 <code>specification</code> or any individual <code>sample_set</code>,
@@ -872,7 +898,7 @@ singleton cluster.</p>
 <p>For <code>limma</code>-like analyses, (see <a href="isolated.html">this vignette on running just the ‘differential’
 phase of the analysis</a> ), it is possible to define different
 imputation strategies:</p>
-<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">sample_set</span><span class="op">(</span><span class="va">...</span>,</span>
 <span>    normalise <span class="op">=</span> <span class="st">"vsn"</span>,</span>
 <span>    impute    <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>method<span class="op">=</span><span class="st">"MinProb"</span>, q<span class="op">=</span><span class="fl">0.01</span><span class="op">)</span>,</span>
@@ -889,20 +915,20 @@ to tune the analysis by choosing the parameters behind the algorithms.
 It’s possible to set any parameters that the core analysis script has
 made available to you through the <code>settings</code> top level
 option:</p>
-<div class="sourceCode" id="cb26"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" tabindex="-1"></a><span class="fu">specification</span>(</span>
-<span id="cb26-2"><a href="#cb26-2" tabindex="-1"></a>  <span class="at">sample_sets =</span><span class="fu">list</span>( </span>
-<span id="cb26-3"><a href="#cb26-3" tabindex="-1"></a>  ...</span>
-<span id="cb26-4"><a href="#cb26-4" tabindex="-1"></a>  ),</span>
-<span id="cb26-5"><a href="#cb26-5" tabindex="-1"></a> <span class="at">settings=</span><span class="fu">settings</span>(     <span class="do">## analysis parameters</span></span>
-<span id="cb26-6"><a href="#cb26-6" tabindex="-1"></a>   <span class="at">alpha          =</span> <span class="fl">0.05</span>,    <span class="do">## p-value cutoff</span></span>
-<span id="cb26-7"><a href="#cb26-7" tabindex="-1"></a>   <span class="at">lfcThreshold   =</span> <span class="dv">0</span>,       <span class="do">## abs lfc threshold</span></span>
-<span id="cb26-8"><a href="#cb26-8" tabindex="-1"></a>   <span class="at">baseMeanMin    =</span> <span class="dv">0</span>,       <span class="do">## discard transcripts with average normalised counts lower than this</span></span>
-<span id="cb26-9"><a href="#cb26-9" tabindex="-1"></a>   <span class="at">top_n_variable =</span> <span class="dv">500</span>,     <span class="do">## For PCA</span></span>
-<span id="cb26-10"><a href="#cb26-10" tabindex="-1"></a>   <span class="at">showCategory   =</span> <span class="dv">25</span>,      <span class="do">## For enrichment analyses</span></span>
-<span id="cb26-11"><a href="#cb26-11" tabindex="-1"></a>   <span class="at">seed           =</span> <span class="dv">1</span>,       <span class="do">## random seed gets set at start of script, just in case.</span></span>
-<span id="cb26-12"><a href="#cb26-12" tabindex="-1"></a>   <span class="at">filterFun      =</span> IHW<span class="sc">::</span>ihw <span class="do">## NULL for standard DESeq2 results, otherwise  functions,</span></span>
-<span id="cb26-13"><a href="#cb26-13" tabindex="-1"></a>   <span class="at">gene_clust     =</span> bluster<span class="sc">::</span><span class="fu">HclustParam</span>(<span class="at">cut.params =</span> <span class="fu">list</span>(<span class="at">k=</span><span class="dv">12</span>))    )</span>
-<span id="cb26-14"><a href="#cb26-14" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb27"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" tabindex="-1"></a><span class="fu">specification</span>(</span>
+<span id="cb27-2"><a href="#cb27-2" tabindex="-1"></a>  <span class="at">sample_sets =</span><span class="fu">list</span>( </span>
+<span id="cb27-3"><a href="#cb27-3" tabindex="-1"></a>  ...</span>
+<span id="cb27-4"><a href="#cb27-4" tabindex="-1"></a>  ),</span>
+<span id="cb27-5"><a href="#cb27-5" tabindex="-1"></a> <span class="at">settings=</span><span class="fu">settings</span>(     <span class="do">## analysis parameters</span></span>
+<span id="cb27-6"><a href="#cb27-6" tabindex="-1"></a>   <span class="at">alpha          =</span> <span class="fl">0.05</span>,    <span class="do">## p-value cutoff</span></span>
+<span id="cb27-7"><a href="#cb27-7" tabindex="-1"></a>   <span class="at">lfcThreshold   =</span> <span class="dv">0</span>,       <span class="do">## abs lfc threshold</span></span>
+<span id="cb27-8"><a href="#cb27-8" tabindex="-1"></a>   <span class="at">baseMeanMin    =</span> <span class="dv">0</span>,       <span class="do">## discard transcripts with average normalised counts lower than this</span></span>
+<span id="cb27-9"><a href="#cb27-9" tabindex="-1"></a>   <span class="at">top_n_variable =</span> <span class="dv">500</span>,     <span class="do">## For PCA</span></span>
+<span id="cb27-10"><a href="#cb27-10" tabindex="-1"></a>   <span class="at">showCategory   =</span> <span class="dv">25</span>,      <span class="do">## For enrichment analyses</span></span>
+<span id="cb27-11"><a href="#cb27-11" tabindex="-1"></a>   <span class="at">seed           =</span> <span class="dv">1</span>,       <span class="do">## random seed gets set at start of script, just in case.</span></span>
+<span id="cb27-12"><a href="#cb27-12" tabindex="-1"></a>   <span class="at">filterFun      =</span> IHW<span class="sc">::</span>ihw <span class="do">## NULL for standard DESeq2 results, otherwise  functions,</span></span>
+<span id="cb27-13"><a href="#cb27-13" tabindex="-1"></a>   <span class="at">gene_clust     =</span> bluster<span class="sc">::</span><span class="fu">HclustParam</span>(<span class="at">cut.params =</span> <span class="fu">list</span>(<span class="at">k=</span><span class="dv">12</span>))    )</span>
+<span id="cb27-14"><a href="#cb27-14" tabindex="-1"></a>)</span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="cascade">Cascading properties of a spec file<a class="anchor" aria-label="anchor" href="#cascade"></a>
@@ -935,6 +961,10 @@ will only be used when a model doesn’t specify this directly.</li>
 <code>profile_plots</code> can be set at the
 <code>specification</code> and/or <code>sample_set</code> level, and
 will be added to those of any model-specific plot profiles</li>
+<li>
+<code>extra_assay</code>s can be set at the
+<code>specification</code> level, and will be added to any
+sample_set-specific ones.</li>
 </ul>
 <p>These are intended to ‘do what I mean’ for the most typical
 situations.</p>
