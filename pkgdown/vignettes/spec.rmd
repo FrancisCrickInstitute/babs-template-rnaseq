@@ -237,16 +237,21 @@ This clearly leaves, in this case, the _nuclear_ samples normalised to
 themselves (so identically zero across all genes). To avoid this
 disrupting the visual picture, we have a third dataset-specific
 predicate `visualise` (alongside `subset` and `influential_samples`)
-that will remove these samples from plots.
+that will remove these samples from plots (this is optional, but if
+you dislike seeing a primarily white set of columns in your heatmaps,
+this is the way to eradicate them.)
 
 The `method="identity"` allows us to create assays identical to the
 `from` assay, but allow us to switch off the centring and/or scaling.
 
-We'll see out to use the extra assays in the [plotting
+We'll see how to use the extra assays in the [plotting
 section](#profile-formulae). But a reminder: these extra assays are
 ignored in the differential testing, as the inferences and estimations
 are always done on the primary assay. You'll need to model the pairing
 explicitly.
+
+The extra assays accumulate, so you can have a later `to_T0` that
+could be generated `from="to_nulcear"`, for instance.
 
 ### Models
 
@@ -729,6 +734,25 @@ defined [here](#extra-assays) - simply setting the `y` aesthetic to
 map to the name of the extra assay will replace the default assay
 (vst-transformed normalised counts) in the plots.
 
+
+#### Clustering
+
+We use the `bluster` package to cluster samples and features in our
+heatmaps, via the `gene_clust` and `sample_clust` settings. The defaults are:
+
+```
+settings( ...
+  gene_clust     = bluster::HclustParam(cut.params = list(k = 12)),   ## When we need to chose clusters of genes, how many?
+  sample_clust   = bluster::HclustParam(metric="pearson"),...
+  )
+```
+
+The `k` there determines the number of feature clusters that a heatmap
+is broken into (which are then used in the profile-plots, so we'll be
+plotting e.g. 12 centroids).  The metric can be any `dist` metric, or
+`cor` method.
+
+
 #### Sample swaps
 
 If there have been a pair of samples swapped, this can be corrected in
@@ -830,6 +854,12 @@ size factors are calculated on all rows that pass the controlGenes
 filter, and then the subset filter is applied to all the original rows
 (so one can calculate on the spike-ins, and then drop them out.)
 
+For `SummarizedExperiment` objects (e.g. proteomics or metabolomics
+analysis, but not _yet_ DESeq2 RNASeq analyses), we have the
+capability to stratify the normalisation process: adding a `strata = ~
+batch` to a `sample_set` definition will separately calculate the
+imputation and vst transformations for each stratum defined by the formula.
+
 #### External genelists
 
 If there are lists of _a priori_ interesting genes, the analysis can
@@ -915,5 +945,6 @@ comparisons` hierarchy.  We list the expected behaviour of those:
  - `drop_unsupported_combinations` can be set at the `specification` and/or `sample_set` level, and will only be used when a model doesn't specify this directly.
  - `drop_incomplete` can be set at the `specification` and/or `sample_set` level, and will only be used when a model doesn't specify this directly.
  - `profile_plots` can be set at the `specification` and/or `sample_set` level, and will be added to those of any model-specific plot profiles
+ - `extra_assay`s can be set at the `specification` level, and will be added to any sample_set-specific ones.
 
 These are intended to 'do what I mean' for the most typical situations.
