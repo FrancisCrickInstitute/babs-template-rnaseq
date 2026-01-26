@@ -460,15 +460,19 @@ for (dataset_id in names(dataset_model_comp)) {
       for (plot_id in distinct_formulae(plot_formulae)) {
         plot_fml <- plot_formulae[[plot_id]]
         if ("y" %in% names(plot_fml[[2]])) {
-          tidied_se <- tidy_significant_se(dataset_se, is_significant, weights=zweights, assay=as.character(as.character(plot_fml[[2]]$y)))
+          which_assay <- as.character(as.character(plot_fml[[2]]$y))
+          tidied_se <- tidy_significant_se(dataset_se, is_significant, weights=zweights, assay=which_assay)
+          do_recentre <- metadata(this_dds)$extra_assays[[which_assay]]$recentre %||% FALSE
+          do_rescale <- metadata(this_dds)$extra_assays[[which_assay]]$rescale %||% FALSE
         } else {
           tidied_se <- tidy_significant_se(dataset_se, is_significant, weights=zweights)
+          do_recentre <- do_rescale <- FALSE
         }
         design(tidied_se) <- design(this_dds)
         tidied_se <- reorder_samples(tidied_se,c(model_vars, ".influential"))
-        assay(tidied_se) <- assay(tidied_se) / rowSds(assay(tidied_se)[,colnames(this_dds),drop=FALSE])
         assay(tidied_se) <- reconstruct(tidied_se, plot_fml, influence=tidied_se$.influential, assay=assayNames(tidied_se)[1])
-        tidied_se <- scale_se(tidied_se, ind=colnames(this_dds), centre=FALSE, scale=TRUE)
+        if (do_recentre) assay(tidied_se) <- assay(tidied_se) - rowMeans(assay(tidied_se)[,tidied_se$.influential, drop=FALSE])
+        if (do_rescale) assay(tidied_se) <- assay(tidied_se) / rowSds(assay(tidied_se)[,tidied_se$.influential, drop=FALSE])       
         if ("cols" %in% names(plot_fml[[2]])) {
           col_split <- rlang::eval_tidy(eval(plot_fml[[2]])$cols, colDF(tidied_se))
         } else {
@@ -488,7 +492,7 @@ for (dataset_id in names(dataset_model_comp)) {
           slot(hc, "cut.params") <- modifyList(slot(hc, "cut.params"), list(k=ceiling(nrow(tidied_se)/3)))
         }
         if (nrow(tidied_se)>1) {
-          gene_clust <- bluster::clusterRows(assay(tidied_se)[,colnames(this_dds), drop=FALSE], hc, full=TRUE)
+          gene_clust <- bluster::clusterRows(assay(tidied_se)[,colnames(this_dds), drop=FALSE], adapt_hclust_param(hc), full=TRUE)
           if (is_external) {
             gene_clust$clusters <- match(names(gene_clust$clusters), external_list$ID)
           }
