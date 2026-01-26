@@ -1,3 +1,21 @@
+# Version 1.6.1
+
+## Major Changes
+ - Use `extra_assays` in differential plots
+ - Allow stratified normalisation
+ - add `make retag` to allow versions to be added post-run
+ 
+## Minor Changes
+ - Refactor partials for elegance. Add masks - na assays
+ - Fix masks breaking plots that don't know about them
+ - Improve clustering
+ - Latest infrastructure - late-expanded HOME
+ - Fix differential heatmaps
+ - Add retagging
+ - Add alternative assays to the differential analysis
+ - Improve scaling/centring in differential plots
+ - Update documentation with recent additions
+ 
 # Version 1.4.0
 
 ## Major Changes
