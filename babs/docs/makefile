@@ -63,7 +63,9 @@ else
 endif
 
 
-ifneq ($(configs),)
+ifeq ($(configs),)
+$(error No config files in the docs directory)
+else
 $(configs) :
 	[[ -s "$@" ]] || { echo "$@ is empty" | tee -a tmp.err; }
 endif
