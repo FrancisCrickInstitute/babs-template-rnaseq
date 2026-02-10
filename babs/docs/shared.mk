@@ -83,11 +83,15 @@ ENV_FILES := $(shell \
     done | tac\
 )
 
-ifneq ($(wildcard ./resources/shell/direnv.sh),)
 .env.mk: $(ENV_FILES)
-	bash ./resources/shell/direnv.sh $(ENV_FILES) > $@
+	@if [ -f .env.mk ]; then \
+	echo "🧹 .env.mk was generated with stale exports."; \
+	echo "It has been removed. Please simply re-run make."; \
+	rm -f .env.mk; \
+	exit 1; \
+	fi
+	@bash ./resources/shell/direnv.sh $(ENV_FILES) > $@
 include .env.mk
-endif
 
 NUM_THREADS:=$(or ${SLURM_CPUS_PER_TASK},$(NUM_THREADS),2)
 data_transfer_filename?=.data-transfer-rules

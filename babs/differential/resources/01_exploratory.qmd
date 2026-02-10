@@ -50,13 +50,6 @@ if (!isTRUE(getOption('knitr.in.progress'))) {
   params <- load_params(choose_staging("01_exploratory"))
 }
 
-align_params <- get_align_params(params$alignment)
-rowNoun <- align_params$rowNoun %||% "gene"
-RowNoun <- stringr::str_to_title(rowNoun)
-if ("missing" %in% names(align_params)) {
-  attr(rowNoun, "readout") <- "missingness"
-  attr(RowNoun, "readout") <- "Missingness"
-}
 
 do_plot <- plot_tracker(params)
 
@@ -96,6 +89,16 @@ if (!is.null(metadata(dds)$organism$org)) {
 
 specs   <- load_specs(file=paste0(params$spec, ".spec"), context=dds)
 param <- ParamList$new(defaults=specs$settings)
+align_params <- get_align_params(params$alignment)
+rowNoun <- align_params$rowNoun %||% "gene"
+RowNoun <- stringr::str_to_title(rowNoun)
+if ("missing" %in% names(align_params)) {
+  attr(rowNoun, "readout") <- "missingness"
+  attr(RowNoun, "readout") <- "Missingness"
+}
+param$set("rowNoun", rowNoun)
+param$set("RowNoun", RowNoun)
+
 ```
 
 We also have the following defaults set.  Whenever they are used
@@ -206,7 +209,7 @@ we have a more complex structure different questions may demand a
 diversity of approaches, optionally: accounting for various
 covariates; stratifying the analysis by experimental factors; looking
 for the ways that one factor modifies the effect of another upon 
-`{r}  noun_to_readout(rowNoun)`;... We use mathematical formulae to
+`{r}  noun_to_readout(param$get("rowNoun"))`;... We use mathematical formulae to
 specify these approaches:
 
 ```{r}
@@ -222,7 +225,7 @@ for (dataset in names(ddsList)) {
     dmc_heading(ddsList, dataset=dataset, model=mdl, depth="###", numbered=FALSE)
     src2bullets(metadata(ddsList[[dataset]])$models[[mdl]], c("subset", "influential_samples", "extra_assays"))
     cat("`",
-        Reduce(paste, sub("~", paste0(noun_to_readout(RowNoun)," ~ "), deparse(mdls[[mdl]]))),
+        Reduce(paste, sub("~", paste0(noun_to_readout(param$get("RowNoun"))," ~ "), deparse(mdls[[mdl]]))),
         "`\n\n"
         )
   }
@@ -266,12 +269,12 @@ each configuration.
 
 These visualisations are carried out blind to the experimental
 design. For the heatmap @fig-Heatmap-1, we select a subset of
-`{r} rowNoun`s removing the (assumed uninformative) `{r} rowNoun`s with flat `{r} noun_to_readout(rowNoun)`
+`{r} param$get("rowNoun")`s removing the (assumed uninformative) `{r} param$get("rowNoun")`s with flat `{r} noun_to_readout(param$get("rowNoun"))`
 levels across the whole sample set. We'd expect samples from the same
 experimental group to cluster together, in the sense that they are on
 the same branch of the tree. But this is a transcriptome-wide picture,
-and even if the clustering is not perfect, there will still be `{r} rowNoun`s
-that are consistent with the expected `{r} noun_to_readout(rowNoun)` profiles, and they
+and even if the clustering is not perfect, there will still be `{r} param$get("rowNoun")`s
+that are consistent with the expected `{r} noun_to_readout(param$get("rowNoun"))` profiles, and they
 will be revealed in the differential analysis.
 
 The values of the covariates relevant to the dataset and model will be
@@ -292,22 +295,22 @@ perhaps the reverse, so for this 'supervised' clustering we chose the
 
 ## Clustering centroids
 
-Based on the `{r} rowNoun`'s `{r} noun_to_readout(rowNoun)` in the
+Based on the `{r} param$get("rowNoun")`'s `{r} noun_to_readout(param$get("rowNoun"))` in the
 influential samples, the dendrogram from the heatmap will be split
-into similarly behaving features. We can aggregate the `{r} noun_to_readout(rowNoun)` 
+into similarly behaving features. We can aggregate the `{r} noun_to_readout(param$get("rowNoun"))` 
 across those features and produce dot
 plots for each of the clusters. See, for example @fig-clustProfile-1
 
 ## PC-Covariate assocation
 
-Principal Components are a way of finding a number of meta-`{r} rowNoun`s
-- proxies that best reconstruct the multi-dimensional `{r} noun_to_readout(rowNoun)`
+Principal Components are a way of finding a number of meta-`{r} param$get("rowNoun")`s
+- proxies that best reconstruct the multi-dimensional `{r} noun_to_readout(param$get("rowNoun"))`
 signal if we had to choose 1, 2,
 ... individual numbers to represent a sample. In @fig-covar-1 the
 columns explore the lower-order principal components (which although
 not providing a universally strong signal transcriptome wide, might
-still detect biology that is affecting a smaller subset of `{r} rowNoun`s,
-or a reasonably large set of `{r} rowNoun`s to a lesser
+still detect biology that is affecting a smaller subset of `{r} param$get("rowNoun")`s,
+or a reasonably large set of `{r} param$get("rowNoun")`s to a lesser
 extent than happens in the higher-order PCS). The rows represent the
 experimental factors we have recorded, and the depth of colour of the
 cell records the degree of 'association' that factor has with the give
@@ -320,8 +323,8 @@ with each other.
 ## Principal Component Scatterplots
 
 Then come scatter plots of the first two
-Principal Components - a way of summarising all the `{r} rowNoun`s down to just
-two 'meta`{r} rowNoun`s' that attempt to encapsulate the variability across the
+Principal Components - a way of summarising all the `{r} param$get("rowNoun")`s down to just
+two 'meta`{r} param$get("rowNoun")`s' that attempt to encapsulate the variability across the
 samples in as faithful way as possible. Each plot
 (e.g. @fig-twopc-1) takes the PCs from the unadjusted data,
 and colours them according to the plot configuration under
@@ -348,8 +351,8 @@ e.g. @fig-covar-1 leads us to believe are relevant to the experimental
 design. Just like the cluster dot-plots, we can take a single value as
 a representation of the sample and plot it, as in @fig-onepc-1, against the covariates
 according to the chosen plot configuration. Whereas in the cluster
-dotplot we equally-weighted various subsets of similar `{r} rowNoun`s,
-in the PC dotplots we aggregate all the `{r} rowNoun`s
+dotplot we equally-weighted various subsets of similar `{r} param$get("rowNoun")`s,
+in the PC dotplots we aggregate all the `{r} param$get("rowNoun")`s
 but chose a weighting scheme that captures as much of the
 multi-dimensionality as possible. 
 
@@ -440,13 +443,13 @@ for (dataset_id in names(ddsList)) {
       do_rescale <- metadata(this_dds)$extra_assays[[which_assay]]$rescale %||% do_z
       do_recentre <- metadata(this_dds)$extra_assays[[which_assay]]$recentre %||% do_z
       if (param$get("sample_clust")@metric %in% c("binary")) {
-        measure_name <- paste("Binary", noun_to_readout(RowNoun))
+        measure_name <- paste("Binary", noun_to_readout(param$get("RowNoun")))
       } else {
         measure_name <- paste0(
           ifelse(do_recentre, "Centred ", ""),
           ifelse(do_rescale, "Scaled ", ""),
           which_assay, " ",
-          noun_to_readout(RowNoun)
+          noun_to_readout(param$get("RowNoun"))
         )
         if (do_recentre) hmap_data <- hmap_data - rowMeans(hmap_data[,this_dds$.influential, drop=FALSE])
         if (do_rescale) hmap_data <- hmap_data / rowSds(hmap_data[,this_dds$.influential, drop=FALSE])
@@ -454,31 +457,18 @@ for (dataset_id in names(ddsList)) {
       my_caption <- paste0(measure_name, " in ",  dtag(dataset_id), removed)
       gene_clust <- bluster::clusterRows(cluster_transform(hmap_data[,this_dds$.influential]), adapt_hclust_param(param$get("gene_clust")), full=TRUE)
       this_clust <- cluster_ind()
-      levels(gene_clust$clusters) <- paste0(this_clust, levels(gene_clust$clusters))
+      gene_clust$clusters <- cluster_cardinality(gene_clust$clusters, this_clust)
       cc <- cluster_calc(hmap_data, clusterID=gene_clust$clusters)
-      vis <- all.vars(plot_fml[[2]]$visible)[1]
-      if (!is.na(vis)) {
+      if ("visible" %in% names(plot_fml[[2]])) {
         vis_sample <- eval(plot_fml[[2]]$visible, colDat)
       } else {
         vis_sample <- TRUE
       }
       ### Empirically column-ordered heatmap
-      hmap_fn <- heatmap_fn_factory()      
-      if ("cols" %in% names(plot_fml[[2]])) {
-        col_split <- rlang::eval_tidy(eval(plot_fml[[2]])$cols, colDat[vis_sample, , drop=FALSE])
-        splits <- split(seq_along(col_split), col_split)
-      } else {
-        splits <- setNames(TRUE, "Samples")
-      }
-      pls <- mapply(hmap_fn,
-                   ind=splits,
-                   first=c(TRUE, rep(FALSE, length(splits)-1)),
-                   last=c(rep(FALSE, length(splits)-1),TRUE),
-                   column_title=names(splits),
-                   MoreArgs=list(mat=hmap_data[, vis_sample, drop=FALSE],
-                                 dds=this_dds[,vis_sample,drop=FALSE]
-                                 )
-                   )
+      pls <- hmap_fn(
+        dds=this_dds, mat=hmap_data, param=param,
+        cluster_transform=cluster_transform, gene_clust = gene_clust,
+        model_vars = model_vars, plot_fml =plot_fml, measure_name =measure_name)      
       do_plot(Reduce(`+`, pls),
               label= "Heatmap",
               caption=my_caption,
@@ -488,17 +478,7 @@ for (dataset_id in names(ddsList)) {
       first <- FALSE
       ### Design-based column ordering of  heatmap
       cat("\n\n---\n\n")
-      pls <- mapply(hmap_fn,
-                   ind=splits,
-                   first=c(TRUE, rep(FALSE, length(splits)-1)),
-                   last=c(rep(FALSE, length(splits)-1),TRUE),
-                   column_title=names(splits),
-                   MoreArgs=list(
-                     mat=hmap_data[, vis_sample, drop=FALSE],
-                     dds=this_dds[, vis_sample,drop=FALSE],
-                     cluster_columns = FALSE)
-                   )
-
+      pls <- hmap_fn(dds=this_dds, mat=hmap_data, param=param, cluster_transform=cluster_transform, gene_clust = gene_clust,   model_vars = model_vars,   plot_fml =plot_fml,   measure_name = measure_name, cluster_columns = FALSE)
       do_plot(Reduce(`+`, pls),
               label= "Heatmap",
               caption=my_caption,
@@ -519,7 +499,7 @@ for (dataset_id in names(ddsList)) {
       pl <- ggplot(centroid_df, mapping) +
         facet_wrapper(mapping, default=aes(facets = .derived), scales="free_y") + 
         geom_point_interactive(size = 3, shape = 21) +
-        labs(y=noun_to_readout(RowNoun)) 
+        labs(y=noun_to_readout(param$get("RowNoun"))) 
       if ("group" %in% names(mapping)) {
         group_df <- cbind(cc, colDat[model_vars])[vis_sample,,drop=FALSE]  %>%
           pivot_longer(cols=any_of(names(cc)), names_to=".derived", values_to=".derived.value") %>%
@@ -650,7 +630,7 @@ fname <- write_clusters(links$clusters,
 
 cat('\n\n<a class="download-excel btn btn-primary" href="',
     attr(fname,"link"),
-    '">', RowNoun,'-Cluster mappings</a>', sep="")
+    '">', param$get("RowNoun"),'-Cluster mappings</a>', sep="")
 plot_df <- bind_rows(do_plot())
 saveRDS(plot_df, file = file.path("data", "exploratory_plots.rds"))
 ojs_define(plot_df = plot_df)

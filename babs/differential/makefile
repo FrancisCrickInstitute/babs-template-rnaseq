@@ -38,6 +38,7 @@ $(mk): $(staging_dir)/.make-% : $(file.spec) $(samplesheets) | $(staging_dir)
 	   '$(qmd_path): section=$*'\
 	   '$(qmd_path): cat1=$(or $(shell sed -n "s/^#$(squote)[[:space:]]*@categories[[:space:]]\+\(.*\)/\1/p" extdata/$(ispec).spec | head -n1),$(ispec))'\
 	   '$(qmd_path): cat2=$(or $($(ialign).categories), $(ialign))'\
+	   '$(qmd_path): specname=$(or $(shell sed -n "s/^#$(squote)[[:space:]]*@specname[[:space:]]\+\(.*\)/\1/p" extdata/$(ispec).spec | head -n1),$(ispec))'\
 	   '$(qmd_path): $(source_dir)/$*.qmd'\
 	   '$(staged_results)/$*_$(ispec)_$(ialign).html: $(my_counts_dir)/$(ialign) $(ispec).spec $(my_metadata)_$(ialign).csv $(qmd_path) $(staged_results)/$($*_parent).html'\
 	)) > $@
@@ -58,6 +59,7 @@ $(mk0): $(staging_dir)/.make-% : $(samplesheets) $(genes_results) | $(staging_di
 	 '$(qmd0_path): script=$*_$(ialign)'\
 	 '$(qmd0_path): section=$*'\
 	 '$(qmd0_path): cat1=$($(ialign).categories)'\
+	 '$(qmd_path): specname=$(or $(shell sed -n "s/^#$(squote)[[:space:]]*@specname[[:space:]]\+\(.*\)/\1/p" extdata/$(ispec).spec | head -n1),$(ispec))'\
 	 '$(qmd0_path): $(source_dir)/$*.qmd $(my_counts_dir)/$(ialign)'\
 	 '$(staged_results)/$*_$(ialign).html: $(my_metadata)_$(ialign).csv $(qmd0_path)'\
 	) > $@
@@ -126,12 +128,13 @@ $(qmds) : $(staging_dir)/%.qmd : $(staging_dir)/%.yml $(staging_dir)/$(VERSION).
 	sed -i -e 's#choose_staging("$(section)")#"$(staging_dir)/$*"#' $@
 
 $(qmds:qmd=yml):
-	echo "title: $(alignment) $(spec)" > $@
+	echo "title: $(alignment) $(or $(specname),$(spec))" > $@
 	echo "description: $(alignment)-aligned data$(if $(spec), according to plan '$(spec)')" >> $@
 	echo "categories: [$(if $(cat1),$(if $(cat2),$(cat1)$(comma)$(cat2),$(cat1)),$(cat2))]" >> $@
 	echo "params:" >> $@
 	echo "  alignment: $(alignment)" >> $@
 	echo "  spec: $(or $(spec),'')" >> $@
+	echo "  specname: $(or $(specname),'')" >> $@
 	echo "  script: $(@:yml=qmd)" >> $@
 
 

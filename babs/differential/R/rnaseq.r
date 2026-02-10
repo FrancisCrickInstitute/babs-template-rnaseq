@@ -1360,22 +1360,28 @@ add_extra_assays <- function(dds) {
   dds
 }
 
+
+interpolate <- function(x) {
+  splines::ns(x, knots=sort(unique(x))[-c(1, length(unique(x)))], Boundary.knots=range(x, na.rm=TRUE))
+}
+
 #' @export
 generate_assay <- function(args, dds) {
   curAssay <- assay(dds, args$from)
   if (args$method=="normalise") {
     curFrame <- as.data.frame(colData(dds))
-    X <- model.matrix(args$design, curFrame)
-    storage.mode(X) <- "double"
-    QR <- qr(X)
-    coefs <- t(qr.coef(QR, t(curAssay)))
-    coefs[is.na(coefs)] <- 0
+    margs <- modifyList(args, list(from=NULL, method=NULL, design=NULL, recentre=NULL, rescale=NULL))
     baseFrame <-do.call(
       transform,
-      modifyList(args, list(from=NULL, method=NULL, design=NULL, recentre=NULL, rescale=NULL, `_data`=curFrame)))
-    mf <- model.frame(args$design, curFrame)
-    baseline_X <- model.matrix(args$design, baseFrame, xlev=.getXlevels(terms(mf), mf), contrasts.arg=attr(model.matrix(args$design, mf), "contrasts"))
-    out <- curAssay - coefs %*% t(baseline_X)
+      modifyList(margs, list(`_data`=curFrame))
+    )
+    baseline_ind <- apply(curFrame[names(margs)]==baseFrame[names(margs)], 1, all)
+    X <- model.matrix(args$design, baseFrame[baseline_ind,,drop=FALSE])
+    storage.mode(X) <- "double"
+    QR <- qr(X)
+    coefs <- t(qr.coef(QR, t(curAssay[,baseline_ind,drop=FALSE])))
+    coefs[is.na(coefs)] <- 0
+    out <- curAssay - coefs %*% t(model.matrix(args$design, curFrame))
   } else if(args$method == "identity") {
     out <- curAssay
   }

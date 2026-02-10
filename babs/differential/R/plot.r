@@ -277,7 +277,7 @@ handle_flag_aes <- function(aes_obj) {
   aes_obj$fill <- colour_expr
   if (has_flag) {
     flag_expr <- aes_obj$flag
-    flag_true <- paste(all.vars(eval(plot_fml[[2]])$flag), collapse=",")
+    flag_true <- paste(all.vars(aes_obj$flag), collapse=",")
     aes_obj$colour <- expr(factor(ifelse(!!flag_expr, !!flag_true, as.character(!!colour_expr)), levels=c(levels(!!colour_expr), !!flag_true)))
     aes_obj$flag   <- NULL
   }
@@ -374,21 +374,23 @@ adapt_hclust_param <- function(param) {
 }
 
 
-heatmap_fn_factory <- function() {
-  rowNoun <- rowNoun
-  cluster_transform <- cluster_transform
-  param <- param
-  gene_clust <- gene_clust
-  model_vars <- model_vars
-  function(ind=TRUE, mat, first=TRUE, last=TRUE, dds, ...) {
+hmap_fn <- function(dds, mat, param, cluster_transform, gene_clust, model_vars, plot_fml, measure_name, ...) {
+  if ("visible" %in% names(plot_fml[[2]])) {
+    vis_sample <- eval(plot_fml[[2]]$visible, colDF(dds))
+  } else {
+    vis_sample <- TRUE
+  }
+  mat <- mat[, vis_sample, drop=FALSE]
+  dds <- dds[,vis_sample, drop=FALSE]
+  panel_hmap <- function(ind=TRUE, first, last, column_title, args) {
     masked <- mat
     mask <- all.vars(plot_fml[[2]]$mask)[1]
     if (!is.na(mask) && mask %in% assayNames(dds)) {
       masked[assay(dds, mask)[row.names(masked), colnames(masked)]] <- NA
     }
     col_fn <- sym_colour(masked[,colData(dds)$.influential])
-    cluster_size_per_row <- (table(gene_clust$cluster))[gene_clust$cluster]
-    if (first) {
+    if (first && !is.null(gene_clust)) {
+      cluster_size_per_row <- (table(gene_clust$cluster))[gene_clust$cluster]
       left_annotation <- ComplexHeatmap::rowAnnotation(
         size = anno_barplot(
           as.vector(cluster_size_per_row),
@@ -399,15 +401,18 @@ heatmap_fn_factory <- function() {
       left_annotation <- NULL
     }
     defaults <- list(
-      matrix=masked[,ind],
-      name = measure_name,
-      column_title = "Samples",
-      row_title = paste0(RowNoun,"s"),
+      matrix=masked[,ind,drop=FALSE],
+      column_title = column_title,
+      row_title = paste0(param$get("RowNoun"),"s"),
       col = col_fn,
-      cluster_columns = bluster::clusterRows(
-        t(cluster_transform(mat[,ind,drop=FALSE])),
-        adapt_hclust_param(param$get("sample_clust")), full=TRUE)$objects$hclust,
-      cluster_rows = gene_clust$objects$hclust,
+      cluster_columns = if (nrow(masked[,ind,drop=FALSE]) >1 && "sample_clust" %in% names(param$publish())) {
+        bluster::clusterRows(
+          t(cluster_transform(mat[,ind,drop=FALSE])),
+          adapt_hclust_param(param$get("sample_clust")), full=TRUE)$objects$hclust
+      } else {
+        FALSE
+      },
+      cluster_rows = if ("objects" %in% names(gene_clust)) gene_clust$objects$hclust else FALSE,
       heatmap_legend_param = list(direction = "horizontal"),
       left_annotation=left_annotation,
       top_annotation = ComplexHeatmap::HeatmapAnnotation(
@@ -416,11 +421,28 @@ heatmap_fn_factory <- function() {
         show_legend=FALSE,
         show_annotation_name=last
       ), 
+      show_heatmap_legend=first,
       show_row_names = FALSE,
       show_column_names = TRUE)
-    do.call(ComplexHeatmap::Heatmap, modifyList(defaults, list(...)))
+    if (first) defaults$name <- measure_name
+    do.call(ComplexHeatmap::Heatmap, modifyList(defaults, args))
   }
+  if ("cols" %in% names(plot_fml[[2]])) {
+    col_split <- rlang::eval_tidy(eval(plot_fml[[2]])$cols, colDF(dds))
+    splits <- split(seq_along(col_split), col_split)
+  } else {
+    splits <- setNames(TRUE, "Samples")
+  }
+  pls <- mapply(panel_hmap,
+               ind=splits,
+               first=c(TRUE, rep(FALSE, length(splits)-1)),
+               last=c(rep(FALSE, length(splits)-1),TRUE),
+               column_title=names(splits),
+               args=list(list(...))
+               )
+  
 }
+
 
 #To change what the clustering operates on
 make_clusterer <- function(dds, fml) {

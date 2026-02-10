@@ -66,6 +66,7 @@ write_clusters <- function(clust, mcols, p, prefix="clusters") {
   } else {
     df <- Reduce(function(x,y) merge(x, y, by="ID", all=TRUE), frames)
   }
+  saveRDS(df, file=file.path("data", paste0(prefix, "_", p$spec, "_", p$alignment, ".rds")))
   meta <- as.data.frame(mcols)
   df <- merge(meta, df,  by.x=0, by.y="ID")
   names(df)[names(df)=="Row.names"] <- "ID"
