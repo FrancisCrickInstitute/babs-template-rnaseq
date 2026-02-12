@@ -113,13 +113,13 @@ server <- function(input, output, session) {
 
   output$profileInput <- renderUI({
     req(dmc(), input$dmc_d, input$dmc_m)
-    profile <- metadata(dmc()[[input$dmc_d]][[input$dmc_m]]$comps[[1]])$model$differential_profile_plots
-    selectInput("dmc_profile", "Plot Arrangement",
-                setNames(
-                  seq_along(profile),
-                  ifelse(names(profile)=="", paste0("P", seq_along(profile)), names(profile))
-                )
-                )
+    profile <- lapply(list(General="profile_plots", Exploratory="exploratory_profile_plots", Differential="differential_profile_plots"),
+                     function(x)  metadata(dmc()[[input$dmc_d]][[input$dmc_m]]$comps[[1]])$model[[x]]
+    )
+    profile <- profile[!sapply(profile, is.null)]
+    profile <- lapply(profile, function(p) setNames(names(p), names(p)))
+    if (length(profile)==1) profile <- profile[[1]]
+    selectInput("dmc_profile", "Plot Arrangement", profile)
   })
   
   output$subsetInput <- renderUI({
@@ -227,11 +227,24 @@ server <- function(input, output, session) {
     selected_row(row.names(tbl())[1])
   })
 
+  formula_reactive <- reactive({
+    meta <- metadata(dmc()[[input$dmc_d]][[input$dmc_m]]$comps[[1]])$model
+    fields <- intersect(
+      c("profile_plots", "exploratory_profile_plots", "differential_profile_plots"),
+      names(meta))
+    profile <- lapply(setNames(fields, fields),
+      function(nam) meta[[nam]]
+      )
+    inds <- lapply(profile, function(p) names(p[input$dmc_profile])[1])
+    inds <- inds[!sapply(inds, is.null)][1]
+    meta[[names(inds)]][[input$dmc_profile]]
+  })
+  
   hmap_reactive <- reactive({
     req(dmc(), input$dmc_d, input$dmc_m, inds(), ddsList())
     dds <- ddsList()[[input$dmc_d]]
     design(dds) <-  design(dmc()[[input$dmc_d]][[input$dmc_m]]$dds)
-    plot_fml <- metadata(dmc()[[input$dmc_d]][[input$dmc_m]]$comps[[1]])$model$differential_profile_plots[[as.numeric(input$dmc_profile)]]
+    plot_fml <- formula_reactive()
     model_meta <- metadata(dds)$models[[input$dmc_m]]
     model_vars <- sort_vars(
       unique(c(all.vars(model_meta$design),
@@ -266,7 +279,7 @@ server <- function(input, output, session) {
     req(dmc(), input$dmc_d, input$dmc_m, selected_row(), ddsList())
     dds <- ddsList()[[input$dmc_d]]
     design(dds) <-  design(dmc()[[input$dmc_d]][[input$dmc_m]]$dds)
-    plot_fml <- metadata(dmc()[[input$dmc_d]][[input$dmc_m]]$comps[[1]])$model$differential_profile_plots[[as.numeric(input$dmc_profile)]]
+    plot_fml <- formula_reactive()
     mapping <- eval(plot_fml[[2]])
     plotFrame <- as.data.frame(colData(dds))
     this_assay <- cached_partial()(dds, plot_fml, influence=dds$.influential)
@@ -348,3 +361,4 @@ server <- function(input, output, session) {
 
 
 app <- shinyApp(ui = ui, server = server)
+#runApp(app, host="0.0.0.0")

@@ -71,6 +71,7 @@ chmod = setfacl -m $2:$3 $1 >/dev/null 2>&1 || chmod $2=$3 $1
 ## Environment Variables
 ################################################################
 # Scan all our .env files
+ifneq ($(wildcard ./resources/shell/direnv.sh),)
 ENV_FILES := $(shell \
     dir=$(realpath .); \
     while :; do \
@@ -92,6 +93,7 @@ ENV_FILES := $(shell \
 	fi
 	@bash ./resources/shell/direnv.sh $(ENV_FILES) > $@
 include .env.mk
+endif
 
 NUM_THREADS:=$(or ${SLURM_CPUS_PER_TASK},$(NUM_THREADS),2)
 data_transfer_filename?=.data-transfer-rules
@@ -332,7 +334,7 @@ envsubst = $(foreach v,$(1),envsubst_$v='$($(v))' )envsubst '$(foreach v,$(1),$$
 excluded-targets += R R-local R-$(RVERSION)
 
 .PHONY: R R-local R-$(RVERSION)
-
+launch-targets=rstudio shiny jupyter http server-info read-envs launch-helper
 
 R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses).
 
@@ -342,20 +344,20 @@ launcher: R-$(RVERSION) ## Create a launcher script that will guide you through 
 R-$(RVERSION): resources/shell/R-local.sh 
 	cp $< $@
 	@$(call chmod,$@,u,rwx)
-	for i in rstudio shiny jupyter http server-info read-envs launch-helper; do sed -i -e "\,source $$i.sh,{" -e "r resources/shell/$$i.sh" -e "d" -e "}" $@; done
+	for i in $(launch-targets); do sed -i -e "\,source $$i.sh,{" -e "r resources/shell/$$i.sh" -e "d" -e "}" $@; done
 
 R:
 	@echo "Starting R $(RVERSION) in container $(CONTAINER_IMAGE) ..."
 	@$(CONTAINER) $(CONTAINER_OPTIONS) $(CONTAINER_IMAGE) R
 
-launch-%: R-$(RVERSION) ## launch-R launch-rstudio, launch-jupyter etc 
-	BABS_CMD=$* ./R-$(RVERSION)
+launch-%: R-$(RVERSION) ## launch-R launch-rstudio, launch-jupyter, launch-shiny ARGS=Explorer, etc
+	BABS_CMD=$* ./R-$(RVERSION) $(ARGS)
 
-admin-launch-%: ##  admin-launch-R, admin-launch-debug  etc will use a temporary workspace
+admin-launch-%: ##  admin-launch-R, admin-launch-debug  etc will use a temporary workspace. Also passes ARGS
 	d=$$(mktemp -d) ;\
 	cp  resources/shell/R-local.sh $$d/launcher.sh ;\
 	@$(call chmod,$$d/launcher.sh,u,rwx) ;\
-	for i in rstudio shiny jupyter server-info; do sed -i -e "\,source $$i.sh,{" -e "r resources/shell/$$i.sh" -e "d" -e "}" $$d/launcher.sh; done ;\
+	for i in $(launch-targets); do sed -i -e "\,source $$i.sh,{" -e "r resources/shell/$$i.sh" -e "d" -e "}" $$d/launcher.sh; done ;\
 	echo "Running in $$d" ;\
-	BABS_CMD=$* BABS_TMP=$$d $$d/launcher.sh 2>&1 | tee -a $$d/report.txt
+	BABS_CMD=$* BABS_LAUNCHER_DIR=$$d $$d/launcher.sh $(ARGS) 2>&1 | tee -a $$d/report.txt
 

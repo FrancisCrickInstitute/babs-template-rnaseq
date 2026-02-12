@@ -1,5 +1,7 @@
 img[data-interactive="true"] {
-  display: none !important;
+    width: 10% !important;
+    float: right;
+    margin-left: 1em ;
 }
 [data-bs-toggle="tooltip"] {
   text-decoration: underline dotted;

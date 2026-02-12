@@ -9,6 +9,7 @@
 # BABS_DOTENV - What the environment files are prefixed with (default .env - set to empty to prevent)
 # BABS_INTERACTIVE - whether to add a '-it' flag for docker, specifically
 # BABS_LOG - where to write a debug report if called with BABS_CMD=debug
+# BABS_LAUNCHER_DIR - override the $launcher_dir(=./babs-launchers) storage/cache location
 
 export BABS_DOTENV=${BABS_DOTENV-.env}
 ## source any .env files
@@ -18,6 +19,7 @@ if [[ -n "$BABS_DOTENV" ]]; then
     done
 fi
 
+launcher_dir=${BABS_LAUNCHER_DIR:-$launcher_dir}
 source launch-helper.sh
 
 if ! (mkdir -p "${launcher_dir}" 2>/dev/null && [ -w "${launcher_dir}" ]); then
