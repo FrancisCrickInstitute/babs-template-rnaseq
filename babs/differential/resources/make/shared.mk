@@ -100,12 +100,42 @@ export SINGULARITYENV_GITHUB_PAT=${GITHUB_PAT}
 ################################################################
 PROJECT_HOME:=$(shell $(GIT) rev-parse --show-toplevel 2>/dev/null || echo $(dir $(abspath $(firstword $(MAKEFILE_LIST)))))
 GIT_BRANCH := $(shell git branch --show-current | sed 's/^main$$//')
-VERSION := $(and $(GIT_BRANCH),$(GIT_BRANCH)/)$(shell $(GIT) diff --quiet --ignore-submodules --exit-code	 && \
-                     ($(GIT) describe --tags --exact-match 2>/dev/null || printf "unreleased") || \
-                     printf "modified") #ie v0.1.2 or unreleased or modified
-TAG = _$(VERSION)-$(shell $(GIT) rev-parse --short HEAD 2>/dev/null || echo "uncontrolled")# e.g. v1.0.2-2-ace1729a
+VERSION := $(and $(GIT_BRANCH),$(GIT_BRANCH)/)$(shell $(GIT) diff --quiet --ignore-submodules --exit-code && \
+          ($(GIT) describe --tags --exact-match 2>/dev/null || \
+	  printf "unreleased") || \
+          printf "modified")# ie v0.1.2 or unreleased or modified
+TAG = _$(VERSION)-$(shell $(GIT) rev-parse --short HEAD 2>/dev/null || echo "uncontrolled")# e.g. _v1.0.2-ace1729a
 git-ignore=touch .gitignore && grep -qxF '$(1)' .gitignore || echo '$(1)' >> .gitignore
 
+
+# canned recipe to create checkpoint after a run
+define post_run_checkpoint
+echo "GIT_REF=$(TAG)" > $(RESULTS_DIR)/latest/.latest
+$(GIT) branch -D "$(1)" 2>/dev/null || true
+$(GIT) checkout -b "$(1)"
+$(GIT) add -u
+$(GIT) commit -m "Pipeline pre-run checkpoint" --allow-empty
+$(GIT) checkout -
+$(GIT) checkout "$(1)" -- .
+$(GIT) reset .
+endef
+
+# canned recipe to test compatibility with checkpoint pre retag
+define test_checkpoint
+if ! $(GIT) diff --quiet "$(1)" -- .; then \
+  if [ -z "$(force-retag)" ]; then \
+    echo "------------------------------------------------------------"; \
+    echo "ERROR: Working tree has drifted from checkpoint branch '$(1)'"; \
+    echo "Review changes below, and use 'force-retag=1' to override if you insist:"; \
+    echo "------------------------------------------------------------"; \
+    $(GIT) diff --stat "$(1)" -- .; \
+    echo "------------------------------------------------------------"; \
+    exit 1; \
+  else \
+    echo "WARNING: Worktree drift detected, but proceeding due to force-retag."; \
+  fi \
+fi
+endef
 
 ################################################################
 ## Publishing (moving) generated results and providing shortcuts
