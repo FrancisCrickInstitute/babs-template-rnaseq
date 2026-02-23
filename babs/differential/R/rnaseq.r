@@ -405,7 +405,7 @@ fit_model <- function(mdl, dds, ...) {
     message("Processing comparison ", comp_ind)
     fit <- fit_comparison(comp=mdl$comparisons[[comp_ind]], model_dds=model_dds, mdl=mdl, ...)
     if (class(mdl$comparisons[[comp_ind]])=="post_hoc") {
-      names(fit) <- paste0("(", names(mdl$comparisons)[comp_ind],") '", names(fit), "'")
+      names(fit) <- paste0("(", names(mdl$comparisons)[comp_ind],") ", names(fit))
     } else {
       names(fit) <- names(mdl$comparisons)[comp_ind]
     }
@@ -981,7 +981,7 @@ colDF <- function(se) {
 
 #' @export
 reorder_samples <- function(se, columns) {
-  cols <- intersect(unique(unlist(columns)), colnames(colData(se)))
+  cols <- intersect(c(unique(unlist(columns)), ".influential"), colnames(colData(se)))
   colData(se) <- colData(se)[,cols,drop=FALSE]
   colData(se)[] <- lapply(colData(se), function(x) {
     if (is.character(x)) factor(x) else x
