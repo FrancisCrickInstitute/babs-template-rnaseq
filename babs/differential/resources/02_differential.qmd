@@ -473,7 +473,7 @@ for (dataset_id in names(dataset_model_comp)) {
           do_recentre <- do_rescale <- FALSE
         }
         design(tidied_se) <- design(this_dds)
-        tidied_se <- reorder_samples(tidied_se,c(model_vars, ".influential"))
+        tidied_se <- reorder_samples(tidied_se,model_vars)
         assay(tidied_se) <- reconstruct(tidied_se, plot_fml, influence=tidied_se$.influential, assay=assayNames(tidied_se)[1])
         if ("visible" %in% names(plot_fml[[2]])) {
           vis_sample <- eval(plot_fml[[2]]$visible, colData(tidied_se))
