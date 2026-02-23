@@ -205,6 +205,7 @@ build_dds_list <- function(dds, spec) {
       }
     }
     dataset_spec <- spec$sample_sets[[dataset_i]]
+    dds$.influential <- dataset_spec$influential_samples
     obj <- dds
     # ensure any sample indices take into account dataset subsetting
     for (lower_level_subset in intersect(names(dataset_spec), c("influential_samples"))) {
@@ -226,7 +227,6 @@ build_dds_list <- function(dds, spec) {
     }
     mdlList <- dataset_spec$models
     obj <- obj[, dataset_spec$subset]
-    obj$.influential <- dataset_spec$influential_samples
     colData(obj) <- droplevels(colData(obj))
     if (!is.null(dataset_spec$filterFeatures)) {
       keepFeaturesInd <- eval_dds(obj, dataset_spec$filterFeatures, assays=c(assayNames(obj), "norm", "missing"))
@@ -305,14 +305,14 @@ build_dds_list <- function(dds, spec) {
         colData(obj) <- droplevels(colData(obj))
       }
       new_cols <- intersect(modelled_terms, setdiff(names(colData(obj)), names(default_palette$Heatmap)))
-      old_cols <- setdiff(modelled_terms, new_cols)
+      old_cols <- intersect(names(colData(obj)),setdiff(modelled_terms, new_cols))
       if (length(old_cols)>0) {
         is_modified <- sapply(old_cols,
                                function(x) {
-                                 if (class(colData(obj)[[x]]) != class(colData(obj)[[x]])) return(TRUE)
-                                 if (is.factor(colData(obj)[[x]])) return(!all(levels(colData(obj)[[x]]) %in%  levels(colData(obj)[[x]])))
-                                 if (is.character(colData(obj)[[x]])) return(!all(unique(colData(obj)[[x]]) %in%  levels(unique(obj)[[x]])))
-                                 return(!all(range(colData(obj)[[x]], na.rm=TRUE)==range(colData(obj)[[x]], na.rm=TRUE)))
+                                 if (class(colData(obj)[[x]]) != class(colData(dds)[[x]])) return(TRUE)
+                                 if (is.factor(colData(obj)[[x]])) return(!all(levels(colData(obj)[[x]]) %in%  levels(colData(dds)[[x]])))
+                                 if (is.character(colData(obj)[[x]])) return(!all(unique(colData(obj)[[x]]) %in%  levels(unique(dds)[[x]])))
+                                 return(!all(range(colData(obj)[[x]], na.rm=TRUE)==range(colData(dds)[[x]], na.rm=TRUE)))
                                })
         new_cols <- c(new_cols, old_cols[is_modified])
       }
@@ -986,7 +986,7 @@ reorder_samples <- function(se, columns) {
   colData(se)[] <- lapply(colData(se), function(x) {
     if (is.character(x)) factor(x) else x
   })
-  se[,do.call(order, as.list(colData(se)))]
+  se[,do.call(order, as.list(colData(se))), drop=FALSE]
 }
 
 

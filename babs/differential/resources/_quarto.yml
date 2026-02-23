@@ -4,6 +4,9 @@ website:
   title: "Analysis results"
   navbar:
     right:
+      - href: notes.html
+        text: Release Notes
+        icon: clock-history
       - href: https://github.com/BABS-STP/
         text: Github repository
         icon: github

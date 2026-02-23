@@ -131,7 +131,7 @@ profile_to_string <- function(fml) {
   renamer <- as.list(setNames(names(mapping), names(mapping)))
   renamer$data_id <- "hover grouping"
   renamer$group <- "grouping variables"
-  renamer$extra <- "additional variables"
+  renamer$sort_by <- "sort by"
   renamer$flag <- "sample highlighter"
   renamer$cols <- "column splitter"
   renamer$mask <- "assay for masking"

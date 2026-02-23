@@ -181,7 +181,7 @@ separate_legend <- function(dds, vars=unique(unlist(lapply(metadata(dds)$models,
 }
 
 #' @export
-substitute_x_aes <- function(mapping, excludes=c("", "group", "data_id", "tooltip", "extra")) {
+substitute_x_aes <- function(mapping) {
   # x aesthetic about to be used to represent e.g. PC1 so may need to
   # remap what was being represented by x to another
   # aesthetic. Supplement with x swapped to colour if necessary

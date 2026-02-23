@@ -7,3 +7,53 @@ img[data-interactive="true"] {
   text-decoration: underline dotted;
   cursor: help; 
 }
+
+
+.commit {
+  display: block;
+  padding: 0.25rem;
+  margin-bottom: -1px;            /* collapse borders between items */
+  background-color: #fff;
+  border: 1px solid #706f6f;
+  border-radius: 0;                /* reset corners */
+}
+
+/* Round top corners of the first commit in the section */
+.commit:first-of-type {
+  border-top-left-radius: 0.25rem;
+  border-top-right-radius: 0.25rem;
+}
+
+/* Round bottom corners of the last commit in the section */
+.commit:last-of-type {
+  border-bottom-left-radius: 0.25rem;
+  border-bottom-right-radius: 0.25rem;
+}
+
+
+span.todo.TODO {
+    color: #e30613;
+}
+span.todo.DONE {
+    color: #76b82a;
+}
+
+:where(h1,h2,h3,h4,h5,h6):has(.header-section-number + .todo) > .header-section-number {
+  display: none;
+}
+
+span.tag > span{
+    display: inline-flex;      /* inline but flex container */
+    align-items: center;       /* vertical centering */
+    justify-content: center;   /* optional horizontal centering inside padding */
+    padding: 0.2em 0.4em 0.3em 0.4em;
+    font-size: 0.5em;
+    color: #fff;
+    background-color: #706f6f;
+    border-radius: 0.25rem;
+    white-space: nowrap;
+}
+
+.commit a {
+    text-decoration: none;
+}

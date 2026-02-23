@@ -21,7 +21,7 @@ const axes = parse(Deno.readTextFileSync(args.staging + "/_sidebar.yml"));
 
 const { navTree, flatList } = expandAxesForNav(axes, args.staging);
 quarto.website.sidebar.contents = navTree;
-quarto.project.render = ["index.qmd", ...flatList];
+quarto.project.render = ["index.qmd", "notes.md", ...flatList];
 
 const gh=quarto.website.navbar.right.findIndex(s => s.text=="Github repository");
 if (gh != -1) {

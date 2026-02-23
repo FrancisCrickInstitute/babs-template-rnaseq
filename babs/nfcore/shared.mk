@@ -46,14 +46,9 @@ source_dir=resources
 staging_dir=staging
 ## place within the staging directory where renders will be placed
 RESULTS_DIR = results
-## Convenient shortcut for immediate quarto output
-staged_results=$(staging_dir)/$(RESULTS_DIR)/$(VERSION)
 
 # csv file names (excluding ext)
 log_dir=logs
-
-SELF_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
-
 
 ################################################################
 # Executables and their versions
@@ -103,10 +98,12 @@ export SINGULARITYENV_GITHUB_PAT=${GITHUB_PAT}
 ################################################################
 # Git-derived variables
 ################################################################
-TAG = _$(shell $(GIT) describe --tags --dirty=_altered --always --long 2>/dev/null || echo "uncontrolled")# e.g. v1.0.2-2-ace1729a
 PROJECT_HOME:=$(shell $(GIT) rev-parse --show-toplevel 2>/dev/null || echo $(dir $(abspath $(firstword $(MAKEFILE_LIST)))))
 GIT_BRANCH := $(shell git branch --show-current | sed 's/^main$$//')
-VERSION := $(and $(GIT_BRANCH),$(GIT_BRANCH)/)$(shell $(GIT) describe --tags --abbrev=0 2>/dev/null || echo "vX.Y.Z")#e.g. v1.0.2
+VERSION := $(and $(GIT_BRANCH),$(GIT_BRANCH)/)$(shell $(GIT) diff --quiet --ignore-submodules --exit-code && \
+                     ($(GIT) describe --tags --exact-match 2>/dev/null || printf "unreleased") || \
+                     printf "modified") #ie v0.1.2 or unreleased or modified
+TAG = _$(VERSION)-$(shell $(GIT) rev-parse --short HEAD 2>/dev/null || echo "uncontrolled")# e.g. v1.0.2-2-ace1729a
 git-ignore=touch .gitignore && grep -qxF '$(1)' .gitignore || echo '$(1)' >> .gitignore
 
 

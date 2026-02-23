@@ -363,6 +363,7 @@ for (dataset_id in names(dataset_model_comp)) {
           next
         }
       }
+      
       ## MA Plot
       cat('\n\n::: {.panel-tabset .unnumbered group="diffplot"}\n\n')
       md <- metadata(this_dds)
@@ -520,6 +521,25 @@ for (dataset_id in names(dataset_model_comp)) {
                   mat_height 
                 )
                 )
+        ### Design-based column ordering of  heatmap
+        cat("\n\n---\n\n")
+        pls <- hmap_fn(
+          dds=tidied_se, mat=hmap_data, param=param,
+          cluster_transform=identity, gene_clust = gene_clust,
+          model_vars = model_vars,
+          plot_fml =plot_fml, 
+          measure_name=comparison_id,
+          show_column_names=TRUE, cluster_columns = FALSE)
+        do_plot(Reduce(`+`, pls),
+                label="Heatmap",
+                caption=paste0("Sorted heatmap on ", capt,  ". White for ", baseline_str),
+                plot_meta=section_hierarchy,
+                height_opt=paste0(
+                  "#| fig-height: ",
+                  mat_height 
+                )
+                )
+        
         centroid_df[[plot_id]] <- cbind(cc, colDF(tidied_se))[vis_sample,,drop=FALSE] %>%
           pivot_longer(cols=any_of(names(cc)), names_to=".derived", values_to=".derived.value") %>%
           mutate(.derived=factor(.derived, levels=names(cc)))
