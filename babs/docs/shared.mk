@@ -248,15 +248,14 @@ else
   $(error "# Don't recognise '$(EXECUTOR)' as an executor")
 endif
 
-
 ifeq ($(CONTAINER),)
 optionalContainer=
 containerPrefix=
-NEED_CONTAINER := false
+WRAP:=none
 else
 optionalContainer=$(CONTAINER_IMAGE)
 containerPrefix=$(CONTAINER) $(CONTAINER_OPTIONS) --env MAKEFLAGS="$(MAKEFLAGS)" $(CONTAINER_IMAGE)
-NEED_CONTAINER := true
+WRAP:=container
 endif
 
 excluded-targets += docker
@@ -269,15 +268,10 @@ excluded-targets += docker
 ## By default, run recipes in the usual manner rather than slurm etc.
 
 # Determine if sbatch is needed
-ifeq ($(SLURM_JOB_ID),)
-  # SLURM_JOB_ID is empty
-  ifeq ($(origin sbatch_args),command line)
-    NEED_SBATCH := true
-  else
-    NEED_SBATCH := false
-  endif
-else
-  NEED_SBATCH := false
+ifeq ($(SLURM_JOB_ID)$(origin sbatch_args),command line)
+  # SLURM_JOB_ID is empty and sbatch set at command_line.
+  # makefile will pick up containerPrefix anyway, so can overwrite WRAP
+WRAP:=sbatch
 endif
 
 default_sbatch_args=\
@@ -358,10 +352,11 @@ envsubst = $(foreach v,$(1),envsubst_$v='$($(v))' )envsubst '$(foreach v,$(1),$$
 ## Recipes for calling R/Rstudio
 ##
 ################################################################
-excluded-targets += R R-local R-$(RVERSION)
 
 .PHONY: R R-local R-$(RVERSION)
 launch-targets=rstudio shiny jupyter http server-info read-envs launch-helper
+
+excluded-targets += R R-local R-$(RVERSION) launcher $(foreach t,$(launch-targets),launch-$(t) admin-launch-$(t))
 
 R-local: R-$(RVERSION) ## Create a local shell script that will run R (optional, but helpful for interactive analyses).
 

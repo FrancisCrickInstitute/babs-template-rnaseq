@@ -1,5 +1,5 @@
 .PHONY: makefile resources/make/module.mk resources/make/shared.mk resources/make/project.mk
-.PHONY: build clean maintainer-clean geo R-local
+.PHONY: clean maintainer-clean geo R-local
 .DEFAULT_GOAL=help
 diff_dir=.
 include resources/make/shared.mk
@@ -83,9 +83,8 @@ includes=$(patsubst $(source_dir)/html/%,$(staging_dir)/%,$(wildcard $(source_di
 $(includes): $(staging_dir)/% : $(source_dir)/html/%
 	cp $< $@
 
-ifeq ($(NEED_SBATCH),false)
-    ifeq ($(NEED_CONTAINER),false)
-##     To be executed directly - no (further) containerisation wrapping needed
+ifeq ($(WRAP),none)
+##     To be executed directly, so can expose targets without need for wrapping (in sbatch/container)
 
 .PHONY: run pages scripts
 
@@ -160,7 +159,7 @@ $(staging_dir)/_quarto.yml: $(source_dir)/_quarto.yml $(qmds) $(css) $(includes)
 	 --template=$< \
 	 --staging=$(staging_dir)\
 	 --repo="$(repo)" > $@
-	echo 'multiqc: "$(if $(wildcard $(RESULTS_DIR)/multiqc-*),MultiQC and,)"' >> $@
+	echo 'multiqc: "$(if $(wildcard $(RESULTS_DIR)/multiqc-*),MultiQC and ,)"' >> $@
 	cp $(source_dir)/_quarto-*.yml $(staging_dir)/
 	rm -f ${staging_dir}/_sidebar.yml
 	mkdir -p ${staging_dir}/_extensions
@@ -198,23 +197,19 @@ renv.lock: $(wildcard resources/renv/renv.lock) | $(log_dir)
 	$(GIT) add $(wildcard makefile R .Rbuildignore .gitignore) resources/_dependencies.R
 	$(GIT) commit -m 'Renv initialised by pipeline' || echo "No initialisation files need commiting" $(call log,renv,-a) 
 
-else
-##   To be executed by container so prefix the original call to make with the container
-
-run  pages $(html_reports) scripts $(qmds) $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd  extdata/R.bib renv.lock notes: $(optionalContainer)
-	$(containerPrefix) make $@ EXECUTOR=make
-    endif
-else
-
-## To be submitted.  The 'slurm' variable (in 'resources/make/slurm.mk') has the sbatch options, and a possibly
-## containerised call to make
-
-run pages $(html_reports) scripts $(qmds) $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd extdata/R.bib renv.lock notes: $(optionalContainer)
-	sbatch $(default_sbatch_args) $(sbatch_args) --wrap='$(slurm_wrap)'
-
 endif
 
-## Back outside the executor
+ifeq ($(WRAP),container)
+##   To be executed by container so prefix the original call to make with the container
+%: $(optionalContainer)
+	$(containerPrefix) make $@ EXECUTOR=make
+endif
+
+ifeq ($(WRAP),sbatch)
+## To be submitted. slurm_wrap contains an instruction to do the 'make' on a node.
+%: $(optionalContainer)
+	sbatch $(default_sbatch_args) $(sbatch_args) --wrap='$(slurm_wrap)'
+endif
 
 
 
@@ -247,7 +242,9 @@ publish: $(pubdir)/$(VERSION) ## Copy results to final location. Either 'outputs
 	  echo "$$line" >> $(pubdir)/$(VERSION)/notes.html ;\
 	done < $(RESULTS_DIR)/$(VERSION)/notes.html
 
--include $(RESULTS_DIR)/latest/.latest
+include .latest
+.latest:
+	@touch $@
 retag: ## If you've changed the git tag for the source code but sourcecode is the same, reflect the changed tagging in the results without re-running
 	$(call test_checkpoint,tmp/pipeline-checkpoint)
 	for f in $(RESULTS_DIR)/latest/*/*$(GIT_REF).*; do \
@@ -260,16 +257,12 @@ retag: ## If you've changed the git tag for the source code but sourcecode is th
 	find $(RESULTS_DIR)/latest/ -name '*.html' -exec sed -i "s|>$(RESULTS_DIR)/$$(readlink $(RESULTS_DIR)/latest)</td>|>$(RESULTS_DIR)/$(VERSION)</td>|g" {} +
 	mv $(RESULTS_DIR)/$$(readlink $(RESULTS_DIR)/latest)  $(RESULTS_DIR)/$(VERSION)
 	ln -sfn  $(VERSION) $(RESULTS_DIR)/latest
-	echo "GIT_REF=$(TAG)" > $(RESULTS_DIR)/latest/.latest
+	echo "GIT_REF=$(TAG)" > .latest
 
-
-## TODO - won't work when we do a group-as of alignments
 
 ################################################################
 #### Bootstrap all relevant data from outside
 ################################################################
-
-build: $(my_metadata).csv $(file.spec) $(samplesheets) $(genes_results) ##  'build' is deprecated - `make run` is now sufficient.
 
 ifneq ($(docs_dir),)
 $(docs_dir)/%:
