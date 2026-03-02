@@ -318,14 +318,6 @@ choose_staging <- function(resource, staging="staging") {
 
 
 
-#' @export
-section_chooser <- function(obj, ...) {
-  has_length <- sapply(list(...), function(x) length(obj[[x]])>0)
-  if (any(has_length))
-    obj[[list(...)[[which(has_length)[1]]]]]
-  else
-    NULL
-}
 
 #' @export
 get_align_params <- function(name) {
@@ -441,3 +433,26 @@ design <- function(x) {
   }
 }
 
+split_conjuncts <- function(expr) {
+  if (is.call(expr) && identical(expr[[1]], as.name("&"))) {
+    c(
+      split_conjuncts(expr[[2]]),
+      split_conjuncts(expr[[3]])
+    )
+  } else {
+    list(expr)
+  }
+}
+
+accumulate_predicates <- function(preds, deps, target=NULL, pred=TRUE) {
+  if (!is.null(target) && !target %in% names(deps)) return(pred)
+  for (i in names(preds)) {
+    if (!is.null(target) && i==target) {
+      return( pred  & Reduce(`&`, preds[intersect(names(preds), deps[[i]])]) )
+    }
+    if (i %in% names(deps)) {
+      preds[[i]] <- preds[[i]] & Reduce(`&`, preds[intersect(names(preds), deps[[i]])])
+    }
+  }
+  preds
+}

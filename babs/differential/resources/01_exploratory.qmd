@@ -119,7 +119,8 @@ data.frame(
 ```
 
 ```{r}
-#| label: read-expl2
+#| label: tbl-read-expl2
+#| tbl-cap: Analysis Settings
 
 # Calling the setter without a value will pick up the default (from the spec), _and_ alert it in the markdown, and return the default
 set.seed(param$set("seed", postpone=TRUE))
@@ -130,12 +131,16 @@ param$set("LRT_effect", postpone=TRUE)
 param$set("baseMeanMin")
 
 ddsList <- build_dds_list(dds, specs)
+gt(summarise_filters(ddsList))
+ddsList <- lapply(ddsList, function(dds) dds[mcols(dds)$filter$universal %||% TRUE, , drop=FALSE])
+
 ddsList <- lapply(ddsList, sample_norm)
 ddsList <- removeLow(ddsList, preserve_across=TRUE, baseMeanMin=param$get("baseMeanMin"))
 ddsList <- lapply(ddsList, add_extra_assays)
 
 dtag <- dmc_factory(ddsList, type="dataset")
 mtag <- dmc_factory(ddsList, type="model")
+
 
 ```
 
@@ -379,8 +384,11 @@ for (dataset_id in names(ddsList)) {
   dataset_name <- metadata(ddsList[[dataset_id]])$dmc$dataset_name %||% dataset_id
   dmc_heading(ddsList, dataset=dataset_id, model=NULL, depth=strrep("#", length(section_hierarchy)))
   src2bullets(metadata(ddsList[[dataset_id]]), c("subset", "extra_assays", "influential_samples"))
-  mdls <- sapply(metadata(ddsList[[dataset_id]])$models,
-                function(mdl) !is_null(section_chooser(mdl, "exploratory_profile_plots", "profile_plots")))
+  mdls <- sapply(
+    metadata(ddsList[[1]])$models,
+    function(m) !is.null(m$profile_plots) &&
+      length(get_in_section(m$profile_plots, c("all", "exploratory"))) > 0
+    )
   for (model_id in names(mdls[mdls])) {
     this_dds <- ddsList[[dataset_id]]
     section_hierarchy <- list(dataset=dataset_id, model=model_id)
@@ -390,7 +398,7 @@ for (dataset_id in names(ddsList)) {
         args=modifyList(list(from="imputed", design=model_meta$design), metadata(this_dds)$extra_assays[[new_name]]),
         this_dds)
     }
-    plot_formulae <- section_chooser(model_meta, "exploratory_profile_plots", "profile_plots")
+    plot_formulae <- get_in_section(model_meta$profile_plots, c("all", "exploratory"))
     model_vars <- sort_vars(
       unique(c(all.vars(model_meta$design),
                unique(unlist(lapply(plot_formulae, all.vars)))
@@ -428,10 +436,7 @@ for (dataset_id in names(ddsList)) {
       this_assay <- reconstruct(this_dds, plot_fml, influence=this_dds$.influential)
       removed <- attr(this_assay, "removed")
       which_assay <- attr(this_assay, "which_assay")
-      if ("filterQC" %in%  names(mcols(this_dds))) {
-        this_assay <- this_assay[mcols(this_dds)$filterQC,]
-      }
-
+      this_assay <- this_assay[mcols(this_dds)$filter$exploratory %||% TRUE, , drop=FALSE]
       ## Heatmaps
       cat('\n\n::: {.panel-tabset .unnumbered group="explot"}\n\n')
       cat("\n\n", strrep("#", length(section_hierarchy)+1), " Heatmap\n\n", sep="")

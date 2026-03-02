@@ -110,7 +110,7 @@ git-ignore=touch .gitignore && grep -qxF '$(1)' .gitignore || echo '$(1)' >> .gi
 
 # canned recipe to create checkpoint after a run
 define post_run_checkpoint
-echo "GIT_REF=$(TAG)" > $(RESULTS_DIR)/latest/.latest
+echo "GIT_REF=$(TAG)" > .latest
 $(GIT) branch -D "$(1)" 2>/dev/null || true
 $(GIT) checkout -b "$(1)"
 $(GIT) add -u

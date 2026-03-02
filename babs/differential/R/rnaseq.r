@@ -29,9 +29,10 @@ load_specs <- function(file="", context) {
            },
            envir=e)
     assign("profile_plot",
-           function(x, name=NULL, description=NULL) {
+           function(x, name=NULL, description=NULL, section="all") {
              attr(x, "name") <- name
              attr(x, "description") <- description
+             attr(x, "section") <- section
              x
            },
            envir=e)
@@ -158,6 +159,7 @@ build_dds_list <- function(dds, spec) {
   spec <- trickle_down(field="termNames", to="sample_sets", merge_fn=modifyList, default=list())
   spec <- trickle_down(field="filterFeatures", to="sample_sets", default=spec$settings$filterFeatures)
   spec <- trickle_down(field="filterQC", to="sample_sets", default=spec$settings$filterQC)
+  spec <- trickle_down(field="feature_filters", to="sample_sets", default=spec$settings$feature_filters)
   spec <- trickle_down(field="impute", to="sample_sets", default=spec$settings$impute)
   spec <- trickle_down(field="normalise", to="sample_sets", default=spec$settings$normalise)
   spec <- trickle_down(field="external_list", to="models", default=NULL)
@@ -200,9 +202,6 @@ build_dds_list <- function(dds, spec) {
       if ("profile_plots" %in% names(spec$sample_sets[[dataset_i]]$models[[model_i]])) {
         names(spec$sample_sets[[dataset_i]]$models[[model_i]]$profile_plots) <- default_names(spec$sample_sets[[dataset_i]]$models[[model_i]]$profile_plots, prefix="P")
       }
-      if ("differential_profile_plots" %in% names(spec$sample_sets[[dataset_i]]$models[[model_i]])) {
-        names(spec$sample_sets[[dataset_i]]$models[[model_i]]$differential_profile_plots) <- default_names(spec$sample_sets[[dataset_i]]$models[[model_i]]$differential_profile_plots, prefix="DP")
-      }
     }
     dataset_spec <- spec$sample_sets[[dataset_i]]
     dds$.influential <- dataset_spec$influential_samples
@@ -228,13 +227,39 @@ build_dds_list <- function(dds, spec) {
     mdlList <- dataset_spec$models
     obj <- obj[, dataset_spec$subset]
     colData(obj) <- droplevels(colData(obj))
-    if (!is.null(dataset_spec$filterFeatures)) {
-      keepFeaturesInd <- eval_dds(obj, dataset_spec$filterFeatures, assays=c(assayNames(obj), "norm", "missing"))
-      obj <- obj[keepFeaturesInd,]
+    ff <- dataset_spec$feature_filter
+    if (!is.null(ff)) {
+      deps <- list(post_norm="universal", exploratory=c("post_norm", "universal"), differential=c("post_norm", "universal"))
+      if (is.list(ff)) {
+        mcols(obj)$filter <- as.data.frame(
+          accumulate_predicates(
+            lapply(ff, function(f) eval_dds(obj, f, assays=c(assayNames(obj), "norm", "missing"))),
+            deps=deps)
+            )
+      } else {
+        mcols(obj)$filter <- data.frame(universal=eval_dds(obj, ff, assays=c(assayNames(obj), "norm", "missing")))
+      }
+      for (f in names(mcols(obj)$filter)) {
+        # Separate 'and' clauses of an individual filter
+        conjuncts <- split_conjuncts(ff[[f]])
+        if (length(conjuncts)>1) {
+          # get the predicates corresponding to those clauses
+          pass <- lapply(conjuncts, function(conjunct) eval_dds(obj, conjunct, assays=c(assayNames(obj), "norm", "missing")))
+          # Apply adjustment for  predecessor predicates
+          pass <- lapply(pass, function(p)  accumulate_predicates(mcols(obj)$filter, deps=deps, target=f, pred=p))
+          percent <- 100 * sapply(Reduce(`&`, pass, accumulate=TRUE), mean)
+          attr(mcols(obj)$filter[[f]], "subpreds") <-paste0("(", paste(sprintf("%0.0f%%", percent), collapse=","), ")")
+        }
+      }
+    } else {
+      mcols(obj)$filter <- data.frame(universal=TRUE)
     }
-    if (!is.null(dataset_spec$filterQC)) {
-      mcols(obj)$filterQC <- eval_dds(obj, dataset_spec$filterQC,assays=c(assayNames(obj), "norm", "missing"))
+    if (!is.null(dataset_spec$filterQC)) {#DEPRECATED
+      mcols(obj)$filter$exploratory <- eval_dds(obj, dataset_spec$filterQC, assays=c(assayNames(obj), "norm", "missing"))
     }    
+    if (!is.null(dataset_spec$filterFeatures)) {
+      mcols(obj)$filter$universal <- eval_dds(obj, dataset_spec$filterFeatures, assays=c(assayNames(obj), "norm", "missing"))
+    }
     if ("termNames" %in% names(dataset_spec)) {
       metadata(obj)$termNames <- dataset_spec$termNames
     } else {
@@ -252,24 +277,20 @@ build_dds_list <- function(dds, spec) {
     }
 
     for (i in seq_along(mdlList)) {
-      if (is_null(section_chooser(mdlList[[i]], "profile_plots", "exploratory_profile_plots", "differential_profile_plots"))) {      
+      if (! "profile_plots" %in% names(mdlList[[i]])) {
         # default to the set of models removing any terms that will preserve marginality
         pp <- find_simpler_models(mdlList[[i]]$design, do_aes=TRUE, type="design")
         attr(pp[[1]], "src") <- paste0(deparse(pp[[1]]), collapase="")
         mdlList[[i]]$profile_plots <- pp
       } else {
-        for (profiler in c("profile_plots", "exploratory_profile_plots", "differential_profile_plots")) {
-          if (!is_null(section_chooser(mdlList[[i]], profiler))) {
-            mdlList[[i]][[profiler]] <- lapply(
-              mdlList[[i]][[profiler]],
-              function(p) {
-                o <- update(mdlList[[i]]$design, p)
-                attributes(o) <- attributes(p)
-                attr(o, "src") <- paste0(deparse(p), collapse="")
-                o
-              })
-          }
-        }
+        mdlList[[i]]$profile_plots <- lapply(
+          mdlList[[i]]$profile_plots,
+          function(p) {
+            o <- update(mdlList[[i]]$design, p)
+            attributes(o) <- attributes(p)
+            attr(o, "src") <- paste0(deparse(p), collapse="")
+            o
+          })
       }
     }
     metadata(obj)$models <- mdlList
@@ -1336,10 +1357,12 @@ sample_norm.SummarizedExperiment <- function(se) {
     if (!is.null(imp)) {
       assay(se, "na") <- is.na(assay(se))
       for (i in grp) {
+        invisible(capture.output({
         out[, i] <- MSnbase::exprs(do.call(
           MSnbase::impute,
           modifyList(imp,
                      list(object=as(se[, i, drop = FALSE], "MSnSet"), differential=NULL))))
+        }))
       }
       assays(se) <- setFirstAssay(
         se,
@@ -1403,31 +1426,56 @@ expr_to_list <- function(x, aliases = c("list", "specification", "sample_set", "
 }
 
 eval_dds <- function(dds, expr, assays = assayNames(dds)) {
-  df_env <- new.env()
-  df_env$df <- as.data.frame(colData(dds))
+  e <- new.env(parent = baseenv())
+  df <- as.data.frame(colData(dds))
 
+  assays <- intersect(assays, all.vars(expr))
+  mnames <- intersect(names(mcols(dds)), all.vars(expr))
+  # If no dependency on assay, can just use mcols vectorised
+  if (length(assays)==0) {
+    for (j in mnames) {
+      assign(j, mcols(dds)[[j]], envir=e)
+    }
+    return(eval(expr, env = e))
+  }
+  
   # Cache each assay matrix mentioned in expr in a list
-  assays <- intersect(assays, all.names(expr))
   assay_mats <- lapply(setNames(assays, assays),function(a) assayPlus(dds, a))
 
-  # Define an accessor function per assay
-  for (a in assays) {
-    assign(a, function(transform = identity) {
-      (df_env$df %>% transform)[[a]]
-    }, envir = df_env)
-  }
 
+  mc <- mcols(dds)
+  mc_list <- lapply(mnames, function(j) mc[[j]])
+  names(mc_list) <- mnames
+
+  if (as.character(expr[[1]]) == "%>%") {
+    pipeline_fn <- eval(expr, e)#function closure is now dynamically updatable
+    is_fn <- TRUE
+  } else {
+    is_fn <- FALSE
+  }
+  
   # Preallocate result vector
   res <- logical(nrow(dds))
-
   for (i in seq_len(nrow(dds))) {
     # Set each assay vector directly from the cached matrix
     for (a in assays) {
-      df_env$df[[a]] <- assay_mats[[a]][i, ]
+      df[[a]] <- assay_mats[[a]][i, ]
     }
-    res[[i]] <- rlang::eval_tidy(expr, env = df_env)
+    for (j in mnames) {
+      e[[j]] <- mc_list[[j]][i]
+    }
+    if (is_fn) {
+      out <- pipeline_fn(df)
+      } else {
+        out <- rlang::eval_tidy(expr, data=df, env=e)
+      }
+    if (is.data.frame(out) && ncol(out) == 1)
+      out <- out[[1]]
+    if (length(out) == 1)
+      res[i] <- out
+    else
+      stop("Expression must return a single logical value.")
   }
-
   res
 }
 
@@ -1482,4 +1530,39 @@ em_constraint <- function(fit, constraint) {
   rg <- emmeans::ref_grid(fit)
   em <- emmeans::emmeans(subset(rg, eval(constraint[[2]])), update(eval(constraint[[1]]), revpairwise ~ .))
   em$contrasts@linfct
+}
+
+
+summarise_filters <- function(ddsList) {
+ dfs <- mapply(
+    function(dds, id) {
+      passes <- sapply(
+        mcols(dds)$filter,
+        function(pass) sprintf("%0.1f%%", 100 * mean(pass))
+      )
+      df <- data.frame(
+        dataset=id,
+        filter=names(passes),
+        success=passes,
+        condition=sapply(metadata(dds)$feature_filters, deparse1)
+      )
+      subs <- sapply(mcols(dds)$filter, attr, "subpreds")
+      if (is.character(subs) && length(subs)==nrow(df)) df$stages <- subs
+      df
+    },
+    ddsList,
+    names(ddsList),
+    SIMPLIFY=FALSE
+ )
+ df <- bind_rows(dfs)
+ if ("stages" %in% names(df)) df$stages[is.na(df$stages)] <- ""
+ df
+}
+
+get_in_section <- function(lst, sections) {
+  ind <- sapply(
+    lst,
+    function(item)  is.null(attr(item, "section")) || attr(item, "section") %in% sections
+  )
+  lst[ind]
 }

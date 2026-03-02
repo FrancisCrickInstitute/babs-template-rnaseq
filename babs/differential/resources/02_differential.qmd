@@ -87,7 +87,7 @@ if (isTRUE(getOption('knitr.in.progress'))) {
 base_dir <- getwd()
 data(list=paste0("counts_", params$alignment))
 data(list=paste0("ddsList_", params$alignment, "_", params$spec))
-
+ddsList <- lapply(ddsList, function(dds) dds[mcols(dds)$filter$differential %||% TRUE, , drop=FALSE])
 ddsList <- lapply(ddsList, function(dds) {
   imp <- metadata(dds)$impute
   if (!is.null(imp) && !is.null(imp$differential) && !imp$differential) {
@@ -438,7 +438,7 @@ for (dataset_id in names(dataset_model_comp)) {
               plot_meta=section_hierarchy
               )
       cat("\n\n---\n\n")
-      plot_formulae <- section_chooser(md$model, "differential_profile_plots", "profile_plots")
+      plot_formulae <- get_in_section(md$model$profile_plots, c("all", "differential"))
       model_vars <- sort_vars(
         unique(c(all.vars(md$model$design),
                  unique(unlist(lapply(plot_formulae, all.vars)))
