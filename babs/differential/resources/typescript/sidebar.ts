@@ -83,52 +83,36 @@ function expandAxesForNav(axes, staging, prefix = {}) {
 		    children.forEach(child => {
 			delete child.params;
 		    });
-		    if (
-		        children.length === 1 &&
-			    children[0] &&
-			    typeof children[0].href === "string" &&
-			    typeof children[0].text === "string" &&
-			    !("section" in children[0])
-		    ) {
-			results.push({
-			    ...children[0],
-			    params: filteredParams
-			});
-		    } else {
-			
+// TODO: Used to have this conditional to 'promote' singleton's,
+// But if we only have 00_init and 01_exploratory, it doesn't work
+//		    if (children.length == 1) { 
+//			results.push({...children[0], params:filteredParams});
+//		    } else {
 			results.push({
 			    section: label + ":",
 			    contents: children,
 			    params: filteredParams
 			});
-		    }
+//		    }
 		}
 	    }
 	}
 	const sectionNodes = results.filter(item => "section" in item);
-	// Only collapse structural wrapper if it is a pure passthrough
-	if (sectionNodes.length === 1 && results.length === 1) {
-	    const only = sectionNodes[0];
-	    
-	    // Collapse only if the section adds no real grouping value
-	    if (Array.isArray(only.contents)) {
-		results = only.contents;
-	    }
-	}
-	// If this axis has only one non-null value,
-	// promote its section contents upward
-	if (
-	    values.filter(v => v !== null).length === 1
-	) {
-	    const promoted = [];
+	
+	if (sectionNodes.length === 1 && results.length > 1) {
+	    // mixed case: keep non-section items and flatten the single section
+	    const flattened = [];
 	    for (const item of results) {
 		if (item.section && Array.isArray(item.contents)) {
-		    promoted.push(...item.contents);
+		    flattened.push(...item.contents);
 		} else {
-		    promoted.push(item);
+		    flattened.push(item);
 		}
 	    }
-	    results = promoted;
+	    results = flattened;
+	} else if (sectionNodes.length === 1 && results.length === 1) {
+	    // single section only: flatten entirely
+	    results = sectionNodes[0].contents;
 	}
 	results.forEach(child => {
 	    delete child.params;

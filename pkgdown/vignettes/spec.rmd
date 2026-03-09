@@ -948,3 +948,116 @@ comparisons` hierarchy.  We list the expected behaviour of those:
  - `extra_assay`s can be set at the `specification` level, and will be added to any sample_set-specific ones.
 
 These are intended to 'do what I mean' for the most typical situations.
+
+### Less verbose specification
+
+Sometime the specfile can seem somewhat long-winded:
+
+```{r, eval = FALSE}
+specification(
+  sample_sets =list(
+    S1=sample_set(
+      models=list(
+       M1=model (
+         comparisons=list(
+	   c1 = comparison(
+	   ...
+```
+
+
+
+We can cut this down in three ways:
+
+#### Shortcuts for parent-list > child
+
+There are a set of functions `sample_sets`, `models`, `comparisons` which replace the whole `plural=list(singular...`, so the above can become:
+
+```{r, eval = FALSE}
+specification(
+  sample_sets(
+    S1=sample_set(
+      models(
+       M1=model (
+         comparisons(
+	   c1 = comparison(
+```
+
+Using R's meta-programming capabilities, these expand to the same syntax as the original above.
+
+#### Automatic wrapping of objects
+
+A further level of abbreviation allows us to say that any singular
+object (model, sample_set, comparison) that's not in a corresponding
+list (models, samples_sets, comparisons) - in either of the above
+syntaxes - should get wrapped in.  This means we lose the potential to
+name the model in the convenient `my_model_name=model(...` notation,
+but the models will still get automatically assigned an ID:
+
+```{r, eval = FALSE}
+specification(
+  sampleset(subset=TRUE,
+    model(design = ~1,
+      comparison(name="coef"
+```
+
+#### Automatic nesting
+
+Sometime's we'll want, say, the same model fitted to each subset.  If
+a model is defined at the top of the specification (ie alongside,
+rather than within, a sample_set), then it will get added to all the
+sample_sets it sits alongside.
+
+
+```{r, eval = FALSE}
+specification(
+  sample_set(subset=TRUE),
+  sample_set(subset=!ID in c("outlier1","outlier2")),
+  model(design ~ treatment + batch)
+)
+  
+```
+
+will result in two sample_sets, each fitted with the same design.
+
+Similarly a comparison that is not within a model will be applied
+across the elements it is defined alongside:
+
+```{r, eval = FALSE}
+specification(
+  sample_set(subset=TRUE),
+  sample_set(subset=!ID in c("outlier1","outlier2")),
+  model(design ~ treatment + batch),
+  model(design ~ treatment)
+  comparison(mult_comp(revpairwise ~ treatment)
+)
+```
+
+will result in two sample_sets, each fitted with two models, and the
+comparison between treatments being applied to these four settings
+separetly. This is the same as the [cascading idea](#cascade)
+mentioned previously, but works particularly well in combination with the two other tricks.
+
+
+#### Availability of these helper functions
+
+The `plural(` shortcut notation for `plural=list(` is available for the
+following objects:
+
+ - `sample_sets`
+ - `models`
+ - `comparisons`
+ - `missingness`
+ - `feature_filters`
+ - `settings`
+ - `strata`
+ - `profile_plots`
+ - `extra_assays`
+
+basically, anywhere one used to type `plural=list(`!
+
+The automatic wrapping of singletong objects in their corresponding
+plurals is more limited to the primary specfile objects
+
+ - `sample_sets`
+ - `models`
+ - `comparisons`

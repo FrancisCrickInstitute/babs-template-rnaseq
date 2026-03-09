@@ -1635,13 +1635,15 @@ get_in_section <- function(lst, sections) {
 }
 
 wrap_exposed <- function(x, me, parent = paste0(me, "s"), parent_name = NULL) {
-  if (!is.list(x) || identical(parent_name, parent) || length(x)==0) return(x)
   nms <- if (!is.null(names(x))) names(x) else rep("", length(x))
   need_wrap <-sapply(x,function(child) identical(attr(child, "constructor", exact = TRUE), me)) &
     nms != parent
-  # Recurse into conforming elements first
-  for (i in which(!need_wrap)) {
-      x[[i]] <- wrap_exposed(x[[i]], me = me, parent = parent, parent_name = nms[[i]])
+  # Recurse into potential elements first
+  # exclude if it needs wrapping, or isn't a list, or is zero length or it's a parenttype
+  for (i in which(!( need_wrap |
+        sapply(x, function(x) !is.list(x) || length(x)==0) |
+        sapply(nms, identical, parent)))) {
+    x[[i]] <- wrap_exposed(x[[i]], me = me, parent = parent, parent_name = nms[[i]])
   }
   if (any(need_wrap)) {
     singleton_items <- x[need_wrap]
