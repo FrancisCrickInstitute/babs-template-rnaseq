@@ -363,7 +363,13 @@ for (dataset_id in names(dataset_model_comp)) {
           next
         }
       }
-      
+      involved <- attr(metadata(this_dds)$comparison, "involved")
+      if (is.null(involved)) { # Fall back for contrasts that don't (yet) memorise which samples they're affected by
+        dataset_se$.involved <- TRUE
+      } else {
+        dataset_se$.involved <- FALSE
+        dataset_se$.involved[dataset_se$.influential] <- involved
+      }
       ## MA Plot
       cat('\n\n::: {.panel-tabset .unnumbered group="diffplot"}\n\n')
       md <- metadata(this_dds)
@@ -444,7 +450,7 @@ for (dataset_id in names(dataset_model_comp)) {
                  unique(unlist(lapply(plot_formulae, all.vars)))
                  )),
         md$model$variables)
-      model_vars <- intersect(model_vars, names(colData(this_dds)))
+      model_vars <- setdiff(intersect(model_vars, names(colData(this_dds))), ".involved")
       if ("mat" %in% names(md$model)) {
         mmat <- md$model$mat
       } else {
@@ -461,10 +467,12 @@ for (dataset_id in names(dataset_model_comp)) {
       zweights[colnames(this_dds)] <- weights
       centroid_df <- list()
       reconstruct <- cached_partial(dataset=dataset_id, model=model_id) # This memo-ised function performs model-based removal of random and/or systematic effects
-      for (plot_id in distinct_formulae(plot_formulae)) {
+      for (plot_id in names(plot_formulae)) {
         plot_fml <- plot_formulae[[plot_id]]
+        y_hint <- plot_fml[[2]]$y
         if ("y" %in% names(plot_fml[[2]])) {
-          which_assay <- as.character(as.character(plot_fml[[2]]$y))
+          which_assay <- as.character(as.character(y_hint))
+          y_hint <- md$extra_assays[[which_assay]]$hint %||% which_assay
           tidied_se <- tidy_significant_se(dataset_se, is_significant, weights=zweights, assay=which_assay)
           do_recentre <- metadata(this_dds)$extra_assays[[which_assay]]$recentre %||% FALSE
           do_rescale <- metadata(this_dds)$extra_assays[[which_assay]]$rescale %||% FALSE
@@ -510,7 +518,7 @@ for (dataset_id in names(dataset_model_comp)) {
           cluster_transform=identity, gene_clust = gene_clust,
           model_vars = model_vars,
           plot_fml =plot_fml, 
-          measure_name=comparison_id,
+          measure_name=paste(c(noun_to_readout(param$get("RowNoun")), y_hint), collapse=" "),
           show_column_names=TRUE)
         do_plot(Reduce(`+`, pls),
                 label="Heatmap",
@@ -528,7 +536,7 @@ for (dataset_id in names(dataset_model_comp)) {
           cluster_transform=identity, gene_clust = gene_clust,
           model_vars = model_vars,
           plot_fml =plot_fml, 
-          measure_name=comparison_id,
+          measure_name=paste(c(noun_to_readout(param$get("RowNoun")), y_hint), collapse=" "),
           show_column_names=TRUE, cluster_columns = FALSE)
         do_plot(Reduce(`+`, pls),
                 label="Heatmap",
@@ -560,6 +568,11 @@ for (dataset_id in names(dataset_model_comp)) {
       cat("\n\n", strrep("#", length(section_hierarchy)+1), " Profile\n\n", sep="")
       for (plot_id in names(plot_formulae)) {
         plot_fml <- plot_formulae[[plot_id]]
+        y_hint <- plot_fml[[2]]$y
+        if (!is.null(y_hint)) {
+          which_assay <- as.character(as.character(y_hint))
+          y_hint <- md$extra_assays[[which_assay]]$hint %||% which_assay
+        }
         if (! "name" %in% names(attributes(plot_fml))) attr(plot_fml, "name") <- plot_id
         section_hierarchy$plot_config <- attr(plot_fml, "name")
         dmc_heading(dataset_model_comp, dataset=dataset_id, model=model_id, plot=plot_fml, depth=strrep("#", length(section_hierarchy)+2), numbered=FALSE)
@@ -569,7 +582,7 @@ for (dataset_id in names(dataset_model_comp)) {
           facet_wrapper(mapping, default=aes(facets = .derived), scales="free_y") + 
           theme_bw() +
           geom_point_interactive(aes(y= .derived.value), size = 3, shape = 21) +
-          labs(y=noun_to_readout(param$get("RowNoun")))
+          labs(y=paste(c(noun_to_readout(param$get("RowNoun")), y_hint), collapse=" "))
         pl <- pl + my_alpha_scale(pl)
         if ("group" %in% names(mapping)) {
           pl <- pl+geom_line(colour_aes, stat="summary", fun=mean)

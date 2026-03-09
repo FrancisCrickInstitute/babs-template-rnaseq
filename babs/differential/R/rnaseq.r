@@ -6,8 +6,10 @@ load_specs <- function(file="", context) {
     isVarying <- which((sapply(df, function(v) length(unique(v))) %% nrow(df)) > 1)
     assign("Guess", names(df)[isVarying][1], envir=e)
     # Alias several spec-file functions to be list-constructors that can have dangling commas
+    aliased_list <- character()
     list_ok <- function(my_alias, envir) {
-      assign(my_alias, function(...) {out <- rlang::dots_list(..., .ignore_empty="all"); attr(out, "constructor") <- my_alias; out}, envir=envir)
+      aliased_list <<- c(aliased_list, my_alias)
+      assign(my_alias, function(...) {out <- rlang::dots_list(..., .ignore_empty="all"); structure(out, constructor=my_alias)}, envir=envir)
     }
     parent.env(e) <- environment()
     list_ok("list", envir=e)
@@ -15,6 +17,33 @@ load_specs <- function(file="", context) {
     list_ok("model", envir=e)
     list_ok("specification", envir=e)
     list_ok("generate_assay", envir=e)
+    shortcut <- function(my_alias, envir = parent.frame(), quote = TRUE) {
+      aliased_list <<- c(aliased_list, my_alias)
+      assign(my_alias,
+        function(...) {
+          if (quote) {
+            dots <- as.list(substitute(list(...)))[-1]
+            nm <- names(match.call(expand.dots = FALSE)$...)
+            if (is.null(nm)) nm <- rep("", length(dots))
+            names(dots) <- nm
+            out <- dots
+          } else {
+            out <- list(...)
+          }
+          structure(out, alias = my_alias)
+        },
+        envir = envir
+      )
+    }
+    shortcut("missingness", e)
+    shortcut("feature_filters", e)
+    shortcut("settings", e)
+    shortcut("strata", e)
+    shortcut("sample_sets", e, quote=FALSE)
+    shortcut("models", e, quote=FALSE)
+    shortcut("comparisons", e, quote=FALSE)
+    shortcut("profile_plots", e, quote=FALSE)
+    shortcut("extra_assays", e, quote=FALSE)
     assign("comparison",
            function(x, name=NULL, description=NULL,...) {
              # Allow for potentially missing mult_comp wrapper around e.g. revpairwise ~ treatment
@@ -24,20 +53,15 @@ load_specs <- function(file="", context) {
              } else {
                out <- x
              }
-             attributes(out) <- c(attributes(out), list(name=name, description=description))
-             out
+             structure(out, name=name, description=description, constructor="comparison")
            },
            envir=e)
     assign("profile_plot",
            function(x, name=NULL, description=NULL, section="all") {
-             attr(x, "name") <- name
-             attr(x, "description") <- description
-             attr(x, "section") <- section
-             x
+             structure(x, name=name, description=description, section=section, constructor="profile_plot")
            },
            envir=e)
     assign("constrain", expression, envir=e)
-    assign("settings", alist, envir=e)
     assign("mutate",
            function(...) {
              substitute(alist(...))
@@ -45,7 +69,11 @@ load_specs <- function(file="", context) {
            envir=e
            )
     specs <- source(file.path("extdata",file), local=e)$value
-    srcs <- expr_to_list(parse(file.path("extdata",file))[[1]])
+    specs <- resolve_alias(specs)
+    for (singleton in c("sample_set", "model", "comparison")) {
+      specs <- wrap_exposed(specs, singleton)
+    }
+    srcs <- expr_to_list(parse(file.path("extdata",file))[[1]], aliased_list)
     specs <- attach_src(specs, srcs)
     assign("sample_set", expression, envir=e) # avoid evaluating any examples sample_sets.
     pkg_defaults <-default_spec_settings()
@@ -72,6 +100,18 @@ load_specs <- function(file="", context) {
     )
   }
   specs
+}
+
+
+
+resolve_alias <- function(l) {
+  # Base case: if l is not a list, just return it
+  if (!is.list(l)) return(l)
+  alias <- sapply(l, function(e) {val <- attr(e, "alias"); if (is.null(val)) NA else val})
+  names(l)[!is.na(alias)] <- alias[!is.na(alias)]
+  islist <- sapply(l, is.list)
+  if (any(islist)) l[islist] <- lapply(l[islist], resolve_alias)
+  l
 }
 
 #' Recode nested factors to avoid matrix-rank problems
@@ -101,6 +141,7 @@ default_namer <- function() {
   offsets <- list() 
   function(obj, prefix="") {
     if (!prefix %in% names(offsets)) offsets[[prefix]] <- 0
+    if (is.null(names(obj))) names(obj) <- rep("", length(obj))
     out <- ifelse(names(obj)=="", paste0(prefix, seq_along(obj)+offsets[[prefix]]), names(obj))
     offsets[[prefix]] <<- offsets[[prefix]] + length(obj)
     out
@@ -159,7 +200,7 @@ build_dds_list <- function(dds, spec) {
   spec <- trickle_down(field="termNames", to="sample_sets", merge_fn=modifyList, default=list())
   spec <- trickle_down(field="filterFeatures", to="sample_sets", default=spec$settings$filterFeatures)
   spec <- trickle_down(field="filterQC", to="sample_sets", default=spec$settings$filterQC)
-  spec <- trickle_down(field="feature_filters", to="sample_sets", default=spec$settings$feature_filters)
+  spec <- trickle_down(field="feature_filters", to="sample_sets", default=alist(universal=TRUE))
   spec <- trickle_down(field="impute", to="sample_sets", default=spec$settings$impute)
   spec <- trickle_down(field="normalise", to="sample_sets", default=spec$settings$normalise)
   spec <- trickle_down(field="external_list", to="models", default=NULL)
@@ -227,32 +268,28 @@ build_dds_list <- function(dds, spec) {
     mdlList <- dataset_spec$models
     obj <- obj[, dataset_spec$subset]
     colData(obj) <- droplevels(colData(obj))
-    ff <- dataset_spec$feature_filter
-    if (!is.null(ff)) {
-      deps <- list(post_norm="universal", exploratory=c("post_norm", "universal"), differential=c("post_norm", "universal"))
-      if (is.list(ff)) {
-        mcols(obj)$filter <- as.data.frame(
-          accumulate_predicates(
-            lapply(ff, function(f) eval_dds(obj, f, assays=c(assayNames(obj), "norm", "missing"))),
-            deps=deps)
-            )
-      } else {
-        mcols(obj)$filter <- data.frame(universal=eval_dds(obj, ff, assays=c(assayNames(obj), "norm", "missing")))
-      }
-      for (f in names(mcols(obj)$filter)) {
-        # Separate 'and' clauses of an individual filter
-        conjuncts <- split_conjuncts(ff[[f]])
-        if (length(conjuncts)>1) {
-          # get the predicates corresponding to those clauses
-          pass <- lapply(conjuncts, function(conjunct) eval_dds(obj, conjunct, assays=c(assayNames(obj), "norm", "missing")))
-          # Apply adjustment for  predecessor predicates
-          pass <- lapply(pass, function(p)  accumulate_predicates(mcols(obj)$filter, deps=deps, target=f, pred=p))
-          percent <- 100 * sapply(Reduce(`&`, pass, accumulate=TRUE), mean)
-          attr(mcols(obj)$filter[[f]], "subpreds") <-paste0("(", paste(sprintf("%0.0f%%", percent), collapse=","), ")")
-        }
-      }
+    ff <- dataset_spec$feature_filters
+    deps <- list(post_norm="universal", exploratory=c("post_norm", "universal"), differential=c("post_norm", "universal"))
+    if (is.list(ff)) {
+      mcols(obj)$filter <- as.data.frame(
+        accumulate_predicates(
+          lapply(ff, function(f) eval_dds(obj, f, assays=c(assayNames(obj), "norm", "missing"))),
+          deps=deps)
+      )
     } else {
-      mcols(obj)$filter <- data.frame(universal=TRUE)
+      mcols(obj)$filter <- data.frame(universal=eval_dds(obj, ff, assays=c(assayNames(obj), "norm", "missing")))
+    }
+    for (f in names(mcols(obj)$filter)) {
+      # Separate 'and' clauses of an individual filter
+      conjuncts <- split_conjuncts(ff[[f]])
+      if (length(conjuncts)>1) {
+        # get the predicates corresponding to those clauses
+        pass <- lapply(conjuncts, function(conjunct) eval_dds(obj, conjunct, assays=c(assayNames(obj), "norm", "missing")))
+        # Apply adjustment for  predecessor predicates
+        pass <- lapply(pass, function(p)  accumulate_predicates(mcols(obj)$filter, deps=deps, target=f, pred=p))
+        percent <- 100 * sapply(Reduce(`&`, pass, accumulate=TRUE), mean)
+        attr(mcols(obj)$filter[[f]], "subpreds") <-paste0("(", paste(sprintf("%0.0f%%", percent), collapse=","), ")")
+      }
     }
     if (!is.null(dataset_spec$filterQC)) {#DEPRECATED
       mcols(obj)$filter$exploratory <- eval_dds(obj, dataset_spec$filterQC, assays=c(assayNames(obj), "norm", "missing"))
@@ -352,8 +389,12 @@ build_dds_list <- function(dds, spec) {
                    do.call(paste, c(unique(mf), sep="\r")))
       obj <- collapseReplicates(obj, groupby=factor(ind), renameCols=FALSE)
     }
+    obj$.involved <- TRUE
     ddsList[[names(spec$sample_sets)[dataset_i]]] <- obj
   }
+  colour_toml <- "extdata/colours.toml"
+  if (!file.exists(colour_toml)) save_palettes(ddsList, fname="extdata/colours.toml")
+  
   ddsList <- imap(ddsList,
                   function(obj, dname) {
                     metadata(obj)$dmc <- list(
@@ -663,11 +704,14 @@ emcontrasts <- function(dds, comp, prefix="my") {
     tooltip <- do.call(paste, c(mapply(function(a, b) paste0(a," = ", b), names(contr_frame), contr_frame, SIMPLIFY=FALSE), sep="<br/>"))
   }
   contr <- lapply(split_idx, function(i) t(contr_mat[i,,drop=FALSE]))
+  X <- model.matrix(mdl$lm)
   contr <- mapply( function(cont, base, tip) {
     attr(cont, "spec") <- comp$spec
     if (!comp$omni) {
       attr(cont, "baseline_contrast") <- base
       attr(cont, "tooltip") <- tip
+      sample_weights <- X %*% solve(t(X) %*% X) %*% cont
+      attr(cont, "involved") <- abs(sample_weights) > 1e-8
     }
     cont},
     contr,
@@ -1002,7 +1046,7 @@ colDF <- function(se) {
 
 #' @export
 reorder_samples <- function(se, columns) {
-  cols <- intersect(c(unique(unlist(columns)), ".influential"), colnames(colData(se)))
+  cols <- intersect(c(unique(unlist(columns)), ".influential", ".involved"), colnames(colData(se)))
   colData(se) <- colData(se)[,cols,drop=FALSE]
   colData(se)[] <- lapply(colData(se), function(x) {
     if (is.character(x)) factor(x) else x
@@ -1339,13 +1383,8 @@ sample_norm.DESeqDataSet <- function(se) {
 sample_norm.SummarizedExperiment <- function(se) {
     assayNames(se)[1] <- noun_to_readout(rowNoun)
     rowData(se)$nna <- apply(is.na(assay(se)), 1, sum)
-    fml <- metadata(se)$strata
-    if (is.null(fml)) {
-      grp <- list(a=1:ncol(se))
-    } else {
-      strata <- interaction(model.frame(fml, colData(se)))
-      grp <- split(seq_along(strata), strata)
-    }
+    strata <- get_strata(metadata(se)$strata, se)
+    grp <- lapply(strata, "[[", "samples")
     if ((metadata(se)$normalise %||% "none") =="vsn") {
       out <- assay(se)
       for (i in grp) {
@@ -1371,7 +1410,30 @@ sample_norm.SummarizedExperiment <- function(se) {
     se
 }
 
+get_strata <- function(e, se) {
+  if (is.null(e)) {
+    return(list(samples=1:ncol(se), fn=identity, mcol_group=NULL))
+  }
+  if (length(e)==1 && length(e[[1]])==2) {
+    fml <- eval(e[[1]])
+    strata <- interaction(model.frame(fml, colData(se)))
+    grps <- split(seq_along(strata), strata)
+    return(lapply(grps, function(g) list(samples=g, fn=identity, mcol_group=NULL)))
+  } 
+  strata <- lapply(e, parse_stratum, se)
+  remainder <- !Reduce(`|`, lapply(strata, "[[", "samples"))
+  if (any(remainder)) strata$.remainder <- list(samples=remainder, fn=identity, mcol_group=NULL)
+  strata
+}
 
+parse_stratum <- function(q, se) {
+  if (length(q)==3) { ## subset ~ summary(group)
+    sample_ind <- eval(q[[2]], colData(se))
+    fn <- eval(q[[3]][[1]])
+    grp <- if (length(q[[3]])>1) q[[3]][[2]] else NULL  
+  }
+  list(samples=sample_ind, fn=fn, mcol_group=grp)
+}
 
 
 #' @export
@@ -1393,7 +1455,7 @@ generate_assay <- function(args, dds) {
   curAssay <- assay(dds, args$from)
   if (args$method=="normalise") {
     curFrame <- as.data.frame(colData(dds))
-    margs <- modifyList(args, list(from=NULL, method=NULL, design=NULL, recentre=NULL, rescale=NULL))
+    margs <- modifyList(args, list(from=NULL, method=NULL, design=NULL, recentre=NULL, rescale=NULL, hint=NULL))
     baseFrame <-do.call(
       transform,
       modifyList(margs, list(`_data`=curFrame))
@@ -1413,7 +1475,7 @@ generate_assay <- function(args, dds) {
 
 
 #' @export
-expr_to_list <- function(x, aliases = c("list", "specification", "sample_set", "model", "settings", "mutate" )) {
+expr_to_list <- function(x, aliases = c("list")) {
   if (is.call(x) && deparse(x[[1]]) %in% aliases) {
     # It's a list-like call → recursively process elements
     out <- lapply(as.list(x[-1]), expr_to_list, aliases = aliases)
@@ -1431,12 +1493,15 @@ eval_dds <- function(dds, expr, assays = assayNames(dds)) {
 
   assays <- intersect(assays, all.vars(expr))
   mnames <- intersect(names(mcols(dds)), all.vars(expr))
+    
   # If no dependency on assay, can just use mcols vectorised
   if (length(assays)==0) {
     for (j in mnames) {
       assign(j, mcols(dds)[[j]], envir=e)
     }
-    return(eval(expr, env = e))
+    out <- eval(expr, env = e)
+    if (length(out) ==1) out <- rep(out, nrow(dds))
+    return(out)
   }
   
   # Cache each assay matrix mentioned in expr in a list
@@ -1512,6 +1577,7 @@ df2colorspace <- function(df, palette) {
               }
               )
   res$Heatmap$.influential <- setNames(c("black", "white"), c(TRUE, FALSE))
+  res$Heatmap$.involved <- setNames(c("black", "white"), c(TRUE, FALSE))
   res$ggplot <- purrr::map2(df, start_levels,
               function(column, start_level) {
                 if (is.factor(column)) {
@@ -1523,6 +1589,7 @@ df2colorspace <- function(df, palette) {
               }
               )
   res$ggplot$.influential <- setNames(c("black", "white"), c(TRUE, FALSE))
+  res$ggplot$.involved <- setNames(c("black", "white"), c(TRUE, FALSE))
   res
 }
 
@@ -1565,4 +1632,21 @@ get_in_section <- function(lst, sections) {
     function(item)  is.null(attr(item, "section")) || attr(item, "section") %in% sections
   )
   lst[ind]
+}
+
+wrap_exposed <- function(x, me, parent = paste0(me, "s"), parent_name = NULL) {
+  if (!is.list(x) || identical(parent_name, parent) || length(x)==0) return(x)
+  nms <- if (!is.null(names(x))) names(x) else rep("", length(x))
+  need_wrap <-sapply(x,function(child) identical(attr(child, "constructor", exact = TRUE), me)) &
+    nms != parent
+  # Recurse into conforming elements first
+  for (i in which(!need_wrap)) {
+      x[[i]] <- wrap_exposed(x[[i]], me = me, parent = parent, parent_name = nms[[i]])
+  }
+  if (any(need_wrap)) {
+    singleton_items <- x[need_wrap]
+    x[[parent]] <- c(x[[parent]], singleton_items)  # append in case parent already exists
+    x[need_wrap] <- NULL
+  }
+  x
 }

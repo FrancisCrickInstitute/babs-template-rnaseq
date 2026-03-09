@@ -60,7 +60,7 @@ plot_tracker <- function(my_params) {
             any(c("tooltip", "data_id", "onclick") %in% names(layer$mapping))
         })
       )
-    if ("Heatmap" %in% class(pl)) {
+    if (inherits(pl, "Heatmap") || inherits(pl, "HeatmapList")) {
       fn <- function() {
         draw(pl, heatmap_legend_side = "bottom")
       }
@@ -350,6 +350,7 @@ facet_wrapper <- function(mapping, default=aes(), ...) {
 }
 
 #' @export
+#TODO: This used to be used to cut down redundant heatmaps, but is too severe so isn't references anywhere
 distinct_formulae <- function(flist) {
   keys <- lapply(flist, function(fml) c(
     as.character(eval(fml[[2]])$y %||% "NULL"),
@@ -433,6 +434,7 @@ hmap_fn <- function(dds, mat, param, cluster_transform, gene_clust, model_vars, 
   } else {
     splits <- setNames(TRUE, "Samples")
   }
+  splits <- splits[sapply(splits, length) != 0]
   pls <- mapply(panel_hmap,
                ind=splits,
                first=c(TRUE, rep(FALSE, length(splits)-1)),
@@ -457,3 +459,40 @@ make_clusterer <- function(dds, fml) {
   }
 }
 
+save_palettes <- function(ddsList, fname) {
+  con <- file(fname, "w")
+  palettes <- lapply(ddsList, function(dds) metadata(colData(dds))$palette$ggplot)
+  field_instances <- table(unlist(lapply(palettes, names)))
+  in_all <- names(field_instances)[field_instances==length(palettes)]
+  in_common <- sapply(
+    in_all,
+    function(f) {
+      all(sapply(palettes, function(p) {
+        all(p[[f]] == palettes[[1]][[f]])
+      }))
+    })
+  name2key <- function(s) {ind <- grepl("[^A-Za-z0-9_-]", s); s[ind] <- paste0("'",s[ind],"'"); s}
+
+  palette2toml <- function(j, prefix="") {
+    writeLines(paste0("[", prefix, name2key(j), "]"), con=con)
+    if (is.null(names(palettes[[1]][[j]]))) {
+      writeLines(c(paste0("'low to high' = [", paste0('"', palettes[[1]][[j]], '"', collapse=", "), "]"),""), con=con)
+    } else {
+      writeLines(c(paste0(name2key(names(palettes[[1]][[j]])), ' = "', palettes[[1]][[j]], '"'), ""), con=con)
+    }
+  }
+  
+  for (j in in_all[in_common]) {
+    palette2toml(j)
+  }
+
+  distinct <- setdiff(names(field_instances), in_all[in_common])
+  palettes <- lapply(palettes, "[", distinct)
+  palettes <- palettes[sapply(palettes, length)>0]
+  for (i in names(palettes)) {
+    for (j in names(palettes[[i]])) {
+      palette2toml(j, prefix=paste0(i, '.'))
+    }
+  }
+  close(con)
+}

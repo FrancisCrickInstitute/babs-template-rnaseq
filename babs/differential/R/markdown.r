@@ -160,6 +160,6 @@ tooltip <- function(md, text="") {
       tooltip <- paste0(" {{< tooltips tooltip=\"", attributes(md$comparison)$tooltip, "\" text=\"", text, "\" >}} ")
     }
   } else {
-    tooltip=" "
+    tooltip=text
   }
 }
