@@ -1,3 +1,19 @@
+# Version 1.9.0
+## Major Changes
+## Minor Changes
+ - Throw error when no config files found
+ - Add ability to distribute shiny apps as resources
+ - Refactor heatmap plotter
+ - Better shiny-explorer. Update to latest template.
+ - feat: Generate release notes
+ - fix: Remove single quotes from comparison names
+ - fix: Ensure plotting dds is refreshed each model
+ - feat: robust retag
+ - chore: Cleaner wrapping of make targets in sbatch/container
+ - feat: Add table to track impact of feature-filtering
+ - style: Trim down excess menu levels from sidebar
+ - style: Improve figure legends
+ - docs: Document the new specfile additions
 # Version 1.6.1
 
 ## Major Changes
