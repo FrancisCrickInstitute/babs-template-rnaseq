@@ -87,6 +87,9 @@ ENV_FILES := $(shell \
 	exit 1; \
 	fi
 	@bash ./resources/shell/direnv.sh $(ENV_FILES) > $@
+
+$(ENV_FILES): ;
+
 include .env.mk
 endif
 
@@ -202,23 +205,27 @@ EXECUTOR?=singularity
 renv_root=$(realpath $(or $(SINGULARITYENV_RENV_PATHS_ROOT),$(HOME)/.cache/R/renv))
 ifeq ($(EXECUTOR),singularity)
 CONTAINER= $(call ml,$(SINGULARITY_MODULE)); singularity
-CONTAINER_IMAGE=$(or $(SINGULARITY_IMAGEDIR),$(or $(SINGULARITY_CACHEDIR),$(HOME)/.singularity/cache)/library)/$(sif_file)
+CONTAINER_IMAGE=${source_dir}/docker/$(sif_file)
+SIF_ORIGIN=$(or $(SINGULARITY_IMAGEDIR),$(or $(SINGULARITY_CACHEDIR),$(HOME)/.singularity/cache)/library)/$(sif_file)
 CONTAINER_BIND=--bind $(BIND_DIR),/tmp,$(renv_root)
 CONTAINER_ENV=--env SQLITE_TMPDIR=/tmp,$\
   OMP_NUM_THREADS=$(NUM_THREADS),OPENBLAS_NUM_THREADS=$(NUM_THREADS),BIOCPARALLEL_WORKER_NUMBER=$(NUM_THREADS),$\
   SLURM_JOB_ID="$${SLURM_JOB_ID}",SLURM_ARRAY_TASK_ID="$${SLURM_ARRAY_TASK_ID}"
 CONTAINER_OPTIONS= exec $(CONTAINER_BIND) --pwd $$(realpath .) --containall --cleanenv $(CONTAINER_ENV)
-$(CONTAINER_IMAGE):
+$(CONTAINER_IMAGE): $(SIF_ORIGIN)
+	mkdir -p $(dir $(CONTAINER_IMAGE))
+	ln -sfn $(SIF_ORIGIN) $(CONTAINER_IMAGE)
+$(SIF_ORIGIN): 
 	env DOCKER_USERNAME="$(or $(DOCKER_USERNAME),$(GITHUB_USERNAME),$(shell git config --get github.user))" \
 	DOCKER_PASSWORD=$${DOCKER_PASSWORD-$${GITHUB_PAT}} \
-	$(CONTAINER) pull $@ docker://$(docker_image)
-	$(call chmod,$(CONTAINER_IMAGE),g,rwx)
-	$(call chmod,$(CONTAINER_IMAGE),u,rwx)
+	$(CONTAINER) pull $(SIF_ORIGIN) docker://$(docker_image)
+	$(call chmod,$@,g,rwx)
+	$(call chmod,$@,u,rwx)
 
 
 else ifeq ($(EXECUTOR),docker)
 CONTAINER=docker
-CONTAINER_IMAGE=$(IMAGE)$(colon)$(IMAGE_TAG)
+CONTAINER_IMAGE=${source_dir}/docker/$(IMAGE)$(colon)$(IMAGE_TAG)
 CONTAINER_OPTIONS=run \
 --mount type=bind,source="$(BIND_DIR)",target="$(BIND_DIR)" \
 --mount type=bind,source="/tmp",target="/tmp" \
@@ -367,6 +374,8 @@ R-$(RVERSION): resources/shell/R-local.sh
 	cp $< $@
 	@$(call chmod,$@,u,rwx)
 	for i in $(launch-targets); do sed -i -e "\,source $$i.sh,{" -e "r resources/shell/$$i.sh" -e "d" -e "}" $@; done
+
+resources/shell/R-local.sh: ;
 
 R:
 	@echo "Starting R $(RVERSION) in container $(CONTAINER_IMAGE) ..."

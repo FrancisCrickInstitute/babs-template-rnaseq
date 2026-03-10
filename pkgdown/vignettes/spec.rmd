@@ -1055,9 +1055,9 @@ following objects:
 
 basically, anywhere one used to type `plural=list(`!
 
-The automatic wrapping of singletong objects in their corresponding
+The automatic wrapping of singleton objects in their corresponding
 plurals is more limited to the primary specfile objects
 
- - `sample_sets`
- - `models`
- - `comparisons`
+ - `sample_set`
+ - `model`
+ - `comparison`

@@ -1,6 +1,6 @@
 http() {
-  my_caller python3 -m http.server ${PORT} "$@" &
+  my_caller python3 -m http.server ${PORT} --directory ${1:-.} &
   PID=$!
   server_info http ${PORT}
-  wait $PID
+  [ -n "$run_tmux" ] || wait $PID
 }

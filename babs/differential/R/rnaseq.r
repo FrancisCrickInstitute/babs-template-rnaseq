@@ -1412,7 +1412,7 @@ sample_norm.SummarizedExperiment <- function(se) {
 
 get_strata <- function(e, se) {
   if (is.null(e)) {
-    return(list(samples=1:ncol(se), fn=identity, mcol_group=NULL))
+    return(list(list(samples=1:ncol(se), fn=identity, mcol_group=NULL)))
   }
   if (length(e)==1 && length(e[[1]])==2) {
     fml <- eval(e[[1]])

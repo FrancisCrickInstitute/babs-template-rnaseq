@@ -3,7 +3,7 @@
 We use a Docker image for all script runtimes (R, Python, etc). This
 is based upon the official Bioconductor images (which in turn are
 based upon Rocker). We build and publish these images on
-[github](https://github.com/franciscrickinstitute/babs-wg-environments/pkgs/container/babs-wg-environments%2Fbioconductor_docker)
+[github](https://github.com/franciscrickinstitute/babs-environments/pkgs/container/babs-environments%2Fbioconductor_docker)
 but all the resources we used to construct this are at
 `./resources/docker` if that URL becomes unavailable.
 

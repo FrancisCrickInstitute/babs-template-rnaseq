@@ -38,5 +38,5 @@ ${launcher_dir}/${USER}/rstudio:$HOME/.config/rstudio"
     my_caller bash -c "$rstudio_cmd" &
     PID=$!
     server_info rstudio 8787
-    wait $PID
+    [ -n "$run_tmux" ] || wait $PID
 }

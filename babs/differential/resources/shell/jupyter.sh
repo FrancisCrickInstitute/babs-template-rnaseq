@@ -28,5 +28,5 @@ jupyter() {
               --NotebookApp.token="${PASSWORD}" &
     PID=$!
     server_info jupyter 8888 "/lab?token=${PASSWORD}"
-    wait $PID
+    [ -n "$run_tmux" ] || wait $PID
 }

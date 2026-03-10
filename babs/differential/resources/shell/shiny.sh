@@ -21,5 +21,5 @@ shiny() {
     my_caller R --quiet --no-echo --no-restore -e "my_title <- '${shortTitle} ${app}'; cat('✅ Starting app', my_title, '...\n'); source('$appSource'); shiny::runApp(app, host='0.0.0.0',port=${PORT})" &
     PID=$!
     server_info shiny 3838
-    wait $PID
+    [ -n "$run_tmux" ] || wait $PID
 }

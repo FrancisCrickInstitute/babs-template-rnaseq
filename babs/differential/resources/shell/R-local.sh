@@ -43,6 +43,16 @@ fi
 
 ## slurm-specific customisations
 basename=${SLURM_JOB_NAME:-$(basename "$0")}
+run_local=
+run_tmux=
+if [[ $BABS_CMD == ,* ]]; then
+    run_local=yes
+    BABS_CMD=${BABS_CMD#,}
+fi
+if [[ $BABS_CMD == *, ]]; then
+    BABS_CMD=${BABS_CMD%,}   # strip trailing comma
+    run_tmux="tmux new-window -n $BABS_CMD -d"
+fi
 cmd=${BABS_CMD:-${basename%-*}}
 
 ## Set number of threads appropriately
@@ -70,9 +80,9 @@ for v in ${bind_dirs}; do
     [[ -n $my_path ]] && SINGULARITY_BIND+=",$my_path" && mkdir -p "$my_path"
 done
 
-echo -e "\033[44;97m i \033[0m Extra directories being bound to the container. This might affect reproducibility: ,${SINGULARITY_BIND}"  | tr ',' '\n' 1>&2
+[[ $run_local ]] || echo -e "\033[44;97m i \033[0m Extra directories being bound to the container. This might affect reproducibility: ,${SINGULARITY_BIND}"  | tr ',' '\n' 1>&2
 
-if compgen -v | grep SINGULARITYENV 1>&2 > /dev/null; then
+if [[ ! run_local ]] && compgen -v | grep SINGULARITYENV 1>&2 > /dev/null; then
     echo -e "\033[44;97m i \033[0m The following environment variables are inherited in the container. Remove the corresponding SINGULARITYENV_* variable (unset) if you don't want the following values to be used:"
     for var in $(compgen -v | grep SINGULARITYENV); do
 
@@ -92,7 +102,9 @@ while :; do
     ((seed++))
 done
 
-if  ! command -v docker >/dev/null 2>&1; then
+if [[ $run_local ]]; then
+    my_caller () { echo "⚠️⚠️ Running uncontained ⚠️⚠️" ; ${run_tmux} "$@"; }
+elif ! command -v docker >/dev/null 2>&1; then
     image="${SINGULARITY_IMAGEDIR:-${SINGULARITY_CACHEDIR:-$HOME/.singularity/cache}/library}/${sif_file}"
     if [ ! -f "${image}" ]; then
         echo "✅ Creating ${image} from ${docker_image}..."
@@ -124,7 +136,7 @@ if  ! command -v docker >/dev/null 2>&1; then
     )
     singularity_args+=("$@")
     [ -n "${BABS_DEV}" ] && restore_fds
-    singularity "${singularity_args[@]}"
+    ${run_tmux} singularity "${singularity_args[@]}"
     }
 else
     container=docker
@@ -158,7 +170,7 @@ else
     [[ "$method" == shell ]] && docker_args+=("bash")
     docker_args+=("$@")
     [ -n "${BABS_DEV}" ] && restore_fds
-    docker run "${docker_args[@]}"
+    ${run_tmux} docker run "${docker_args[@]}"
     }
 fi
 
