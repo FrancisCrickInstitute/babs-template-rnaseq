@@ -7,16 +7,23 @@ load_specs <- function(file="", context) {
     assign("Guess", names(df)[isVarying][1], envir=e)
     # Alias several spec-file functions to be list-constructors that can have dangling commas
     aliased_list <- character()
-    list_ok <- function(my_alias, envir) {
+
+    # single objects that have a "constructor" attribute, so they can be wrapped in a list container
+    list_obj <- function(my_alias, envir) {
       aliased_list <<- c(aliased_list, my_alias)
-      assign(my_alias, function(...) {out <- rlang::dots_list(..., .ignore_empty="all"); structure(out, constructor=my_alias)}, envir=envir)
+      assign(my_alias, function(...) {
+        out <- rlang::dots_list(..., .ignore_empty="all")
+        structure(out, constructor=my_alias)
+      }, envir=envir)
     }
     parent.env(e) <- environment()
-    list_ok("list", envir=e)
-    list_ok("sample_set", envir=e)
-    list_ok("model", envir=e)
-    list_ok("specification", envir=e)
-    list_ok("generate_assay", envir=e)
+    list_obj("list", envir=e)
+    list_obj("sample_set", envir=e)
+    list_obj("model", envir=e)
+    list_obj("specification", envir=e)
+    list_obj("extra_assay", envir=e)
+
+    # List wrappers - either evaluating or not
     shortcut <- function(my_alias, envir = parent.frame(), quote = TRUE) {
       aliased_list <<- c(aliased_list, my_alias)
       assign(my_alias,
@@ -44,23 +51,26 @@ load_specs <- function(file="", context) {
     shortcut("comparisons", e, quote=FALSE)
     shortcut("profile_plots", e, quote=FALSE)
     shortcut("extra_assays", e, quote=FALSE)
+
+    # These singleton objects aren't lists themselves
+    # TODO - one day we should rationalise everything to be a list, and us list_obj
     assign("comparison",
-           function(x, name=NULL, description=NULL,...) {
+           function(x, ID=NULL, name=NULL, description=NULL,...) {
              # Allow for potentially missing mult_comp wrapper around e.g. revpairwise ~ treatment
              if (is_formula(x) && length(x)==3) {
-                 out <- list(spec=x,...)
-                 class(out) <- "post_hoc"
+               out <- mult_comp(x, name=name, description=description, omnibus=FALSE, keep=TRUE, trend=FALSE, ...)
              } else {
                out <- x
              }
-             structure(out, name=name, description=description, constructor="comparison")
+             structure(out, ID=ID, name=name, description=description, constructor="comparison")
            },
            envir=e)
     assign("profile_plot",
-           function(x, name=NULL, description=NULL, section="all") {
-             structure(x, name=name, description=description, section=section, constructor="profile_plot")
+           function(x, ID=NULL, name=NULL, description=NULL, section="all") {
+             structure(x, ID=ID, name=name, description=description, section=section, constructor="profile_plot")
            },
            envir=e)
+    # Other convenience functions
     assign("constrain", expression, envir=e)
     assign("mutate",
            function(...) {
@@ -1387,20 +1397,29 @@ sample_norm.SummarizedExperiment <- function(se) {
     grp <- lapply(strata, "[[", "samples")
     if ((metadata(se)$normalise %||% "none") =="vsn") {
       out <- assay(se)
-      for (i in grp) {
-        out[, i] <- vsn::predict(vsn::vsnMatrix(assay(se)[, i, drop = FALSE]), assay(se)[, i, drop = FALSE])
+      scale_factors <- data.frame(a=rep(NA_real_, ncol(out)), b=rep(NA_real_, ncol(out)))
+      for (stratum in seq_along(strata)) {
+        i <- strata[[stratum]]$samples
+        pre <- reduce_by_mcol(se, strata[[stratum]])
+        fit <- vsn::vsnMatrix(pre)
+        scale_factors$a[i] <- coef(fit)[1,,1]
+        scale_factors$b[i] <- coef(fit)[1,,2]
+        out[, i] <- vsn::predict(fit, pre)[attr(pre, "ind"),,drop=FALSE]
       }
       assays(se) <- setFirstAssay(se, vst= out)
+      colData(se)$.scale_factors <- scale_factors
     }
     imp <- metadata(se)$impute
     if (!is.null(imp)) {
       assay(se, "na") <- is.na(assay(se))
-      for (i in grp) {
+      for (stratum in seq_along(strata)) {
+        i <- strata[[stratum]]$samples
+        pre <- reduce_by_mcol(se, strata[[stratum]])
         invisible(capture.output({
         out[, i] <- MSnbase::exprs(do.call(
           MSnbase::impute,
           modifyList(imp,
-                     list(object=as(se[, i, drop = FALSE], "MSnSet"), differential=NULL))))
+                     list(object=as(SummarizedExperiment(pre), "MSnSet"), differential=NULL))))[attr(pre, "ind"),,drop=FALSE]
         }))
       }
       assays(se) <- setFirstAssay(
@@ -1426,10 +1445,23 @@ get_strata <- function(e, se) {
   strata
 }
 
+reduce_by_mcol <- function(se, stratum) {
+  if (!is.null(stratum$mcol_group)) {
+    mcol <- mcols(se)[[as.character(stratum$mcol_group)]]
+    out <- apply(assay(se)[, stratum$samples, drop = FALSE], 2, tapply,  mcol, stratum$fn)
+    structure(out, ind=match(mcol, row.names(out)))
+  } else {
+    structure(assay(se)[, stratum$samples, drop=FALSE], ind=TRUE)
+  }
+}
+  
+
 parse_stratum <- function(q, se) {
-  if (length(q)==3) { ## subset ~ summary(group)
+  if (length(q)==3) { ## column= value ~ summary(group)
     sample_ind <- eval(q[[2]], colData(se))
-    fn <- eval(q[[3]][[1]])
+    vars <- all.vars(q[[3]])
+    # TODO: document that we use measure == "global" ~ mean(group, na.rm = TRUE) or even  ~(function(a,b) ba(b,a))(gene, usual_first_arg)
+    fn <- eval(call("function", as.pairlist(setNames(vector("list", length(vars)), vars)), q[[3]]))
     grp <- if (length(q[[3]])>1) q[[3]][[2]] else NULL  
   }
   list(samples=sample_ind, fn=fn, mcol_group=grp)
@@ -1646,7 +1678,10 @@ wrap_exposed <- function(x, me, parent = paste0(me, "s"), parent_name = NULL) {
     x[[i]] <- wrap_exposed(x[[i]], me = me, parent = parent, parent_name = nms[[i]])
   }
   if (any(need_wrap)) {
-    singleton_items <- x[need_wrap]
+    singleton_items <- setNames(
+      x[need_wrap],
+      sapply(x[need_wrap], function(y) (attr(y, "ID", exact=TRUE) %||% ""))
+    )
     x[[parent]] <- c(x[[parent]], singleton_items)  # append in case parent already exists
     x[need_wrap] <- NULL
   }

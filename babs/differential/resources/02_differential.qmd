@@ -473,6 +473,8 @@ for (dataset_id in names(dataset_model_comp)) {
         if ("y" %in% names(plot_fml[[2]])) {
           which_assay <- as.character(as.character(y_hint))
           y_hint <- md$extra_assays[[which_assay]]$hint %||% which_assay
+          do_weight <- (!metadata(this_dds)$extra_assays[[which_assay]]$method %in% "normalise") %||% TRUE
+          if (!do_weight) zweights <- NULL
           tidied_se <- tidy_significant_se(dataset_se, is_significant, weights=zweights, assay=which_assay)
           do_recentre <- metadata(this_dds)$extra_assays[[which_assay]]$recentre %||% FALSE
           do_rescale <- metadata(this_dds)$extra_assays[[which_assay]]$rescale %||% FALSE
