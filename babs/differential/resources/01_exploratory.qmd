@@ -226,13 +226,13 @@ specify these approaches:
 #| label: formulae
 
 for (dataset in names(ddsList)) {
-  dmc_heading(ddsList, dataset=dataset, model=NULL, depth="##")
+  dmc_heading(ddsList, list(dataset=dataset), depth="##")
   src2bullets(metadata(ddsList[[dataset]]), c("subset", "extra_assays", "influential_samples"))
   met <- metadata(ddsList[[dataset]])
   mdls <- lapply(met$models, function(x) x$design)
   mdls <- mdls[sapply(met$models, function(x) "comparisons" %in% names(x))]
   for (mdl in names(mdls)) {
-    dmc_heading(ddsList, dataset=dataset, model=mdl, depth="###", numbered=FALSE)
+    dmc_heading(ddsList, list(dataset=dataset, model=mdl), depth="###", numbered=FALSE)
     src2bullets(metadata(ddsList[[dataset]])$models[[mdl]], c("subset", "influential_samples", "extra_assays"))
     cat("`",
         Reduce(paste, sub("~", paste0(noun_to_readout(param$get("RowNoun"))," ~ "), deparse(mdls[[mdl]]))),
@@ -387,7 +387,7 @@ girafe_ind <- counter()
 for (dataset_id in names(ddsList)) {
   section_hierarchy <- list(dataset=dataset_id)
   dataset_name <- metadata(ddsList[[dataset_id]])$dmc$dataset_name %||% dataset_id
-  dmc_heading(ddsList, dataset=dataset_id, model=NULL, depth=strrep("#", length(section_hierarchy)))
+  dmc_heading(ddsList, section_hierarchy, depth=strrep("#", length(section_hierarchy)))
   src2bullets(metadata(ddsList[[dataset_id]]), c("subset", "extra_assays", "influential_samples"))
   mdls <- sapply(
     metadata(ddsList[[1]])$models,
@@ -411,7 +411,7 @@ for (dataset_id in names(ddsList)) {
       model_meta$variables)
     model_vars <- intersect(model_vars, names(colDF(this_dds)))
     this_dds <- reorder_samples(this_dds, model_vars)
-    dmc_heading(ddsList, dataset=dataset_id, model=model_id, depth=strrep("#", length(section_hierarchy)))
+    dmc_heading(ddsList, section_hierarchy, depth=strrep("#", length(section_hierarchy)))
     # Show an overall legend
     nice_legends <- separate_legend(ddsList[[dataset_id]], model_vars)
     pl <- do.call(gridExtra::arrangeGrob, c(
@@ -436,7 +436,7 @@ for (dataset_id in names(ddsList)) {
       }
       if (! "name" %in% names(attributes(plot_fml))) attr(plot_fml, "name") <- plot_id
       section_hierarchy <- list(dataset=dataset_id, model=model_id, plot_config=attr(plot_fml, "name"))
-      dmc_heading(ddsList, dataset=dataset_id, model=model_id, plot=plot_fml, depth=strrep("#", length(section_hierarchy)))
+      dmc_heading(ddsList, section_hierarchy, depth=strrep("#", length(section_hierarchy)))
       # Do any regressing-out for the plots
       this_assay <- reconstruct(this_dds, plot_fml, influence=this_dds$.influential)
       removed <- attr(this_assay, "removed")

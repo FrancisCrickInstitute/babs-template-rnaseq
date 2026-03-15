@@ -9,11 +9,15 @@ load_specs <- function(file="", context) {
     aliased_list <- character()
 
     # single objects that have a "constructor" attribute, so they can be wrapped in a list container
-    list_obj <- function(my_alias, envir) {
+    list_obj <- function(my_alias, envir, post=NULL) {
       aliased_list <<- c(aliased_list, my_alias)
       assign(my_alias, function(...) {
-        out <- rlang::dots_list(..., .ignore_empty="all")
-        structure(out, constructor=my_alias)
+        out <- structure(rlang::dots_list(..., .ignore_empty="all"), constructor=my_alias)
+        if (is.null(post)) {
+          out
+        } else {
+          post(out)
+        }
       }, envir=envir)
     }
     parent.env(e) <- environment()
@@ -22,6 +26,8 @@ load_specs <- function(file="", context) {
     list_obj("model", envir=e)
     list_obj("specification", envir=e)
     list_obj("extra_assay", envir=e)
+    list_obj("profile_plot", envir=e, post=function(x) modifyList(list(section="all"), x))
+    list_obj("comparison", envir=e, post=function(x) modifyList(list(section="all"), x))
 
     # List wrappers - either evaluating or not
     shortcut <- function(my_alias, envir = parent.frame(), quote = TRUE) {
@@ -54,6 +60,11 @@ load_specs <- function(file="", context) {
 
     # These singleton objects aren't lists themselves
     # TODO - one day we should rationalise everything to be a list, and us list_obj
+    wrap_mult_comp <- function(comp) {
+      if (is_formula(x[[1]]) %% length(x[[1]]) == 3) {
+        x[[1]] <- mult_comp(x[[1]], name=x$name, description=x$description)
+      }
+    }
     assign("comparison",
            function(x, ID=NULL, name=NULL, description=NULL,...) {
              # Allow for potentially missing mult_comp wrapper around e.g. revpairwise ~ treatment
@@ -65,11 +76,11 @@ load_specs <- function(file="", context) {
              structure(out, ID=ID, name=name, description=description, constructor="comparison")
            },
            envir=e)
-    assign("profile_plot",
-           function(x, ID=NULL, name=NULL, description=NULL, section="all") {
-             structure(x, ID=ID, name=name, description=description, section=section, constructor="profile_plot")
-           },
-           envir=e)
+    ## assign("profile_plot",
+    ##        function(x, ID=NULL, name=NULL, description=NULL, section="all") {
+    ##          structure(x, ID=ID, name=name, description=description, section=section, constructor="profile_plot")
+    ##        },
+    ##        envir=e)
     # Other convenience functions
     assign("constrain", expression, envir=e)
     assign("mutate",
@@ -224,7 +235,7 @@ build_dds_list <- function(dds, spec) {
         if (is_formula(y$design))
           d <- all.vars(update(y$design, NULL ~ .))
         if ("profile_plots" %in% names(y))
-            d <- c(d, unlist(lapply(y$profile_plots, all.vars)))
+            d <- c(d, unlist(lapply(y$profile_plots, function(x) all.vars(x[[1]]))))
         d
       })
     })
@@ -328,15 +339,17 @@ build_dds_list <- function(dds, spec) {
         # default to the set of models removing any terms that will preserve marginality
         pp <- find_simpler_models(mdlList[[i]]$design, do_aes=TRUE, type="design")
         attr(pp[[1]], "src") <- paste0(deparse(pp[[1]]), collapase="")
-        mdlList[[i]]$profile_plots <- pp
+        mdlList[[i]]$profile_plots <- structure(list(pp, section="all"), "src"="Auto-generated")
       } else {
         mdlList[[i]]$profile_plots <- lapply(
           mdlList[[i]]$profile_plots,
           function(p) {
-            o <- update(mdlList[[i]]$design, p)
-            attributes(o) <- attributes(p)
-            attr(o, "src") <- paste0(deparse(p), collapse="")
-            o
+            fml <- p[[1]]
+            o <- update(mdlList[[i]]$design, fml)
+            attributes(o) <- attributes(fml)
+            attr(o, "src") <- paste0(deparse(fml), collapse="")
+            p[[1]] <- o
+            p
           })
       }
     }
@@ -1661,7 +1674,7 @@ summarise_filters <- function(ddsList) {
 get_in_section <- function(lst, sections) {
   ind <- sapply(
     lst,
-    function(item)  is.null(attr(item, "section")) || attr(item, "section") %in% sections
+    function(item)  item$section %in% sections %||% TRUE
   )
   lst[ind]
 }

@@ -328,13 +328,13 @@ for (dataset_id in names(dataset_model_comp)) {
   section_hierarchy <- list(dataset=dataset_id)
   dataset_se <- ddsList[[dataset_id]]
   met <- metadata(dataset_se)
-  dmc_heading(dataset_model_comp, dataset=dataset_id, model=NULL, depth=strrep("#", length(section_hierarchy)))
+  dmc_heading(dataset_model_comp, list(dataset=dataset_id), depth=strrep("#", length(section_hierarchy)))
   has_comparisons <- sapply(met$models, function(m) "comparisons" %in% names(m) && length(m$comparisons) > 0)
   src2bullets(met, c("subset", "extra_assays", "influential_samples"))
   for (model_id in names(dataset_model_comp[[dataset_id]])) {
     section_hierarchy <- list(dataset=dataset_id, model=model_id)
     this_model <- dataset_model_comp[[dataset_id]][[model_id]]
-    dmc_heading(ddsList, dataset=dataset_id, model=model_id, depth=strrep("#", length(section_hierarchy)))
+    dmc_heading(ddsList, list(dataset=dataset_id, model=model_id), depth=strrep("#", length(section_hierarchy)))
     src2bullets(met$models[[model_id]], c("subset", "extra_assays", "influential_samples"))
     cat("`",
         Reduce(paste, sub("~", paste0(noun_to_readout(param$get("RowNoun"))," ~ "), deparse(design(this_model[[1]])))),
@@ -349,7 +349,7 @@ for (dataset_id in names(dataset_model_comp)) {
     }
     for (comparison_id in c(names(this_model), unique(external_list$Comparison))) {
       section_hierarchy <- list(dataset=dataset_id, model=model_id, comparison=comparison_id)
-      dmc_heading(dataset_model_comp, dataset=dataset_id, model=model_id, comparison=comparison_id, depth=strrep("#", length(section_hierarchy)))
+      dmc_heading(dataset_model_comp, section_hierarchy, depth=strrep("#", length(section_hierarchy)))
       is_external <- !(comparison_id %in% names(this_model))
       if (is_external) {
         this_dds <- this_model[[1]]
@@ -430,6 +430,10 @@ for (dataset_id in names(dataset_model_comp)) {
         first <- FALSE
         cat("\n\n---\n\n")
       }
+      if (is_null(plot_formulae)) {
+        cat(':::\n\n')
+        next
+      }
       ## Heatmap
       nice_legends <- separate_legend(dataset_se)
       pl <- do.call(gridExtra::arrangeGrob,c(
@@ -447,7 +451,7 @@ for (dataset_id in names(dataset_model_comp)) {
       plot_formulae <- get_in_section(md$model$profile_plots, c("all", "differential"))
       model_vars <- sort_vars(
         unique(c(all.vars(md$model$design),
-                 unique(unlist(lapply(plot_formulae, all.vars)))
+                 unique(unlist(lapply(plot_formulae, function(p) all.vars(p[[1]]))))
                  )),
         md$model$variables)
       model_vars <- setdiff(intersect(model_vars, names(colData(this_dds))), ".involved")
@@ -468,7 +472,9 @@ for (dataset_id in names(dataset_model_comp)) {
       centroid_df <- list()
       reconstruct <- cached_partial(dataset=dataset_id, model=model_id) # This memo-ised function performs model-based removal of random and/or systematic effects
       for (plot_id in names(plot_formulae)) {
-        plot_fml <- plot_formulae[[plot_id]]
+        section_hierarchy <- list(dataset=dataset_id, model=model_id, comparison=comparison_id, plot_config=plot_formulae[[plot_id]]$name %||% plot_id)
+        dmc_heading(dataset_model_comp, section_hierarchy, depth=strrep("#", length(section_hierarchy)+1), numbered=FALSE)
+        plot_fml <- plot_formulae[[plot_id]][[1]]
         y_hint <- plot_fml[[2]]$y
         if ("y" %in% names(plot_fml[[2]])) {
           which_assay <- as.character(as.character(y_hint))
@@ -562,22 +568,17 @@ for (dataset_id in names(dataset_model_comp)) {
         }
         cat('\n\n---\n\n')
       }
-      if (is_null(plot_formulae)) {
-        cat(':::\n\n')
-        next
-      }
       ## Profile plots
+      section_hierarchy <- list(dataset=dataset_id, model=model_id, comparison=comparison_id)
       cat("\n\n", strrep("#", length(section_hierarchy)+1), " Profile\n\n", sep="")
       for (plot_id in names(plot_formulae)) {
-        plot_fml <- plot_formulae[[plot_id]]
+        section_hierarchy <- list(dataset=dataset_id, model=model_id, comparison=comparison_id, plot_config=plot_formulae[[plot_id]]$name %||% plot_id)
         y_hint <- plot_fml[[2]]$y
         if (!is.null(y_hint)) {
           which_assay <- as.character(as.character(y_hint))
           y_hint <- md$extra_assays[[which_assay]]$hint %||% which_assay
         }
-        if (! "name" %in% names(attributes(plot_fml))) attr(plot_fml, "name") <- plot_id
-        section_hierarchy$plot_config <- attr(plot_fml, "name")
-        dmc_heading(dataset_model_comp, dataset=dataset_id, model=model_id, plot=plot_fml, depth=strrep("#", length(section_hierarchy)+2), numbered=FALSE)
+        dmc_heading(dataset_model_comp, section_hierarchy, depth=strrep("#", length(section_hierarchy)+1), numbered=FALSE)
         colour_aes <- eval(plot_fml[[2]])["colour"]        
         mapping <- modify_mapping(modifyList(eval(plot_fml[[2]]), aes(y=.derived.value, mask=NULL, cluster=NULL)))
         pl <- ggplot(centroid_df[[plot_id]], mapping) +

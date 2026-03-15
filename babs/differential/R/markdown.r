@@ -17,11 +17,15 @@ load_params <- function(script) {
 #' @return A markdown string
 #' @author Gavin Kelly
 #' @export
-dmc_heading <- function(obj, dataset=1, model=NULL, comparison=NULL, plot=NULL, depth="##", numbered=TRUE, describe=TRUE) {
+dmc_heading <- function(obj, hierarchy,  depth="##", numbered=TRUE, describe=TRUE) {
   heading <- paste0("\n\n", depth)
   text <- ""
+  dataset <- hierarchy$dataset_id
+  model <- hierarchy$model_id
+  comparison <- hierarchy$comparison_id
+  plot <- hierarchy$plot_id
   is_dmc <- is.list(obj[[dataset]])
-  if (is.null(model)) {
+    if (is.null(model)) {
     ## Doing a dataset
     if (is_dmc) {
       met <- metadata(obj[[dataset]][[1]][[1]])$dmc
@@ -38,9 +42,9 @@ dmc_heading <- function(obj, dataset=1, model=NULL, comparison=NULL, plot=NULL, 
   } else {
     if (!is.null(plot)) {
       heading <- c(heading, "Plot config")
-      heading <- c(heading, attr(plot, "name"))
-      if (!is.null(attr(plot, "description"))) {
-        text <- paste0(attr(plot, "description"), "\n\n",
+      heading <- c(heading, plot$name)
+      if (!is.null(plot$description)) {
+        text <- paste0(plot$description, "\n\n",
                       profile_to_string(plot), "\n\n")
       } else {
         text <- paste0(profile_to_string(plot), "\n\n")
@@ -92,7 +96,85 @@ dmc_heading <- function(obj, dataset=1, model=NULL, comparison=NULL, plot=NULL, 
   }
   if (!describe) text=""
   cat(paste0(heading, "\n\n", text, "\n\n"))
+
 }
+
+## dmc_heading <- function(obj, dataset=1, model=NULL, comparison=NULL, plot=NULL, depth="##", numbered=TRUE, describe=TRUE) {
+##   heading <- paste0("\n\n", depth)
+##   text <- ""
+##   is_dmc <- is.list(obj[[dataset]])
+##   if (is.null(model)) {
+##     ## Doing a dataset
+##     if (is_dmc) {
+##       met <- metadata(obj[[dataset]][[1]][[1]])$dmc
+##     } else { 
+##       met <- metadata(obj[[dataset]])$dmc
+##     }
+##     heading <- c(heading, "Dataset", met$dataset)
+##     if (!is.null(met$dataset_name)) {
+##       heading <- c(heading, "-", met$dataset_name)
+##     }
+##     if (!is.null(met$dataset_description)) {
+##       text <- paste0(met$dataset_description, "\n\n")
+##     }
+##   } else {
+##     if (!is.null(plot)) {
+##       heading <- c(heading, "Plot config")
+##       heading <- c(heading, attr(plot, "name"))
+##       if (!is.null(attr(plot, "description"))) {
+##         text <- paste0(attr(plot, "description"), "\n\n",
+##                       profile_to_string(plot), "\n\n")
+##       } else {
+##         text <- paste0(profile_to_string(plot), "\n\n")
+##       }
+##     } else if (!is.null(comparison)) {
+##       if (comparison %in% names(obj[[dataset]][[model]])) { # otherwise an external list
+##         met <- metadata(obj[[dataset]][[model]][[comparison]])$dmc
+##         heading <- c(heading, "Comparison", comparison)
+##         if (!is.null(met$comparison_name)) {
+##           heading <- c(heading, "-", met$comparison_name)
+##         }
+##         if (!is.null(met$comparison_description)) {
+##           text <- paste0(met$comparison_description, "\n\n")
+##         }
+##         if (comparison %in% names(obj[[dataset]][[model]]) && "tooltip" %in% names(attributes(metadata(obj[[dataset]][[model]][[comparison]])$comparison))) {
+##           text <- paste(text, attr(metadata(obj[[dataset]][[model]][[comparison]])$comparison, "tooltip"))
+##         }
+##       } else {
+##         heading <- c(heading, "List", comparison)
+##       }
+##     } else {
+##       ## Doing a model
+##       heading <- c(heading, "Model")
+##       if (is_dmc) {
+##         met <- metadata(obj[[dataset]][[model]][[1]])$dmc
+##         heading <- c(heading, met$model)
+##         if (!is.null(met$model_name)) {
+##           heading <- c(heading, "-", met$model_name)
+##         }
+##         if (!is.null(met$model_description)) {
+##           text <- paste0(met$model_description, "\n\n")
+##         }
+##       }
+##       else {
+##         heading <- c(heading, model)
+##         met <- metadata(obj[[dataset]])$models[[model]]
+##         if (!is.null(met$name)) {
+##           heading <- c(heading, "-", met$name)
+##         }
+##         if (!is.null(met$description)) {
+##           text <- paste0(met$description, "\n\n")
+##         }
+##       }
+##     }
+##   }
+##   heading <- paste(heading, collapse=" ")
+##   if (!numbered) {
+##     heading <- paste0(heading, "{.unnumbered}")
+##   }
+##   if (!describe) text=""
+##   cat(paste0(heading, "\n\n", text, "\n\n"))
+## }
 
 #' @export
 report_span <- function(id, type, name="", description="" ) {
