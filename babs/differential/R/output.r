@@ -91,7 +91,7 @@ write_clusters <- function(clust, mcols, p, prefix="clusters") {
 #' @return A list of file paths to the excel files
 #' @author Gavin Kelly
 #' @export
-write_results <- function(ddsList, param, params, assays=NULL) {
+write_results <- function(dmc, param, params, assays=NULL) {
   si <- session_info()
   crick_colours <-list(
     primary=list(red="#e3001a",yellow="#ffe608",blue="#4066aa",green="#7ab51d",purple="#bb90bd"),
@@ -101,9 +101,9 @@ write_results <- function(ddsList, param, params, assays=NULL) {
                     border = "Bottom")
   hs2 <- createStyle(fgFill = crick_colours$secondary$blue, textDecoration = "italic",
                     border = "Bottom")
-  summaries <- map_depth(ddsList, 3, summarise_results)
-  out <- lapply(ddsList, function(x) "")
-  for (dataset in names(ddsList)) {
+  summaries <- map_depth(dmc, 3, summarise_results)
+  out <- lapply(dmc, function(x) "")
+  for (dataset in names(dmc)) {
     wb <- openxlsx::createWorkbook(title="Differential Analysis",
                                   creator="BABS")
     tmp <- param$describe()
@@ -112,7 +112,7 @@ write_results <- function(ddsList, param, params, assays=NULL) {
     addWorksheet(wb, sn)
     writeData(wb, sn, dframe,rowNames=FALSE, colNames=TRUE)
     ## Design
-    samples_used <- as.data.frame(colData(ddsList[[dataset]][[1]][[1]]))
+    samples_used <- as.data.frame(colData(dmc[[dataset]][[1]][[1]]))
     sn <- "Design"
     addWorksheet(wb, sn)
     writeData(wb, sn, samples_used, headerStyle=hs2)
@@ -126,11 +126,19 @@ write_results <- function(ddsList, param, params, assays=NULL) {
     ## Differential gene-lists
     comparison_name_lookup <- list()
     addWorksheet(wb, "Comparison Key")
-    for (design_ind in 1:length(ddsList[[dataset]])) {
-      for (contrast_name in names(ddsList[[dataset]][[design_ind]])) {
-        dframe <- as.data.frame(mcols(ddsList[[dataset]][[design_ind]][[contrast_name]])$results)
+    for (model_ind in 1:length(dmc[[dataset]])) {
+      model_id <- names(dmc[[dataset]])[model_ind]
+      for (comparison_id in names(dmc[[dataset]][[model_ind]])) {
+        model_name <- metadata(dmc[[dataset]][[model_ind]][[comparison_id]])$dmc$model_name %||% model_id
+        comparison_name <- metadata(dmc[[dataset]][[model_ind]][[comparison_id]])$dmc$comparison_name %||% comparison_id
+        mc <- mcols(dmc[[dataset]][[model_ind]][[comparison_id]])
+        ind <- sapply(mc, function(x) is.null(dim(x)))
+        dframe <- as.data.frame(mc[,ind,drop=FALSE])
+        if (any(!ind)) {
+          dframe <- cbind(dframe, do.call(cbind, mc[,!ind, drop=FALSE]))
+        }
         for (assay_name in assays) {
-          this_assay <- assayPlus(ddsList[[dataset]][[design_ind]][[contrast_name]], assay_name)
+          this_assay <- assayPlus(dmc[[dataset]][[model_ind]][[comparison_id]], assay_name)
           if (is.null(this_assay)) {
             warning(assay_name, " not an assay, so not added to output")
             next
@@ -143,22 +151,29 @@ write_results <- function(ddsList, param, params, assays=NULL) {
         dframe <- dframe %>%
           tibble::rownames_to_column("id") %>%
 #          dplyr::filter(padj<param$get("alpha")) %>%
-          dplyr::arrange(desc(abs(shrunkLFC))) %>%
-          dplyr::select(-padj)
-        if (length(ddsList[[dataset]])==1) {
-          sn <- contrast_name
+          dplyr::arrange(desc(abs(results.shrunkLFC))) %>%
+          dplyr::select(-results.padj)
+        if (length(dmc[[dataset]])==1) {
+          sn <- comparison_name
+          if (nchar(sn) > 31) {sn <- comparison_id; comparison_name_lookup[[sn]] <- comparison_name}
         } else {
-          sn <- paste0(contrast_name, ", ", names(ddsList[[dataset]])[design_ind])
+          o <- sn <- paste0(comparison_name, ",", model_name)
+          if (nchar(sn) > 31) {
+            sn <- paste0(comparison_name, ",", model_id);
+            if (nchar(sn) > 31) sn <- paste0(comparison_id, ",", model_id)
+            comparison_name_lookup[[sn]] <- o
+          }
         }
         if (nchar(sn)>31) {
+          comparison_name_lookup[[sn]] <- NULL
           alpha_key <- to_letter(length(comparison_name_lookup)+1)
           comparison_name_lookup[[alpha_key]] <- sn
           sn <- alpha_key
         }
-        addWorksheet(wb, sn, tabColour=crick_colours$secondary[[design_ind]])
+        addWorksheet(wb, sn, tabColour=crick_colours$secondary[[model_ind]])
         writeData(wb, sn, dframe, headerStyle=hs1, withFilter=TRUE)
-        groupRows(wb, sn, rows=which(!grepl("\\*$", dframe$class))+1, hidden=TRUE)
-        filtCol <- match("class", names(dframe))
+        groupRows(wb, sn, rows=which(!grepl("\\*$", dframe$results.class))+1, hidden=TRUE)
+        filtCol <- match("results.class", names(dframe))
         if (!is.na(filtCol)) {
           filt_string <- sprintf(
             '><filterColumn colId="%s"><customFilters><customFilter val="*~*"/></customFilters></filterColumn></autoFilter>',
@@ -200,18 +215,18 @@ write_results <- function(ddsList, param, params, assays=NULL) {
 #'
 #' Save unfiltered versions of the results in text files
 #' @title Store results as text files
-#' @param ddsList A depth-3 list of [DESeq2::DESeqDataSet-class()] objects containing results in the [S4Vectors::mcols()] slot
+#' @param dmc A depth-3 list of [DESeq2::DESeqDataSet-class()] objects containing results in the [S4Vectors::mcols()] slot
 #' @param dir Directory to store the results in
 #' @return 
 #' @author Gavin Kelly
 #' @export
-write_all_results <- function(ddsList, dir=".") {
-  for (i in names(ddsList)) {
-    for (j in names(ddsList[[i]])) { 
-      for (k in names(ddsList[[i]][[j]])) { 
+write_all_results <- function(dmc, dir=".") {
+  for (i in names(dmc)) {
+    for (j in names(dmc[[i]])) { 
+      for (k in names(dmc[[i]][[j]])) { 
         readr::write_excel_csv(
           path=file.path(dir, sprintf("allgenes_%s_%s_%s.csv", i, j, k)),
-          x=as.data.frame(mcols(ddsList[[i]][[j]][[k]])$results) %>% dplyr::select(log2FoldChange, stat, symbol, class))
+          x=as.data.frame(mcols(dmc[[i]][[j]][[k]])$results) %>% dplyr::select(log2FoldChange, stat, symbol, class))
       }
     }
   }
