@@ -20,12 +20,12 @@ load_params <- function(script) {
 dmc_heading <- function(obj, hierarchy,  depth="##", numbered=TRUE, describe=TRUE) {
   heading <- paste0("\n\n", depth)
   text <- ""
-  dataset <- hierarchy$dataset_id
-  model <- hierarchy$model_id
-  comparison <- hierarchy$comparison_id
-  plot <- hierarchy$plot_id
+  dataset <- hierarchy$dataset
+  model <- hierarchy$model
+  comparison <- hierarchy$comparison
+  plot <- hierarchy$plot_config
   is_dmc <- is.list(obj[[dataset]])
-    if (is.null(model)) {
+  if (is.null(model)) {
     ## Doing a dataset
     if (is_dmc) {
       met <- metadata(obj[[dataset]][[1]][[1]])$dmc
@@ -39,54 +39,61 @@ dmc_heading <- function(obj, hierarchy,  depth="##", numbered=TRUE, describe=TRU
     if (!is.null(met$dataset_description)) {
       text <- paste0(met$dataset_description, "\n\n")
     }
-  } else {
-    if (!is.null(plot)) {
-      heading <- c(heading, "Plot config")
-      heading <- c(heading, plot$name)
-      if (!is.null(plot$description)) {
-        text <- paste0(plot$description, "\n\n",
-                      profile_to_string(plot), "\n\n")
-      } else {
-        text <- paste0(profile_to_string(plot), "\n\n")
+  } else if (!is.null(plot)) {
+    ## Doing a plot
+    if (is_dmc) {
+      met <- metadata(obj[[dataset]][[model]][[1]])$model$profile_plots[[plot]]
+    } else { 
+      met <- metadata(obj[[dataset]])$models[[model]]$profile_plots[[plot]]
+    }
+    heading <- c(heading, "Plot config", plot)
+    if (!is.null(met$name)) {
+      heading <- c(heading, "-", met$name)
+    }
+    if (!is.null(met$description)) {
+      text <- paste0(met$description, "\n\n",
+                    profile_to_string(met[[1]]), "\n\n")
+    } else {
+      text <- paste0(profile_to_string(met[[1]]), "\n\n")
+    }
+  } else if (!is.null(comparison)) {
+    ## Doing a comparison
+    if (comparison %in% names(obj[[dataset]][[model]])) { # otherwise an external list
+      met <- metadata(obj[[dataset]][[model]][[comparison]])$dmc
+      heading <- c(heading, "Comparison", comparison)
+      if (!is.null(met$comparison_name)) {
+        heading <- c(heading, "-", met$comparison_name)
       }
-    } else if (!is.null(comparison)) {
-      if (comparison %in% names(obj[[dataset]][[model]])) { # otherwise an external list
-        met <- metadata(obj[[dataset]][[model]][[comparison]])$dmc
-        heading <- c(heading, "Comparison", comparison)
-        if (!is.null(met$comparison_name)) {
-          heading <- c(heading, "-", met$comparison_name)
-        }
-        if (!is.null(met$comparison_description)) {
-          text <- paste0(met$comparison_description, "\n\n")
-        }
-        if (comparison %in% names(obj[[dataset]][[model]]) && "tooltip" %in% names(attributes(metadata(obj[[dataset]][[model]][[comparison]])$comparison))) {
-          text <- paste(text, attr(metadata(obj[[dataset]][[model]][[comparison]])$comparison, "tooltip"))
-        }
-      } else {
-        heading <- c(heading, "List", comparison)
+      if (!is.null(met$comparison_description)) {
+        text <- paste0(met$comparison_description, "\n\n")
+      }
+      if (comparison %in% names(obj[[dataset]][[model]]) && "tooltip" %in% names(attributes(metadata(obj[[dataset]][[model]][[comparison]])$comparison))) {
+        text <- paste(text, attr(metadata(obj[[dataset]][[model]][[comparison]])$comparison, "tooltip"))
       }
     } else {
-      ## Doing a model
-      heading <- c(heading, "Model")
-      if (is_dmc) {
-        met <- metadata(obj[[dataset]][[model]][[1]])$dmc
-        heading <- c(heading, met$model)
-        if (!is.null(met$model_name)) {
-          heading <- c(heading, "-", met$model_name)
-        }
-        if (!is.null(met$model_description)) {
-          text <- paste0(met$model_description, "\n\n")
-        }
+      heading <- c(heading, "List", comparison)
+    }
+  } else {
+    ## Doing a model
+    heading <- c(heading, "Model")
+    if (is_dmc) {
+      met <- metadata(obj[[dataset]][[model]][[1]])$dmc
+      heading <- c(heading, met$model)
+      if (!is.null(met$model_name)) {
+        heading <- c(heading, "-", met$model_name)
       }
-      else {
-        heading <- c(heading, model)
-        met <- metadata(obj[[dataset]])$models[[model]]
-        if (!is.null(met$name)) {
-          heading <- c(heading, "-", met$name)
-        }
-        if (!is.null(met$description)) {
-          text <- paste0(met$description, "\n\n")
-        }
+      if (!is.null(met$model_description)) {
+        text <- paste0(met$model_description, "\n\n")
+      }
+    }
+    else {
+      heading <- c(heading, model)
+      met <- metadata(obj[[dataset]])$models[[model]]
+      if (!is.null(met$name)) {
+        heading <- c(heading, "-", met$name)
+      }
+      if (!is.null(met$description)) {
+        text <- paste0(met$description, "\n\n")
       }
     }
   }

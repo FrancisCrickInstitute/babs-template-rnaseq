@@ -383,7 +383,9 @@ attach_src <- function(spec, src) {
     try(attr(spec, "src") <- src, silent=TRUE)
     return(spec)
   }
-  Map(attach_src, spec, src)
+  out <- Map(attach_src, spec, src)
+  attributes(out) <- attributes(spec)
+  out
 }
 
 

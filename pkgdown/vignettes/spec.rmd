@@ -206,13 +206,13 @@ cytoplasmic and nuclear subsamples) it might be preferable to look at
 one of the pair normalised against it's pair-mate. This is purely for
 visualisation purposes: for differential analysis it is always worth
 sticking with the primary assay (counts). This can be achieved by a
-setting `extra_assays` in a dataset as alist of `generate_assay`
+setting `extra_assays` in a dataset as a list of `extra_assay`
 calls:
 
 ```
   subset = ...,
   extra_assays = list(
-      to_nuclear=generate_assay(
+      to_nuclear=extra_assay(
       method="normalise", from="vst",
       compartment="nuclear",
       design=~compartment:treatment:replicate,
@@ -970,7 +970,7 @@ We can cut this down in three ways:
 
 #### Shortcuts for parent-list > child
 
-There are a set of functions `sample_sets`, `models`, `comparisons` which replace the whole `plural=list(singular...`, so the above can become:
+There are a set of functions `sample_sets`, `models`, `comparisons` which replace the whole `plurals=list(singular...`, so the above can become:
 
 ```{r, eval = FALSE}
 specification(
@@ -982,16 +982,17 @@ specification(
 	   c1 = comparison(
 ```
 
-Using R's meta-programming capabilities, these expand to the same syntax as the original above.
+Using R's meta-programming capabilities, these expand to the same syntax as the original above, there's often no need to have the explicit `list`.
 
 #### Automatic wrapping of objects
 
 A further level of abbreviation allows us to say that any singular
 object (model, sample_set, comparison) that's not in a corresponding
 list (models, samples_sets, comparisons) - in either of the above
-syntaxes - should get wrapped in.  This means we lose the potential to
-name the model in the convenient `my_model_name=model(...` notation,
-but the models will still get automatically assigned an ID:
+syntaxes - should get wrapped in the corresponding 'plural list'
+wrapper. For example, here we have a singular `model` that isn't
+explicitly container in a `models` list, but the pipeline will now
+automically adjust for that, so the following is valid:
 
 ```{r, eval = FALSE}
 specification(
@@ -999,6 +1000,19 @@ specification(
     model(design = ~1,
       comparison(name="coef"
 ```
+
+We can have multiple singletons, and give it/them short IDs to help identification:
+
+```{r, eval = FALSE}
+specification(
+  sampleset(subset=TRUE,
+    const=model(design = ~1,
+      comparison(name="coef"...
+    treat=model(design = ~treatment,
+      comparison(name="coef"...
+```
+
+
 
 #### Automatic nesting
 
@@ -1061,3 +1075,5 @@ plurals is more limited to the primary specfile objects
  - `sample_set`
  - `model`
  - `comparison`
+ - `extra_assay`
+ - `profile_plot`

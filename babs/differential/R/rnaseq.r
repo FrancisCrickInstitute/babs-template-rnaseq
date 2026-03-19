@@ -26,12 +26,13 @@ load_specs <- function(file="", context) {
     list_obj("model", envir=e)
     list_obj("specification", envir=e)
     list_obj("extra_assay", envir=e)
-    list_obj("profile_plot", envir=e, post=function(x) modifyList(list(section="all"), x))
-    list_obj("comparison", envir=e, post=function(x) modifyList(list(section="all"), x))
+    list_obj("profile_plot", envir=e, post=function(x) {x$section <- x$section %||% "all"; x} )
+    list_obj("comparison", envir=e, post=function(x) {if (is_formula(x[[1]]) && length(x[[1]])==3) do.call(mult_comp, x) else x})
 
     # List wrappers - either evaluating or not
-    shortcut <- function(my_alias, envir = parent.frame(), quote = TRUE) {
+    shortcut <- function(my_alias, envir = parent.frame(), quote = TRUE, child=NULL) {
       aliased_list <<- c(aliased_list, my_alias)
+      fn_name <- deparse(substitute(child))
       assign(my_alias,
         function(...) {
           if (quote) {
@@ -42,6 +43,11 @@ load_specs <- function(file="", context) {
             out <- dots
           } else {
             out <- list(...)
+            if (fn_name != "NULL") {
+              wrong <- sapply(out, function(x) attr(x, "constructor", exact=TRUE) %||% "") != fn_name
+              child_fn <- get(fn_name, envir = envir, mode = "function", inherits = TRUE)
+              out[wrong] <- lapply(out[wrong], child_fn)
+            }
           }
           structure(out, alias = my_alias)
         },
@@ -54,33 +60,10 @@ load_specs <- function(file="", context) {
     shortcut("strata", e)
     shortcut("sample_sets", e, quote=FALSE)
     shortcut("models", e, quote=FALSE)
-    shortcut("comparisons", e, quote=FALSE)
-    shortcut("profile_plots", e, quote=FALSE)
+    shortcut("comparisons", e, quote=FALSE, child=comparison)
+    shortcut("profile_plots", e, quote=FALSE, child=profile_plot)
     shortcut("extra_assays", e, quote=FALSE)
 
-    # These singleton objects aren't lists themselves
-    # TODO - one day we should rationalise everything to be a list, and us list_obj
-    wrap_mult_comp <- function(comp) {
-      if (is_formula(x[[1]]) %% length(x[[1]]) == 3) {
-        x[[1]] <- mult_comp(x[[1]], name=x$name, description=x$description)
-      }
-    }
-    assign("comparison",
-           function(x, ID=NULL, name=NULL, description=NULL,...) {
-             # Allow for potentially missing mult_comp wrapper around e.g. revpairwise ~ treatment
-             if (is_formula(x) && length(x)==3) {
-               out <- mult_comp(x, name=name, description=description, omnibus=FALSE, keep=TRUE, trend=FALSE, ...)
-             } else {
-               out <- x
-             }
-             structure(out, ID=ID, name=name, description=description, constructor="comparison")
-           },
-           envir=e)
-    ## assign("profile_plot",
-    ##        function(x, ID=NULL, name=NULL, description=NULL, section="all") {
-    ##          structure(x, ID=ID, name=name, description=description, section=section, constructor="profile_plot")
-    ##        },
-    ##        envir=e)
     # Other convenience functions
     assign("constrain", expression, envir=e)
     assign("mutate",
@@ -91,11 +74,11 @@ load_specs <- function(file="", context) {
            )
     specs <- source(file.path("extdata",file), local=e)$value
     specs <- resolve_alias(specs)
-    for (singleton in c("sample_set", "model", "comparison")) {
-      specs <- wrap_exposed(specs, singleton)
-    }
     srcs <- expr_to_list(parse(file.path("extdata",file))[[1]], aliased_list)
     specs <- attach_src(specs, srcs)
+    for (singleton in c("sample_set", "model", "comparison", "profile_plot", "extra_assay")) {
+      specs <- wrap_exposed(specs, singleton)
+    }
     assign("sample_set", expression, envir=e) # avoid evaluating any examples sample_sets.
     pkg_defaults <-default_spec_settings()
     new_settings <- setdiff(names(pkg_defaults), names(specs$settings))
@@ -112,7 +95,7 @@ load_specs <- function(file="", context) {
       models=list(
         "Naive" = list(
           design = as.formula(fml),
-          comparisons = mult_comp(as.formula(paste("pairwise", fml)))
+          comparisons = list(pairwise = mult_comp(as.formula(paste("pairwise", fml))))
         )
       ),
       plot_scale = function(y) {
@@ -338,8 +321,7 @@ build_dds_list <- function(dds, spec) {
       if (! "profile_plots" %in% names(mdlList[[i]])) {
         # default to the set of models removing any terms that will preserve marginality
         pp <- find_simpler_models(mdlList[[i]]$design, do_aes=TRUE, type="design")
-        attr(pp[[1]], "src") <- paste0(deparse(pp[[1]]), collapase="")
-        mdlList[[i]]$profile_plots <- structure(list(pp, section="all"), "src"="Auto-generated")
+        mdlList[[i]]$profile_plots <- structure(pp, src="Auto-generated")
       } else {
         mdlList[[i]]$profile_plots <- lapply(
           mdlList[[i]]$profile_plots,
@@ -456,8 +438,8 @@ fit_models <- function(dds, param, ...) {
       metadata(y)$dmc$model <- mname
       metadata(y)$dmc$model_name <- metadata(y)$model$name
       metadata(y)$dmc$model_description <- metadata(y)$model$description
-      metadata(y)$dmc$comparison_name <- attr(metadata(y)$comparison, "name")
-      metadata(y)$dmc$comparison_description <- attr(metadata(y)$comparison, "description")
+#      metadata(y)$dmc$comparison_name <- metadata(y)$dmc$comparison
+      metadata(y)$dmc$model_description <- metadata(y)$dmc$description
       y})
   })
   model_comp
@@ -488,9 +470,10 @@ fit_model <- function(mdl, dds, ...) {
   out <- list()
   for (comp_ind in seq(along=mdl$comparisons)) {
     message("Processing comparison ", comp_ind)
-    fit <- fit_comparison(comp=mdl$comparisons[[comp_ind]], model_dds=model_dds, mdl=mdl, ...)
-    if (class(mdl$comparisons[[comp_ind]])=="post_hoc") {
-      names(fit) <- paste0("(", names(mdl$comparisons)[comp_ind],") ", names(fit))
+    metadata(model_dds)$dmc$comparison <- names(mdl$comparisons)[comp_ind]
+    fit <- fit_comparison(comp=mdl$comparisons[[comp_ind]], model_dds=model_dds, mdl=mdl,  ...)
+    if (length(fit) != 1) {
+      names(fit) <- paste(names(mdl$comparisons)[comp_ind],  seq_along(fit), sep=".")
     } else {
       names(fit) <- names(mdl$comparisons)[comp_ind]
     }
@@ -501,7 +484,7 @@ fit_model <- function(mdl, dds, ...) {
   }
   out <- imap(out, function(obj, cname) {
     metadata(obj)$comparison_code <- paste0("res <- results(dds, contrast=",deparse1(metadata(obj)$comparison),")")
-    metadata(obj)$dmc$comparison <- cname
+#    metadata(obj)$dmc$comparison <- cname
     comp <- metadata(obj)$comparison
     if (is.character(comp) && length(comp)==1) {#'name' contrast so baseline is intercept
       #TODO Set baseline_contrast to intercept
@@ -515,9 +498,7 @@ fit_model <- function(mdl, dds, ...) {
 }
 
 fit_comparison <- function(comp, model_dds, mdl, ...) {
-  if (is_formula(comp)) { # Do the usual DESeq2 LRT
-    return(fitLRT(model_dds, mdl=mdl, reduced=comp, ...))
-  } else if (class(comp)=="post_hoc") { #Multiple-comparisons
+  if (class(comp)=="post_hoc") { #Multiple-comparisons
     strip <- c("spec","name","description")
     contrs <- emcontrasts(dds=model_dds, comp=comp)
     if (length(contrs)==0) return(list())
@@ -556,14 +537,18 @@ fit_comparison <- function(comp, model_dds, mdl, ...) {
       } # no need for an 'else': the model fit has already been done
     }
     # Return a list of DESeq2 objects, with the comparison metadata set.
-    return(lapply(
-      contrs,
-      function(contr) {
-        metadata(model_dds)$models <- NULL
-        metadata(model_dds)$comparisons <- NULL
-        metadata(model_dds)$comparison <- contr
-        model_dds}
-    ))
+    id <- metadata(model_dds)$dmc$comparison
+    name <- metadata(model_dds)$dmc$comparison_name
+    return(imap(contrs, function(contr, cname) {
+      metadata(model_dds)$models <- NULL
+      metadata(model_dds)$comparisons <- NULL
+      metadata(model_dds)$comparison <- contr
+      metadata(model_dds)$dmc$comparison <- paste(id, match(cname, names(contrs)), sep=".")
+      metadata(model_dds)$dmc$comparison_name <- if (is.null(name)) cname else paste(name, cname)
+      model_dds}
+      ))
+  } else if (is_formula(comp[[1]])) { # Do the usual DESeq2 LRT
+    return(fitLRT(model_dds, mdl=mdl, reduced=comp[[1]], ...))
   } else {
     # Just a single DESeq2 Wald
     ## TODO: We should handle limma here as well, using retrieve_contrasts to cast DESeq's comparisons as limma contasts
@@ -573,7 +558,7 @@ fit_comparison <- function(comp, model_dds, mdl, ...) {
     }
     metadata(model_dds)$models <- NULL
     metadata(model_dds)$comparisons <- NULL
-    metadata(model_dds)$comparison <- comp
+    metadata(model_dds)$comparison <- comp[[1]]
     return(list(model_dds))
   }
 }
@@ -681,9 +666,9 @@ check_model <- function(dds) {
 #' @author Gavin Kelly
 #' @export
 mult_comp <- function(spec, name=NULL, description=NULL, omnibus=FALSE, keep=TRUE, trend=FALSE, ...) {
-  obj <- list(spec=spec, omni=omnibus, keep=keep, trend=trend, ...)
+  obj <- structure(list(spec=spec, omni=omnibus, keep=keep, trend=trend, ...), constructor="comparison")
   class(obj) <- "post_hoc"
-  attributes(obj) <- c(attributes(obj), list(name=name, description=description))
+#  attributes(obj) <- c(attributes(obj), list(name=name, description=description))
   obj
 }
 
@@ -696,7 +681,7 @@ mult_comp <- function(spec, name=NULL, description=NULL, omnibus=FALSE, keep=TRU
 #' @return 
 #' @author Gavin Kelly
 emcontrasts <- function(dds, comp, prefix="my") {
-  em_extra <- comp[setdiff(names(comp), c("spec", "keep", "LRT", "omni", "trend"))]
+  em_extra <- comp[setdiff(names(comp), c("spec", "keep", "LRT", "omni", "trend", "name", "description"))]
   mdl <- metadata(dds)$model
   if (comp$trend) {
     em_fn <- emmeans::emtrends
@@ -1029,7 +1014,7 @@ get_result <- function(dds, mcols=c("symbol", "entrez"), filterFun=IHW::ihw, lfc
 #' @export
 summarise_results <- function(dds) {
   res <- mcols(dds)$results
-  as.data.frame(table(
+  out <- as.data.frame(table(
     Group=sub("\\*$","",res$class),
     Significant=factor(ifelse(grepl("\\*$",res$class), "Significant", "not"), levels=c("Significant","not"))
   )) %>%
@@ -1037,6 +1022,9 @@ summarise_results <- function(dds) {
     dplyr::mutate(Total=not+Significant) %>%
     dplyr::select(-not) %>%
     dplyr::arrange(desc(Significant/Total))
+  out$mname <- metadata(dds)$dmc$model_name %||% ""
+  out$cname <- metadata(dds)$dmc$comparison_name %||% ""
+  out
 }    
 
 #' @export
@@ -1240,14 +1228,16 @@ find_simpler_models <- function(fml, do_aes=FALSE, type=c("simplest", "drop1", "
   if (type=="simplest") {
     new <- add.scope(~1, fml)
     lapply(setNames(new, paste("just", new)),
-           function(x) update(fml, as.formula(paste(lhs, "~", x))))
+           function(x) list(structure(update(fml, as.formula(paste(lhs, "~", x))), src=deparse1(update(fml, as.formula(paste(lhs, "~", x))))), section="all")
+           )
   } else if (type=="drop1") {
     drop <- drop.scope(fml)
     lapply(setNames(drop, paste("drop", drop)),
-           function(x) update(fml, as.formula(paste0(lhs, " ~ . -", x))))
+           function(x) list(structure(update(fml, as.formula(paste0(lhs, " ~ . -", x))), src=deparse1(update(fml, as.formula(paste0(lhs, " ~ . -", x))))), section="all")
+           )
   } else if (type=="design") {
     list(
-      'as designed' = update(fml, as.formula(paste(lhs, " ~ .")))
+      design=list(structure(update(fml, as.formula(paste(lhs, " ~ ."))), src=deparse(update(fml, as.formula(paste(lhs, " ~ ."))))), section="all")
     )
   }
 }
@@ -1262,7 +1252,7 @@ translate_terms <- function(txt, obj) {
 
 
 #' @export
-mat_x_terms <- function(mat, fml, fitFrame) {
+mat_x_terms <- function(mat, fml, fitFrame, weights=rep(1, nrow(mat))) {
   yvar <- make.unique(c(colnames(fitFrame), "y", sep = ""))[ncol(fitFrame) + 1]
   fml <- update(fml, paste(yvar, "~ ."))
   simpler <- find_simpler_models(fml, type="drop1")
@@ -1274,21 +1264,22 @@ mat_x_terms <- function(mat, fml, fitFrame) {
   covar_x_mat$Assoc <- NA
   covar_x_mat$pvalue <- NA
   fit_selected <- list()
+  infl <- fitFrame$.influential
   for (imat in 1:nmat) {
     fitFrame[[yvar]] <- mat[, imat]
-    fit1 <- lm(fml, data = fitFrame)
+    fit1 <- lm(fml, data = fitFrame[infl,,drop=FALSE])
     ind_complete <- intersect(row.names(fitFrame), names(residuals(fit1)))
     if (length(ind_complete) < nrow(fitFrame)) {
       fit1 <- lm(fml, data = fitFrame[ind_complete,])
     }
     for (ifml in names(simpler)) {
-      fit0 <- lm(simpler[[ifml]], data=fitFrame[ind_complete,])
+      fit0 <- lm(simpler[[ifml]][[1]], data=fitFrame[ind_complete,])
       ano <- anova(fit0, fit1)
       ss_effect <- ano$"Sum of Sq"[2]
       ss_error <- sum(resid(fit1)^2)
       eta_Sq <- ss_effect/(ss_effect + ss_error)
       i <- covar_x_mat$column==imat & covar_x_mat$Covariate==ifml
-      covar_x_mat$Assoc[i] <- eta_Sq
+      covar_x_mat$Assoc[i] <- eta_Sq * weights[imat]
       covar_x_mat$pvalue[i] <- anova(fit0, fit1)$'Pr(>F)'[2]
       }
     }
@@ -1298,7 +1289,14 @@ mat_x_terms <- function(mat, fml, fitFrame) {
                             min((covar_x_mat$wrap + 1) * 20, nmat))
   covar_x_mat$column <- sprintf("%02d", covar_x_mat$column)
   covar_x_mat$wrap <- paste("PCs",covar_x_mat$wrap)
-  covar_x_mat$Assoc[covar_x_mat$pvalue>0.05] <- NA
+  if (any(covar_x_mat$pvalue<=0.05)) {
+    covar_x_mat$Assoc[covar_x_mat$pvalue>0.05] <- NA
+  } else {
+    for (i in unique(covar_x_mat$Covariate)) {
+      ind <- covar_x_mat$Covariate==i
+      covar_x_mat$Assoc[ind & covar_x_mat$Assoc < max(covar_x_mat$Assoc[ind])] <- NA
+    }
+  }
   covar_x_mat
 }
 
