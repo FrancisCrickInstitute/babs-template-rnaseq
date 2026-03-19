@@ -1,3 +1,21 @@
+# Version 1.10.0
+## Major Changes
+ - Change default fastq.gz location prefix to `inputs/sequencing/data`,
+   rather than `inputs/sequencing/released`
+ - Allow abbreviated spec files, from verbose
+   `sample_set(models=list(model(...), model(...))`
+   to `sample_set(model(...), model(...))`
+## Minor Changes
+ - chore: Bring in the updated environment/docker infrastructure
+ - chore: Tidy up the load_specs
+ - feat: First stage of switching profile_plot and comparison to standard wrap
+ - feat: Add mcols to xl files
+ - feat: Add dendrogram row-cluster splits
+ - fix: Ensure the spec's evaluated/unevaluated objects stay in sync
+ - feat: Allow custom fastq dirs
+ - fix: Change where we look for fastq files
+ - fix: Ensure children of profile_plots and comparisons are valid
+ - docs: Update pkgdown handler
 # Version 1.9.0
 ## Major Changes
 ## Minor Changes
