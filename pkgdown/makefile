@@ -7,12 +7,10 @@ include shared.mk
 shared.mk: ../babs/docs/shared.mk
 	cp $< $@
 
+
+ifeq ($(WRAP),none)
+##     To be executed directly, so can expose targets without need for wrapping (in sbatch/container)
 .PHONY: site
-
-wrapped-targets=site renv.lock
-
-ifeq ($(CONTAINER),)
-##     To be executed directly - no (further) containerisation wrapping needed
 
 site: renv.lock | ../test/babs/differential/results/latest ## Create pkgdown site in ./docs
 	rsync -ar ../babs/differential/R/ R/
@@ -34,10 +32,18 @@ renv.lock:
 	mv DESCRIPTION no-DESCRIPTION
 	$(R) -e 'library(renv); init()'
 	mv no-DESCRIPTION DESCRIPTION
-else
-##   To be executed by so prefix the original call to make with the container
-$(wrapped-targets): $(optionalRenviron)
-	$(containerPrefix) make $(MAKECMDGOALS) EXECUTOR=make; $(and $(SLURM_JOB_ID),$(call send_notification,Processing))
+endif
+
+ifeq ($(WRAP),container)
+##   To be executed by container so prefix the original call to make with the container
+%: $(optionalContainer)
+	$(containerPrefix) make $@ EXECUTOR=make
+endif
+
+ifeq ($(WRAP),sbatch)
+## To be submitted. slurm_wrap contains an instruction to do the 'make' on a node.
+%: $(optionalContainer)
+	sbatch $(default_sbatch_args) $(sbatch_args) --wrap='$(slurm_wrap)'
 endif
 
 publish:
