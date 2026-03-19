@@ -35,7 +35,7 @@ endif
 limsid=$(subst asf-,,$(subst lims-,,$(setting_Lims)))
 lab-sci=$(word 2,$(subst /projects/, ,$(dir $(setting_Path))))
 
-fqprefix?=/nemo/stp/babs/inputs/sequencing/released
+fqprefix?=/nemo/stp/babs/inputs/sequencing/data
 fqfiles=$(wildcard $(fqprefix)/$(lab-sci)$(limsid)/primary_data/*/fastq/*_R1_001.fastq.gz)
 
 .PHONY: check-samplesheet
