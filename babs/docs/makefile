@@ -8,12 +8,9 @@ samplesheet=$(wildcard $(samplesheet_fname).csv)
 configs = $(wildcard *.config)
 metadata = $(wildcard $(experiment_table).csv)
 
-.PHONY: build run clean
+.PHONY: run clean
 
 include settings.mk
-
-build: run
-	echo "WARNING: 'build' is deprecated - `make run` has been invoked for you, instead. In future, there's no need to build"
 
 # Logic is to use existence of non-empty report.err as a flag for
 # problem.  On any run, put any problems in tmp.err, and at the end
@@ -37,7 +34,9 @@ endif
 
 limsid=$(subst asf-,,$(subst lims-,,$(setting_Lims)))
 lab-sci=$(word 2,$(subst /projects/, ,$(dir $(setting_Path))))
-fqfiles=$(wildcard /nemo/stp/babs/inputs/sequencing/released/$(lab-sci)$(limsid)/primary_data/*/fastq/*_R1_001.fastq.gz)
+
+fqprefix?=/nemo/stp/babs/inputs/sequencing/released
+fqfiles=$(wildcard $(fqprefix)/$(lab-sci)$(limsid)/primary_data/*/fastq/*_R1_001.fastq.gz)
 
 .PHONY: check-samplesheet
 check-samplesheet: $(samplesheet_fname).csv
@@ -47,7 +46,7 @@ check-samplesheet: $(samplesheet_fname).csv
 
 $(samplesheet_fname).csv : $(fqfiles)
 ifeq ($(fqfiles),)
-	echo "Couldn't find fastq files in " $(fqfiles) | tee -a tmp.err
+	echo "Couldn't find fastq files in " $(fqprefix)/$(lab-sci)$(limsid)/primary_data " Perhaps try setting fqprefix or fqfiles" | tee -a tmp.err
 else
 	echo "sample,fastq_1,fastq_2" > $@
 	for r1 in $(fqfiles); do \
