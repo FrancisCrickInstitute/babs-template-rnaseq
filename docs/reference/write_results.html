@@ -37,7 +37,7 @@
   <main id="main" class="col-md-9"><div class="page-header">
 
       <h1>XLSX report of results</h1>
-      <small class="dont-index">Source: <a href="https://github.com/FrancisCrickInstitute/babs-template-rnaseq/blob/master/babs/differential/R/output.r" class="external-link"><code>R/output.r</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/FrancisCrickInstitute/babs-template-rnaseq/blob/listify/babs/differential/R/output.r" class="external-link"><code>R/output.r</code></a></small>
       <div class="d-none name"><code>write_results.Rd</code></div>
     </div>
 
@@ -47,19 +47,19 @@
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">write_results</span><span class="op">(</span><span class="va">ddsList</span>, <span class="va">param</span>, <span class="va">params</span>, assays <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">write_results</span><span class="op">(</span><span class="va">dmc</span>, <span class="va">param</span>, <span class="va">params</span>, assays <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
     <h2 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h2>
 
 
-<dl><dt id="arg-ddslist">ddsList<a class="anchor" aria-label="anchor" href="#arg-ddslist"></a></dt>
-<dd><p>A depth-3 list of <code>DESeq2::DESeqDataSet-class()</code> objects containing results in the mcols slot</p></dd>
-
-
-<dt id="arg-param">param<a class="anchor" aria-label="anchor" href="#arg-param"></a></dt>
+<dl><dt id="arg-param">param<a class="anchor" aria-label="anchor" href="#arg-param"></a></dt>
 <dd><p>The parameter object used to generate the results</p></dd>
+
+
+<dt id="arg-ddslist">ddsList<a class="anchor" aria-label="anchor" href="#arg-ddslist"></a></dt>
+<dd><p>A depth-3 list of <code>DESeq2::DESeqDataSet-class()</code> objects containing results in the mcols slot</p></dd>
 
 
 <dt id="arg-dir">dir<a class="anchor" aria-label="anchor" href="#arg-dir"></a></dt>
