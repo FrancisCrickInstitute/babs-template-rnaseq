@@ -370,9 +370,10 @@ for (dataset_id in names(dataset_model_comp)) {
         dataset_se$.involved <- FALSE
         dataset_se$.involved[dataset_se$.influential] <- involved
       }
+      md <- metadata(this_dds)
+      plot_formulae <- get_in_section(md$model$profile_plots, c("all", "differential"))
       ## MA Plot
       cat('\n\n::: {.panel-tabset .unnumbered group="diffplot"}\n\n')
-      md <- metadata(this_dds)
       res <- as.data.frame(mcols(this_dds)$results)
       pal <- RColorBrewer::brewer.pal(9, "Set1")
       res$class <- ifelse(is_significant, "Sig", "Not")
@@ -430,10 +431,6 @@ for (dataset_id in names(dataset_model_comp)) {
         first <- FALSE
         cat("\n\n---\n\n")
       }
-      if (is_null(plot_formulae)) {
-        cat(':::\n\n')
-        next
-      }
       ## Heatmap
       nice_legends <- separate_legend(dataset_se)
       pl <- do.call(gridExtra::arrangeGrob,c(
@@ -448,7 +445,6 @@ for (dataset_id in names(dataset_model_comp)) {
               plot_meta=section_hierarchy
               )
       cat("\n\n---\n\n")
-      plot_formulae <- get_in_section(md$model$profile_plots, c("all", "differential"))
       model_vars <- sort_vars(
         unique(c(all.vars(md$model$design),
                  unique(unlist(lapply(plot_formulae, function(p) all.vars(p[[1]]))))
@@ -471,7 +467,9 @@ for (dataset_id in names(dataset_model_comp)) {
       zweights[colnames(this_dds)] <- weights
       centroid_df <- list()
       reconstruct <- cached_partial(dataset=dataset_id, model=model_id) # This memo-ised function performs model-based removal of random and/or systematic effects
-      for (plot_id in names(plot_formulae)) {
+      # Because heatmaps aren't really affected by anything other than y-aesthetic and partials:
+      unique_heatmaps <- !duplicated(sapply(plot_formulae, function(pl) {fml <- pl[[1]]; y <- eval(fml[[2]])$y; fml[[2]] <- y; deparse1(fml)}))
+      for (plot_id in names(plot_formulae)[unique_heatmaps]) {
         section_hierarchy <- list(dataset=dataset_id, model=model_id, comparison=comparison_id, plot_config=plot_formulae[[plot_id]]$name %||% plot_id)
         dmc_heading(dataset_model_comp, section_hierarchy, depth=strrep("#", length(section_hierarchy)+1), numbered=FALSE)
         plot_fml <- plot_formulae[[plot_id]][[1]]
@@ -525,7 +523,8 @@ for (dataset_id in names(dataset_model_comp)) {
           dds=tidied_se, mat=hmap_data, param=param,
           cluster_transform=identity, gene_clust = gene_clust,
           model_vars = model_vars,
-          plot_fml =plot_fml, 
+          plot_fml =plot_fml,
+          row_split = if ("cut.params" %in% slotNames(hc) && "k" %in% names(slot(hc, "cut.params"))) slot(hc, "cut.params")$k  else NULL,
           measure_name=paste(c(noun_to_readout(param$get("RowNoun")), y_hint), collapse=" "),
           show_column_names=TRUE)
         do_plot(Reduce(`+`, pls),
@@ -543,6 +542,7 @@ for (dataset_id in names(dataset_model_comp)) {
           dds=tidied_se, mat=hmap_data, param=param,
           cluster_transform=identity, gene_clust = gene_clust,
           model_vars = model_vars,
+          row_split = if ("cut.params" %in% slotNames(hc) && "k" %in% names(slot(hc, "cut.params"))) slot(hc, "cut.params")$k  else NULL,
           plot_fml =plot_fml, 
           measure_name=paste(c(noun_to_readout(param$get("RowNoun")), y_hint), collapse=" "),
           show_column_names=TRUE, cluster_columns = FALSE)
@@ -568,8 +568,12 @@ for (dataset_id in names(dataset_model_comp)) {
         }
         cat('\n\n---\n\n')
       }
+      ## if (is_null(plot_formulae)) {
+      ##   cat(':::\n\n')
+      ##   next
+      ## }
       ## Profile plots
-      section_hierarchy <- list(dataset=dataset_id, model=model_id, comparison=comparison_id)
+      section_hierarchy$plot_config <- NULL
       cat("\n\n", strrep("#", length(section_hierarchy)+1), " Profile\n\n", sep="")
       for (plot_id in names(plot_formulae)) {
         section_hierarchy <- list(dataset=dataset_id, model=model_id, comparison=comparison_id, plot_config=plot_formulae[[plot_id]]$name %||% plot_id)

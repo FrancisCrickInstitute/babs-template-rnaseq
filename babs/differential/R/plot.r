@@ -390,17 +390,18 @@ hmap_fn <- function(dds, mat, param, cluster_transform, gene_clust, model_vars, 
       masked[assay(dds, mask)[row.names(masked), colnames(masked)]] <- NA
     }
     col_fn <- sym_colour(masked[,colData(dds)$.influential])
-    if (first && !is.null(gene_clust)) {
-      cluster_size_per_row <- (table(gene_clust$cluster))[gene_clust$cluster]
-      left_annotation <- ComplexHeatmap::rowAnnotation(
-        size = anno_barplot(
-          as.vector(cluster_size_per_row),
-          bar_width=0.6,
-          width = unit(1, "cm")),
-        show_legend=FALSE)
-    } else {
-      left_annotation <- NULL
-    }
+    ## if (first && !is.null(gene_clust)) {
+    ##   cluster_size_per_row <- (table(gene_clust$cluster))[gene_clust$cluster]
+    ##   left_annotation <- ComplexHeatmap::rowAnnotation(
+    ##     size = anno_barplot(
+    ##       as.vector(cluster_size_per_row),
+    ##       bar_width=0.6,
+    ##       width = unit(1, "cm")),
+    ##     show_legend=FALSE)
+    ## } else {
+         left_annotation <- NULL
+    ## }
+    
     defaults <- list(
       matrix=masked[,ind,drop=FALSE],
       column_title = column_title,
@@ -416,6 +417,7 @@ hmap_fn <- function(dds, mat, param, cluster_transform, gene_clust, model_vars, 
       cluster_rows = if ("objects" %in% names(gene_clust)) gene_clust$objects$hclust else FALSE,
       heatmap_legend_param = list(direction = "horizontal"),
       left_annotation=left_annotation,
+      row_split=gene_clust$cluster,
       top_annotation = ComplexHeatmap::HeatmapAnnotation(
         df = as.data.frame(colData(dds))[ind, model_vars, drop=FALSE], 
         col = metadata(colData(dds))$palette$Heatmap[model_vars],
