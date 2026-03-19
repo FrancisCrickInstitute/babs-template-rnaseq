@@ -73,7 +73,14 @@ load_specs <- function(file="", context) {
            envir=e
            )
     specs <- source(file.path("extdata",file), local=e)$value
-    specs <- resolve_alias(specs)
+    # Which parents have enforce some post-processing on their children
+    # We'll need to do that manually if we're in the old "profile_plots=list(..." idiom
+    post_fns <- Filter(
+      function(x) x!= "NULL",
+      sapply(
+        setNames(aliased_list, aliased_list),
+        function(x) environment(e[[x]])$fn_name %||% "NULL"))
+    specs <- resolve_alias(specs, lapply(post_fns, function(x) environment(e[[x]])$post))
     srcs <- expr_to_list(parse(file.path("extdata",file))[[1]], aliased_list)
     specs <- attach_src(specs, srcs)
     for (singleton in c("sample_set", "model", "comparison", "profile_plot", "extra_assay")) {
@@ -108,13 +115,21 @@ load_specs <- function(file="", context) {
 
 
 
-resolve_alias <- function(l) {
+resolve_alias <- function(l, post_fns) {
   # Base case: if l is not a list, just return it
   if (!is.list(l)) return(l)
+  already_parent_list <- names(l) %in% names(post_fns)
+  #e.g. for profile_plots=list(aes() ~ .)
+  #if specified by profile_plot(aes() ~ .) each would get wrapped in a list and its post
+  # function would be executed, so
+  for (i in which(already_parent_list)) {
+    l[[i]] <- lapply(l[[i]], function(x) if (is.list(x)) x else list(x))
+    l[[i]] <- lapply(l[[i]], post_fns[[names(l)[i]]])
+  }
   alias <- sapply(l, function(e) {val <- attr(e, "alias"); if (is.null(val)) NA else val})
   names(l)[!is.na(alias)] <- alias[!is.na(alias)]
   islist <- sapply(l, is.list)
-  if (any(islist)) l[islist] <- lapply(l[islist], resolve_alias)
+  if (any(islist)) l[islist] <- lapply(l[islist], resolve_alias, post_fns)
   l
 }
 
