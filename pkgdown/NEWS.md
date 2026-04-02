@@ -1,3 +1,13 @@
+# Version 1.11.0
+## Minor Changes
+ - Sorted differential plots - can use a 'sort' aes in
+   plot-profiles. If it matches a column in results, differential
+   heatmaps are sorted accordingly. If it's prefixed with a '+', then
+   the tree branches are sorted accordingly. 
+ - Better contrast naming
+ - Differential heatmaps are feature-clustered based only on the
+   'involved' samples (which now falls back to the 'influential'
+   samples when auto-involvement isn't calculated.
 # Version 1.10.0
 ## Major Changes
  - Change default fastq.gz location prefix to `inputs/sequencing/data`,
