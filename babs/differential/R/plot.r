@@ -427,6 +427,16 @@ hmap_fn <- function(dds, mat, param, cluster_transform, gene_clust, model_vars, 
       show_heatmap_legend=first,
       show_row_names = FALSE,
       show_column_names = TRUE)
+    row_behaviour <- plot_fml[[2]]$sort %||% NA
+    if (row_behaviour %in% names(mcols(dds)$results)) {
+      defaults$row_order <- order(mcols(dds)$results[[row_behaviour]])
+      defaults$cluster_rows <- FALSE
+      defaults$row_split <- NULL
+      args$row_split <- NULL
+    }
+    if (row_behaviour %in% paste0("+", names(mcols(dds)$results))) {
+      defaults$row_dend_reorder <- mcols(dds)$results[[sub("^\\+", "", row_behaviour)]]
+    }
     if (first) defaults$name <- measure_name
     do.call(ComplexHeatmap::Heatmap, modifyList(defaults, args))
   }

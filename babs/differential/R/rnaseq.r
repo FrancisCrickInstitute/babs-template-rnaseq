@@ -512,6 +512,15 @@ fit_model <- function(mdl, dds, ...) {
   return(out)
 }
 
+
+get_design_matrix <- function(dds) {
+  if (is_formula(design(dds))) {
+    model.matrix(design(dds), colData(dds))
+  } else {
+    design(dds)
+  }
+}
+
 fit_comparison <- function(comp, model_dds, mdl, ...) {
   if (class(comp)=="post_hoc") { #Multiple-comparisons
     strip <- c("spec","name","description")
@@ -527,23 +536,13 @@ fit_comparison <- function(comp, model_dds, mdl, ...) {
     } else if ((mdl$approach %||% "DESeq2")=="voom"){
       ## TODO: possibly optimise/cache repeated calls to fitVoom, like 'model_fit_done'
       fit <- fitVoom(model_dds, mdl)
-      fit <- limma::contrasts.fit(fit, do.call(cbind, contrs))
-      fit <- limma::eBayes(fit)
+      fit <- apply_contrasts_with_estimability(fit, contrs, rowwise = FALSE)
       metadata(model_dds)$limma <- fit
     } else if ((mdl$approach %||% "DESeq2")=="limma" || !inherits(model_dds, "DESeqDataSet")){
       ## TODO: possibly optimise/cache repeated calls to fitVoom, like 'model_fit_done'
-      if (is_formula(design(model_dds))) {
-        mm <- model.matrix(design(model_dds), colData(model_dds))
-      } else {
-        mm <- design(model_dds)
-      }
-      fit <- limma::lmFit(assay(model_dds), mm)
+      fit <- limma::lmFit(assay(model_dds), get_design_matrix(model_dds))
       metadata(model_dds)$lmfit <- fit
-      nb <- apply(!is.na(assay(model_dds)), 1, function(x) estimability::nonest.basis(fit$design[x,]))
-      isEst <- apply(do.call(cbind,contrs),2, function(x) {sapply(nb,  function(y) estimability::is.estble(x, y))})
-      fit <- limma::contrasts.fit(fit, do.call(cbind, contrs))
-      fit$coefficients[!isEst] <- NA
-      fit <- limma::eBayes(fit)
+      fit <- apply_contrasts_with_estimability(fit, contrs, assay_mat = assay(model_dds), rowwise = TRUE)
       metadata(model_dds)$limma <- fit
     } else {
       if (!metadata(model_dds)$model_fit_done) {
@@ -553,13 +552,12 @@ fit_comparison <- function(comp, model_dds, mdl, ...) {
     }
     # Return a list of DESeq2 objects, with the comparison metadata set.
     id <- metadata(model_dds)$dmc$comparison
-    name <- metadata(model_dds)$dmc$comparison_name
     return(imap(contrs, function(contr, cname) {
       metadata(model_dds)$models <- NULL
       metadata(model_dds)$comparisons <- NULL
       metadata(model_dds)$comparison <- contr
       metadata(model_dds)$dmc$comparison <- paste(id, match(cname, names(contrs)), sep=".")
-      metadata(model_dds)$dmc$comparison_name <- if (is.null(name)) cname else paste(name, cname)
+      metadata(model_dds)$dmc$comparison_name <- cname
       model_dds}
       ))
   } else if (is_formula(comp[[1]])) { # Do the usual DESeq2 LRT
@@ -578,6 +576,46 @@ fit_comparison <- function(comp, model_dds, mdl, ...) {
   }
 }
 
+
+apply_contrasts_with_estimability <- function(fit, contrs, assay_mat = NULL, rowwise = FALSE) {
+  # Apply contrasts
+  C <- do.call(cbind, contrs)
+  fit <- limma::contrasts.fit(fit, C)
+
+  if (rowwise && !is.null(assay_mat)) {
+    design <- fit$design
+    obs <- !is.na(assay_mat)
+
+    nb <- lapply(seq_len(nrow(obs)), function(i) {
+      idx <- obs[i, ]
+      if (all(idx)) return(NULL)
+      estimability::nonest.basis(design[idx, , drop = FALSE])
+    })
+
+    isEst <- vapply(seq_len(ncol(C)), function(j) {
+      vapply(seq_along(nb), function(i) {
+        if (is.null(nb[[i]])) TRUE else estimability::is.estble(C[, j], nb[[i]])
+      }, logical(1))
+    }, logical(nrow(obs)))
+
+  } else {
+    # global estimability (voom case)
+    nb <- estimability::nonest.basis(fit$design)
+    isEst <- apply(C, 2, function(cc) estimability::is.estble(cc, nb))
+
+    # expand to matrix for consistent handling
+    isEst <- matrix(isEst, nrow = nrow(fit$coefficients), ncol = ncol(C), byrow = TRUE)
+  }
+
+  # Mask non-estimable entries
+  fit$coefficients[!isEst] <- NA
+  fit$stdev.unscaled[!isEst] <- NA
+
+  # eBayes AFTER masking
+  fit <- limma::eBayes(fit)
+
+  fit
+}
 
 annihilator <- function(x) diag(nrow = nrow(x)) - x %*% solve(t(x) %*% x) %*% t(x)
 reduced_design.fit <- function(fit, reduced_design){
@@ -722,7 +760,7 @@ emcontrasts <- function(dds, comp, prefix="my") {
   } else {
     split_idx <- setNames(
       seq_len(nrow(contr_frame)),
-      do.call(paste, c(contr_frame,sep= "|"))
+      do.call(paste, c(lapply(contr_frame, function(column) sub("(.*) - (.*)", "(\\1-\\2)", column)),sep= "×"))
     )
     tooltip <- do.call(paste, c(mapply(function(a, b) paste0(a," = ", b), names(contr_frame), contr_frame, SIMPLIFY=FALSE), sep="<br/>"))
   }
@@ -733,7 +771,7 @@ emcontrasts <- function(dds, comp, prefix="my") {
     if (!comp$omni) {
       attr(cont, "baseline_contrast") <- base
       attr(cont, "tooltip") <- tip
-      sample_weights <- X %*% solve(t(X) %*% X) %*% cont
+      sample_weights <-  X %*% MASS::ginv(t(X) %*% X) %*% cont #X %*% solve(t(X) %*% X) %*% cont
       attr(cont, "involved") <- abs(sample_weights) > 1e-8
     }
     cont},
@@ -822,12 +860,7 @@ fitLRT <- function(dds, mdl, reduced, ...) {
     )
   } else {
     design(dds) <- full
-    if (is_formula(design(dds))) {
-      mm <- model.matrix(design(dds), colData(dds))
-    } else {
-      mm <- design(dds)
-    }
-    fit <- limma::lmFit(assay(dds), mm)
+    fit <- limma::lmFit(assay(dds), get_design_matrix(dds))
     metadata(dds)$lmfit <- fit
     if (is_formula(reduced)) {
       reduced <- model.matrix(reduced, colData(dds))

@@ -365,7 +365,7 @@ for (dataset_id in names(dataset_model_comp)) {
       }
       involved <- attr(metadata(this_dds)$comparison, "involved")
       if (is.null(involved)) { # Fall back for contrasts that don't (yet) memorise which samples they're affected by
-        dataset_se$.involved <- TRUE
+        dataset_se$.involved <- dataset_se$.influential
       } else {
         dataset_se$.involved <- FALSE
         dataset_se$.involved[dataset_se$.influential] <- involved
@@ -487,6 +487,7 @@ for (dataset_id in names(dataset_model_comp)) {
           do_recentre <- do_rescale <- FALSE
         }
         design(tidied_se) <- design(this_dds)
+        mcols(tidied_se)$results <- mcols(this_dds)$results[row.names(tidied_se),]
         tidied_se <- reorder_samples(tidied_se,model_vars)
         assay(tidied_se) <- reconstruct(tidied_se, plot_fml, influence=tidied_se$.influential, assay=assayNames(tidied_se)[1])
         if ("visible" %in% names(plot_fml[[2]])) {
@@ -502,7 +503,7 @@ for (dataset_id in names(dataset_model_comp)) {
           slot(hc, "cut.params") <- modifyList(slot(hc, "cut.params"), list(k=ceiling(nrow(tidied_se)/3)))
         }
         if (nrow(tidied_se)>1) {
-          gene_clust <- bluster::clusterRows(assay(tidied_se)[,colnames(this_dds), drop=FALSE], adapt_hclust_param(hc), full=TRUE)
+          gene_clust <- bluster::clusterRows(assay(tidied_se)[,this_dds$.involved,drop=FALSE], adapt_hclust_param(hc), full=TRUE)
           if (is_external) {
             gene_clust$clusters <- match(names(gene_clust$clusters), external_list$ID)
           }

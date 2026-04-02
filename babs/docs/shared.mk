@@ -103,7 +103,7 @@ export SINGULARITYENV_GITHUB_PAT=${GITHUB_PAT}
 ################################################################
 PROJECT_HOME:=$(shell $(GIT) rev-parse --show-toplevel 2>/dev/null || echo $(dir $(abspath $(firstword $(MAKEFILE_LIST)))))
 GIT_BRANCH := $(shell git branch --show-current | sed 's/^main$$//')
-VERSION := $(and $(GIT_BRANCH),$(GIT_BRANCH)/)$(shell $(GIT) diff --quiet --ignore-submodules --exit-code && \
+VERSION := $(and $(GIT_BRANCH),$(GIT_BRANCH).)$(shell $(GIT) diff --quiet --ignore-submodules --exit-code && \
           ($(GIT) describe --tags --exact-match 2>/dev/null || \
 	  printf "unreleased") || \
           printf "modified")# ie v0.1.2 or unreleased or modified

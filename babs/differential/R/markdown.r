@@ -34,7 +34,7 @@ dmc_heading <- function(obj, hierarchy,  depth="##", numbered=TRUE, describe=TRU
     }
     heading <- c(heading, "Dataset", met$dataset)
     if (!is.null(met$dataset_name)) {
-      heading <- c(heading, "-", met$dataset_name)
+      heading <- c(heading, ":", met$dataset_name)
     }
     if (!is.null(met$dataset_description)) {
       text <- paste0(met$dataset_description, "\n\n")
@@ -48,7 +48,7 @@ dmc_heading <- function(obj, hierarchy,  depth="##", numbered=TRUE, describe=TRU
     }
     heading <- c(heading, "Plot config", plot)
     if (!is.null(met$name)) {
-      heading <- c(heading, "-", met$name)
+      heading <- c(heading, ":", met$name)
     }
     if (!is.null(met$description)) {
       text <- paste0(met$description, "\n\n",
@@ -62,7 +62,7 @@ dmc_heading <- function(obj, hierarchy,  depth="##", numbered=TRUE, describe=TRU
       met <- metadata(obj[[dataset]][[model]][[comparison]])$dmc
       heading <- c(heading, "Comparison", comparison)
       if (!is.null(met$comparison_name)) {
-        heading <- c(heading, "-", met$comparison_name)
+        heading <- c(heading, ":", met$comparison_name)
       }
       if (!is.null(met$comparison_description)) {
         text <- paste0(met$comparison_description, "\n\n")
@@ -80,7 +80,7 @@ dmc_heading <- function(obj, hierarchy,  depth="##", numbered=TRUE, describe=TRU
       met <- metadata(obj[[dataset]][[model]][[1]])$dmc
       heading <- c(heading, met$model)
       if (!is.null(met$model_name)) {
-        heading <- c(heading, "-", met$model_name)
+        heading <- c(heading, ":", met$model_name)
       }
       if (!is.null(met$model_description)) {
         text <- paste0(met$model_description, "\n\n")
@@ -90,14 +90,14 @@ dmc_heading <- function(obj, hierarchy,  depth="##", numbered=TRUE, describe=TRU
       heading <- c(heading, model)
       met <- metadata(obj[[dataset]])$models[[model]]
       if (!is.null(met$name)) {
-        heading <- c(heading, "-", met$name)
+        heading <- c(heading, ":", met$name)
       }
       if (!is.null(met$description)) {
         text <- paste0(met$description, "\n\n")
       }
     }
   }
-  heading <- paste(heading, collapse=" ")
+  heading <- gsub(" : ", ": ", paste(heading, collapse=" "))
   if (!numbered) {
     heading <- paste0(heading, "{.unnumbered}")
   }
