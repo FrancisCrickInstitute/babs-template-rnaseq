@@ -1,0 +1,467 @@
+diff -ur infra-tmp/makefile babs/differential/makefile
+--- infra-tmp/makefile	2026-04-02 09:50:02.000000000 +0100
++++ babs/differential/makefile	2026-04-02 09:45:10.814296000 +0100
+@@ -1,7 +1,7 @@
+ .PHONY: makefile resources/make/module.mk resources/make/shared.mk resources/make/project.mk
+-.PHONY: build clean maintainer-clean geo R-local
++.PHONY: clean maintainer-clean geo R-local
+ .DEFAULT_GOAL=help
+-
++diff_dir=.
+ include resources/make/shared.mk
+ include resources/make/module.mk   ## Anything we need to over-ride from shared
+ include resources/make/project.mk  ## Describe analysis structure of the qmds etc
+@@ -16,41 +16,61 @@
+ 
+ 
+ ## Create a makefile per section. It will set up target-specific
+-## variables to inform subsequent targets of the sections their
+-## subsections. It will also set up the global variables
+-## 'section'_(pages|qmds|htmls) which enumerate the individual combos.
+-## Because these makefiles are 'included' they will automatically get
+-## remade as necessary, and if changed will cause the whole 'make'
+-## process to be repeated.
+-
+-mk = $(patsubst %,$(staging_dir)/.make-%,$(sections))
+-qmd_path=$(staging_dir)/$(subsection).qmd
+-
+-subsections=$(or $(patsubst $(source_dir)/%.yml,%,$(wildcard $(source_dir)/$**.yml)),$*)
+-all_subs=$(sort $(foreach sect,$(sections),$(patsubst $(source_dir)/$(sect)%.yml,%,$(wildcard $(source_dir)/$(sect)*.yml))))
+-
+-## Enumerate subsections into a file that the sidebar typescript can use
+-yml_sections=$(patsubst %,$(staging_dir)/%.yml,$(sections))
+-$(yml_sections): $(staging_dir)/%.yml: |  $(staging_dir)
+-	echo '[$(subst $(space),$(comma),$(subsections))]' >> $@
+-
+-$(mk): $(staging_dir)/.make-% : $(yml_sections) | $(staging_dir)
+-	$(foreach subsection,$(subsections),\
+-	 echo '$(qmd_path): script=$(qmd_path)' >> $@;\
+-	 echo '$(qmd_path): section=$*' >> $@;\
+-	 echo '$(qmd_path): subsection=$(subsection)' >> $@;\
+-	 echo '$(qmd_path): $(source_dir)/$(subsection).yml $(source_dir)/$*.qmd' >> $@;\
+-	 echo '$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$(subsection).html:  $(qmd_path)' >> $@ ;\
+-	 echo '' >> $@ ;\
+-	)
+-	echo '$*_pages=$(subsections)' >> $@
++## variables to inform subsequent targets of the alignment, spec-file,
++## and section for each alignment:spec combo. It will also set up the
++## global variables 'section'_(pages|qmds|htmls) which
++## enumerate the individual combos.  Because these makefiles are
++## 'included' they will automatically get remade as necessary, and if
++## changed will cause the whole 'make' process to be repeated.
++
++mk0 = $(patsubst %,$(staging_dir)/.make-%,$(filter 00_%,$(sections)))
++mk = $(patsubst %,$(staging_dir)/.make-%,$(filter-out 00_%,$(sections)))
++qmd_path=$(staging_dir)/$*_$(ispec)_$(ialign).qmd
++qmd0_path=$(staging_dir)/$*_$(ialign).qmd
++
++
++$(mk): $(staging_dir)/.make-% : $(file.spec) $(samplesheets) | $(staging_dir)
++	printf "%s\n" $(foreach ispec,$(specfiles),\
++	   $(foreach ialign,$(alignments),\
++	   '$(qmd_path): alignment=$(ialign)'\
++	   '$(qmd_path): spec=$(ispec)'\
++	   '$(qmd_path): script=$*_$(ispec)_$(ialign)'\
++	   '$(qmd_path): section=$*'\
++	   '$(qmd_path): cat1=$(or $(shell sed -n "s/^#$(squote)[[:space:]]*@categories[[:space:]]\+\(.*\)/\1/p" extdata/$(ispec).spec | head -n1),$(ispec))'\
++	   '$(qmd_path): cat2=$(or $($(ialign).categories), $(ialign))'\
++	   '$(qmd_path): specname=$(or $(shell sed -n "s/^#$(squote)[[:space:]]*@specname[[:space:]]\+\(.*\)/\1/p" extdata/$(ispec).spec | head -n1),$(ispec))'\
++	   '$(qmd_path): $(source_dir)/$*.qmd'\
++	   '$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$*_$(ispec)_$(ialign).html: $(my_counts_dir)/$(ialign) $(ispec).spec $(my_metadata)_$(ialign).csv $(qmd_path) $(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$($*_parent).html'\
++	)) > $@
++	echo '$*_pages=$(foreach ialign,$(alignments),$(foreach ispec,$(filter-out $($(ialign).nospec),$(specfiles)),$*_$(ispec)_$(ialign)))' >> $@
+ 	echo '$*_qmds = $$(patsubst %,$(staging_dir)/%.qmd,$$($*_pages))'>> $@
+ 	echo '$*_htmls = $$(patsubst %,$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/%.html,$$($*_pages))'>> $@
+ 	echo '$*_htmls: $$($*_htmls)'>> $@
+ 
+-# For sections without any yml parametrisations, fall back to empty parameter sets
+-$(patsubst %,$(source_dir)/%.yml,$(sections)):
+-	echo "params:" >> $@
++
++# The trick to get e.g. nfcore run outside any differential container
++# is for a generated makefile to take a dependency on the
++# yet-to-be-run nfcore results.  Here, we ensure that the
++# genes_results are made before the makefile that describes the dependencies
++# of the 00_init.qmd's:
++$(mk0): $(staging_dir)/.make-% : $(samplesheets) $(genes_results) | $(staging_dir)
++	printf "%s\n" $(foreach ialign,$(alignments),\
++	 '$(qmd0_path): alignment=$(ialign)'\
++	 '$(qmd0_path): script=$*_$(ialign)'\
++	 '$(qmd0_path): section=$*'\
++	 '$(qmd0_path): cat1=$($(ialign).categories)'\
++	 '$(qmd_path): specname=$(or $(shell sed -n "s/^#$(squote)[[:space:]]*@specname[[:space:]]\+\(.*\)/\1/p" extdata/$(ispec).spec | head -n1),$(ispec))'\
++	 '$(qmd0_path): $(source_dir)/$*.qmd $(my_counts_dir)/$(ialign)'\
++	 '$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$*_$(ialign).html: $(my_metadata)_$(ialign).csv $(qmd0_path)'\
++	) > $@
++	echo '$*_pages=$(foreach ialign,$(alignments),$*_$(ialign))' >> $@
++	echo '$*_qmds = $$(patsubst %,$(staging_dir)/%.qmd,$$($*_pages))'>> $@
++	echo '$*_htmls = $$(patsubst %,$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/%.html,$$($*_pages))'>> $@
++	echo '$*_htmls: $$($*_htmls)'>> $@
++
++ifneq (,$(filter-out $(or $(excluded-targets),$(MAKECMDGOALS)),$(MAKECMDGOALS)))
++include $(configs)
++endif
+ 
+ qmds=$(strip $(foreach section,$(sections),$($(section)_qmds)))
+ 
+@@ -72,7 +92,8 @@
+ quarto_opts=--output-dir $(RESULTS_DIR)/$(VERSION) --execute-dir $(CURDIR) -M repo:$(repo)
+ 
+ ## Render the qmds to html in one quarto call
+-run: $(qmds) $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd | $(log_dir) data $(RESULTS_DIR)/$(VERSION)  ## Create objects in `data` that store the results of applying each spec file, along with a versioned html report in `results`.
++run: $(qmds) $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(samplesheets)| $(log_dir) data $(RESULTS_DIR)/$(VERSION)  $(genes_results)  ## Create objects in `data` that store the results of applying each spec file, along with a versioned html report in `results`.
++	$(GIT) commit -m "Adding files generated by a differential run" || echo "No additional differential files needed adding"
+ 	sed  -i 's#^  contents: .*#  contents: [$(subst $(space),$(comma),$(patsubst $(staging_dir)/%,%,$(qmds)))]#' $(staging_dir)/index.qmd
+ 	rm -rf $(staging_dir)/$(RESULTS_DIR)/$(VERSION)
+ 	rm -rf $(RESULTS_DIR)/$(VERSION).previous
+@@ -93,7 +114,7 @@
+ 	ln -sfn  $(VERSION) $(RESULTS_DIR)/latest
+ 
+ ## Render an individual page
+-$(html_reports) : $(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%.html : $(staging_dir)/%.qmd $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd | $(log_dir) $(RESULTS_DIR)/$(VERSION) $(staging_dir)/$(RESULTS_DIR)/$(VERSION)
++$(html_reports) : $(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%.html : $(staging_dir)/%.qmd $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(samplesheets)| $(log_dir) $(RESULTS_DIR)/$(VERSION) $(staging_dir)/$(RESULTS_DIR)/$(VERSION)
+ 	$(QUARTO) render '$<' $(quarto_opts) $(call log,html-$*)
+ 
+ html-%: $(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%.html ## Create a single html file to be placed in the staging directory, '%' is a simplified filename e.g. `make html-01_exploratory_per-plan_GRCh38`.
+@@ -107,7 +128,7 @@
+ notesfile=$(firstword $(wildcard NOTES.org NOTES.md))
+ $(staging_dir)/notes.md: $(notesfile) CHANGELOG.md
+ 	:> $@
+-	[ -z "$(notesfile)" ] || [ "$(suffix $(notesfile))" = md ] || pandoc -s -o $@ $<  
++	[ -z "$(notesfile)" ] || [ "$(suffix $(notesfile))" = md ] || pandoc --lua-filter=resources/_extensions/notes.lua -s -o $@ $<  
+ 	[ "$(notesfile)" = CHANGELOG.md ] || cat CHANGELOG.md >> $@
+ 
+ CHANGELOG.md:
+@@ -123,14 +144,27 @@
+ 	 --generated=$(staging_dir)/$(VERSION).params.yml > $@
+ 	sed -i -e 's#choose_staging("$(section)")#"$(staging_dir)/$*"#' $@
+ 
++$(qmds:qmd=yml):
++	echo "title: $(alignment) $(or $(specname),$(spec))" > $@
++	echo "description: $(alignment)-aligned data$(if $(spec), according to plan '$(spec)')" >> $@
++	echo "categories: [$(if $(cat1),$(if $(cat2),$(cat1)$(comma)$(cat2),$(cat1)),$(cat2))]" >> $@
++	echo "params:" >> $@
++	echo "  alignment: $(alignment)" >> $@
++	echo "  spec: $(or $(spec),'')" >> $@
++	echo "  specname: $(or $(specname),'')" >> $@
++	echo "  script: $(@:yml=qmd)" >> $@
++
+ 
+ $(staging_dir)/_quarto.yml: $(source_dir)/_quarto.yml $(qmds) $(css) $(includes)
+-	echo 'section: [$(subst $(space),$(comma)$(space),$(sections))]' > ${staging_dir}/_sidebar.yml
+-	echo 'subsection: [$(subst $(space),$(comma)$(space),$(all_subs))]' >> ${staging_dir}/_sidebar.yml
++	echo 'alignment: [$(subst $(space),$(comma)$(space),$(alignments))]' > ${staging_dir}/_sidebar.yml
++	echo 'spec: [null,$(subst $(space),$(comma)$(space),$(specfiles))]' >> ${staging_dir}/_sidebar.yml
++	echo 'section: [$(subst $(space),$(comma)$(space),$(sections))]' >> ${staging_dir}/_sidebar.yml
+ 	$(QUARTO) run $(source_dir)/typescript/sidebar.ts\
+ 	 --template=$< \
+ 	 --staging=$(staging_dir)\
+ 	 --repo="$(repo)" > $@
++	echo 'multiqc: "$(if $(wildcard $(RESULTS_DIR)/multiqc-*),MultiQC and ,)"' >> $@
++	[ -z "$(shortTitle)" ] || sed -i 's/title: Analysis results/title: $(shortTitle) analysis results/' $@
+ 	cp $(source_dir)/_quarto-*.yml $(staging_dir)/
+ 	rm -f ${staging_dir}/_sidebar.yml
+ 	mkdir -p ${staging_dir}/_extensions
+@@ -150,7 +184,10 @@
+ extdata/R.bib: renv.lock
+ 	$(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")' $(call log,bib)
+ 
++renv.lock: orgs=$(strip $(foreach align,$(alignments),$($(align).org.db)))
+ renv.lock: $(wildcard resources/renv/renv.lock) | $(log_dir)
++	sed -i '/\#DO NOT EDIT AFTER THIS LINE/q' resources/_dependencies.R
++	for i in "$(orgs)"; do echo "library($$i)" >> resources/_dependencies.R; done
+ 	if [ -f resources/renv/renv.lock ] ; then \
+ 	  $(GIT) mv resources/renv/renv.lock renv.lock 2>/dev/null || mv resources/renv/renv.lock renv.lock;\
+ 	  $(R) -e 'library(renv); activate()' ;\
+@@ -161,9 +198,9 @@
+ 	  $(R) -e 'library(renv); snapshot(type="all")' ;\
+ 	fi
+ 	$(GIT) add renv.lock renv .Rprofile $(source_dir)
+-	$(GIT) add $(wildcard ../shared.mk ../makefile ../.gitignore ../readme.md ../.gitignore ../.pipeline-version)
+-	$(GIT) add $(wildcard makefile R .Rbuildignore .gitignore resources/_dependencies.R)
+-	$(GIT) commit -m 'Renv initialised by pipeline' || echo "No initialisation files need commiting"
++	$(GIT) add $(wildcard ../makefile ../.gitignore ../readme.md ../.gitignore .pipeline-version)
++	$(GIT) add $(wildcard makefile R .Rbuildignore .gitignore) resources/_dependencies.R
++	$(GIT) commit -m 'Renv initialised by pipeline' || echo "No initialisation files need commiting" $(call log,renv,-a) 
+ 
+ endif
+ 
+@@ -181,9 +218,24 @@
+ 
+ 
+ 
++# .PHONY: geo
++# geo: geo/md5.txt  ## Gather everything into the 'geo' folder. Specify `version=`, `alignment=` and `spec=` to customise. Remember to `make clean-geo` when the files have been upload.
++# geo/md5.txt:
++# 	mkdir -p $(SCRATCH_DIR)geo
++# 	mkdir -p shortcuts
++# 	ln -s $(SCRATCH_DIR)geo shortcuts/geo
++# 	ln -fn $(my_counts_dir)/$(alignment)/*.genes.results shortcuts/geo/
++# 	ln -fn $(RESULTS_DIR)/$(VERSION)/$(alignment)/$(spec)/*.xlsx shortcuts/geo/
++# 	$(SQLITE) extdata/$(samples_db) 'select fastq_1 from fastqs  where config_file="$(alignment)";' | \
++# 	while read -r fq ; do cp $${fq} shortcuts/geo/ ; done
++# 	$(SQLITE) extdata/$(samples_db) 'select fastq_2 from fastqs  where config_file="$(alignment)";' | \
++# 	while read -r fq ; do cp $${fq} shortcuts/geo/ ; done
++# 	pushd shortcuts/geo; md5sum *.* > geo.md5.txt; popd
++
+ .PHONY: publish
+ publish: $(pubdir)/$(VERSION) ## Copy results to final location. Either 'outputs' folder (default), intranet (`make publish location=intranet`) or internet
+ 	cp --no-preserve=mode -r $(RESULTS_DIR)/$(VERSION)/. $(extra_files) $(pubdir)/$(VERSION)
++	cp --no-preserve=mode --recursive --dereference --no-clobber $(RESULTS_DIR)/multiqc-* $(pubdir)/ 2> /dev/null || true
+ 	ln -sfn $(VERSION) $(pubdir)/latest
+ 	[ "$(location)" = "outputs" ] || cp --no-preserve=mode -r .htaccess $(pubdir)/ || echo "Warning: no .htaccess files, so unauthorised people may be able to view these results"
+ 	ln -sfn $$(realpath $(pubdir)/$(VERSION)) $(RESULTS_DIR)/published_$(location)
+@@ -216,12 +268,73 @@
+ ################################################################
+ #### Bootstrap all relevant data from outside
+ ################################################################
+-.PHONY: build
+-build: 
++
++ifneq ($(docs_dir),)
++$(docs_dir)/%:
++	$(MAKE) --no-print-directory -C $(docs_dir) $*
++$(file.spec): extdata/% : $(docs_dir)/% | extdata
++	cp $< $@
++	$(GIT) add $@ $<
++$(my_metadata).csv: $(docs_dir)/$(experiment_table).csv | $(dir $(my_metadata))
++	$(MAKE) --no-print-directory -C $(ingress_dir) $(experiment_table).csv
++	cp $(ingress_dir)/$(experiment_table).csv $@
++	$(GIT) add $@ $<
++$(configs): extdata/%.config: $(docs_dir)/%.config | extdata
++	$(MAKE) --no-print-directory -C $(ingress_dir) $*.config
++	cp $(ingress_dir)/$*.config $@
++	$(GIT) add $@ $<
++else
++$(my_metadata).csv $(configs):
++	touch $@
++endif
++
++
++ifneq ($(nfcore_dir),)
++$(nfcore_dir)/%:
++	$(MAKE) --no-print-directory -C $(nfcore_dir) $*
++
++# All the nfcore dependencies on docs - if docs samplesheet changes, recalculate everything.  If a config changes, just recalc that.
++
++$(nfcore_dir)/samplesheet_%.csv: $(docs_dir)/%.config $(docs_dir)/$(samplesheet_fname).csv
++$(nfcore_dir)/results/%/merged.gene_counts.tsv : $(docs_dir)/%.config $(docs_dir)/$(samplesheet_fname).csv
++
++
++## Recipes for copying & generating files from nfcore results
++$(samplesheets) : $(my_metadata)_%.csv : $(nfcore_dir)/samplesheet_%.csv $(my_metadata).csv
++	rm -f '$*.db'
++	$(SQLITE) '$*.db' '.import --csv  $< $*'  ;\
++	$(SQLITE) '$*.db' '.import --csv  $(my_metadata).csv metadata'  ;\
++	$(SQLITE) -header -csv '$*.db' 'SELECT metadata.* FROM metadata INNER JOIN (SELECT * FROM "$*" GROUP BY $(samplesheet_id_column)) AS nfcore on metadata.$(metadata_id_column)=nfcore.$(samplesheet_id_column);' > $@
++	rm -f '$*.db'
++	$(GIT) add $@
++
++$(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/results/%/merged.gene_counts.tsv 
++	dir=$(if $($*.group-as),$($*.group-as),$*);\
++	mkdir -p $(my_counts_dir)/$${dir} ;\
++	if [ "$($*.aligner)" = star_salmon ]; then \
++	  for s in $(nfcore_dir)/results/$${dir}/star_salmon/*/quant.sf; do d=$(my_counts_dir)/$${dir}/star_salmon/$$(basename $$(dirname $$s)); mkdir -p $$d; cp -l $$s $$d/; done ;\
++	  cp $(nfcore_dir)/results/$${dir}/star_salmon/salmon_tx2gene.tsv $(my_counts_dir)/$${dir}/star_salmon/ ;\
++	else \
++	  cp -l $(nfcore_dir)/results/$${dir}/star_rsem/*.genes.results $(my_counts_dir)/$${dir}/ || cp  $(nfcore_dir)/results/$${dir}/star_rsem/*.genes.results $(my_counts_dir)/$${dir}/ ;\
++	fi
++	mkdir -p $(RESULTS_DIR)/multiqc-$*
++	cp -lr $(nfcore_dir)/results/$*/multi-qc/. $(RESULTS_DIR)/multiqc-$* || cp -r $(nfcore_dir)/results/$*/multi-qc/. $(RESULTS_DIR)/multiqc-$*
++else
++$(samplesheets):
++	touch $@
++$(genes_results):
++	mkdir -p $@
++endif
++
+ 
+ ################################################################
+ #### Helper goals
+ ################################################################
++check-isolated: confs=$(or $(LABEL),$(patsubst extdata/%.config,%,$(configs)),example)
++check-isolated:
++	@echo "Checking general setup"
++	@. resources/shell/isolated.sh
++	@for conf in $(confs); do echo "Checking setup for config '$${conf}'"; . resources/shell/isolated.sh $${conf}; done
+ 
+ $(log_dir) $(dir $(my_metadata)) data $(RESULTS_DIR)/$(VERSION) $(RESULTS_DIR) $(staging_dir)/$(RESULTS_DIR)/$(VERSION) $(staging_dir) extdata:
+ 	mkdir -p $@
+@@ -231,5 +344,10 @@
+ maintainer-clean: clean ## Remove the results and data directories, in addition to staging and logs. The former contain end-results, so only do this if you really want to discard them (e.g. the analysis had a bug in it, and you want to do some housekeeping)
+ 	rm -rf $(RESULTS_DIR) data 
+ 
++clean-geo:  ## Remove the GEO files from scratch
++	rm -f shortcuts/geo
++	rm -rf $(SCRATCH_DIR)geo
++
+ 
++MAKEFLAGS += --no-builtin-rules
+ 
+diff -ur infra-tmp/resources/_dependencies.R babs/differential/resources/_dependencies.R
+--- infra-tmp/resources/_dependencies.R	2025-12-24 16:03:55.000000000 +0000
++++ babs/differential/resources/_dependencies.R	2025-12-23 10:15:47.061214219 +0000
+@@ -1,17 +1,16 @@
+-library(BiocParallel)
+-library(BiocManager)
+-library(BiocVersion)
+ library(yaml)
++library(BiocVersion)
++library(DBI)
++library(preprocessCore)
++library(cluster)
++library(codetools)
+ library(lattice)
+ library(Matrix)
+ library(nlme)
+ library(boot)
+ library(class)
+-library(cluster)
+-library(codetools)
+ library(foreign)
+ library(KernSmooth)
+-library(MASS)
+ library(mgcv)
+ library(nnet)
+ library(rpart)
+diff -ur infra-tmp/resources/make/module.mk babs/differential/resources/make/module.mk
+--- infra-tmp/resources/make/module.mk	2025-12-22 09:42:32.000000000 +0000
++++ babs/differential/resources/make/module.mk	2025-12-22 15:09:09.041947622 +0000
+@@ -4,3 +4,51 @@
+ ## Most things will already have been set in shared.mk -
+ ## if you want to over-ride them, it is best to do so here
+ ################################################################
++
++
++################################################################
++## Directories
++################################################################
++
++## Location of qmds and multi-yaml files
++source_dir=resources
++## Place where qmds will be generated
++staging_dir=staging
++## place within the staging directory where renders will be placed
++RESULTS_DIR = results
++staged_results=$(staging_dir)/$(RESULTS_DIR)/$(VERSION)
++## Where to store key information transferred from nfcore run
++my_counts_dir=extdata/genes.results
++my_metadata=extdata/metadata
++
++# The following can be set to singularity|docker|shell
++# and determines the environment in which quarto/R processes
++# will be run in.
++EXECUTOR = singularity
++
++SQLITE_MODULE=SQLite/3.42.0-GCCcore-12.3.0
++SQLITE = $(call ml,$(SQLITE_MODULE)); sqlite3
++
++################################################################
++## Propagation of docs files
++## 'Earliest' presence of a propagated file is taken as definitive.
++################################################################
++early_spec_dir=$(firstword $(wildcard $(docs_dir) $(diff_dir)/extdata))
++specfiles=$(patsubst $(early_spec_dir)/%.spec,%,$(wildcard $(early_spec_dir)/*.spec))
++
++samplesheets = $(patsubst %,$(my_metadata)_%.csv,$(alignments))
++configs = $(patsubst %,extdata/%.config,$(alignments))
++genes_results = $(patsubst %,$(my_counts_dir)/%,$(alignments))
++file.spec = $(patsubst %,extdata/%.spec,$(specfiles))
++
++################################################################
++## GEO settings
++################################################################
++## For submission to GEO, we need to know the version, spec and
++## aligment settings that are to be submitted.
++################################################################
++geo: version=latest
++geo: alignment=$(firstword $(alignments))
++geo: spec=$(firstword $(specfiles))
++
++excluded-targets += check-isolated
+diff -ur infra-tmp/resources/make/project.mk babs/differential/resources/make/project.mk
+--- infra-tmp/resources/make/project.mk	2026-02-21 16:21:50.000000000 +0000
++++ babs/differential/resources/make/project.mk	2025-12-05 14:01:32.722817321 +0000
+@@ -7,10 +7,13 @@
+ ################################################################
+ 
+ res_dir = $(RESULTS_DIR)/$(VERSION)
++file_col = $(metadata_id_column)
++metadata = $(my_metadata)_$(alignment).csv
++counts =  $(my_counts_dir)/$(alignment)/
+ 
+ ## Let later processes know which of those to include in every section -
+ ## variable _names_ need to be stored in the `param_names` variable:
+-param_names = res_dir VERSION TAG staging_dir 
++param_names = res_dir VERSION TAG staging_dir file_col name_col metadata counts
+ 
+ 
+ ################################################################
+@@ -20,7 +23,8 @@
+ ## name everything in the source dirrectory (`./resources` by default)
+ ## after one one of these.
+ 
+-sections=01_analyse
++sections=00_init 01_exploratory 02_differential 03_enrichment
++
+ 
+ ################################################################
+ ## Section-to-section dependencies
+@@ -30,7 +34,6 @@
+ ## for 'make pages' we can specify a `section`_parent variable
+ ################################################################
+ 
+-# e.g.
+-# html-outdir=$(staging_dir)/$(RESULTS_DIR)/$(VERSION)
+-# 02_publish_htmls : $(html-outdir)/02_publish_%.html $(html-outdir)/01_analyse_%.html 
+-
++01_exploratory_parent = 00_init_$(ialign)
++02_differential_parent = 01_exploratory_$(ispec)_$(ialign)
++03_enrichment_parent = 02_differential_$(ispec)_$(ialign)
+diff -ur infra-tmp/resources/make/shared.mk babs/differential/resources/make/shared.mk
+--- infra-tmp/resources/make/shared.mk	2026-04-02 09:53:15.000000000 +0100
++++ babs/differential/resources/make/shared.mk	2026-04-08 20:03:57.096037966 +0100
+@@ -1,3 +1,26 @@
++docs_dir?=$(wildcard ../docs)
++ingress_dir?=$(wildcard ../ingress)
++nfcore_dir?=$(wildcard ../nfcore)
++diff_dir?=$(wildcard ../differential)
++
++samplesheet_fname=samplesheet
++experiment_table = experiment_table
++samplesheet_id_column = sample
++metadata_id_column = ID
++name_col = sample_name
++
++ifneq ($(diff_dir),)
++alignments=$(patsubst $(diff_dir)/extdata/%.config,%,$(wildcard $(diff_dir)/extdata/*.config))
++endif
++ifneq ($(nfcore_dir),)
++alignments=$(patsubst $(nfcore_dir)/results/%,%,$(wildcard $(nfcore_dir)/results/*))
++endif
++ifneq ($(ingress_dir),)
++alignments=$(patsubst $(ingress_dir)/%.config,%,$(wildcard $(ingress_dir)/*.config))
++endif
++ifneq ($(docs_dir),)
++alignments=$(patsubst $(docs_dir)/%.config,%,$(wildcard $(docs_dir)/*.config))
++endif
+ ################################################################
+ ## Things here are typically shared across all phases of the
+ ## analysis. There's originally one gold-reference copy of this file
+diff -ur infra-tmp/resources/params.yml babs/differential/resources/params.yml
+--- infra-tmp/resources/params.yml	2025-12-05 14:11:10.000000000 +0000
++++ babs/differential/resources/params.yml	2025-12-05 14:01:32.708943866 +0000
+@@ -4,6 +4,13 @@
+      - ref: babs
+    roles:
+     - Development
++ - name: Gavin Kelly
++   id: kellyg
++   affiliation:
++    - ref: babs
++   roles:
++    - Developer
++    - Statistical Metholodogy
+ affiliations:
+   - id: babs
+     name: Francis Crick Institute

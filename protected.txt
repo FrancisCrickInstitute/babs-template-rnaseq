@@ -1,6 +1,0 @@
-# Files that over-ride things from the template
-makefile
-resources/_dependencies.R
-resources/make/module.mk
-resources/make/project.mk
-resources/params.yml

@@ -35,10 +35,15 @@ $(template_dir)/archive:
 
 infrastructure: ## Transfer differential code from template
 infrastructure: $(template_dir)/environment.tar.gz
-	tar -xzf $< --exclude-from=protected.txt -C babs/differential/
-	cd babs/differential/resources/make && cat pipeline.mk shared.mk > tmp.mk && mv tmp.mk shared.mk
+	tar -xzf $< -C babs/differential/
+	patch -p1 -d babs/differential < rnaseq.patch
 	for i in docs ingress nfcore; do cp babs/differential/resources/make/shared.mk babs/$$i/; done
 
+rnaseq.patch: $(template_dir)/environment.tar.gz
+	rm -rf infra-tmp && mkdir infra-tmp
+	tar -xzf $< -C infra-tmp && \
+	diff -ur infra-tmp babs/differential | grep -v "^Only in " > $@ || true; \
+	rm -rf infra-tmp	
 
 ################################################################
 #### Testing the pipeline
