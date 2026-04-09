@@ -44,10 +44,10 @@ console.log(stringify(quarto, {lineWidth: -1}).replace(/\n$/, ''));
  *
  * Returns: { navTree, flatList }
  */
-function expandAxesForNav(axes, staging, prefix = {}) {
+function expandAxesForNav(axes, staging) {
     const flatList = [];
 
-    function recurse(keys, prefix) {
+    function recurse(keys, prefix={}) {
 	if (keys.length === 0) {
 	    const fname =
 		  Object.keys(prefix).reverse().map(k => prefix[k]).filter(v => v != null && v !== "").join("_") + ".qmd";
@@ -74,14 +74,33 @@ function expandAxesForNav(axes, staging, prefix = {}) {
 		    results.push(...children);
 		} else {
 		    // Use params from first child for section label
-		    let label = capitalizeFirstLetter(children[0].params?.[currentKey] || val);
-		    const filteredParams = Object.fromEntries(
-			Object.keys(prefix)
-			    .filter(k => k in (children[0].params || {}))
-			    .map(k => [k, children[0].params[k]])
+		    const nameVal = children.reduce((found, child) =>
+			found || child.params?.[currentKey + "name"] || null, null
 		    );
+		    // capture specname (non-empty) before params are deleted
+		    const nonEmptyNameVal = nameVal || null;
+		    
+		    let label = capitalizeFirstLetter(
+			nonEmptyNameVal ||
+			    children[0].params?.[currentKey] ||
+			    val
+		    );
+		    
+		    const filteredParams = Object.fromEntries(
+			[currentKey, ...Object.keys(prefix)]
+			    .flatMap(k => {
+				const sourceForK     = children.find(c => k in (c.params || {}) && c.params[k] !== '');
+				const sourceForKName = children.find(c => (k+"name") in (c.params || {}) && c.params[k+"name"] !== '');
+				const entries = [];
+				if (sourceForK)     entries.push([k, sourceForK.params[k]]);
+				if (sourceForKName) entries.push([k+"name", sourceForKName.params[k+"name"]]);
+				return entries;
+			    })
+		    );
+		    
+		    // only delete params AFTER filteredParams is built
 		    children.forEach(child => {
-			delete child.params;
+    delete child.params;
 		    });
 		    if (
 		        children.length === 1 &&
@@ -97,7 +116,7 @@ function expandAxesForNav(axes, staging, prefix = {}) {
 		    } else {
 			
 			results.push({
-			    section: label + ":",
+			    section: (quarto?._prefixes?.[currentKey] ?? "") + label + ":",
 			    contents: children,
 			    params: filteredParams
 			});
@@ -130,13 +149,13 @@ function expandAxesForNav(axes, staging, prefix = {}) {
 	    }
 	    results = promoted;
 	}
-	results.forEach(child => {
-	    delete child.params;
-	});
+	// results.forEach(child => {
+	//     delete child.params;
+	// });
 	return results;
     }
 
-    const navTree = recurse(Object.keys(axes), prefix);
+    const navTree = recurse(Object.keys(axes).filter(k => k !=="_prefixes"));
     return { navTree, flatList };
 
 }
@@ -148,8 +167,12 @@ function qmd2nav(fname, staging, param_keys={}) {
 	const sectionName = params.section || fname.replace(/\.qmd$/, "");
 	const filteredParams = Object.fromEntries(
 	    param_keys
-		.filter(k => k in params)
-		.map(k => [k, params[k]])
+		.flatMap(k => {
+		    const entries = [];
+		    if (k in params)             entries.push([k, params[k]]);
+		    if ((k + "name") in params)  entries.push([k + "name", params[k + "name"]]);
+		    return entries;
+		})
 	);
 	return {
 	    href: fname,

@@ -35,3 +35,6 @@ execute:
   error: true
 code-summary: "Show the code"
 concise: false
+_prefixes:
+  spec: ⚙
+  alignment: 📁
