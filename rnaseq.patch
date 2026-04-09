@@ -1,6 +1,6 @@
 diff -ur infra-tmp/makefile babs/differential/makefile
---- infra-tmp/makefile	2026-04-02 09:50:02.000000000 +0100
-+++ babs/differential/makefile	2026-04-02 09:45:10.814296000 +0100
+--- infra-tmp/makefile
++++ babs/differential/makefile
 @@ -1,7 +1,7 @@
  .PHONY: makefile resources/make/module.mk resources/make/shared.mk resources/make/project.mk
 -.PHONY: build clean maintainer-clean geo R-local
@@ -299,8 +299,8 @@ diff -ur infra-tmp/makefile babs/differential/makefile
 +MAKEFLAGS += --no-builtin-rules
  
 diff -ur infra-tmp/resources/_dependencies.R babs/differential/resources/_dependencies.R
---- infra-tmp/resources/_dependencies.R	2025-12-24 16:03:55.000000000 +0000
-+++ babs/differential/resources/_dependencies.R	2025-12-23 10:15:47.061214219 +0000
+--- infra-tmp/resources/_dependencies.R
++++ babs/differential/resources/_dependencies.R
 @@ -1,17 +1,16 @@
 -library(BiocParallel)
 -library(BiocManager)
@@ -325,8 +325,8 @@ diff -ur infra-tmp/resources/_dependencies.R babs/differential/resources/_depend
  library(nnet)
  library(rpart)
 diff -ur infra-tmp/resources/make/module.mk babs/differential/resources/make/module.mk
---- infra-tmp/resources/make/module.mk	2025-12-22 09:42:32.000000000 +0000
-+++ babs/differential/resources/make/module.mk	2025-12-22 15:09:09.041947622 +0000
+--- infra-tmp/resources/make/module.mk
++++ babs/differential/resources/make/module.mk
 @@ -4,3 +4,51 @@
  ## Most things will already have been set in shared.mk -
  ## if you want to over-ride them, it is best to do so here
@@ -380,8 +380,8 @@ diff -ur infra-tmp/resources/make/module.mk babs/differential/resources/make/mod
 +
 +excluded-targets += check-isolated
 diff -ur infra-tmp/resources/make/project.mk babs/differential/resources/make/project.mk
---- infra-tmp/resources/make/project.mk	2026-02-21 16:21:50.000000000 +0000
-+++ babs/differential/resources/make/project.mk	2025-12-05 14:01:32.722817321 +0000
+--- infra-tmp/resources/make/project.mk
++++ babs/differential/resources/make/project.mk
 @@ -7,10 +7,13 @@
  ################################################################
  
@@ -419,8 +419,8 @@ diff -ur infra-tmp/resources/make/project.mk babs/differential/resources/make/pr
 +02_differential_parent = 01_exploratory_$(ispec)_$(ialign)
 +03_enrichment_parent = 02_differential_$(ispec)_$(ialign)
 diff -ur infra-tmp/resources/make/shared.mk babs/differential/resources/make/shared.mk
---- infra-tmp/resources/make/shared.mk	2026-04-02 09:53:15.000000000 +0100
-+++ babs/differential/resources/make/shared.mk	2026-04-08 20:03:57.096037966 +0100
+--- infra-tmp/resources/make/shared.mk
++++ babs/differential/resources/make/shared.mk
 @@ -1,3 +1,26 @@
 +docs_dir?=$(wildcard ../docs)
 +ingress_dir?=$(wildcard ../ingress)
@@ -449,8 +449,8 @@ diff -ur infra-tmp/resources/make/shared.mk babs/differential/resources/make/sha
  ## Things here are typically shared across all phases of the
  ## analysis. There's originally one gold-reference copy of this file
 diff -ur infra-tmp/resources/params.yml babs/differential/resources/params.yml
---- infra-tmp/resources/params.yml	2025-12-05 14:11:10.000000000 +0000
-+++ babs/differential/resources/params.yml	2025-12-05 14:01:32.708943866 +0000
+--- infra-tmp/resources/params.yml
++++ babs/differential/resources/params.yml
 @@ -4,6 +4,13 @@
       - ref: babs
     roles:
@@ -465,3 +465,13 @@ diff -ur infra-tmp/resources/params.yml babs/differential/resources/params.yml
  affiliations:
    - id: babs
      name: Francis Crick Institute
+diff -ur infra-tmp/resources/_quarto.yml babs/differential/resources/_quarto.yml
+--- infra-tmp/resources/_quarto.yml
++++ babs/differential/resources/_quarto.yml
+@@ -35,3 +35,6 @@
+   error: true
+ code-summary: "Show the code"
+ concise: false
++_prefixes:
++  spec: ⚙
++  alignment: 📁

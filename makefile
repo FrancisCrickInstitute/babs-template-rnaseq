@@ -41,8 +41,8 @@ infrastructure: $(template_dir)/environment.tar.gz
 
 rnaseq.patch: $(template_dir)/environment.tar.gz
 	rm -rf infra-tmp && mkdir infra-tmp
-	tar -xzf $< -C infra-tmp && \
-	diff -ur infra-tmp babs/differential | grep -v "^Only in " > $@ || true; \
+	tar -xzf $< -C infra-tmp
+	diff -ur infra-tmp babs/differential | grep -v "^Only in " | sed -E 's/^([+-]{3} [^\t]+)\t[0-9]{4}.*/\1/'> $@ || true
 	rm -rf infra-tmp	
 
 ################################################################
