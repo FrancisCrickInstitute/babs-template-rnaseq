@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RNASeq Template</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.9.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.12.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -37,17 +37,39 @@
   <main id="main" class="col-md-9"><div class="page-header">
 
       <h1>Changelog</h1>
-      <small>Source: <a href="https://github.com/FrancisCrickInstitute/babs-template-rnaseq/blob/listify/babs/differential/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
+      <small>Source: <a href="https://github.com/FrancisCrickInstitute/babs-template-rnaseq/blob/master/babs/differential/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
     <div class="section level2">
-<h2 class="pkg-version" data-toc-text="1.9.0" id="version-190">Version 1.9.0<a class="anchor" aria-label="anchor" href="#version-190"></a></h2>
+<h2 class="pkg-version" data-toc-text="1.12.0" id="version-1120">Version 1.12.0<a class="anchor" aria-label="anchor" href="#version-1120"></a></h2>
 <div class="section level3">
-<h3 id="major-changes-1-9-0">Major Changes<a class="anchor" aria-label="anchor" href="#major-changes-1-9-0"></a></h3>
+<h3 id="minor-changes-1-12-0">Minor Changes<a class="anchor" aria-label="anchor" href="#minor-changes-1-12-0"></a></h3>
+<ul><li>infra: Use patching to build on infrastructure template</li>
+<li>feat: Put spec and alignment icons in the quarto sidebar</li>
+<li>feat: Add differential PC plots</li>
+</ul></div>
 </div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="1.11.0" id="version-1110">Version 1.11.0<a class="anchor" aria-label="anchor" href="#version-1110"></a></h2>
 <div class="section level3">
-<h3 id="minor-changes-1-9-0">Minor Changes<a class="anchor" aria-label="anchor" href="#minor-changes-1-9-0"></a></h3>
-<ul><li>Throw error when no config files found</li>
+<h3 id="minor-changes-1-11-0">Minor Changes<a class="anchor" aria-label="anchor" href="#minor-changes-1-11-0"></a></h3>
+<ul><li>Sorted differential plots - can use a ‘sort’ aes in plot-profiles. If it matches a column in results, differential heatmaps are sorted accordingly. If it’s prefixed with a ‘+’, then the tree branches are sorted accordingly.</li>
+<li>Better contrast naming</li>
+<li>Differential heatmaps are feature-clustered based only on the ‘involved’ samples (which now falls back to the ‘influential’ samples when auto-involvement isn’t calculated. # Version 1.10.0 ## Major Changes</li>
+<li>Change default fastq.gz location prefix to <code>inputs/sequencing/data</code>, rather than <code>inputs/sequencing/released</code>
+</li>
+<li>Allow abbreviated spec files, from verbose <code>sample_set(models=list(model(...), model(...))</code> to <code>sample_set(model(...), model(...))</code> ## Minor Changes</li>
+<li>chore: Bring in the updated environment/docker infrastructure</li>
+<li>chore: Tidy up the load_specs</li>
+<li>feat: First stage of switching profile_plot and comparison to standard wrap</li>
+<li>feat: Add mcols to xl files</li>
+<li>feat: Add dendrogram row-cluster splits</li>
+<li>fix: Ensure the spec’s evaluated/unevaluated objects stay in sync</li>
+<li>feat: Allow custom fastq dirs</li>
+<li>fix: Change where we look for fastq files</li>
+<li>fix: Ensure children of profile_plots and comparisons are valid</li>
+<li>docs: Update pkgdown handler # Version 1.9.0 ## Major Changes ## Minor Changes</li>
+<li>Throw error when no config files found</li>
 <li>Add ability to distribute shiny apps as resources</li>
 <li>Refactor heatmap plotter</li>
 <li>Better shiny-explorer. Update to latest template.</li>
@@ -62,13 +84,13 @@
 <li>docs: Document the new specfile additions # Version 1.6.1</li>
 </ul></div>
 <div class="section level3">
-<h3 id="major-changes-1-9-0-1">Major Changes<a class="anchor" aria-label="anchor" href="#major-changes-1-9-0-1"></a></h3>
+<h3 id="major-changes-1-11-0">Major Changes<a class="anchor" aria-label="anchor" href="#major-changes-1-11-0"></a></h3>
 <ul><li>Use <code>extra_assays</code> in differential plots</li>
 <li>Allow stratified normalisation</li>
 <li>add <code>make retag</code> to allow versions to be added post-run</li>
 </ul></div>
 <div class="section level3">
-<h3 id="minor-changes-1-9-0-1">Minor Changes<a class="anchor" aria-label="anchor" href="#minor-changes-1-9-0-1"></a></h3>
+<h3 id="minor-changes-1-11-0-1">Minor Changes<a class="anchor" aria-label="anchor" href="#minor-changes-1-11-0-1"></a></h3>
 <ul><li>Refactor partials for elegance. Add masks - na assays</li>
 <li>Fix masks breaking plots that don’t know about them</li>
 <li>Improve clustering</li>
