@@ -18,6 +18,7 @@ ParamList <- R6::R6Class("ParamList",
                                             showStringsAsFactors="Convert strings to factors in the experiment table? - {}",
                                             baseMeanMin="Discard transcripts with few average counts per sample than {}",
                                             baseline_heuristic="Use the '{}' heuristic to centre the colour-scale",
+                                            pc_weight="Use the '{}' heuristic to choose strength of PC-covariate association",
                                             LRT_effect="Use the '{}' summary of an LRT 'effect size'"
                                             ),
                           defaults=list(),
@@ -404,6 +405,7 @@ default_spec_settings <- function() {
     normalise=NULL,
     impute=NULL,
     baseline_heuristic = "min",  ## For the "white" colour in differential heatmaps
+    pc_weight = "equal weight", ## equal_weight/eigen (latter favours early PCs)
     LRT_effect = "default"  ## For the "white" colour in differential heatmaps
   )
   attach_src(lapply(ex, eval), lapply(ex, function(x) paste(deparse(x), collapse="")))

@@ -142,6 +142,8 @@ param$set("lfcThreshold", postpone=TRUE)
 param$set("filterFun", postpone=TRUE)
 param$set("LRT_effect", postpone=TRUE)
 param$set("gene_clust", postpone=TRUE)
+param$set("pc_x", 1, postpone=TRUE)
+param$set("pc_y", 2, postpone=TRUE)
 param$set("sample_clust")
 
 rds_name <- file.path("data", paste0(basename(params$spec),"_x_", params$alignment, ".rds"))
@@ -456,15 +458,14 @@ for (dataset_id in names(dataset_model_comp)) {
       } else {
         mmat <- model.matrix(md$model$design, colData(this_dds))
       }
+      weights <- setNames(rep(0, ncol(dataset_se)), colnames(dataset_se))
       if (!is_external && "baseline_contrast" %in% names(attributes(md$comparison))) {
-        weights <- t(as.vector(attr(md$comparison, "baseline_contrast")) %*% MASS::ginv(mmat))
+        weights[colnames(this_dds)] <- t(as.vector(attr(md$comparison, "baseline_contrast")) %*% MASS::ginv(mmat))
         baseline_str <- paste("baseline", noun_to_readout(param$get("rowNoun")))
       } else {
-        weights <- rep(1/nrow(mmat), times=nrow(mmat))
+        weights[colnames(this_dds)] <- rep(1/nrow(mmat), times=nrow(mmat))
         baseline_str <- paste("average", noun_to_readout(param$get("rowNoun")))
       }
-      zweights <- setNames(rep(0, ncol(dataset_se)), colnames(dataset_se))
-      zweights[colnames(this_dds)] <- weights
       centroid_df <- list()
       reconstruct <- cached_partial(dataset=dataset_id, model=model_id) # This memo-ised function performs model-based removal of random and/or systematic effects
       # Because heatmaps aren't really affected by anything other than y-aesthetic and partials:
@@ -472,31 +473,34 @@ for (dataset_id in names(dataset_model_comp)) {
       for (plot_id in names(plot_formulae)[unique_heatmaps]) {
         section_hierarchy <- list(dataset=dataset_id, model=model_id, comparison=comparison_id, plot_config=plot_formulae[[plot_id]]$name %||% plot_id)
         dmc_heading(dataset_model_comp, section_hierarchy, depth=strrep("#", length(section_hierarchy)+1), numbered=FALSE)
-        plot_fml <- plot_formulae[[plot_id]][[1]]
-        y_hint <- plot_fml[[2]]$y
-        if ("y" %in% names(plot_fml[[2]])) {
-          which_assay <- as.character(as.character(y_hint))
-          y_hint <- md$extra_assays[[which_assay]]$hint %||% which_assay
-          do_weight <- (!metadata(this_dds)$extra_assays[[which_assay]]$method %in% "normalise") %||% TRUE
-          if (!do_weight) zweights <- NULL
-          tidied_se <- tidy_significant_se(dataset_se, is_significant, weights=zweights, assay=which_assay)
-          do_recentre <- metadata(this_dds)$extra_assays[[which_assay]]$recentre %||% FALSE
-          do_rescale <- metadata(this_dds)$extra_assays[[which_assay]]$rescale %||% FALSE
-        } else {
-          tidied_se <- tidy_significant_se(dataset_se, is_significant, weights=zweights)
-          do_recentre <- do_rescale <- FALSE
-        }
-        design(tidied_se) <- design(this_dds)
-        mcols(tidied_se)$results <- mcols(this_dds)$results[row.names(tidied_se),]
-        tidied_se <- reorder_samples(tidied_se,model_vars)
-        assay(tidied_se) <- reconstruct(tidied_se, plot_fml, influence=tidied_se$.influential, assay=assayNames(tidied_se)[1])
-        if ("visible" %in% names(plot_fml[[2]])) {
-          vis_sample <- eval(plot_fml[[2]]$visible, colData(tidied_se))
-        } else {
-          vis_sample <- TRUE
-        }
-        if (do_recentre) assay(tidied_se) <- assay(tidied_se) - rowMeans(assay(tidied_se)[,tidied_se$.influential, drop=FALSE])
-        if (do_rescale) assay(tidied_se) <- assay(tidied_se) / rowSds(assay(tidied_se)[,tidied_se$.influential, drop=FALSE])       
+        prepare_plot_data <- expr({
+          plot_fml <- plot_formulae[[plot_id]][[1]]
+          y_hint <- plot_fml[[2]]$y
+          if ("y" %in% names(plot_fml[[2]])) {
+            which_assay <- as.character(as.character(y_hint))
+            y_hint <- md$extra_assays[[which_assay]]$hint %||% which_assay
+            do_weight <- (!metadata(this_dds)$extra_assays[[which_assay]]$method %in% "normalise") %||% TRUE
+            tidied_se <- tidy_significant_se(dataset_se, is_significant, weights=if (do_weight) weights else NULL, assay=which_assay)
+            do_recentre <- metadata(this_dds)$extra_assays[[which_assay]]$recentre %||% FALSE
+            do_rescale <- metadata(this_dds)$extra_assays[[which_assay]]$rescale %||% FALSE
+          } else {
+            tidied_se <- tidy_significant_se(dataset_se, is_significant, weights=weights)
+            do_recentre <- do_rescale <- FALSE
+          }
+          design(tidied_se) <- design(this_dds)
+          mcols(tidied_se)$results <- mcols(this_dds)$results[row.names(tidied_se),]
+          tidied_se <- reorder_samples(tidied_se,model_vars)
+          assay(tidied_se) <- reconstruct(tidied_se, plot_fml, influence=tidied_se$.influential, assay=assayNames(tidied_se)[1])
+          removed <- attr(assay(tidied_se), "removed")
+          if ("visible" %in% names(plot_fml[[2]])) {
+            vis_sample <- eval(plot_fml[[2]]$visible, colData(tidied_se))
+          } else {
+            vis_sample <- TRUE
+          }
+          if (do_recentre) assay(tidied_se) <- assay(tidied_se) - rowMeans(assay(tidied_se)[,tidied_se$.influential, drop=FALSE])
+          if (do_rescale) assay(tidied_se) <- assay(tidied_se) / rowSds(assay(tidied_se)[,tidied_se$.influential, drop=FALSE])
+        })
+        eval(prepare_plot_data)
         mat_height <- height_scaler(n=nrow(tidied_se), small=10, big=20, N=1000)
         hc <- param$get("gene_clust")
         if ("cut.params" %in% slotNames(hc) && "k" %in% names(slot(hc, "cut.params")) && slot(hc, "cut.params")$k >= nrow(tidied_se)) {
@@ -573,6 +577,59 @@ for (dataset_id in names(dataset_model_comp)) {
       ##   cat(':::\n\n')
       ##   next
       ## }
+      ##
+      ## PC2
+      section_hierarchy$plot_config <- NULL
+      cat("\n\n", strrep("#", length(section_hierarchy)+1), " 2PC\n\n", sep="")
+      for (plot_id in names(plot_formulae)) {
+        section_hierarchy <- list(dataset=dataset_id, model=model_id, comparison=comparison_id, plot_config=plot_formulae[[plot_id]]$name %||% plot_id)
+        dmc_heading(dataset_model_comp, section_hierarchy, depth=strrep("#", length(section_hierarchy)+1), numbered=FALSE)
+        eval(prepare_plot_data)
+        this_assay <- assay(tidied_se)
+        colour_aes <- eval(plot_fml[[2]])["colour"]
+        orig_caption <- aes_caption(eval(plot_fml[[2]]))
+        mapping <- modify_mapping(modifyList(eval(plot_fml[[2]]), aes(y=.derived.value, mask=NULL, cluster=NULL)))
+        my_pc <- prcomp(
+          t(this_assay[,tidied_se$.influential]),
+          center = do_recentre,
+          scale = FALSE)
+        proj <- predict(my_pc, newdata = t(this_assay))
+        my_percent <- round(100 * my_pc$sdev^2/sum(my_pc$sdev^2))
+        pc.df <- cbind(colDF(tidied_se),
+                        data.frame(
+                          PC1 = proj[, param$get("pc_x")],
+                          PC2 = proj[, param$get("pc_y")], 
+                          sample = rownames(colDF(tidied_se))))
+        aes_list <- lapply(substitute_x_aes(eval(plot_fml[[2]])),function(m)  modify_mapping(modifyList(m, aes(y=.derived.value, mask=NULL, cluster=NULL))))
+        for (this_aes in aes_list) {
+          pl <- ggplot(transform(pc.df[vis_sample,],.derived="", .derived.value=""),
+                      modifyList(this_aes, aes(x=PC1, y=PC2))) + 
+            geom_point_interactive(size = 5, shape = 21) +
+            facet_wrapper(mapping, this_aes) + 
+            xlab(paste0("PC ", param$get("pc_x"), ": ", my_percent[param$get("pc_x")], "% variance")) +
+            ylab(paste0("PC ", param$get("pc_y"), ": ", my_percent[param$get("pc_y")], "% variance"))
+          do_labels <- nrow(colDF(this_dds)) < 10
+          if (do_labels) {
+            pl <- pl + geom_text_repel(aes(label = sample))
+          }
+          pl <- pl + get_colour_scales(this_dds, this_aes, all.vars(eval(plot_fml[[2]])$flag))
+          cat("\n\n")
+          if (identical(this_aes,aes_list[[1]])) {
+            this_caption <- orig_caption
+          } else {
+            tmp <- eval(plot_fml[[2]])
+            tmp$colour <- tmp$x
+            this_caption <- aes_caption(tmp)
+          }
+          do_plot(pl,
+                  label= "twopc",
+                  caption=paste("Annotated by", this_caption, "in", dtag(dataset_id), removed),
+                  plot_meta=section_hierarchy)
+          cat("\n\n")
+        } # Repeat if need to annotate by an overwritten 'x'
+      }
+      ##
+      ##
       ## Profile plots
       section_hierarchy$plot_config <- NULL
       cat("\n\n", strrep("#", length(section_hierarchy)+1), " Profile\n\n", sep="")

@@ -1301,6 +1301,7 @@ translate_terms <- function(txt, obj) {
 
 #' @export
 mat_x_terms <- function(mat, fml, fitFrame, weights=rep(1, nrow(mat))) {
+  if (is.null(weights)) weights <- weights=rep(1, nrow(mat))
   yvar <- make.unique(c(colnames(fitFrame), "y", sep = ""))[ncol(fitFrame) + 1]
   fml <- update(fml, paste(yvar, "~ ."))
   simpler <- find_simpler_models(fml, type="drop1")

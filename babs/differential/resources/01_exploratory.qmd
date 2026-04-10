@@ -375,7 +375,8 @@ param$set("top_n_variable", postpone=TRUE)
 param$set("gene_clust", postpone=TRUE)
 param$set("sample_clust", postpone=TRUE)
 param$set("pc_x", 1, postpone=TRUE)
-param$set("pc_y", 2)
+param$set("pc_y", 2, postpone=TRUE)
+param$set("pc_weight")
 first <- TRUE
 links <- list(
   clusters=list(),
@@ -591,8 +592,9 @@ for (dataset_id in names(ddsList)) {
       #
       ## 1D PC plots
       cat("\n\n", strrep("#", length(section_hierarchy)+1), " 1PC\n\n", sep="")
-      #Can use `weights=my_pc$sdev^2/sum(my_pc$sdev^2)` in the following line, if we want to de-emphasise low-order PCs
-      covar_x_pc <- mat_x_terms(proj, model_meta$design, colDF(this_dds))
+      #Can use weights=my_pc$sdev^2/sum(my_pc$sdev^2) in the following line, if we want to de-emphasise low-order PCs
+      pc_weights <- if (param$get("pc_weight")=="eigen") my_pc$sdev^2/sum(my_pc$sdev^2) else NULL
+      covar_x_pc <- mat_x_terms(proj, model_meta$design, colDF(this_dds), weights=pc_weights)
       pl <- ggplot(covar_x_pc, aes(x = column, y = Covariate, fill = Assoc)) + 
        geom_raster() +
        facet_wrap(~wrap, scales = "free_x",ncol = 1)  +
