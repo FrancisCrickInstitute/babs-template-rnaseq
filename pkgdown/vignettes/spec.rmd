@@ -633,7 +633,7 @@ specification(
         nested = model(
           design = ~timepoint *  genotype + person:genotype,
           comparisons = list(
-            mult_comp(revpairwise ~ timepoint | genotype)
+            mult_comp(revpairwise ~ timepoint + genotype, interaction=TRUE)
           ),
           drop_unsupported_combinations=TRUE
         )

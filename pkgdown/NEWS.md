@@ -1,3 +1,9 @@
+# Version 1.12.0
+## Minor Changes
+ - infra: Use patching to build on infrastructure template
+ - feat: Put spec and alignment icons in the quarto sidebar
+ - feat: Add differential PC plots
+ 
 # Version 1.11.0
 ## Minor Changes
  - Sorted differential plots - can use a 'sort' aes in
