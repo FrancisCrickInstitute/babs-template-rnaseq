@@ -1301,7 +1301,7 @@ translate_terms <- function(txt, obj) {
 
 #' @export
 mat_x_terms <- function(mat, fml, fitFrame, weights=rep(1, nrow(mat))) {
-  if (is.null(weights)) weights <- weights=rep(1, nrow(mat))
+  if (is.null(weights)) weights <- rep(1, nrow(mat))
   yvar <- make.unique(c(colnames(fitFrame), "y", sep = ""))[ncol(fitFrame) + 1]
   fml <- update(fml, paste(yvar, "~ ."))
   simpler <- find_simpler_models(fml, type="drop1")
@@ -1338,7 +1338,7 @@ mat_x_terms <- function(mat, fml, fitFrame, weights=rep(1, nrow(mat))) {
                             min((covar_x_mat$wrap + 1) * 20, nmat))
   covar_x_mat$column <- sprintf("%02d", covar_x_mat$column)
   covar_x_mat$wrap <- paste("PCs",covar_x_mat$wrap)
-  if (any(covar_x_mat$pvalue<=0.05)) {
+  if (any(covar_x_mat$pvalue<=0.05, na.rm=TRUE)) {
     covar_x_mat$Assoc[covar_x_mat$pvalue>0.05] <- NA
   } else {
     for (i in unique(covar_x_mat$Covariate)) {
