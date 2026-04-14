@@ -765,7 +765,11 @@ emcontrasts <- function(dds, comp, prefix="my") {
     tooltip <- do.call(paste, c(mapply(function(a, b) paste0(a," = ", b), names(contr_frame), contr_frame, SIMPLIFY=FALSE), sep="<br/>"))
   }
   contr <- lapply(split_idx, function(i) t(contr_mat[i,,drop=FALSE]))
-  X <- model.matrix(mdl$lm)
+  if ("mat" %in% names(mdl)) {
+    X <- mdl$mat
+  } else {
+    X <- model.matrix(mdl$lm)
+  }
   contr <- mapply( function(cont, base, tip) {
     attr(cont, "spec") <- comp$spec
     if (!comp$omni) {
