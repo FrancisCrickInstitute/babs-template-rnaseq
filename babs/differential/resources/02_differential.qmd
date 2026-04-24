@@ -339,7 +339,7 @@ for (dataset_id in names(dataset_model_comp)) {
     dmc_heading(ddsList, list(dataset=dataset_id, model=model_id), depth=strrep("#", length(section_hierarchy)))
     src2bullets(met$models[[model_id]], c("subset", "extra_assays", "influential_samples"))
     cat("`",
-        Reduce(paste, sub("~", paste0(noun_to_readout(param$get("RowNoun"))," ~ "), deparse(design(this_model[[1]])))),
+        Reduce(paste, sub("~", paste0(noun_to_readout(param$get("RowNoun"))," ~ "), deparse(metadata(this_model[[1]])$model$design))),
         "`\n\n"
         )
     first <- TRUE
@@ -434,7 +434,13 @@ for (dataset_id in names(dataset_model_comp)) {
         cat("\n\n---\n\n")
       }
       ## Heatmap
-      nice_legends <- separate_legend(dataset_se)
+      model_vars <- sort_vars(
+        unique(c(all.vars(md$model$design),
+                 unique(unlist(lapply(plot_formulae, function(p) all.vars(p[[1]]))))
+                 )),
+        md$model$variables)
+      model_vars <- setdiff(intersect(model_vars, names(colData(this_dds))), ".involved")
+      nice_legends <- separate_legend(dataset_se, model_vars)
       pl <- do.call(gridExtra::arrangeGrob,c(
         nice_legends,
         ncol=ceiling(sqrt(length(nice_legends)))))
@@ -447,12 +453,6 @@ for (dataset_id in names(dataset_model_comp)) {
               plot_meta=section_hierarchy
               )
       cat("\n\n---\n\n")
-      model_vars <- sort_vars(
-        unique(c(all.vars(md$model$design),
-                 unique(unlist(lapply(plot_formulae, function(p) all.vars(p[[1]]))))
-                 )),
-        md$model$variables)
-      model_vars <- setdiff(intersect(model_vars, names(colData(this_dds))), ".involved")
       if ("mat" %in% names(md$model)) {
         mmat <- md$model$mat
       } else {
@@ -487,7 +487,7 @@ for (dataset_id in names(dataset_model_comp)) {
             tidied_se <- tidy_significant_se(dataset_se, is_significant, weights=weights)
             do_recentre <- do_rescale <- FALSE
           }
-          design(tidied_se) <- design(this_dds)
+          design(tidied_se) <- md$model$design
           mcols(tidied_se)$results <- mcols(this_dds)$results[row.names(tidied_se),]
           tidied_se <- reorder_samples(tidied_se,model_vars)
           assay(tidied_se) <- reconstruct(tidied_se, plot_fml, influence=tidied_se$.influential, assay=assayNames(tidied_se)[1])
@@ -590,7 +590,7 @@ for (dataset_id in names(dataset_model_comp)) {
         orig_caption <- aes_caption(eval(plot_fml[[2]]))
         mapping <- modify_mapping(modifyList(eval(plot_fml[[2]]), aes(y=.derived.value, mask=NULL, cluster=NULL)))
         my_pc <- prcomp(
-          t(this_assay[,tidied_se$.influential]),
+          t(this_assay[,tidied_se$.influential,drop=FALSE]),
           center = do_recentre,
           scale = FALSE)
         proj <- predict(my_pc, newdata = t(this_assay))
@@ -598,7 +598,7 @@ for (dataset_id in names(dataset_model_comp)) {
         pc.df <- cbind(colDF(tidied_se),
                         data.frame(
                           PC1 = proj[, param$get("pc_x")],
-                          PC2 = proj[, param$get("pc_y")], 
+                          PC2 = proj[, param$get(if (nrow(this_assay) != 1) "pc_y" else "pc_x")], 
                           sample = rownames(colDF(tidied_se))))
         aes_list <- lapply(substitute_x_aes(eval(plot_fml[[2]])),function(m)  modify_mapping(modifyList(m, aes(y=.derived.value, mask=NULL, cluster=NULL))))
         for (this_aes in aes_list) {

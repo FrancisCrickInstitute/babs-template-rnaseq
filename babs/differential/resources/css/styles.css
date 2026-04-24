@@ -57,3 +57,9 @@ span.tag > span{
 .commit a {
     text-decoration: none;
 }
+.sidebar-navigation .active {
+  display: block;
+  background-color: #f0f8ff;
+  padding: 6px 10px;
+  border-radius: 6px;
+}

@@ -272,6 +272,11 @@ build_dds_list <- function(dds, spec) {
       dataset_spec[[lower_level_subset]] <- dataset_spec[[lower_level_subset]][dataset_spec$subset]
       attr(dataset_spec[[lower_level_subset]], "src") <- a
     }
+    for (ea in seq_along(dataset_spec$extra_assays)) {
+      a <- attr(dataset_spec$extra_assays[[ea]]$influential_samples, "src")
+      dataset_spec$extra_assays[[ea]]$influential_samples <- dataset_spec$extra_assays[[ea]]$influential_samples[dataset_spec$subset] %||% TRUE
+      attr(dataset_spec$extra_assays[[ea]]$influential_samples, "src") <- a
+    }
     metadata(obj) <- modifyList(metadata(obj), dataset_spec)
     if ("baseline" %in% names(dataset_spec)) {
       if (!is.list(dataset_spec$baseline$ind)) {
@@ -624,7 +629,9 @@ reduced_design.fit <- function(fit, reduced_design){
   if(sum(abs(residuals(mapping))) > 1e-8){
     stop("Apparently the reduced design is not nested in the full design")
   }
-  cntrst <- annihilator(coef(mapping))
+  coef <- coef(mapping)
+  if (is.null(dim(coef))) coef <- t(t(coef))
+  cntrst <- annihilator(coef)
   colnames(cntrst) <- colnames(full_design)
   rownames(cntrst) <- colnames(full_design)
   cntrst <- cntrst[, colSums(abs(cntrst)) > 1e-8]
@@ -754,13 +761,17 @@ emcontrasts <- function(dds, comp, prefix="my") {
   new_emmc <- sub("\\.emmc$", "", ls("package:emmeans", pattern="*.emmc"))
   embaseline <- do.call(em_fn, c(list(object=mdl$lm, specs= replace_emmc(comp$spec, new_emmc)), em_extra))
   baseline_mat <- embaseline$contrast@linfct[ind_est, !mdl$dropped, drop=FALSE]
+  byvars <- names(contr_frame) %in% (attr(emc, "misc")$by.vars %||% character())
   if (comp$omni) {
     split_idx <- split(which(ind_est), interaction(emc@grid[ind_est, emc@misc$by.vars], drop = TRUE))
     tooltip <- list()
   } else {
     split_idx <- setNames(
       seq_len(nrow(contr_frame)),
-      do.call(paste, c(lapply(contr_frame, function(column) sub("(.*) - (.*)", "(\\1-\\2)", column)),sep= "×"))
+      paste(
+        do.call(paste,  c(lapply(contr_frame[!byvars], function(column) sub("(.*) - (.*)", "(\\1-\\2)", column)),sep= "×")),
+        do.call(paste,  c(lapply(contr_frame[ byvars], function(column) sub("(.*) - (.*)", "(\\1-\\2)", column)),sep= ",")),
+        sep=ifelse(length(byvars)==0, "", "|"))
     )
     tooltip <- do.call(paste, c(mapply(function(a, b) paste0(a," = ", b), names(contr_frame), contr_frame, SIMPLIFY=FALSE), sep="<br/>"))
   }
@@ -1304,11 +1315,17 @@ translate_terms <- function(txt, obj) {
 
 
 #' @export
-mat_x_terms <- function(mat, fml, fitFrame, weights=rep(1, nrow(mat))) {
+mat_x_terms <- function(mat, fml, fitFrame, weights=rep(1, nrow(mat)), type) {
   if (is.null(weights)) weights <- rep(1, nrow(mat))
   yvar <- make.unique(c(colnames(fitFrame), "y", sep = ""))[ncol(fitFrame) + 1]
   fml <- update(fml, paste(yvar, "~ ."))
-  simpler <- find_simpler_models(fml, type="drop1")
+  if (type=="main") {
+    tt <- terms(fml)
+    main <- attr(tt, "term.labels")[!grepl(":", attr(tt, "term.labels"))]
+    fml <- reformulate(main, response = all.vars(fml)[1])
+    type <- "drop1"
+  }
+  simpler <- find_simpler_models(fml, type=type)
   names(simpler) <- sub("^drop ", "", names(simpler))
   nmat <- ncol(mat)
   covar_x_mat <- expand.grid(
@@ -1334,8 +1351,8 @@ mat_x_terms <- function(mat, fml, fitFrame, weights=rep(1, nrow(mat))) {
       i <- covar_x_mat$column==imat & covar_x_mat$Covariate==ifml
       covar_x_mat$Assoc[i] <- eta_Sq * weights[imat]
       covar_x_mat$pvalue[i] <- anova(fit0, fit1)$'Pr(>F)'[2]
-      }
     }
+  }
   covar_x_mat$wrap <- (covar_x_mat$column - 1)%/%20
   covar_x_mat$wrap <- paste0(covar_x_mat$wrap * 20 +  1,
                             "-",
@@ -1551,18 +1568,19 @@ generate_assay <- function(args, dds) {
   curAssay <- assay(dds, args$from)
   if (args$method=="normalise") {
     curFrame <- as.data.frame(colData(dds))
-    margs <- modifyList(args, list(from=NULL, method=NULL, design=NULL, recentre=NULL, rescale=NULL, hint=NULL))
+    margs <- modifyList(args, list(from=NULL, method=NULL, design=NULL, recentre=NULL, rescale=NULL, hint=NULL, influential_samples=NULL))
     baseFrame <-do.call(
       transform,
       modifyList(margs, list(`_data`=curFrame))
     )
     baseline_ind <- apply(curFrame[names(margs)]==baseFrame[names(margs)], 1, all)
-    X <- model.matrix(args$design, baseFrame[baseline_ind,,drop=FALSE])
-    storage.mode(X) <- "double"
+    X <- model.matrix(args$design, curFrame)[baseline_ind, , drop=FALSE]
     QR <- qr(X)
     coefs <- t(qr.coef(QR, t(curAssay[,baseline_ind,drop=FALSE])))
     coefs[is.na(coefs)] <- 0
-    out <- curAssay - coefs %*% t(model.matrix(args$design, curFrame))
+    X_ref <- model.matrix(args$design, baseFrame)
+    stopifnot(identical(colnames(X), colnames(X_ref)))
+    out <- curAssay - coefs %*% t(X_ref)
   } else if(args$method == "identity") {
     out <- curAssay
   }
@@ -1654,7 +1672,11 @@ df2colorspace <- function(df, palette) {
   if (ncol(df)==0) return(list(Heatmap=list(), ggplot=list()))
   df <- dplyr::mutate_if(as.data.frame(df), is.character, as.factor)
   seq_cols <-c("Blues", "Greens", "Oranges", "Purples", "Reds")
-  df <- df[,order(sapply(df, is.numeric)),drop=FALSE] # move factors to the front
+  # Order factor columns by number of levels
+  is_fac <- sapply(df, is.factor)
+  fac_order <- order(sapply(df[, is_fac, drop = FALSE], nlevels))
+  # Reorder dataframe
+  df <- df[, c(which(is_fac)[fac_order], which(!is_fac)), drop = FALSE]
   # for factors, zero-based starting index for colours
   start_levels <- cumsum(c(0,sapply(df, nlevels)))[1:length(df)] 
   is_num <- sapply(df, is.numeric)

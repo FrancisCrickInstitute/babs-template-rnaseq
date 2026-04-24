@@ -84,19 +84,23 @@ partialise.DESeqDataSet <- function(obj, assay="vst", influence=TRUE) {
   } else {
     mat <-assay(vst(obj, nsub=min(1000, nrow(obj))))
   }
+  influence <- influence & (metadata(obj)$extra_assays$influential_samples %||% TRUE)
   partialise.matrix(
     obj=mat,
     cdata=as.data.frame(colData(obj)),
-    fml=design(obj)
+    fml=design(obj),
+    influence=influence
   )
 }
 
 partialise.SummarizedExperiment <- function(obj, assay=1, fml=design(obj), influence=TRUE) {
   mat <- assay(obj, assay)
+  influence <- influence & (metadata(obj)$extra_assays$influential_samples %||% TRUE)
   partialise.matrix(
     obj=mat,
     cdata=as.data.frame(colData(obj)),
-    fml=fml
+    fml=fml,
+    influence=influence
   )
 }
 
