@@ -398,6 +398,12 @@ build_dds_list <- function(dds, spec) {
                                  return(!all(range(colData(obj)[[x]], na.rm=TRUE)==range(colData(dds)[[x]], na.rm=TRUE)))
                                })
         new_cols <- c(new_cols, old_cols[is_modified])
+        for (ir in old_cols[!is_modified]) {
+          if (is.factor(colData(obj)[[ir]])) {
+            metadata(colData(obj))$palette$Heatmap[[ir]] <- metadata(colData(obj))$palette$Heatmap[[ir]][match(names(metadata(colData(obj))$palette$Heatmap[[ir]]), levels(colData(obj)[[ir]]))]
+            metadata(colData(obj))$palette$ggplot[[ir]] <- metadata(colData(obj))$palette$ggplot[[ir]][match(names(metadata(colData(obj))$palette$ggplot[[ir]]), levels(colData(obj)[[ir]]))]
+          }
+        }
       }
       if (length(new_cols)>0) {
         new_meta <- df2colorspace(
@@ -1125,7 +1131,7 @@ reorder_samples <- function(se, columns) {
   colData(se)[] <- lapply(colData(se), function(x) {
     if (is.character(x)) factor(x) else x
   })
-  se[,do.call(order, as.list(colData(se))), drop=FALSE]
+  do.call(order, as.list(colData(se)))
 }
 
 
@@ -1658,58 +1664,6 @@ eval_dds <- function(dds, expr, assays = assayNames(dds)) {
   res
 }
 
-#' Heatmap colour-scheme generator
-#'
-#' For each column in a dataframe, generate a sensible colour palette
-#' for each column
-#' @param df data.frame containing the covariates to be colour-encoded
-#' @param palette The baseline palette
-#' @return
-#' @author Gavin Kelly
-#' @export
-df2colorspace <- function(df, palette) {
-  pal <- RColorBrewer::brewer.pal(RColorBrewer::brewer.pal.info[palette, "maxcolors"], palette)
-  if (ncol(df)==0) return(list(Heatmap=list(), ggplot=list()))
-  df <- dplyr::mutate_if(as.data.frame(df), is.character, as.factor)
-  seq_cols <-c("Blues", "Greens", "Oranges", "Purples", "Reds")
-  # Order factor columns by number of levels
-  is_fac <- sapply(df, is.factor)
-  fac_order <- order(sapply(df[, is_fac, drop = FALSE], nlevels))
-  # Reorder dataframe
-  df <- df[, c(which(is_fac)[fac_order], which(!is_fac)), drop = FALSE]
-  # for factors, zero-based starting index for colours
-  start_levels <- cumsum(c(0,sapply(df, nlevels)))[1:length(df)] 
-  is_num <- sapply(df, is.numeric)
-  # for numerics, which seq palette shall we use for this factor
-  start_levels[is_num] <- (cumsum(is_num[is_num])-1) %% length(seq_cols) + 1
-  res <- list()
-  res$Heatmap <- purrr::map2(df, start_levels,
-              function(column, start_level) {
-                if (is.factor(column)) {
-                  setNames(pal[(seq(start_level, length=nlevels(column)) %% length(pal)) + 1],
-                                     levels(column))
-                } else {
-                  my_cols <- RColorBrewer::brewer.pal(3, seq_cols[start_level])[-2]
-                  circlize::colorRamp2(range(column, na.rm=TRUE), my_cols)
-                }
-              }
-              )
-  res$Heatmap$.influential <- setNames(c("black", "white"), c(TRUE, FALSE))
-  res$Heatmap$.involved <- setNames(c("black", "white"), c(TRUE, FALSE))
-  res$ggplot <- purrr::map2(df, start_levels,
-              function(column, start_level) {
-                if (is.factor(column)) {
-                  setNames(pal[(seq(start_level, length=nlevels(column)) %% length(pal)) + 1],
-                                     levels(column))
-                } else {
-                  RColorBrewer::brewer.pal(3, seq_cols[start_level])[-2]
-                }
-              }
-              )
-  res$ggplot$.influential <- setNames(c("black", "white"), c(TRUE, FALSE))
-  res$ggplot$.involved <- setNames(c("black", "white"), c(TRUE, FALSE))
-  res
-}
 
 em_constraint <- function(fit, constraint) {
   rg <- emmeans::ref_grid(fit)

@@ -412,7 +412,6 @@ for (dataset_id in names(ddsList)) {
                )),
       model_meta$variables)
     model_vars <- intersect(model_vars, names(colDF(this_dds)))
-    #this_dds <- reorder_samples(this_dds, model_vars)
     dmc_heading(ddsList, section_hierarchy, depth=strrep("#", length(section_hierarchy)))
     # Show an overall legend
     nice_legends <- separate_legend(ddsList[[dataset_id]], model_vars)
@@ -442,7 +441,9 @@ for (dataset_id in names(ddsList)) {
       which_assay <- attr(this_assay, "which_assay")
       this_dds$.influential_in_assay  <- this_dds$.influential & (metadata(this_dds)$extra_assays[[which_assay]]$influential_samples %||% TRUE)
       if ("sort_by" %in%  names(all.vars(eval(plot_fml[[2]])))) {
-        this_dds <- reorder_samples(this_dds, all.vars(eval(plot_fml[[2]])$sort_by))
+        sample_order <- reorder_samples(this_dds, all.vars(eval(plot_fml[[2]])$sort_by))
+      } else {
+        sample_order <- reorder_samples(this_dds, model_vars)
       }
       y_hint <- metadata(this_dds)$extra_assays[[which_assay]]$hint %||% which_assay
       this_assay <- this_assay[mcols(this_dds)$filter$exploratory %||% TRUE, , drop=FALSE]
@@ -485,7 +486,7 @@ for (dataset_id in names(ddsList)) {
       #
       ## Empirically column-ordered heatmap
       pls <- hmap_fn(
-        dds=this_dds, mat=hmap_data, param=param,
+        dds=this_dds[,sample_order, drop=FALSE], mat=hmap_data[,sample_order, drop=FALSE], param=param,
         row_split = if ("cut.params" %in% slotNames(param$get("gene_clust")) && "k" %in% names(slot(param$get("gene_clust"), "cut.params"))) slot(param$get("gene_clust"), "cut.params")$k  else NULL,
         cluster_transform=cluster_transform, gene_clust = gene_clust,
         model_vars = model_vars, plot_fml =plot_fml, measure_name =measure_name)
@@ -499,7 +500,7 @@ for (dataset_id in names(ddsList)) {
       #
       ## Design-based column ordering of  heatmap
       cat("\n\n---\n\n")
-      pls <- hmap_fn(dds=this_dds, mat=hmap_data, param=param,
+      pls <- hmap_fn(dds=this_dds[,sample_order, drop=FALSE], mat=hmap_data[,sample_order, drop=FALSE], param=param,
                     row_split = if ("cut.params" %in% slotNames(param$get("gene_clust")) && "k" %in% names(slot(param$get("gene_clust"), "cut.params"))) slot(param$get("gene_clust"), "cut.params")$k  else NULL,
                     cluster_transform=cluster_transform, gene_clust = gene_clust,   model_vars = model_vars,   plot_fml =plot_fml,   measure_name = measure_name, cluster_columns = FALSE)
       do_plot(Reduce(`+`, pls),
