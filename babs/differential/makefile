@@ -28,7 +28,7 @@ mk = $(patsubst %,$(staging_dir)/.make-%,$(filter-out 00_%,$(sections)))
 qmd_path=$(staging_dir)/$*_$(ispec)_$(ialign).qmd
 qmd0_path=$(staging_dir)/$*_$(ialign).qmd
 
-
+spec_of_align=$(filter-out $($(1).nospec),$(if $($(1).spec),$(filter $($(1).spec),$(specfiles)),$(specfiles)))
 $(mk): $(staging_dir)/.make-% : $(file.spec) $(samplesheets) | $(staging_dir)
 	printf "%s\n" $(foreach ispec,$(specfiles),\
 	   $(foreach ialign,$(alignments),\
@@ -42,7 +42,7 @@ $(mk): $(staging_dir)/.make-% : $(file.spec) $(samplesheets) | $(staging_dir)
 	   '$(qmd_path): $(source_dir)/$*.qmd'\
 	   '$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$*_$(ispec)_$(ialign).html: $(my_counts_dir)/$(ialign) $(ispec).spec $(my_metadata)_$(ialign).csv $(qmd_path) $(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$($*_parent).html'\
 	)) > $@
-	echo '$*_pages=$(foreach ialign,$(alignments),$(foreach ispec,$(filter-out $($(ialign).nospec),$(specfiles)),$*_$(ispec)_$(ialign)))' >> $@
+	echo '$*_pages=$(foreach ialign,$(alignments),$(foreach ispec,$(call spec_of_align,$(ialign)),$*_$(ispec)_$(ialign)))' >> $@
 	echo '$*_qmds = $$(patsubst %,$(staging_dir)/%.qmd,$$($*_pages))'>> $@
 	echo '$*_htmls = $$(patsubst %,$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/%.html,$$($*_pages))'>> $@
 	echo '$*_htmls: $$($*_htmls)'>> $@
