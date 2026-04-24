@@ -1,3 +1,10 @@
+# Version 1.13.0
+## Major Changes
+## Minor Changes
+ - fix: Typo in pc weight functionality
+ - fix: make 'involved' samples work in rank-deficient designs
+ - fix: Conversion of .babs file to docs settings
+ - feat: Allow assay-specific influential-samples
 # Version 1.12.0
 ## Minor Changes
  - infra: Use patching to build on infrastructure template
