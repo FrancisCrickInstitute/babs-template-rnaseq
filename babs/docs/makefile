@@ -72,7 +72,7 @@ endif
 
 settings.mk:
 	if [ -f ../../.babs ];\
-	then sed '1d; /^\s*$/d; s/^[[:space:]]*/setting_/; s/: /=/' ../../.babs > $@ ;\
+	then sed '1d; /^\s*$$/d; s/^[[:space:]]*/setting_/; s/: /=/' ../../.babs > $@ ;\
 	else touch settings.mk ;\
 	fi
 
