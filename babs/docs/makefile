@@ -32,11 +32,7 @@ $(specfiles) :
 	[[ -s "$@" ]] || { echo "$@ is empty" | tee -a tmp.err; }
 endif
 
-limsid=$(subst asf-,,$(subst lims-,,$(setting_Lims)))
-lab-sci=$(word 2,$(subst /projects/, ,$(dir $(setting_Path))))
-
-fqprefix?=/nemo/stp/babs/inputs/sequencing/data
-fqfiles=$(wildcard $(fqprefix)/$(lab-sci)$(limsid)/primary_data/*/fastq/*_R1_001.fastq.gz)
+fqfiles=$(wildcard $(fastq_wildcard))
 
 .PHONY: check-samplesheet
 check-samplesheet: $(samplesheet_fname).csv
@@ -46,7 +42,7 @@ check-samplesheet: $(samplesheet_fname).csv
 
 $(samplesheet_fname).csv : $(fqfiles)
 ifeq ($(fqfiles),)
-	echo "Couldn't find fastq files in " $(fqprefix)/$(lab-sci)$(limsid)/primary_data " Perhaps try setting fqprefix or fqfiles" | tee -a tmp.err
+	echo "Couldn't find fastq files in $(fastq_wildcard). Perhaps try setting fastq_wildcard, or change your answers file" | tee -a tmp.err
 else
 	echo "sample,fastq_1,fastq_2" > $@
 	for r1 in $(fqfiles); do \
@@ -69,12 +65,6 @@ $(configs) :
 	[[ -s "$@" ]] || { echo "$@ is empty" | tee -a tmp.err; }
 endif
 
-
-settings.mk:
-	if [ -f ../../.babs ];\
-	then sed '1d; /^\s*$$/d; s/^[[:space:]]*/setting_/; s/: /=/' ../../.babs > $@ ;\
-	else touch settings.mk ;\
-	fi
 
 ifneq ($(metadata),)
 $(metadata) :

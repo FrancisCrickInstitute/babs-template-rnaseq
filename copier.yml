@@ -1,0 +1,33 @@
+project_name:
+  type: str
+  help: What is your project name?
+
+
+_subdirectory: template
+_skip_if_exists:
+    - differential/renv.lock
+
+site: >-
+  {{ load_yaml(BABS_RNASEQ_PROFILE) if BABS_RNASEQ_PROFILE else {} }}
+
+lab:
+  type: str
+  when: "{{ 'lab' in site.get('required_inputs', []) }}"
+  help: "Enter NEMO lab name, e.g. nursep"
+
+scientist:
+  type: str
+  when: "{{ 'scientist' in site.get('required_inputs', []) }}"
+  help: "Enter first part of scientist's name, e.g francis.crick"
+
+limsid:
+  type: str
+  when: "{{ 'limsid' in site.get('required_inputs', []) }}"
+  help: "Enter LIMS ID corresponding to samples being analysed"
+
+fastq_wildcard: >-
+  {{ site.fastq_wildcard.format(
+    lab=lab,
+    scientist=scientist,
+    limsid=limsid
+  ) if site.get("fastq_wildcard") else "" }}

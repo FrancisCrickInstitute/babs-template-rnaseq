@@ -1,0 +1,5 @@
+fastq_wildcard: "/nemo/stp/babs/inputs/sequencing/data/{lab}/{scientist}/{limsid}/primary_data/*/fastq/*_R1_001.fastq.gz"
+required_inputs:
+  - lab
+  - scientist
+  - limsid
