@@ -1,14 +1,13 @@
-{% if genomes and genome in genomes %}
-  {% set genome_fasta = genomes[genome].genome_fasta %}
-  {% set org_db = genomes[genome].org_db %}
-  {% set gtf = genomes[genome].gtf %}
-{% endif %}
+{%- if genomes and genome in genomes -%}
+  {%- set genome_fasta = genomes[genome].genome_fasta -%}
+  {%- set org_db = genomes[genome].org_db -%}
+  {%- set gtf = genomes[genome].gtf -%}
+{%- endif -%}
 genome_fasta={{genome_fasta}}
 gtf={{gtf}}
 org.db={{org_db}}
 nfcore={{nfcore}}
-{% if crick_fastq_prefix %}
-  {% set fastq_wildcard = crick_fastq_prefix ~ '/' ~ lab ~ '/' ~ scientist ~ '/' ~ limsid ~ '/' ~ crick_fastq_suffix %}
-{% endif %}
-fastq_wildcard={{fastq_wildcard}}
-
+{%- if crick_fastq_prefix -%}
+  {%- set fastq_wildcard = crick_fastq_prefix ~ '/' ~ lab ~ '/' ~ scientist ~ '/' ~ limsid ~ '/' ~ crick_fastq_suffix -%}
+{%- endif %}
+{{genome}}.fastq_wildcard={{fastq_wildcard}}

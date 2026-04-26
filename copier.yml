@@ -23,10 +23,6 @@ limsid:
   when: "{{ crick_fastq_prefix is not none }}"
   help: "Enter LIMS ID corresponding to samples being analysed"
 
-fastq_wildcard:
-  type: str
-  when: "{{ crick_fastq_prefix is not none }}"
-  help: "Enter path that will match all R1 fastq files"
 
 genome:
   type: str
@@ -48,3 +44,7 @@ gtf:
 org_db:
   type: str
   when: "{{ not genomes or genome not in genomes }}"
+fastq_wildcard:
+  type: str
+  when: "{{ crick_fastq_prefix is none }}"
+  help: "Enter path that will match all R1 fastq files"

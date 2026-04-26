@@ -5,6 +5,7 @@ include module.mk
 
 configs = $(patsubst %,%.config,$(alignments))
 samplesheets = $(patsubst %,samplesheet_%.csv,$(alignments))
+plainsheets = $(patsubst %,%.csv,$(alignments))
 
 ifneq (,$(filter-out $(or $(excluded-targets),$(MAKECMDGOALS)),$(MAKECMDGOALS)))
 include $(configs)
@@ -58,9 +59,9 @@ insfield=$(shell sed '/^$$/d; s/^$*./"/;s/=.*/"/' "$*.config" | paste -sd ',')
 vals=$(shell sed -r '/^$$/d; s/.*=(.*)/"\1"/' "$*.config" | paste -sd ',')
 
 
-$(samplesheets): samplesheet_%.csv: %.config $(samplesheet_fname).csv
+$(samplesheets): samplesheet_%.csv: %.config %.csv
 	rm -f '$*.db'
-	$(SQLITE) '$*.db' ".import --csv $(samplesheet_fname).csv fastqs" \
+	$(SQLITE) '$*.db' ".import --csv $*.csv fastqs" \
 	"ALTER TABLE fastqs ADD COLUMN universal text;" \
 	"UPDATE fastqs SET universal='yes';"; \
 	$(SQLITE) '$*.db' 'CREATE TABLE config ($(field));' \
@@ -87,9 +88,10 @@ $(configs): %.config: $(docs_dir)/%.config
 	$(MAKE) --no-print-directory -C $(ingress_dir) $*.config
 	cp $(ingress_dir)/$*.config $@
 	$(GIT) add $@ $<
-$(samplesheet_fname).csv: $(docs_dir)/$(samplesheet_fname).csv
-	$(MAKE) --no-print-directory -C $(ingress_dir) $(samplesheet_fname).csv
-	cp $(ingress_dir)/$(samplesheet_fname).csv $@
+
+$(plainsheets) : % : $(docs_dir)/%
+	$(MAKE) --no-print-directory -C $(ingress_dir) $*.csv
+	cp $(ingress_dir)/$*.csv $@
 	$(GIT) add $@ $<
 
 endif

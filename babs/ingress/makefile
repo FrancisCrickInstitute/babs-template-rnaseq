@@ -15,9 +15,10 @@ configs = $(patsubst %,%.config,$(alignments))
 ifneq (,$(filter-out $(or $(excluded-targets),$(MAKECMDGOALS)),$(MAKECMDGOALS)))
 include $(configs)
 endif
+samplesheets=$(patsubst %.config,%.csv,$(configs))
 
 
-build: $(samplesheet_fname).csv $(experiment_table).csv
+build: $(samplesheets) $(experiment_table).csv
 
 
 ifneq ($(docs_dir),)
@@ -36,7 +37,7 @@ $(configs): %.config: $(docs_dir)/%.config
 	sed -i 's/^/$*./' $@
 	$(GIT) add $@ $<
 
-$(samplesheet_fname).csv: $(docs_dir)/$(samplesheet_fname).csv
+$(samplesheets) : % : $(docs_dir)/%
 	cp $< $@
 	tr -d '\r' < $< > $@
 	$(GIT) add $@ $<
