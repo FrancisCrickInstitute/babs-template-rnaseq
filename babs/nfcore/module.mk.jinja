@@ -1,4 +1,4 @@
-nf_options = -profile crick -resume -r 3.10.1
+nf_options = -resume -r 3.10.1
 
 SINGULARITY_MODULE=Singularity/3.6.4
 
@@ -8,5 +8,5 @@ SQLITE = $(call ml,$(SQLITE_MODULE)); sqlite3
 NEXTFLOW_MODULE=Nextflow/23.10.0
 NEXTFLOW = $(call ml,$(NEXTFLOW_MODULE)); $(call ml,$(SINGULARITY_MODULE)); nextflow
 
-NXF_SINGULARITY_CACHEDIR=/flask/apps/containers/all-singularity-images/
-SCRATCH_DIR=/flask/scratch/babs/$(or ${USER},$(shell whoami))/projects
+NXF_SINGULARITY_CACHEDIR={{cache}}
+SCRATCH_DIR={{scratch}}

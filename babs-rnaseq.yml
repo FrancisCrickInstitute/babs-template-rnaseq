@@ -1,8 +1,8 @@
-crick_fastq_prefix:
-  /nemo/stp/babs/inputs/sequencing/data
-crick_fastq_suffix:
-  primary_data/*/fastq/*_R1_001.fastq.gz
+crick_fastq_prefix: /nemo/stp/babs/inputs/sequencing/data
+crick_fastq_suffix: primary_data/*/fastq/*_R1_001.fastq.gz
 nfcore: "-profile crick -resume -r 3.10.1"
+scratch: "/flask/scratch/babs/$(or ${USER},$(shell whoami))/projects"
+cache: /flask/apps/containers/all-singularity-images/
 genomes:
   GRCh38:
     genome_fasta: /nemo/svc/reference/Genomics/babs/homo_sapiens/ensembl/GRCh38/release-95/genome/Homo_sapiens.GRCh38.dna_sm.primary_assembly.fa

@@ -79,7 +79,7 @@ $(workdir):
 #### Bootrap all relevant data from outside
 ################################################################
 
-build: $(samplesheet_fname).csv ## Build all necessary inputs: samplesheets for each matching alignment '.config' from 'docs'.
+build: samplesheets ## Build all necessary inputs: samplesheets for each matching alignment '.config' from 'docs'.
 
 ifneq ($(docs_dir),)
 $(docs_dir)/%:
@@ -90,8 +90,8 @@ $(configs): %.config: $(docs_dir)/%.config
 	$(GIT) add $@ $<
 
 $(plainsheets) : % : $(docs_dir)/%
-	$(MAKE) --no-print-directory -C $(ingress_dir) $*.csv
-	cp $(ingress_dir)/$*.csv $@
+	$(MAKE) --no-print-directory -C $(ingress_dir) $*
+	cp $(ingress_dir)/$* $@
 	$(GIT) add $@ $<
 
 endif

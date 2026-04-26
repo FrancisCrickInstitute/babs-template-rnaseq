@@ -41,7 +41,12 @@ check-samplesheets: $(samplesheets)
 	for s in $(samplesheets); do \
 	  head -1 $$s | grep -q "^sample,fastq_1,fastq_2" || { echo "$$s has incorrect header" | tee -a tmp.err ;} ;\
 	  [ $$(wc -l < $$s) -ge 2 ] || { echo "$$s has only one line" | tee -a tmp.err ;} ;\
+<<<<<<< HEAD
 	done
+=======
+s
+done
+>>>>>>> fca7100 (infra: Move crick nfcore settings to jinja)
 
 
 $(samplesheets) : %.csv : %.config
@@ -49,6 +54,7 @@ $(samplesheets) : %.csv : %.config
 	  echo "Couldn't find fastq files in $(fastq_wildcard). Perhaps try setting fastq_wildcard, or change your answers file" | tee -a tmp.err ;\
 	  exit ;\
 	fi
+	echo "sample,fastq_1,fastq_2" > $@
 	for r1 in $(wildcard $($*.fastq_wildcard)); do \
 	  echo -n $$(basename $$r1) | sed 's/_.*/,/' >> $@ ;\
 	  echo -n "$$r1," >> $@ ;\

@@ -48,3 +48,11 @@ fastq_wildcard:
   type: str
   when: "{{ crick_fastq_prefix is none }}"
   help: "Enter path that will match all R1 fastq files"
+cache:
+  type: str
+  help: "Path for nextflow singularity cache"
+  default: "/tmp"
+scratch:
+  type: str
+  help: "Scratch directory to store nextflow work"
+  default: "."
