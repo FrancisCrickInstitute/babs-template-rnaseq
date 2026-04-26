@@ -3,31 +3,48 @@ project_name:
   help: What is your project name?
 
 
-_subdirectory: template
+_subdirectory: babs
 _skip_if_exists:
     - differential/renv.lock
 
-site: >-
-  {{ load_yaml(BABS_RNASEQ_PROFILE) if BABS_RNASEQ_PROFILE else {} }}
 
 lab:
   type: str
-  when: "{{ 'lab' in site.get('required_inputs', []) }}"
+  when: "{{ crick_fastq_prefix is not none }}"
   help: "Enter NEMO lab name, e.g. nursep"
 
 scientist:
   type: str
-  when: "{{ 'scientist' in site.get('required_inputs', []) }}"
+  when: "{{ crick_fastq_prefix is not none }}"
   help: "Enter first part of scientist's name, e.g francis.crick"
 
 limsid:
   type: str
-  when: "{{ 'limsid' in site.get('required_inputs', []) }}"
+  when: "{{ crick_fastq_prefix is not none }}"
   help: "Enter LIMS ID corresponding to samples being analysed"
 
-fastq_wildcard: >-
-  {{ site.fastq_wildcard.format(
-    lab=lab,
-    scientist=scientist,
-    limsid=limsid
-  ) if site.get("fastq_wildcard") else "" }}
+fastq_wildcard:
+  type: str
+  when: "{{ crick_fastq_prefix is not none }}"
+  help: "Enter path that will match all R1 fastq files"
+
+genome:
+  type: str
+  help: >-
+    {% if genomes %}
+    Choose one of: {{ genomes.keys() | join(', ') }} for predefined settings,
+    or anything else for custom genome settings
+    {% else %}
+    No predefined genomes available. Provide a custom genome identifier.
+    {% endif %}
+  default: custom
+
+genome_fasta:
+  type: str
+  when: "{{ not genomes or genome not in genomes }}"
+gtf:
+  type: str
+  when: "{{ not genomes or genome not in genomes }}"
+org_db:
+  type: str
+  when: "{{ not genomes or genome not in genomes }}"

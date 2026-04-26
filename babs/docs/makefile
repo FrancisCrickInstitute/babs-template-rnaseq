@@ -8,9 +8,12 @@ samplesheet=$(wildcard $(samplesheet_fname).csv)
 configs = $(wildcard *.config)
 metadata = $(wildcard $(experiment_table).csv)
 
+ifneq (,$(filter-out $(or $(excluded-targets),$(MAKECMDGOALS)),$(MAKECMDGOALS)))
+include $(configs)
+endif
+
 .PHONY: run clean
 
-include settings.mk
 
 # Logic is to use existence of non-empty report.err as a flag for
 # problem.  On any run, put any problems in tmp.err, and at the end
