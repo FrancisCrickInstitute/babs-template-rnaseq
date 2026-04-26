@@ -1,17 +1,14 @@
-crick_fastq_prefix: /nemo/stp/babs/inputs/sequencing/data
-  when: false
-crick_fastq_suffix: primary_data/*/fastq/*_R1_001.fastq.gz
-  when: false
+crick_fastq_prefix:
+  /nemo/stp/babs/inputs/sequencing/data
+crick_fastq_suffix:
+  primary_data/*/fastq/*_R1_001.fastq.gz
 nfcore: "-profile crick -resume -r 3.10.1"
 genomes:
-  when: false
-  type: yaml
-  default:
-    GRCh38:
-      genome_fasta: /nemo/svc/reference/Genomics/babs/homo_sapiens/ensembl/GRCh38/release-95/genome/Homo_sapiens.GRCh38.dna_sm.primary_assembly.fa
-      gtf: /nemo/svc/reference/Genomics/babs/homo_sapiens/ensembl/GRCh38/release-95/gtf/Homo_sapiens.GRCh38.95.gtf
-      org_db: org.Hs.eg.db
-    GRCm38:
-      genome_fasta: /nemo/svc/reference/Genomics/babs/mus_musculus/ensembl/GRCm38/release-95/genome/Mus_musculus.GRCm38.dna_sm.toplevel.fa
-      gtf: /nemo/svc/reference/Genomics/babs/mus_musculus/ensembl/GRCm38/release-95/gtf/Mus_musculus.GRCm38.95.gtf
-      org_db: org.Mm.eg.db
+  GRCh38:
+    genome_fasta: /nemo/svc/reference/Genomics/babs/homo_sapiens/ensembl/GRCh38/release-95/genome/Homo_sapiens.GRCh38.dna_sm.primary_assembly.fa
+    gtf: /nemo/svc/reference/Genomics/babs/homo_sapiens/ensembl/GRCh38/release-95/gtf/Homo_sapiens.GRCh38.95.gtf
+    org_db: org.Hs.eg.db
+  GRCm38:
+    genome_fasta: /nemo/svc/reference/Genomics/babs/mus_musculus/ensembl/GRCm38/release-95/genome/Mus_musculus.GRCm38.dna_sm.toplevel.fa
+    gtf: /nemo/svc/reference/Genomics/babs/mus_musculus/ensembl/GRCm38/release-95/gtf/Mus_musculus.GRCm38.95.gtf
+    org_db: org.Mm.eg.db
