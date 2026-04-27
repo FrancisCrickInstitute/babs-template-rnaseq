@@ -5,7 +5,7 @@ nfcore: "-profile crick -resume -r 3.10.1"
 scratch: "/flask/scratch/babs/${USER}/projects"
 cache: /flask/apps/containers/all-singularity-images/
 singularity_imagedir: /flask/apps/containers/all-singularity-images
-singularity_module: SINGULARITY_MODULE=Singularity/3.11.3
+singularity_module: Singularity/3.11.3
 singularityenv_renv_paths_root: "$(realpath /nemo/stp/babs/working/bioinformatics/caches/renv)"
 singularityenv_uv_cache_dir: "$(realpath /nemo/stp/babs/working/bioinformatics/caches/uv)"
 
