@@ -1,8 +1,14 @@
+outputs_root: /nemo/stp/babs/outputs
 crick_fastq_prefix: /nemo/stp/babs/inputs/sequencing/data
 crick_fastq_suffix: primary_data/*/fastq/*_R1_001.fastq.gz
 nfcore: "-profile crick -resume -r 3.10.1"
-scratch: "/flask/scratch/babs/$(or ${USER},$(shell whoami))/projects"
+scratch: "/flask/scratch/babs/${USER}/projects"
 cache: /flask/apps/containers/all-singularity-images/
+singularity_imagedir: /flask/apps/containers/all-singularity-images
+singularity_module: SINGULARITY_MODULE=Singularity/3.11.3
+singularityenv_renv_paths_root: "$(realpath /nemo/stp/babs/working/bioinformatics/caches/renv)"
+singularityenv_uv_cache_dir: "$(realpath /nemo/stp/babs/working/bioinformatics/caches/uv)"
+
 genomes:
   GRCh38:
     genome_fasta: /nemo/svc/reference/Genomics/babs/homo_sapiens/ensembl/GRCh38/release-95/genome/Homo_sapiens.GRCh38.dna_sm.primary_assembly.fa
@@ -12,3 +18,10 @@ genomes:
     genome_fasta: /nemo/svc/reference/Genomics/babs/mus_musculus/ensembl/GRCm38/release-95/genome/Mus_musculus.GRCm38.dna_sm.toplevel.fa
     gtf: /nemo/svc/reference/Genomics/babs/mus_musculus/ensembl/GRCm38/release-95/gtf/Mus_musculus.GRCm38.95.gtf
     org_db: org.Mm.eg.db
+
+linked_dir_prefixes:
+  redirect_intranet: "/nemo/stp/babs/www/html/internal/users/${USER}/projects/"
+  redirect_internet: "/nemo/stp/babs/www/html/external/users/${USER}/projects/"
+  url_intranet: "https://bioinformatics.thecrick.org/users/${USER}/projects/"
+  url_internet: "https//bioinformatics.crick.ac.uk/users/${USER}/projects/"
+

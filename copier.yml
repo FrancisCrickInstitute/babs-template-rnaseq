@@ -1,3 +1,7 @@
+ID:
+  type: str
+  help: What is your project ID?
+
 project_name:
   type: str
   help: What is your project name?
@@ -6,7 +10,6 @@ project_name:
 _subdirectory: babs
 _skip_if_exists:
     - differential/renv.lock
-
 
 lab:
   type: str
@@ -18,6 +21,16 @@ scientist:
   when: "{{ crick_fastq_prefix is not none }}"
   help: "Enter first part of scientist's name, e.g francis.crick"
 
+project_path:
+  type: str
+  when: false
+  default: "{{ ( lab ~ '/' ~ scientist ~ '/' ~ ID ) if crick_fastq_prefix is defined else ID }}"
+
+outputs_dir:
+  type: str
+  when: false
+  default: "{{ outputs_root }}/{{ lab }}/{{ scientist }}/$(echo \"$FULLNAME\" | tr ' ' '.' | tr '[:upper:]' '[:lower:]')/{{ ID }}"
+  
 limsid:
   type: str
   when: "{{ crick_fastq_prefix is not none }}"
@@ -56,3 +69,4 @@ scratch:
   type: str
   help: "Scratch directory to store nextflow work"
   default: "."
+  

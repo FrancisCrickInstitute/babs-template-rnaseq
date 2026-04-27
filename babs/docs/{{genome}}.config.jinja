@@ -8,6 +8,6 @@ gtf={{gtf}}
 org.db={{org_db}}
 nfcore={{nfcore}}
 {%- if crick_fastq_prefix -%}
-  {%- set fastq_wildcard = crick_fastq_prefix ~ '/' ~ lab ~ '/' ~ scientist ~ '/' ~ limsid ~ '/' ~ crick_fastq_suffix -%}
+  {%- set fastq_wildcard = crick_fastq_prefix ~ project_path ~ crick_fastq_suffix -%}
 {%- endif %}
 {{genome}}.fastq_wildcard={{fastq_wildcard}}
