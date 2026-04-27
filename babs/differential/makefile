@@ -181,15 +181,14 @@ $(staging_dir)/index.qmd : $(source_dir)/index.qmd $(qmds) $(staging_dir)/notes.
 $(staging_dir)/R.bib: extdata/R.bib
 	cp $< $@
 
-extdata/R.bib: renv.lock
+extdata/R.bib: | renv
 	$(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")' $(call log,bib)
 
-renv.lock: orgs=$(strip $(foreach align,$(alignments),$($(align).org.db)))
-renv.lock: $(wildcard resources/renv/renv.lock) | $(log_dir)
+renv: orgs=$(strip $(foreach align,$(alignments),$($(align).org.db)))
+renv: | $(log_dir)
 	sed -i '/\#DO NOT EDIT AFTER THIS LINE/q' resources/_dependencies.R
 	for i in "$(orgs)"; do echo "library($$i)" >> resources/_dependencies.R; done
-	if [ -f resources/renv/renv.lock ] ; then \
-	  $(GIT) mv resources/renv/renv.lock renv.lock 2>/dev/null || mv resources/renv/renv.lock renv.lock;\
+	if [ -f renv.lock ] ; then \
 	  $(R) -e 'library(renv); activate()' ;\
 	  $(R) -e 'library(renv); restore(); install(lock=TRUE)' ;\
 	else \

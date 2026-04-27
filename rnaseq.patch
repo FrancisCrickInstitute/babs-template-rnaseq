@@ -163,17 +163,17 @@ diff -ur infra-tmp/makefile babs/differential/makefile
  	rm -f ${staging_dir}/_sidebar.yml
  	mkdir -p ${staging_dir}/_extensions
 @@ -150,7 +184,10 @@
- extdata/R.bib: renv.lock
+ extdata/R.bib: | renv
  	$(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")' $(call log,bib)
  
-+renv.lock: orgs=$(strip $(foreach align,$(alignments),$($(align).org.db)))
- renv.lock: $(wildcard resources/renv/renv.lock) | $(log_dir)
++renv: orgs=$(strip $(foreach align,$(alignments),$($(align).org.db)))
+ renv: | $(log_dir)
 +	sed -i '/\#DO NOT EDIT AFTER THIS LINE/q' resources/_dependencies.R
 +	for i in "$(orgs)"; do echo "library($$i)" >> resources/_dependencies.R; done
- 	if [ -f resources/renv/renv.lock ] ; then \
- 	  $(GIT) mv resources/renv/renv.lock renv.lock 2>/dev/null || mv resources/renv/renv.lock renv.lock;\
+ 	if [ -f renv.lock ] ; then \
  	  $(R) -e 'library(renv); activate()' ;\
-@@ -161,9 +198,9 @@
+ 	  $(R) -e 'library(renv); restore(); install(lock=TRUE)' ;\
+@@ -160,9 +197,9 @@
  	  $(R) -e 'library(renv); snapshot(type="all")' ;\
  	fi
  	$(GIT) add renv.lock renv .Rprofile $(source_dir)
@@ -186,7 +186,7 @@ diff -ur infra-tmp/makefile babs/differential/makefile
  
  endif
  
-@@ -181,9 +218,24 @@
+@@ -180,9 +217,24 @@
  
  
  
@@ -211,7 +211,7 @@ diff -ur infra-tmp/makefile babs/differential/makefile
  	ln -sfn $(VERSION) $(pubdir)/latest
  	[ "$(location)" = "outputs" ] || cp --no-preserve=mode -r .htaccess $(pubdir)/ || echo "Warning: no .htaccess files, so unauthorised people may be able to view these results"
  	ln -sfn $$(realpath $(pubdir)/$(VERSION)) $(RESULTS_DIR)/published_$(location)
-@@ -216,12 +268,73 @@
+@@ -215,12 +267,73 @@
  ################################################################
  #### Bootstrap all relevant data from outside
  ################################################################
@@ -287,7 +287,7 @@ diff -ur infra-tmp/makefile babs/differential/makefile
  
  $(log_dir) $(dir $(my_metadata)) data $(RESULTS_DIR)/$(VERSION) $(RESULTS_DIR) $(staging_dir)/$(RESULTS_DIR)/$(VERSION) $(staging_dir) extdata:
  	mkdir -p $@
-@@ -231,5 +344,10 @@
+@@ -230,5 +343,10 @@
  maintainer-clean: clean ## Remove the results and data directories, in addition to staging and logs. The former contain end-results, so only do this if you really want to discard them (e.g. the analysis had a bug in it, and you want to do some housekeeping)
  	rm -rf $(RESULTS_DIR) data 
  
