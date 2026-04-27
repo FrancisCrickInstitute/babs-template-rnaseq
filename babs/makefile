@@ -41,6 +41,13 @@ nfcore: ## Run the nfcore pipeline according to all the `.config` files
 
 differential: ## Analyse the outcome of the nfcore run in the context of the `*.spec` files (same as `make all`)
 
+update: ## Update from the 'export' branch of the original branch of the template repo
+	git fetch template-repo export
+	git checkout template
+	git merge --squash template-repo/export
+	sed '1s/^message: //' .template-provenance | git commit -F -
+
+
 .PHONY: help
 help: ## show help message
 	@awk 'BEGIN {FS = ":.*##"; printf "\nRunning the RNASeq pipeline - `make` subcommands: \033[36m\033[0m\n"}\

@@ -26,6 +26,19 @@ endif
 $(template_dir)/archive:
 	mkdir -p $@
 
+.PHONY: export
+export: ## Create an 'export' branch that can be squash-merged into projects, to update them
+	git checkout --orphan export
+	git read-tree --empty
+	git checkout $(version) -- babs
+	echo "message: Update to template $(version)" > babs/.template-provenance
+	echo "template_tag: $(version)" >> babs/.template-provenance
+	echo "template_commit: $(shell git rev-parse $(version))" >> babs/.template-provenance
+	echo "template_repo: $(shell git remote get-url origin)" >> babs/.template-provenance
+	git add babs
+	git commit -m "Release $(version)"
+	git switch -f -
+
 
 ################################################################
 #### Pull in any cross-template logic
