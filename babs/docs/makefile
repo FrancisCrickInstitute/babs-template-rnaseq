@@ -41,7 +41,7 @@ fqfiles=$(wildcard $(fqprefix)/$(lab-sci)$(limsid)/primary_data/*/fastq/*_R1_001
 .PHONY: check-samplesheet
 check-samplesheet: $(samplesheet_fname).csv
 	head -1 $< | grep -q "^sample,fastq_1,fastq_2" || { echo "$< has incorrect header" | tee -a tmp.err ;}
-	[ $(word 1,$(shell wc -l $<)) -ge 2 ] || { echo "$< has only one line" | tee -a tmp.err ;}
+	[ $$(wc -l < $<) -ge 2 ] || { echo "$< has only one line" | tee -a tmp.err ;}
 
 
 $(samplesheet_fname).csv : $(fqfiles)
