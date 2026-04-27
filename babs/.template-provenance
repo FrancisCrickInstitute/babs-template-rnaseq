@@ -1,0 +1,4 @@
+message: Update to template v1.14.2
+template_tag: v1.14.2
+template_commit: 674e8730bd654d382e9a9c9466a844718c81b2e4
+template_repo: git@github.com:FrancisCrickInstitute/babs-template-rnaseq.git

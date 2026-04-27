@@ -1,0 +1,9 @@
+samples.db
+results_auto/
+logs/
+capsule/
+tmp/
+plugins/
+assets/
+shortcuts/
+results/

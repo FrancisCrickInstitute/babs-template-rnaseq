@@ -1,0 +1,30 @@
+specification(
+  sample_sets =list( 
+    all = sample_set(
+      subset = TRUE,
+      # The variable 'Guess' gets chosen as the first column from the metadata that isn't trivial.
+      # You almost certainly need to remove this and replace it with something better, or at
+      # least rewrite it as something entirely deterministic.
+      models = list(
+        Guess = model(
+          design = as.formula(paste0("~", Guess)),
+	  name = Guess,
+	  description = paste("Warning! An auto-generated model - variation in expression is assumed to only depend on", Guess),
+          comparisons = list(
+            mult_comp(as.formula(paste0("revpairwise ~ as.factor(", Guess, ")")))
+          )
+        )
+      )
+    )
+  ),
+  settings=settings(     ## analysis parameters
+    alpha          = 0.05,    ## p-value cutoff
+    lfcThreshold   = 0,       ## abs lfc threshold
+    baseMeanMin    = 0,       ## discard transcripts with average normalised counts lower than this
+    top_n_variable = 500,     ## For PCA
+    showCategory   = 25,      ## For enrichment analyses
+    stringsAsFactors=TRUE,    ## Convert non-constant and non-unique colData to factors
+    seed           = 1,       ## random seed gets set at start of script, just in case.
+    filterFun      = IHW::ihw ## NULL for standard DESeq2 results, otherwise  functions
+  )
+)

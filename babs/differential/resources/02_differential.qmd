@@ -1,0 +1,714 @@
+---
+title: Differential analysis ${title}
+description: Differential analysis of ${description}
+categories: [Differential]
+params:
+  section: Differential analysis
+---
+
+
+# Preface
+
+We load in all the necessary additional R packages, and set up some initial parameters.
+
+
+```{r}
+#| label: load-diff1
+#| output: false
+#| warning: false
+#| error: false
+
+library(tidyverse)       # Language
+library(devtools)
+library(openxlsx)        # IO
+library(ggrepel)         # General Vis.
+library(RColorBrewer)
+library(ComplexHeatmap)
+library(gt)
+library(emmeans)
+library(DESeq2)          # Assay-specific
+library(PoiClaClu)
+library(rtracklayer)
+library(tximport)
+library(clusterProfiler)
+library(ReactomePA)
+library(GO.db)
+library(IHW)
+library(ggiraph)
+library(ggrastr)
+
+source("R/plot.r", local = knitr::knit_global())
+source("R/markdown.r", local = knitr::knit_global())
+source("R/rnaseq.r", local = knitr::knit_global())
+source("R/partial.r", local = knitr::knit_global())
+source("R/output.r", local = knitr::knit_global())
+source("R/helpers.r", local = knitr::knit_global())
+
+for (i in sub("\\.emmc$", "", ls("package:emmeans", pattern="*.emmc")))
+  assign(paste0("my_", i,".emmc"), negate_emmc(paste0(i, ".emmc")))
+
+set.seed(1)
+
+if (!isTRUE(getOption('knitr.in.progress'))) {
+  params <- load_params(choose_staging("02_differential"))
+}
+
+
+do_plot <- plot_tracker(params)
+
+knitr::opts_chunk$set(
+  warning=FALSE, error=TRUE, message=FALSE,
+  dev=c("ragg_png","pdf"), out.width="100%",
+  dev.args=list(ragg_png=list(scaling=1.5)),
+  fig.width=14, fig.height=10, fig.process=rename_with_tag(params),
+  results='asis'
+)
+
+
+
+```
+
+
+
+```{r}
+#| label: tbl-load-diff2
+#| tbl-cap: Context
+if (isTRUE(getOption('knitr.in.progress'))) {
+  gt(data.frame(Setting=names(params),
+                Value=unlist(params)))
+}
+
+
+```
+
+```{r}
+#| label: read-diff
+
+base_dir <- getwd()
+data(list=paste0("counts_", params$alignment))
+data(list=paste0("ddsList_", params$alignment, "_", params$spec))
+ddsList <- lapply(ddsList, function(dds) dds[mcols(dds)$filter$differential %||% TRUE, , drop=FALSE])
+ddsList <- lapply(ddsList, function(dds) {
+  imp <- metadata(dds)$impute
+  if (!is.null(imp) && !is.null(imp$differential) && !imp$differential) {
+    assays(dds) <- setFirstAssay(dds, setdiff(assayNames(dds), "imputed")[1])
+  }
+  dds
+})
+  
+if (!is.null(metadata(dds)$organism$org)) {
+  library(metadata(dds)$organism$org, character.only=TRUE)
+}
+
+
+specs <- load_specs(file=paste0(params$spec, ".spec"), context=dds)
+
+param <- ParamList$new(defaults=specs$settings)
+# Calling the setter without a value will pick up the default (from the spec), _and_ alert it in the markdown, and return the default
+set.seed(param$set("seed", postpone=TRUE))
+param$set("spec",  params$spec, "Using analysis plan '{}'.", postpone=TRUE)
+param$set("alignment", params$alignment, "Using alignment settings '{}'")
+align_params <- get_align_params(params$alignment)
+rowNoun <- align_params$rowNoun %||% "gene"
+RowNoun <- stringr::str_to_title(rowNoun)
+if ("missing" %in% names(align_params)) {
+  attr(rowNoun, "readout") <- "missingness"
+  attr(RowNoun, "readout") <- "Missingness"
+}
+param$set("rowNoun", rowNoun)
+param$set("RowNoun", RowNoun)
+cluster_ind <- counter(post_fn=to_letter)      
+
+
+dtag <- dmc_factory(ddsList, type="dataset")
+mtag <- dmc_factory(ddsList, type="model")
+
+```
+
+# Find differential `{r} param$get("rowNoun")`s
+
+ We use DESeq2 [@pkg_DESeq2] to find differential `{r} param$get("rowNoun")`s using the
+negative binomial distribution to model counts, with IHW [@IHW2016]
+for multiple-testing correction with greater power than
+Benjamini-Hochberg, and ashr [@pkg_ashr] for effect-size shrinkage
+to ensure reported fold-changes are more robust.
+
+
+```{r}
+#| label: differential
+
+param$set("alpha", postpone=TRUE)
+param$set("lfcThreshold", postpone=TRUE)
+param$set("filterFun", postpone=TRUE)
+param$set("LRT_effect", postpone=TRUE)
+param$set("gene_clust", postpone=TRUE)
+param$set("pc_x", 1, postpone=TRUE)
+param$set("pc_y", 2, postpone=TRUE)
+param$set("sample_clust")
+
+rds_name <- file.path("data", paste0(basename(params$spec),"_x_", params$alignment, ".rds"))
+
+if (interactive() && file.exists(rds_name)) {
+  dataset_model_comp <- decompress_dmc(readRDS(rds_name))
+  # In an interactive session, you may want to skip the rest of this code chunk if you are
+  # sure that the saved rds object represents the latest analysis.
+}
+
+
+## For each dataset, fit all its models
+
+dataset_model_comp <- lapply(
+  ddsList,
+  function(dds) fit_models(
+    dds=dds,
+    param=param,
+    minReplicatesForReplace = Inf
+  )
+)
+
+
+## Now put results in each 3rd level mcols(dds)$results
+dataset_model_comp <- map_depth(
+  dataset_model_comp,
+  .depth=3,
+  function(dds) get_result(dds,
+                         filterFun=param$get("filterFun"),
+                         alpha=param$get("alpha"),
+                         lfcThreshold=param$get("lfcThreshold"),
+                         LRT_effect=param$get("LRT_effect", metadata(dds)$models)
+                         )
+)
+
+
+
+local({
+  dataset_model_comp <- compress_dmc(dataset_model_comp)
+  saveRDS(dataset_model_comp, file=rds_name)
+  save(dataset_model_comp, file=sub("rds$", "rda", rds_name))
+})
+
+
+xl_files <- write_results(dataset_model_comp,
+                         param,
+                         params
+                         )
+iwalk(xl_files,
+     ~cat("\n\n<a class=\"download-excel btn btn-primary\" href=\"", attr(.x, "link"), "\"> Open Spreadsheet '", .y,"'</a>", sep="")
+     )
+
+#write_all_results(dataset_model_comp, dir=params$res_dir)
+
+```
+
+
+## Summary Tables 
+
+Here we summarise the results of the differential testing. Each
+sample-set gets its own table (flick between tabs to choose which),
+within which the different models, and their null hypotheses, are
+enumerated.
+
+In the 'Significant' column we tally the number of significant
+`{r} param$get("rowNoun")`s (for pairwise comparisons, separated into up or down, where
+A-B being labelled up means `{r} noun_to_readout(param$get("rowNoun"))` is higher in A; for omnibus
+comparisons, a broad categorisation of the most extreme groups, as
+described above.) We also tally the total number of `{r} param$get("rowNoun")`s
+exhibiting that behaviour (ie not necessarily statistically
+signficant) - these might not always add up to the same value, as
+there is an independent filter of low-signal `{r} param$get("rowNoun")`s whose effect
+varies from comparison to comparison.
+
+Our naming convention for a comparison often looks like `A-B|M` -
+again, because this is an semi-automated report, this mightn't be
+optimal, but the rationale is `A-B` refers to the two experimental
+conditions being compared (a 'upward' fold change will be reported
+if the `{r} noun_to_readout(param$get("rowNoun"))` is higher in `A` than it is in `B`). The `|M` part
+refers to the fact that we may have looked at that `A-B` comparison
+conditional upon some other variable (which in this example takes the
+value `M`):  anything before the `|` symbol identifies the
+experimental conditions that are being contrasted, and the part after
+the `|` identifies any stratification/conditioning of the data.
+
+In @fig-summaryp-1 we present some diagnostic plots of the observed
+p-values. Theoretically we want the pink part of the plot to have a
+solid peak on the left, and then make a reasonable plateau across
+higher p-values: gross deviations from this can indicate an absence of
+differential behaviour (lack of left-peak) or a model
+mis-specification that might need investigating. The blue tracks
+indicate p-values corresponding to `{r} param$get("rowNoun")`s with very low `{r} noun_to_readout(param$get("rowNoun"))`, which
+would typically struggle to provide evidence of differential
+behaviour, and so show an example of what a 'bad' pink trace might
+look like.
+
+```{r}
+#| label: summary
+
+summaries <- dataset_model_comp %>%
+  map_dmc(summarise_results) %>%
+  map_dmc(function(x) {bind_rows(x, .id="Comparison")}, depth="model") %>%
+  map_dmc(function(x) {bind_rows(x, .id="Model")}, depth="dataset") %>%
+  map(function(x) {
+    levels(x$Group) <- sub(".*<(.+<.+<0)$", "\\1", levels(x$Group))
+    levels(x$Group) <- sub("^(0<.+?<.+?)<.*$", "\\1", levels(x$Group))
+    levels(x$Group) <- sub("(.*?<)(.*0.*)(<.*)", "\\10\\3", levels(x$Group))
+    x
+  }
+  )
+
+unclassed <- lapply(summaries, 
+                    function(s) {
+                      s %>%
+                        subset(Group %in% c('Zero Count', 'Low Count', 'Outlier')) %>%
+                        group_by(Model, Group) %>% summarise(N=paste(unique(Total), collapse=";")) %>%
+                        ungroup() %>%
+                        pivot_wider(id_cols=Model, names_from=Group, values_from=N)
+                      })
+
+pval_frame <- dataset_model_comp %>%
+  map_dmc(~as.data.frame(mcols(.x)$results)) %>%
+  map_dmc(function(x) {bind_rows(x, .id="Comparison")}, depth="model")
+
+cat("\n\n")
+
+for (dataset_id in names(summaries)) {
+  res <- knitr::knit_child(
+    text = c(
+      "```{r}",
+      "#| echo: false",
+      paste0("#| label: tbl-summary-",dataset_id),
+      paste0("#| tbl-cap: ",dataset_id),
+      "summaries[[dataset_id]] %>%",
+      "subset(!Group %in% c('Zero Count', 'Low Count', 'Outlier')) %>% ",
+      "gt(groupname_col=\"Model\") %>%",
+      "tab_style(",
+      "  style = cell_fill(color = '#bee2e9'),",
+      "  locations = cells_row_groups()",
+      ") %>% ",
+      paste0("tab_header(title=\"",param$get("RowNoun"),"List summary\", subtitle=dataset_id)"),
+      "```",
+      "",
+      ""
+    ), envir = environment(), quiet = TRUE)
+  cat(res, sep = '\n\n')
+  
+  if (nrow(unclassed[[dataset_id]])>0) {
+    res <- knitr::knit_child(
+      text = c(
+        "```{r}",
+        "#| echo: false",
+        paste0("#| label: tbl-summaryfit-",dataset_id),
+        paste0("#| tbl-cap: ",dataset_id, " model-fit stats"),
+        "unclassed[[dataset_id]] %>%",
+        "gt() %>%",
+        "tab_header(title=\"Model-fit summary\", subtitle=dataset_id)",
+        "```",
+        "",
+        ""
+      ), envir = environment(), quiet = TRUE)
+    cat(res, sep = '\n\n')
+  }
+  for (model_id in names(pval_frame[[dataset_id]])) {
+    pl <- ggplot(pval_frame[[dataset_id]][[model_id]], aes(x=pvalue, fill=baseMean<1)) +
+      geom_density(alpha=0.5) +
+      facet_wrap(~Comparison) +
+      theme_bw()
+    do_plot(pl,
+            label="summaryp",
+            caption=paste("p-Diagnostic for", dataset_id, model_id),
+            plot_meta=list(dataset=dataset_id, model=model_id)
+            )
+    cat("\n\n---\n\n")
+  }
+}
+
+```
+
+```{r}
+#| label: results
+all_clusters <- list()
+for (dataset_id in names(dataset_model_comp)) {
+  section_hierarchy <- list(dataset=dataset_id)
+  dataset_se <- ddsList[[dataset_id]]
+  met <- metadata(dataset_se)
+  dmc_heading(dataset_model_comp, list(dataset=dataset_id), depth=strrep("#", length(section_hierarchy)))
+  has_comparisons <- sapply(met$models, function(m) "comparisons" %in% names(m) && length(m$comparisons) > 0)
+  src2bullets(met, c("subset", "extra_assays", "influential_samples"))
+  for (model_id in names(dataset_model_comp[[dataset_id]])) {
+    section_hierarchy <- list(dataset=dataset_id, model=model_id)
+    this_model <- dataset_model_comp[[dataset_id]][[model_id]]
+    dmc_heading(ddsList, list(dataset=dataset_id, model=model_id), depth=strrep("#", length(section_hierarchy)))
+    src2bullets(met$models[[model_id]], c("subset", "extra_assays", "influential_samples"))
+    cat("`",
+        Reduce(paste, sub("~", paste0(noun_to_readout(param$get("RowNoun"))," ~ "), deparse(metadata(this_model[[1]])$model$design))),
+        "`\n\n"
+        )
+    first <- TRUE
+    external_list <- metadata(this_model[[1]])$model$external_list
+    if (!is.null(external_list)) {
+      external_list <- read.csv(file.path(base_dir, external_list))
+      external_list <- subset(external_list, ID %in% row.names(this_model[[1]]))
+      external_list$Cluster[is.na(external_list$Cluster)] <- external_list$ID[is.na(external_list$Cluster)]
+    }
+    for (comparison_id in c(names(this_model), unique(external_list$Comparison))) {
+      section_hierarchy <- list(dataset=dataset_id, model=model_id, comparison=comparison_id)
+      dmc_heading(dataset_model_comp, section_hierarchy, depth=strrep("#", length(section_hierarchy)))
+      is_external <- !(comparison_id %in% names(this_model))
+      if (is_external) {
+        this_dds <- this_model[[1]]
+        is_significant <- row.names(this_dds) %in% external_list$ID[external_list$Comparison==comparison_id]
+        comp_type <- " "
+      } else {
+        this_dds <- this_model[[comparison_id]]
+        is_significant <- grepl("\\*$", mcols(this_dds)$results$class)
+        comp_type <- "-differential "
+        if (!any(is_significant)) {
+          next
+        }
+      }
+      involved <- attr(metadata(this_dds)$comparison, "involved")
+      if (is.null(involved)) { # Fall back for contrasts that don't (yet) memorise which samples they're affected by
+        dataset_se$.involved <- dataset_se$.influential
+      } else {
+        dataset_se$.involved <- FALSE
+        dataset_se$.involved[dataset_se$.influential] <- involved
+      }
+      md <- metadata(this_dds)
+      plot_formulae <- get_in_section(md$model$profile_plots, c("all", "differential"))
+      ## MA Plot
+      cat('\n\n::: {.panel-tabset .unnumbered group="diffplot"}\n\n')
+      res <- as.data.frame(mcols(this_dds)$results)
+      pal <- RColorBrewer::brewer.pal(9, "Set1")
+      res$class <- ifelse(is_significant, "Sig", "Not")
+      if (is_external) {
+        cat("\n\n", strrep("#", length(section_hierarchy)+1), " MA\n\n", sep="")
+        cat("For MA plots, external gene-lists are represented in specific comparisons, rather than getting there own plot.\n\n")
+      } else {        
+        if (is_formula(md$comparison)) {
+          yax <- "Largest fold change"
+        } else {
+          yax <- "Log fold change (shrunk)"
+        }
+        pl <- ggplot(res,
+                    aes(x=baseMean,
+                        y=shrunkLFC,
+                        colour=ifelse(class == "Not", "#aaaaaa","#000000"),
+                        size=ifelse(class == "Not", 0.5 , 2),
+                        label=symbol
+                        )
+                    ) +
+          geom_point() +
+          geom_point_interactive(aes(tooltip=symbol), data=res[top_true(is_significant, res$shrunkLFC, n=100),]) +
+          scale_x_log10()  + scale_size_identity() +
+          labs(x="Mean of normalised counts", y=yax)+ theme_bw()
+        colour_scale <- list(labels = c("Not", "Significant"),
+                            breaks = c("#aaaaaa", "#000000"))
+        ind <- top_true(is_significant, res$shrunkLFC, n=5)
+        if (!is.null(external_list)) {
+          ## add external IDs 
+          dat <- res[external_list$ID,]
+          if (length(unique(external_list$Comparison)) <= length(pal)) {
+            col <- pal[match(external_list$Comparison, unique(external_list$Comparison))]
+          } else {
+            col <- rep(pal[1], nrow(dat))
+          }
+          colour_scale$labels <- c(colour_scale$labels, unique(external_list$Comparison))
+          colour_scale$breaks <- c(colour_scale$breaks, pal[seq_along(unique(external_list$Comparison))])
+          pl <- pl +
+            ggrepel::geom_text_repel(aes(colour=col), size=3, data=res[external_list$ID,], max.overlaps=Inf, show.legend = FALSE) +
+            geom_point(aes(colour=col), data=res[external_list$ID,])
+          ind <- ind[!row.names(res)[ind] %in% external_list$ID]
+        }
+        pl <- pl+ggrepel::geom_text_repel(size=3, data=res[ind,], show.legend = FALSE) 
+        pl <- pl +
+          scale_colour_identity(labels=colour_scale$labels, breaks=colour_scale$breaks, guide = "legend") +
+          labs(colour="Class")
+        cat("\n\n", strrep("#", length(section_hierarchy)+1), " MA\n\n", sep="")
+        do_plot(pl,
+                label="MA",
+                caption=paste0("MA plot of ", tooltip(md, comparison_id), "-differential ", param$get("rowNoun"),"s for ",mtag(model_id), " in ", dtag(dataset_id)),
+                preview=first,
+                plot_meta=section_hierarchy,
+                dpi=150, interactive=FALSE
+                )
+        first <- FALSE
+        cat("\n\n---\n\n")
+      }
+      ## Heatmap
+      model_vars <- sort_vars(
+        unique(c(all.vars(md$model$design),
+                 unique(unlist(lapply(plot_formulae, function(p) all.vars(p[[1]]))))
+                 )),
+        md$model$variables)
+      model_vars <- setdiff(intersect(model_vars, names(colData(this_dds))), ".involved")
+      nice_legends <- separate_legend(dataset_se, model_vars)
+      pl <- do.call(gridExtra::arrangeGrob,c(
+        nice_legends,
+        ncol=ceiling(sqrt(length(nice_legends)))))
+      cat("\n\n", strrep("#", length(section_hierarchy)+1), " Heatmap\n\n", sep="")
+      do_plot(pl,
+              label= "legend-a",
+              caption=paste("Metadata colour-codings for",
+                            metadata(dataset_se)$dmc$dataset_name %||% metadata(dataset_se)$dmc$dataset
+                            ),
+              plot_meta=section_hierarchy
+              )
+      cat("\n\n---\n\n")
+      if ("mat" %in% names(md$model)) {
+        mmat <- md$model$mat
+      } else {
+        mmat <- model.matrix(md$model$design, colData(this_dds))
+      }
+      weights <- setNames(rep(0, ncol(dataset_se)), colnames(dataset_se))
+      if (!is_external && "baseline_contrast" %in% names(attributes(md$comparison))) {
+        weights[colnames(this_dds)] <- t(as.vector(attr(md$comparison, "baseline_contrast")) %*% MASS::ginv(mmat))
+        baseline_str <- paste("baseline", noun_to_readout(param$get("rowNoun")))
+      } else {
+        weights[colnames(this_dds)] <- rep(1/nrow(mmat), times=nrow(mmat))
+        baseline_str <- paste("average", noun_to_readout(param$get("rowNoun")))
+      }
+      centroid_df <- list()
+      reconstruct <- cached_partial(dataset=dataset_id, model=model_id) # This memo-ised function performs model-based removal of random and/or systematic effects
+      # Because heatmaps aren't really affected by anything other than y-aesthetic and partials:
+      unique_heatmaps <- !duplicated(sapply(plot_formulae, function(pl) {fml <- pl[[1]]; y <- eval(fml[[2]])$y; fml[[2]] <- y; deparse1(fml)}))
+      for (plot_id in names(plot_formulae)[unique_heatmaps]) {
+        section_hierarchy <- list(dataset=dataset_id, model=model_id, comparison=comparison_id, plot_config=plot_formulae[[plot_id]]$name %||% plot_id)
+        dmc_heading(dataset_model_comp, section_hierarchy, depth=strrep("#", length(section_hierarchy)+1), numbered=FALSE)
+        prepare_plot_data <- expr({
+          plot_fml <- plot_formulae[[plot_id]][[1]]
+          y_hint <- plot_fml[[2]]$y
+          if ("y" %in% names(plot_fml[[2]])) {
+            which_assay <- as.character(as.character(y_hint))
+            y_hint <- md$extra_assays[[which_assay]]$hint %||% which_assay
+            do_weight <- (!metadata(this_dds)$extra_assays[[which_assay]]$method %in% "normalise") %||% TRUE
+            tidied_se <- tidy_significant_se(dataset_se, is_significant, weights=if (do_weight) weights else NULL, assay=which_assay)
+            do_recentre <- metadata(this_dds)$extra_assays[[which_assay]]$recentre %||% FALSE
+            do_rescale <- metadata(this_dds)$extra_assays[[which_assay]]$rescale %||% FALSE
+          } else {
+            tidied_se <- tidy_significant_se(dataset_se, is_significant, weights=weights)
+            do_recentre <- do_rescale <- FALSE
+          }
+          design(tidied_se) <- md$model$design
+          mcols(tidied_se)$results <- mcols(this_dds)$results[row.names(tidied_se),]
+          tidied_se <- reorder_samples(tidied_se,model_vars)
+          assay(tidied_se) <- reconstruct(tidied_se, plot_fml, influence=tidied_se$.influential, assay=assayNames(tidied_se)[1])
+          removed <- attr(assay(tidied_se), "removed")
+          if ("visible" %in% names(plot_fml[[2]])) {
+            vis_sample <- eval(plot_fml[[2]]$visible, colData(tidied_se))
+          } else {
+            vis_sample <- TRUE
+          }
+          if (do_recentre) assay(tidied_se) <- assay(tidied_se) - rowMeans(assay(tidied_se)[,tidied_se$.influential, drop=FALSE])
+          if (do_rescale) assay(tidied_se) <- assay(tidied_se) / rowSds(assay(tidied_se)[,tidied_se$.influential, drop=FALSE])
+        })
+        eval(prepare_plot_data)
+        mat_height <- height_scaler(n=nrow(tidied_se), small=10, big=20, N=1000)
+        hc <- param$get("gene_clust")
+        if ("cut.params" %in% slotNames(hc) && "k" %in% names(slot(hc, "cut.params")) && slot(hc, "cut.params")$k >= nrow(tidied_se)) {
+          slot(hc, "cut.params") <- modifyList(slot(hc, "cut.params"), list(k=ceiling(nrow(tidied_se)/3)))
+        }
+        if (nrow(tidied_se)>1) {
+          gene_clust <- bluster::clusterRows(assay(tidied_se)[,this_dds$.involved,drop=FALSE], adapt_hclust_param(hc), full=TRUE)
+          if (is_external) {
+            gene_clust$clusters <- match(names(gene_clust$clusters), external_list$ID)
+          }
+        } else {
+          gene_clust <- list(
+            clusters=setNames(factor(1), row.names(tidied_se)),
+            objects=list(hclust=FALSE))
+        }
+        if (!is_external) {
+          this_clust <- cluster_ind()
+          gene_clust$clusters <- cluster_cardinality(gene_clust$clusters, this_clust)
+        }
+        removed <- attr(assay(tidied_se), "removed")
+        capt <- paste0(tooltip(md, comparison_id), comp_type, param$get("rowNoun"),"s  of ", mtag(model_id), " in ", dtag(dataset_id), removed)
+        cc <- cluster_calc(assay(tidied_se), clusterID=gene_clust$clusters)
+        hmap_data <- assay(tidied_se)
+        pls <- hmap_fn(
+          dds=tidied_se, mat=hmap_data, param=param,
+          cluster_transform=identity, gene_clust = gene_clust,
+          model_vars = model_vars,
+          plot_fml =plot_fml,
+          row_split = if ("cut.params" %in% slotNames(hc) && "k" %in% names(slot(hc, "cut.params"))) slot(hc, "cut.params")$k  else NULL,
+          measure_name=paste(c(noun_to_readout(param$get("RowNoun")), y_hint), collapse=" "),
+          show_column_names=TRUE)
+        do_plot(Reduce(`+`, pls),
+                label="Heatmap",
+                caption=paste0("Heatmap on ", capt,  ". White for ", baseline_str),
+                plot_meta=section_hierarchy,
+                height_opt=paste0(
+                  "#| fig-height: ",
+                  mat_height 
+                )
+                )
+        ### Design-based column ordering of  heatmap
+        cat("\n\n---\n\n")
+        pls <- hmap_fn(
+          dds=tidied_se, mat=hmap_data, param=param,
+          cluster_transform=identity, gene_clust = gene_clust,
+          model_vars = model_vars,
+          row_split = if ("cut.params" %in% slotNames(hc) && "k" %in% names(slot(hc, "cut.params"))) slot(hc, "cut.params")$k  else NULL,
+          plot_fml =plot_fml, 
+          measure_name=paste(c(noun_to_readout(param$get("RowNoun")), y_hint), collapse=" "),
+          show_column_names=TRUE, cluster_columns = FALSE)
+        do_plot(Reduce(`+`, pls),
+                label="Heatmap",
+                caption=paste0("Sorted heatmap on ", capt,  ". White for ", baseline_str),
+                plot_meta=section_hierarchy,
+                height_opt=paste0(
+                  "#| fig-height: ",
+                  mat_height 
+                )
+                )
+        
+        centroid_df[[plot_id]] <- cbind(cc, colDF(tidied_se))[vis_sample,,drop=FALSE] %>%
+          pivot_longer(cols=any_of(names(cc)), names_to=".derived", values_to=".derived.value") %>%
+          mutate(.derived=factor(.derived, levels=names(cc)))
+        attr(centroid_df[[plot_id]], "caption") <- capt
+        if (!is_external) {
+          all_clusters[[this_clust]] <- list(
+            id=gene_clust$clusters,
+            description=capt
+          )
+        }
+        cat('\n\n---\n\n')
+      }
+      ## if (is_null(plot_formulae)) {
+      ##   cat(':::\n\n')
+      ##   next
+      ## }
+      ##
+      ## PC2
+      section_hierarchy$plot_config <- NULL
+      cat("\n\n", strrep("#", length(section_hierarchy)+1), " 2PC\n\n", sep="")
+      for (plot_id in names(plot_formulae)) {
+        section_hierarchy <- list(dataset=dataset_id, model=model_id, comparison=comparison_id, plot_config=plot_formulae[[plot_id]]$name %||% plot_id)
+        dmc_heading(dataset_model_comp, section_hierarchy, depth=strrep("#", length(section_hierarchy)+1), numbered=FALSE)
+        eval(prepare_plot_data)
+        this_assay <- assay(tidied_se)
+        colour_aes <- eval(plot_fml[[2]])["colour"]
+        orig_caption <- aes_caption(eval(plot_fml[[2]]))
+        mapping <- modify_mapping(modifyList(eval(plot_fml[[2]]), aes(y=.derived.value, mask=NULL, cluster=NULL)))
+        my_pc <- prcomp(
+          t(this_assay[,tidied_se$.influential,drop=FALSE]),
+          center = do_recentre,
+          scale = FALSE)
+        proj <- predict(my_pc, newdata = t(this_assay))
+        my_percent <- round(100 * my_pc$sdev^2/sum(my_pc$sdev^2))
+        pc.df <- cbind(colDF(tidied_se),
+                        data.frame(
+                          PC1 = proj[, param$get("pc_x")],
+                          PC2 = proj[, param$get(if (nrow(this_assay) != 1) "pc_y" else "pc_x")], 
+                          sample = rownames(colDF(tidied_se))))
+        aes_list <- lapply(substitute_x_aes(eval(plot_fml[[2]])),function(m)  modify_mapping(modifyList(m, aes(y=.derived.value, mask=NULL, cluster=NULL))))
+        for (this_aes in aes_list) {
+          pl <- ggplot(transform(pc.df[vis_sample,],.derived="", .derived.value=""),
+                      modifyList(this_aes, aes(x=PC1, y=PC2))) + 
+            geom_point_interactive(size = 5, shape = 21) +
+            facet_wrapper(mapping, this_aes) + 
+            xlab(paste0("PC ", param$get("pc_x"), ": ", my_percent[param$get("pc_x")], "% variance")) +
+            ylab(paste0("PC ", param$get("pc_y"), ": ", my_percent[param$get("pc_y")], "% variance"))
+          do_labels <- nrow(colDF(this_dds)) < 10
+          if (do_labels) {
+            pl <- pl + geom_text_repel(aes(label = sample))
+          }
+          pl <- pl + get_colour_scales(this_dds, this_aes, all.vars(eval(plot_fml[[2]])$flag))
+          cat("\n\n")
+          if (identical(this_aes,aes_list[[1]])) {
+            this_caption <- orig_caption
+          } else {
+            tmp <- eval(plot_fml[[2]])
+            tmp$colour <- tmp$x
+            this_caption <- aes_caption(tmp)
+          }
+          do_plot(pl,
+                  label= "twopc",
+                  caption=paste("Annotated by", this_caption, "in", dtag(dataset_id), removed),
+                  plot_meta=section_hierarchy)
+          cat("\n\n")
+        } # Repeat if need to annotate by an overwritten 'x'
+      }
+      ##
+      ##
+      ## Profile plots
+      section_hierarchy$plot_config <- NULL
+      cat("\n\n", strrep("#", length(section_hierarchy)+1), " Profile\n\n", sep="")
+      for (plot_id in names(plot_formulae)) {
+        section_hierarchy <- list(dataset=dataset_id, model=model_id, comparison=comparison_id, plot_config=plot_formulae[[plot_id]]$name %||% plot_id)
+        y_hint <- plot_fml[[2]]$y
+        if (!is.null(y_hint)) {
+          which_assay <- as.character(as.character(y_hint))
+          y_hint <- md$extra_assays[[which_assay]]$hint %||% which_assay
+        }
+        dmc_heading(dataset_model_comp, section_hierarchy, depth=strrep("#", length(section_hierarchy)+1), numbered=FALSE)
+        colour_aes <- eval(plot_fml[[2]])["colour"]        
+        mapping <- modify_mapping(modifyList(eval(plot_fml[[2]]), aes(y=.derived.value, mask=NULL, cluster=NULL)))
+        pl <- ggplot(centroid_df[[plot_id]], mapping) +
+          facet_wrapper(mapping, default=aes(facets = .derived), scales="free_y") + 
+          theme_bw() +
+          geom_point_interactive(aes(y= .derived.value), size = 3, shape = 21) +
+          labs(y=paste(c(noun_to_readout(param$get("RowNoun")), y_hint), collapse=" "))
+        pl <- pl + my_alpha_scale(pl)
+        if ("group" %in% names(mapping)) {
+          pl <- pl+geom_line(colour_aes, stat="summary", fun=mean)
+        }
+        if ("ScaleDiscrete" %in% class(layer_scales(pl)$x)) {
+          pl <- pl + scale_x_discrete(guide=guide_axis(n.dodge=2))
+        }
+        pl <- pl + get_colour_scales(this_dds, mapping, all.vars(eval(plot_fml[[2]])$flag))
+        do_plot(pl,
+                label= "diffClustProfile",
+                caption=paste0("Cluster profile for ", attr(centroid_df[[plot_id]], "caption")),
+                plot_meta=section_hierarchy
+                )
+        cat('\n\n---\n\n')
+      }
+      cat(':::\n\n')
+    }
+  }
+}
+
+      
+
+```
+
+
+# Downloads
+
+
+```{r}
+#| label: downloads
+
+iwalk(xl_files,
+     ~cat("\n\n<a class=\"download-excel btn btn-primary\" href=\"", attr(.x, "link"), "\"> Differential ",param$get("rowNoun")," for '", .y,"'</a>", sep="")
+     )
+
+fname <- write_clusters(all_clusters,
+                          mcols(ddsList[[1]]),
+                          p=params,
+                          prefix="differential-clusters")
+
+cat('\n\n<a class="download-excel btn btn-primary" href="',
+    attr(fname,"link"),
+    '">',param$get("RowNoun"),'-Cluster mappings</a>', sep="")
+
+
+```
+
+
+# Terms Of Use
+
+The Crick has a [publication
+policy](https://intranet.crick.ac.uk/our-crick/library-information-services/pages/guidelines-publication)
+and we expect to be included on publications, regardless of funding
+arrangements. Any use of these results in publication must be
+discussed with BABS regarding authorship. If not authorship then
+the BABS analyst must receive a named acknowledgement. Please also
+cite the following sources which have enabled the analysis to be
+carried out.
+
+# References
+
+::: {#refs}
+:::
+
