@@ -489,7 +489,7 @@ for (dataset_id in names(dataset_model_comp)) {
           }
           design(tidied_se) <- md$model$design
           mcols(tidied_se)$results <- mcols(this_dds)$results[row.names(tidied_se),]
-          tidied_se <- reorder_samples(tidied_se,model_vars)
+          sample_order <- reorder_samples(tidied_se,model_vars)
           assay(tidied_se) <- reconstruct(tidied_se, plot_fml, influence=tidied_se$.influential, assay=assayNames(tidied_se)[1])
           removed <- attr(assay(tidied_se), "removed")
           if ("visible" %in% names(plot_fml[[2]])) {
@@ -525,7 +525,7 @@ for (dataset_id in names(dataset_model_comp)) {
         cc <- cluster_calc(assay(tidied_se), clusterID=gene_clust$clusters)
         hmap_data <- assay(tidied_se)
         pls <- hmap_fn(
-          dds=tidied_se, mat=hmap_data, param=param,
+          dds=tidied_se[,sample_order, drop=FALSE], mat=hmap_data[,sample_order, drop=FALSE], param=param,
           cluster_transform=identity, gene_clust = gene_clust,
           model_vars = model_vars,
           plot_fml =plot_fml,
@@ -544,7 +544,7 @@ for (dataset_id in names(dataset_model_comp)) {
         ### Design-based column ordering of  heatmap
         cat("\n\n---\n\n")
         pls <- hmap_fn(
-          dds=tidied_se, mat=hmap_data, param=param,
+          dds=tidied_se[,sample_order, drop=FALSE], mat=hmap_data[,sample_order, drop=FALSE], param=param,
           cluster_transform=identity, gene_clust = gene_clust,
           model_vars = model_vars,
           row_split = if ("cut.params" %in% slotNames(hc) && "k" %in% names(slot(hc, "cut.params"))) slot(hc, "cut.params")$k  else NULL,
