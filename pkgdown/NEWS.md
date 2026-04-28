@@ -1,3 +1,14 @@
+# Version 1.15.0
+## Major Changes
+## Minor Changes
+ - chore: version bump
+ - fix: Isolate heatmap sample-reordering
+ - chore: update the rnaseq.patch for the refactored spec/config
+ - infra: Add notes preprocessor
+ - fix: syntax error in docs makefile
+ - feat: Retrieve template updates via the export branch
+ - infra: move renv.lock from resources
+ - fix: regression in the sample ordering of heatmaps
 # Version 1.13.0
 ## Major Changes
 ## Minor Changes
