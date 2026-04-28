@@ -503,8 +503,10 @@ for (dataset_id in names(dataset_model_comp)) {
         eval(prepare_plot_data)
         mat_height <- height_scaler(n=nrow(tidied_se), small=10, big=20, N=1000)
         hc <- param$get("gene_clust")
+        keep_names <- FALSE
         if ("cut.params" %in% slotNames(hc) && "k" %in% names(slot(hc, "cut.params")) && slot(hc, "cut.params")$k >= nrow(tidied_se)) {
-          slot(hc, "cut.params") <- modifyList(slot(hc, "cut.params"), list(k=ceiling(nrow(tidied_se)/3)))
+          slot(hc, "cut.params") <- modifyList(slot(hc, "cut.params"), list(k=nrow(tidied_se)))
+          keep_names <- TRUE
         }
         if (nrow(tidied_se)>1) {
           gene_clust <- bluster::clusterRows(assay(tidied_se)[,this_dds$.involved,drop=FALSE], adapt_hclust_param(hc), full=TRUE)
@@ -518,7 +520,7 @@ for (dataset_id in names(dataset_model_comp)) {
         }
         if (!is_external) {
           this_clust <- cluster_ind()
-          gene_clust$clusters <- cluster_cardinality(gene_clust$clusters, this_clust)
+          gene_clust$clusters <- if (keep_names) row.names(tidied_se) else cluster_cardinality(gene_clust$clusters, this_clust)
         }
         removed <- attr(assay(tidied_se), "removed")
         capt <- paste0(tooltip(md, comparison_id), comp_type, param$get("rowNoun"),"s  of ", mtag(model_id), " in ", dtag(dataset_id), removed)
