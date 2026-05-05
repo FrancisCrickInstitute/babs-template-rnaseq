@@ -101,7 +101,7 @@ dmc_heading <- function(obj, hierarchy,  depth="##", numbered=TRUE, describe=TRU
   if (!numbered) {
     heading <- paste0(heading, "{.unnumbered}")
   }
-  if (!describe) text=""
+  if (!describe) text <- ""
   cat(paste0(heading, "\n\n", text, "\n\n"))
 
 }
@@ -249,6 +249,6 @@ tooltip <- function(md, text="") {
       tooltip <- paste0(" {{< tooltips tooltip=\"", attributes(md$comparison)$tooltip, "\" text=\"", text, "\" >}} ")
     }
   } else {
-    tooltip=text
+    tooltip <- text
   }
 }

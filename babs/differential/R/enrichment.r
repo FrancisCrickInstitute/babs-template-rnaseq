@@ -14,7 +14,7 @@ functional_api <- function (dds, method, source,  ...) {
   org <- metadata(dds)$organism$org
   res <- mcols(dds)$results
   ind <- grepl("\\*", res$class)
-  if (method!="OR") ind=T
+  if (method!="OR") ind <- TRUE
   res <- res[ind & !is.na(res$entrez),]
   res <- res[!duplicated(res$entrez),]
   genes <- setNames(res$shrunkLFC, res$entrez)

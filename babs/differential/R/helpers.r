@@ -56,13 +56,13 @@ ParamList <- R6::R6Class("ParamList",
                             if (is.null(value)) {
                               private$params[id] <- list(NULL)
                             } else {
-                              private$params[[id]]=value
+                              private$params[[id]] <- value
                             }
                             if (description=="") {
                               if (!(id %in% names(private$descriptions))) { # provide tautological definition if 
-                                description=paste0("The value of ", id, " is {}")
+                                description <- paste0("The value of ", id, " is {}")
                               } else {
-                                description=private$descriptions[id]}
+                                description <- private$descriptions[id]}
                             }
                             if ("src" %in% names(attributes(value))) {
                               description <- gsub("\\{\\}", attr(value, "src"), description)
@@ -73,7 +73,7 @@ ParamList <- R6::R6Class("ParamList",
                                 description <- gsub("\\{\\}", value, description)
                               }
                             }
-                            private$descriptions[[id]]=description
+                            private$descriptions[[id]] <- description
                             private$div_contents <- paste(private$div_contents, " - ", self$describe(id), '\n')
                             if ((!postpone) && isTRUE(getOption('knitr.in.progress'))) {
                               cat('\n\n::: {.callout-note title="Setting analysis parameter"}\n', private$div_contents, '\n:::\n\n')
@@ -266,7 +266,7 @@ comparison_name <- function(dds) {
 #' @author Gavin Kelly
 #' @export
 rbind_summary <- function(x, levels=c("Dataset", "Design", "Comparison")) {
-  if (class(x[[1]])=="list") {
+  if (inherits(x[[1]], "list")) {
     do.call(rbind, mapply(function(df, name) {
       extended <- cbind(name, df)
       names(extended)[1] <- levels[1]

@@ -43,6 +43,7 @@ source("R/rnaseq.r", local = knitr::knit_global())
 source("R/partial.r", local = knitr::knit_global())
 source("R/helpers.r", local = knitr::knit_global())
 source("R/output.r", local = knitr::knit_global())
+if (file.exists("R/my-functions.r")) source("R/my-functions.r",  local = knitr::knit_global())
 
 set.seed(1)
 
@@ -235,8 +236,8 @@ for (dataset in names(ddsList)) {
     dmc_heading(ddsList, list(dataset=dataset, model=mdl), depth="###", numbered=FALSE)
     src2bullets(metadata(ddsList[[dataset]])$models[[mdl]], c("subset", "influential_samples", "extra_assays"))
     cat("`",
-        Reduce(paste, sub("~", paste0(noun_to_readout(param$get("RowNoun"))," ~ "), deparse(mdls[[mdl]]))),
-        "`\n\n"
+      Reduce(paste, sub("~", paste0(noun_to_readout(param$get("RowNoun"))," ~ "), deparse(mdls[[mdl]]))),
+      "`\n\n"
         )
   }
 }
@@ -425,7 +426,7 @@ for (dataset_id in names(ddsList)) {
             )
     #
     design(this_dds) <- model_meta$design
-    reconstruct <- cached_partial(dataset=dataset_id, model=model_id) # This memo-ised function performs model-based removal of random and/or systematic effects
+    reconstruct <- cached_partial() # This memo-ised function performs model-based removal of random and/or systematic effects
     # Save the expected values across the designs reference-grid
     expected_assay <- reconstruct(this_dds, design(this_dds), resids=FALSE, influence=this_dds$.influential)
     links$expecteds <- c(links$expecteds, save_expected(expected_assay, colDF(this_dds), params))
@@ -655,9 +656,9 @@ cat(links$expecteds, sep="\n\n")
 cat("\n\n## Cluster Composition\n\n")
 
 fname <- write_clusters(links$clusters,
-                       mcols(ddsList[[1]]),
-                       p=params,
-                       prefix="exploratory-clusters")
+                        mcols(ddsList[[1]]),
+                        p=params,
+                        prefix="exploratory-clusters")
 
 cat('\n\n<a class="download-excel btn btn-primary" href="',
     attr(fname,"link"),
@@ -669,6 +670,7 @@ ojs_define(plot_df = plot_df)
 ```
 
 ```{ojs}
+//| label: select-plot
 plot_rows=transpose(plot_df);
 viewof dataset=Inputs.select([...new Set(plot_rows.map(d => d.dataset))]);
 viewof model=Inputs.select([...new Set(plot_rows.map(d => d.model))]);
