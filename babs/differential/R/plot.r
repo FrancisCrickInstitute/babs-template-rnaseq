@@ -79,7 +79,7 @@ plot_tracker <- function(my_params) {
                    )
         knitr::knit_print(g)
       }
-    } else if ("gtable" %in% class(pl)){
+    } else if (inherits(pl, "gtable")){
       fn <- function() {
         grid.draw(pl)
       }
@@ -211,8 +211,8 @@ aes_caption <- function(ae) {
 
 #' @export
 cluster_calc <- function(mat, clusterID) {
-  if (length(levels(clusterID))==1) {
-    setNames(data.frame(apply(mat, 2, mean)), levels(clusterID))
+  if (nlevels(clusterID)==1) {
+    setNames(data.frame(colMeans(mat)), levels(clusterID))
   } else {
     centres <- apply(mat, 2, function(samp) tapply(samp, clusterID, mean))
     as.data.frame(t(centres))
@@ -252,6 +252,7 @@ sort_vars <- function(x, target) {
 
 #' @export
 modify_mapping <- function(aes_obj) {
+  aes_obj$extra <- NULL
   aes_obj <- handle_flag_aes(aes_obj)
   if (!is.null(aes_obj$tooltip)) return(aes_obj)
   vars_used <- unique(unlist(lapply(aes_obj, all.vars)))
@@ -268,7 +269,7 @@ modify_mapping <- function(aes_obj) {
   return(aes_obj)
 }
 
-    
+
 handle_flag_aes <- function(aes_obj) {
   has_flag <- "flag" %in% names(aes_obj)
   if ("fill" %in% names(aes_obj) || !"colour" %in% names(aes_obj)) return(aes_obj)
@@ -446,7 +447,7 @@ hmap_fn <- function(dds, mat, param, cluster_transform, gene_clust, model_vars, 
   } else {
     splits <- setNames(TRUE, "Samples")
   }
-  splits <- splits[sapply(splits, length) != 0]
+  splits <- splits[lengths(splits) != 0]
   pls <- mapply(panel_hmap,
                ind=splits,
                first=c(TRUE, rep(FALSE, length(splits)-1)),
@@ -500,7 +501,7 @@ save_palettes <- function(ddsList, fname) {
 
   distinct <- setdiff(names(field_instances), in_all[in_common])
   palettes <- lapply(palettes, "[", distinct)
-  palettes <- palettes[sapply(palettes, length)>0]
+  palettes <- palettes[lengths(palettes)>0]
   for (i in names(palettes)) {
     for (j in names(palettes[[i]])) {
       palette2toml(j, prefix=paste0(i, '.'))
@@ -523,6 +524,7 @@ df2colorspace <- function(df, palette) {
   if (ncol(df)==0) return(list(Heatmap=list(), ggplot=list()))
   df <- dplyr::mutate_if(as.data.frame(df), is.character, as.factor)
   seq_cols <-c("Blues", "Greens", "Oranges", "Purples", "Reds")
+  dev_cols <- c("RdYlGn", "PuOr", "PRGn")
   # Order factor columns by number of levels
   is_fac <- sapply(df, is.factor)
   fac_order <- order(sapply(df[, is_fac, drop = FALSE], nlevels))
@@ -531,8 +533,10 @@ df2colorspace <- function(df, palette) {
   # for factors, zero-based starting index for colours
   start_levels <- cumsum(c(0,sapply(df, nlevels)))[1:length(df)] 
   is_num <- sapply(df, is.numeric)
+  centred <- sapply(df, function(x) is.numeric(x) && prod(sign(range(x, na.rm=TRUE))) == -1)
   # for numerics, which seq palette shall we use for this factor
-  start_levels[is_num] <- (cumsum(is_num[is_num])-1) %% length(seq_cols) + 1
+  start_levels[is_num & !centred] <- (cumsum(is_num[is_num & !centred])-1) %% length(seq_cols) + 1
+  start_levels[is_num & centred] <- (cumsum(is_num[is_num & centred])-1) %% length(seq_cols) + 1
   res <- list()
   res$Heatmap <- purrr::map2(df, start_levels,
               function(column, start_level) {
@@ -540,8 +544,14 @@ df2colorspace <- function(df, palette) {
                   setNames(pal[(seq(start_level, length=nlevels(column)) %% length(pal)) + 1],
                                      levels(column))
                 } else {
-                  my_cols <- RColorBrewer::brewer.pal(3, seq_cols[start_level])[-2]
-                  circlize::colorRamp2(range(column, na.rm=TRUE), my_cols)
+                  rng <- range(column, na.rm=TRUE)
+                  if (prod(sign(rng)) == -1) {
+                    my_cols <- RColorBrewer::brewer.pal(3, dev_cols[start_level])
+                    circlize::colorRamp2(c(-max(abs(rng)), 0, max(abs(rng))), my_cols)
+                  } else {
+                    my_cols <- RColorBrewer::brewer.pal(3, seq_cols[start_level])[-2]
+                    circlize::colorRamp2(rng, my_cols)
+                  }
                 }
               }
               )
