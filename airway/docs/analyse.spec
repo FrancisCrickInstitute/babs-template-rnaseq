@@ -4,6 +4,14 @@ specification(
 	    name="All",
 	    description="All samples included",
             subset = TRUE,
+	    extra_assays(
+		to_untreated=extra_assay(
+		    method="normalise", from="vst",
+		    treatment="Untreated",
+		    hint="normalised to untreated",
+		    design = ~  cellLine,
+		    recentre=FALSE, rescale=FALSE)
+	    ),
             models = list(
                 M1 = model(
 		    name="Simple",
@@ -16,7 +24,8 @@ so we have to restrict our model to at most this complexity.",
 		    profile_plots=list(
 			aes(x=cellLine, colour=treatment, group=treatment) ~ .,
 			aes(x=cellLine, colour=treatment, group=treatment) ~ . - treatment,
-			aes(x=cellLine, colour=treatment, group=treatment) ~ . - cellLine
+			aes(x=cellLine, colour=treatment, group=treatment) ~ . - cellLine,
+			aes(y=to_untreated, x=cellLine, colour=treatment) ~ .
 		    ),
                     comparisons = list(
                         mult_comp( revpairwise ~ treatment ),
