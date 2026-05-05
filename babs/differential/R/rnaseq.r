@@ -239,7 +239,7 @@ build_dds_list <- function(dds, spec) {
     })
   modelled_terms <-  setdiff(unique(unlist(modelled_terms)), ".")
   if (!"palette" %in% names(spec$settings)) {
-    spec$settings$palette="Set1"
+    spec$settings$palette <- "Set1"
   }
   if (is.list(spec$settings$palette)) {
     default_palette <- spec$settings$palette
@@ -458,7 +458,7 @@ fit_models <- function(dds, param, ...) {
       fit_model(mdl, dds, ...)
     }
   )
-  model_comp <- model_comp[sapply(model_comp, length)!=0]
+  model_comp <- model_comp[lengths(model_comp)!=0]
   model_comp <- imap(model_comp, function(obj, mname) {
     lapply(obj, function(y) {
       metadata(y)$dmc$model <- mname
@@ -533,7 +533,7 @@ get_design_matrix <- function(dds) {
 }
 
 fit_comparison <- function(comp, model_dds, mdl, ...) {
-  if (class(comp)=="post_hoc") { #Multiple-comparisons
+  if (inherits(comp, "post_hoc")) { #Multiple-comparisons
     strip <- c("spec","name","description")
     contrs <- emcontrasts(dds=model_dds, comp=comp)
     if (length(contrs)==0) return(list())
@@ -660,7 +660,7 @@ check_model <- function(dds) {
   if (is_formula(mdl$design) ) {
     df <- as.data.frame(colData(dds))
     na_covars <- apply(is.na(df[all.vars(mdl$design)]), 1, any)
-    if ("drop_incomplete" %in% names(mdl) && mdl$drop_incomplete==TRUE && any(na_covars)) {
+    if ("drop_incomplete" %in% names(mdl) && mdl$drop_incomplete && any(na_covars)) {
       warning("Dropping samples ", paste0(row.names(df)[na_covars], collapse=", "), " as they have incomplete metadata")
       dds <- dds[, !na_covars]
       colData(dds) <- droplevels(colData(dds))
@@ -679,7 +679,7 @@ check_model <- function(dds) {
         mdl$constraint <- em_constraint(fit, mdl$constraint)
       }
     }
-    if ("drop_unsupported_combinations" %in% names(mdl) && mdl$drop_unsupported_combinations==TRUE) {
+    if ("drop_unsupported_combinations" %in% names(mdl) && mdl$drop_unsupported_combinations) {
       mdl$dropped <- is.na(coef(fit))
     } else {
       if (any(is.na(coef(fit)))) {

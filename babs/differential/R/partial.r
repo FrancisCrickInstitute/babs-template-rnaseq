@@ -37,38 +37,41 @@ partialise.matrix <- function(obj, cdata, fml, influence = TRUE) {
   mf <- model.frame(fml, data = cdata)
   X <- as.matrix(model.matrix(fml, mf))
   storage.mode(X) <- "double"
-  QR <- qr(X)
-  X_center <- drop(colMeans(X))
-  assign <- attr(X, "assign")
-  terms <- attr(terms(fml), "term.labels")
-  nterms <- length(terms)
+  QR     <- qr(X)
+
+  assign   <- attr(X, "assign")
+  terms    <- attr(terms(fml), "term.labels")
+  nterms   <- length(terms)
   termcols <- lapply(seq_len(nterms), function(t) which(assign == t))
   cdata_full$tmat <- t(obj)
   mf_full <- model.frame(fml, data = cdata_full)
   X_full <- as.matrix(model.matrix(fml, mf_full))
   storage.mode(X_full) <- "double"
-  Xc_full <- sweep(X_full, 2, X_center, FUN = "-")  # center using influence means
-  # preallocate outputs
+  X_full  <- X_full[, colnames(X), drop = FALSE]
+
+  beta <- qr.coef(QR, t(obj_influence))   # p × nresp
+  keep <- !is.na(beta)
+  beta[!keep] <- 0
+
+  fitted_full <- X_full %*% beta           # nobs × nresp
+  const       <- beta[1, ]
+
   out <- array(0, c(nobs, nresp, nterms),
                dimnames = list(colnames(obj), rownames(obj), terms))
-  resid <- matrix(0, nobs, nresp, dimnames = list(colnames(obj), rownames(obj)))
-  const <- numeric(nresp)
-  for (i in seq_len(nresp)) {
-    beta <- qr.coef(QR, obj_influence[i, ])
-    beta[is.na(beta)] <- 0
-    term_mat <- matrix(0, nterms, nobs)
-    for (t in seq_len(nterms)) {
-      cols <- termcols[[t]]
-      term_mat[t, ] <- Xc_full[, cols, drop = FALSE] %*% beta[cols]
+
+  for (t in seq_len(nterms)) {
+    cols <- termcols[[t]]
+    if (length(cols) > 0) {
+      beta_sub <- beta[cols, , drop = FALSE]
+      beta_sub[!keep[cols, , drop = FALSE]] <- 0
+      out[, , t] <- X_full[, cols, drop = FALSE] %*% beta_sub
     }
-    out[, i, ] <- t(term_mat)
-    const[i] <- beta[1] + sum(X_center[-1] * beta[-1], na.rm = TRUE)
-    resid[, i] <- obj[i, ] - (colSums(term_mat) + const[i])
   }
+
   ret <- list(
     terms = out,
     const = const,
-    resid = resid
+    resid = t(obj) - fitted_full
   )
   class(ret) <- "partialised"
   ret
@@ -131,25 +134,27 @@ dropped_terms <- function(obj, reduced) {
 #' @author Gavin Kelly
 #' @family partial
 #' @export
-assemble_partialised <- function(obj, reduced, resids=TRUE) {
-  terms <-intersect(
+assemble_partialised <- function(obj, reduced, resids = TRUE) {
+  terms <- intersect(
     dimnames(obj$terms)[[3]],
     labels(terms(reduced))
   )
-  t(
-    rowSums(obj$terms[, , terms, drop=FALSE], na.rm=TRUE, dims=2) +
-      (if(resids) obj$resid else 0)) + obj$const
+
+#  mat <- apply(obj$terms[, , terms, drop = FALSE], c(1,2), sum)
+  mat <- rowSums(obj$terms[, , terms, drop = FALSE], dims = 2)
+  if (resids) {
+    mat <- mat + obj$resid
+  }
+
+  mat <- sweep(mat, 2, obj$const, "+")
+
+  t(mat)
 }
 
-
-cached_partial <- function(...) {
-  dots <- list(...)
-  defaults <- dots[names(dots) != ""]
-  dynamic_keys <- vapply(dots[names(dots) == ""], as.character, "")
+cached_partial <- function() {
   cache <- new.env(parent = emptyenv())
-
   function(obj, plot_fml, resids=TRUE, influence=TRUE, assay=NULL, ...) {
-    #design_key=paste(sort(attr(terms(design(obj)), "term.labels")), collapse="+")
+
     if (is.null(assay)) {
       if ("y" %in% names(plot_fml[[2]])) {
         assay <- as.character(plot_fml[[2]]$y)
@@ -158,48 +163,25 @@ cached_partial <- function(...) {
       }
     }
 
-    call_args <- list(...)
-    args <- modifyList(defaults, call_args)
-    
-    # extract cache keys
-    missing <- setdiff(dynamic_keys, names(args))
-    if (length(missing)) {
-      stop("Missing required arguments: ", paste(missing, collapse = ", "))
-    }
-
-    # walk/create nested environments
-    node <- cache
-    for (k in dynamic_keys) {
-      k <- as.character(k)
-      if (!exists(k, envir = node, inherits = FALSE)) {
-        node[[k]] <- new.env(parent = emptyenv())
-      }
-      node <- node[[k]]
-    }
-
-    # memoised value stored under "assay"
-    if (!exists(assay, envir = node, inherits = FALSE)) {
-      node[[assay]] <- partialise(obj, assay=assay, influence=influence)
-      node$.removed <- character()
+    # calculate the decomposition and cache if not already
+    if (!exists(assay, envir = cache, inherits = FALSE)) {
+      cache[[assay]] <- partialise(obj, assay=assay, influence=influence)
     }
 
     if (formula_equal(design(obj), plot_fml)) {
       removed <- if (resids) "" else " having removed noise"
     } else {
-      txt <- dropped_terms(node[[assay]], update(plot_fml, NULL ~ .))
+      txt <- dropped_terms(cache[[assay]], update(plot_fml, NULL ~ .))
       tr_list <- modifyList(setNames(as.list(txt), txt),  metadata(obj)$termNames)
       removed <- paste0(" having removed effect of ",
                        if (resids) "" else "noise and ",
                        paste(unlist(tr_list), collapse=", ")
                        )
     }
-    node$.removed <- c(node$.removed, removed)
     structure(
-      assemble_partialised(node[[assay]], reduced=update(plot_fml, NULL ~ .),  resids=resids),
+      assemble_partialised(cache[[assay]], reduced=update(plot_fml, NULL ~ .),  resids=resids),
       which_assay=assay,
       removed=removed,
-      defaults=defaults,
-      call_args=call_args,
       ind=!duplicated(model.matrix(design(obj), colDF(obj)))
     )
   }
