@@ -4,16 +4,15 @@ include shared.mk
 include module.mk
 
 configs = $(patsubst %,%.config,$(alignments))
-samplesheets = $(patsubst %,samplesheet_%.csv,$(alignments))
-plainsheets = $(patsubst %,%.csv,$(alignments))
+samplesheets = $(patsubst %,%.csv,$(alignments))
 
-ifneq (,$(filter-out $(or $(excluded-targets),$(MAKECMDGOALS)),$(MAKECMDGOALS)))
+
 include $(configs)
-endif
+
 
 gene_counts = $(patsubst %,results/%/merged.gene_counts.tsv,$(alignments))
 
-refdir = $(realpath $($*.index_dir)/$($*.genome_fasta_md5)/$($*.gtf_md5))
+refdir = $($*.index_dir)/$($*.genome_fasta_md5)/$($*.gtf_md5)
 workdir = $(SCRATCH_DIR)/nf_work
 
 run: $(gene_counts) ## Generate NF-CORE alignments, one folder for each config-specific samplesheet.
@@ -22,8 +21,14 @@ run: $(gene_counts) ## Generate NF-CORE alignments, one folder for each config-s
 $(patsubst %,results/%,$(alignments)):
 	mkdir -p $@
 
-$(gene_counts) : results/%/merged.gene_counts.tsv : samplesheet_%.csv  | $(log_dir) $(workdir)
+$(gene_counts) : results/%/merged.gene_counts.tsv : %.csv  | $(log_dir) $(workdir)
 	mkdir -p results/$*
+	if [ ! -f "$($*.genome_fasta)" ]; then \
+	  rsync -av "$($*.genome_fasta_url)" "$($*.genome_fasta)".gz && gunzip "$($*.genome_fasta)".gz ;\
+	fi
+	if [ ! -f "$($*.gtf)" ]; then \
+	  rsync -av "$($*.gtf_url)" "$($*.gtf)".gz && gunzip "$($*.gtf)".gz ;\
+	fi
 	export NXF_SINGULARITY_CACHEDIR="$(NXF_SINGULARITY_CACHEDIR)" ;\
 	export NXF_SINGULARITY_LIBRARYDIR="$(NXF_SINGULARITY_CACHEDIR)" ;\
 	export NXF_HOME=$(CURDIR) ;\
@@ -39,8 +44,8 @@ $(gene_counts) : results/%/merged.gene_counts.tsv : samplesheet_%.csv  | $(log_d
 	--input $< \
 	--outdir results/$*/ \
 	--aligner $($*.aligner) \
-	--fasta $(realpath $($*.genome_fasta)) \
-	--gtf $(realpath $($*.gtf)) \
+	--fasta $$(realpath $($*.genome_fasta)) \
+	--gtf $$(realpath $($*.gtf)) \
 	-w $(workdir) \
 	-ansi-log false \
 	"$${args[@]}" \
@@ -59,9 +64,9 @@ insfield=$(shell sed '/^$$/d; s/^$*./"/;s/=.*/"/' "$*.config" | paste -sd ',')
 vals=$(shell sed -r '/^$$/d; s/.*=(.*)/"\1"/' "$*.config" | paste -sd ',')
 
 
-$(samplesheets): samplesheet_%.csv: %.config %.csv
+$(samplesheets): %.csv: %.config ingress_%.csv
 	rm -f '$*.db'
-	$(SQLITE) '$*.db' ".import --csv $*.csv fastqs" \
+	$(SQLITE) '$*.db' ".import --csv ingress_$*.csv fastqs" \
 	"ALTER TABLE fastqs ADD COLUMN universal text;" \
 	"UPDATE fastqs SET universal='yes';"; \
 	$(SQLITE) '$*.db' 'CREATE TABLE config ($(field));' \
@@ -79,7 +84,7 @@ $(workdir):
 #### Bootrap all relevant data from outside
 ################################################################
 
-build: samplesheets ## Build all necessary inputs: samplesheets for each matching alignment '.config' from 'docs'.
+build: $(patsubst %,ingress_%,$(samplesheets)) ## Build all necessary inputs: samplesheets for each matching alignment '.config' from 'docs'.
 
 ifneq ($(docs_dir),)
 $(docs_dir)/%:
@@ -88,21 +93,19 @@ $(configs): %.config: $(docs_dir)/%.config
 	$(MAKE) --no-print-directory -C $(ingress_dir) $*.config
 	cp $(ingress_dir)/$*.config $@
 	$(GIT) add $@ $<
-
-$(plainsheets) : % : $(docs_dir)/%
-	$(MAKE) --no-print-directory -C $(ingress_dir) $*
-	cp $(ingress_dir)/$* $@
+ingress_%.csv: $(docs_dir)/%.csv
+	$(MAKE) --no-print-directory -C $(ingress_dir) $*.csv
+	cp $(ingress_dir)/$*.csv $@
 	$(GIT) add $@ $<
 
 endif
-
 
 
 $(log_dir):
 	mkdir -p $@
 
 publish: $(pubdir) ## Copy results to final location. Either 'outputs' folder (default), intranet (`make publish location=intranet`) or internet
-	for i in $(built_samplesheets); do \
+	for i in $(alignments); do \
 	  mkdir -p "$(pubdir)/$(VERSION)/$$i" ;\
 	  cp --no-preserve=mode -r results/"$$i"/star_rsem/*.markdup.sorted.bam "$(pubdir)/$(VERSION)/$$i" ;\
 	  cp --no-preserve=mode -r results/"$$i"/star_rsem/*.markdup.sorted.bam.bai "$(pubdir)/$(VERSION)/$$i" ;\
