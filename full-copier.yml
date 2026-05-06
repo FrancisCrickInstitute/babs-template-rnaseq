@@ -1,11 +1,9 @@
 ID:
   type: str
-  when: "{{ crick_fastq_prefix is not none }}"
   help: What is your project ID?
 
 project_name:
   type: str
-  when: "{{ crick_fastq_prefix is not none }}"
   help: What is your project name?
 
 lab:
