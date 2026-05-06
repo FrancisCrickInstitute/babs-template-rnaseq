@@ -6,15 +6,10 @@ project_name:
   type: str
   help: What is your project name?
 
-
-_subdirectory: babs
-_skip_if_exists:
-    - differential/renv.lock
-
 lab:
   type: str
   when: "{{ crick_fastq_prefix is not none }}"
-  help: "Enter NEMO lab name, e.g. nursep"
+  help: "Enter NEMO lab name, e.g. crickf"
 
 scientist:
   type: str
@@ -48,7 +43,8 @@ genome:
     {% endif %}
   default: custom
 
-genome_fasta:
+genome_fasta
+:
   type: str
   when: "{{ not genomes or genome not in genomes }}"
 gtf:
@@ -69,4 +65,8 @@ scratch:
   type: str
   help: "Scratch directory to store nextflow work"
   default: "."
-  
+
+_subdirectory: babs
+
+_skip_if_exists:
+    - differential/renv.lock
