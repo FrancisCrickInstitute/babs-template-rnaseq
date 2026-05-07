@@ -8,7 +8,7 @@ samplesheets=$(patsubst %.config,%.csv,$(configs))
 configs = $(wildcard *.config)
 metadata = $(wildcard $(experiment_table).csv)
 
-ifneq (,$(filter-out $(or $(excluded-targets),$(MAKECMDGOALS)),$(MAKECMDGOALS)))
+ifneq (,$(filter-out $(excluded-targets),$(MAKECMDGOALS)))
 include $(configs)
 endif
 

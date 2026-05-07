@@ -3,7 +3,6 @@ ingress_dir?=$(wildcard ../ingress)
 nfcore_dir?=$(wildcard ../nfcore)
 diff_dir?=$(wildcard ../differential)
 
-samplesheet_fname=samplesheet
 experiment_table = experiment_table
 samplesheet_id_column = sample
 metadata_id_column = ID

@@ -12,7 +12,7 @@ run: build ## Move relevant 'docs' files here and tidy them up as necessary.
 ################################################################
 
 configs = $(patsubst %,%.config,$(alignments))
-ifneq (,$(filter-out $(or $(excluded-targets),$(MAKECMDGOALS)),$(MAKECMDGOALS)))
+ifneq (,$(filter-out $(excluded-targets),$(MAKECMDGOALS)))
 include $(configs)
 endif
 samplesheets=$(patsubst %.config,%.csv,$(configs))
@@ -57,5 +57,4 @@ clean:
 run-clean:
 
 build-clean:
-	rm -f $(patsubst ../docs/%.config, %.config, $(wildcard ../docs/*.config))
-	rm -f $(patsubst ../docs/$(samplesheet_fname).csv, $(samplesheet_fname).csv, $(wildcard ../docs/$(samplesheet_fname).csv))
+	rm -f $(configs) $(samplesheets) $(experiment_table).csv

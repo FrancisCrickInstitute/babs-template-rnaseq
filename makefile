@@ -69,9 +69,9 @@ airway/fastq: airway/ena.txt
 airway/nfcore.tar.gz: | test ## Cache the nfcore results for future speed
 	cd test/babs/nfcore &&\
 	make run &&\
-	tar -czf  ../../../$@ samplesheet_GRCh38.csv samplesheet.csv GRCh38.config results/GRCh38/multiqc results/GRCh38/star_rsem/*.genes.results results/GRCh38/multi-qc results/GRCh38/star_rsem/rsem.merged.gene_counts.tsv results/GRCh38/merged.gene_counts.tsv
+	tar -czf  ../../../$@ samplesheet_GRCh38.csv GRCh38.csv GRCh38.config results/GRCh38/multiqc results/GRCh38/star_rsem/*.genes.results results/GRCh38/multi-qc results/GRCh38/star_rsem/rsem.merged.gene_counts.tsv results/GRCh38/merged.gene_counts.tsv
 
-test: airway/fastq infrastructure ## Generate a test folder setup for the airway data
+test: airway/fastq ## Generate a test folder setup for the airway data
 	mkdir -p $@/babs
 	touch $@/.babs
 	rsync -av  babs/. $@/babs/. --exclude '.~'

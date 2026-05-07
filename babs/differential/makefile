@@ -294,8 +294,8 @@ $(nfcore_dir)/%:
 
 # All the nfcore dependencies on docs - if docs samplesheet changes, recalculate everything.  If a config changes, just recalc that.
 
-$(nfcore_dir)/samplesheet_%.csv: $(docs_dir)/%.config $(docs_dir)/$(samplesheet_fname).csv
-$(nfcore_dir)/results/%/merged.gene_counts.tsv : $(docs_dir)/%.config $(docs_dir)/$(samplesheet_fname).csv
+$(nfcore_dir)/samplesheet_%.csv: $(docs_dir)/%.config $(docs_dir)/%.csv
+$(nfcore_dir)/results/%/merged.gene_counts.tsv : $(docs_dir)/%.config $(docs_dir)/%.csv
 
 
 ## Recipes for copying & generating files from nfcore results

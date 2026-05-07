@@ -4,11 +4,11 @@ include shared.mk
 include module.mk
 
 configs = $(patsubst %,%.config,$(alignments))
-samplesheets = $(patsubst %,%.csv,$(alignments))
+samplesheets = $(patsubst %,samplesheet_%.csv,$(alignments))
 
-
+ifneq (,$(filter-out $(excluded-targets),$(MAKECMDGOALS)))
 include $(configs)
-
+endif
 
 gene_counts = $(patsubst %,results/%/merged.gene_counts.tsv,$(alignments))
 
@@ -21,7 +21,7 @@ run: $(gene_counts) ## Generate NF-CORE alignments, one folder for each config-s
 $(patsubst %,results/%,$(alignments)):
 	mkdir -p $@
 
-$(gene_counts) : results/%/merged.gene_counts.tsv : %.csv  | $(log_dir) $(workdir)
+$(gene_counts) : results/%/merged.gene_counts.tsv : samplesheet_%.csv  | $(log_dir) $(workdir)
 	mkdir -p results/$*
 	if [ ! -f "$($*.genome_fasta)" ]; then \
 	  rsync -av "$($*.genome_fasta_url)" "$($*.genome_fasta)".gz && gunzip "$($*.genome_fasta)".gz ;\
@@ -64,9 +64,9 @@ insfield=$(shell sed '/^$$/d; s/^$*./"/;s/=.*/"/' "$*.config" | paste -sd ',')
 vals=$(shell sed -r '/^$$/d; s/.*=(.*)/"\1"/' "$*.config" | paste -sd ',')
 
 
-$(samplesheets): %.csv: %.config ingress_%.csv
+$(samplesheets): samplesheet_%.csv: %.config %.csv
 	rm -f '$*.db'
-	$(SQLITE) '$*.db' ".import --csv ingress_$*.csv fastqs" \
+	$(SQLITE) '$*.db' ".import --csv $*.csv fastqs" \
 	"ALTER TABLE fastqs ADD COLUMN universal text;" \
 	"UPDATE fastqs SET universal='yes';"; \
 	$(SQLITE) '$*.db' 'CREATE TABLE config ($(field));' \
@@ -84,7 +84,7 @@ $(workdir):
 #### Bootrap all relevant data from outside
 ################################################################
 
-build: $(patsubst %,ingress_%,$(samplesheets)) ## Build all necessary inputs: samplesheets for each matching alignment '.config' from 'docs'.
+build: $(patsubst %,%.csv,$(alignments)) ## Build all necessary inputs: samplesheets for each matching alignment
 
 ifneq ($(docs_dir),)
 $(docs_dir)/%:
@@ -93,7 +93,7 @@ $(configs): %.config: $(docs_dir)/%.config
 	$(MAKE) --no-print-directory -C $(ingress_dir) $*.config
 	cp $(ingress_dir)/$*.config $@
 	$(GIT) add $@ $<
-ingress_%.csv: $(docs_dir)/%.csv
+$(patsubst %,%.csv,$(alignments)): %.csv: $(docs_dir)/%.csv
 	$(MAKE) --no-print-directory -C $(ingress_dir) $*.csv
 	cp $(ingress_dir)/$*.csv $@
 	$(GIT) add $@ $<
