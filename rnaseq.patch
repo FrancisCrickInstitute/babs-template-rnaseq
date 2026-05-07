@@ -244,8 +244,8 @@ diff -ur infra-tmp/makefile babs/differential/makefile
 +
 +# All the nfcore dependencies on docs - if docs samplesheet changes, recalculate everything.  If a config changes, just recalc that.
 +
-+$(nfcore_dir)/samplesheet_%.csv: $(docs_dir)/%.config $(docs_dir)/$(samplesheet_fname).csv
-+$(nfcore_dir)/results/%/merged.gene_counts.tsv : $(docs_dir)/%.config $(docs_dir)/$(samplesheet_fname).csv
++$(nfcore_dir)/samplesheet_%.csv: $(docs_dir)/%.config $(docs_dir)/%.csv
++$(nfcore_dir)/results/%/merged.gene_counts.tsv : $(docs_dir)/%.config $(docs_dir)/%.csv
 +
 +
 +## Recipes for copying & generating files from nfcore results
@@ -421,13 +421,12 @@ diff -ur infra-tmp/resources/make/project.mk babs/differential/resources/make/pr
 diff -ur infra-tmp/resources/make/shared.mk babs/differential/resources/make/shared.mk
 --- infra-tmp/resources/make/shared.mk
 +++ babs/differential/resources/make/shared.mk
-@@ -1,3 +1,26 @@
+@@ -1,3 +1,25 @@
 +docs_dir?=$(wildcard ../docs)
 +ingress_dir?=$(wildcard ../ingress)
 +nfcore_dir?=$(wildcard ../nfcore)
 +diff_dir?=$(wildcard ../differential)
 +
-+samplesheet_fname=samplesheet
 +experiment_table = experiment_table
 +samplesheet_id_column = sample
 +metadata_id_column = ID
