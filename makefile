@@ -23,6 +23,10 @@ ifeq ($(defaultVersion),true)
 endif
 	mv $(type)-$(version).tar.gz $(template_dir)/archive/$(type)-$(version).tar.gz
 
+gh-deploy:
+	gh release create $(version) '$(template_dir)/archive/$(type)-$(version).tar.gz#Pipeline'
+
+
 $(template_dir)/archive:
 	mkdir -p $@
 
