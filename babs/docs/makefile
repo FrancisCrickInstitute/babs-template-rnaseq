@@ -45,12 +45,9 @@ check-samplesheets: $(samplesheets)
 
 
 $(samplesheets) : %.csv : %.config
-	if [ -z "$(wildcard $($*.fastq_wildcard))" ]; then  \
-	  echo "Couldn't find fastq files in $(fastq_wildcard). Perhaps try setting fastq_wildcard, or change your answers file" | tee -a tmp.err ;\
-	  exit ;\
-	fi
+	$(eval include $<)
 	echo "sample,fastq_1,fastq_2" > $@
-	for r1 in $(wildcard $($*.fastq_wildcard)); do \
+	for r1 in $(or $(r1_wildcard),fastq/*_R1_*.fastq.gz); do \
 	  echo -n $$(basename $$r1) | sed 's/_.*/,/' >> $@ ;\
 	  echo -n "$$r1," >> $@ ;\
 	  r2=`echo $$r1 | sed 's/_R1_/_R2_/'` ;\
@@ -59,6 +56,12 @@ $(samplesheets) : %.csv : %.config
 	    else echo "" >> $@ ;\
 	  fi ;\
 	done
+	if [ $$(wc -l < $@) -eq 1 ]; then \
+	  echo "Error: Couldn't find fastq files matching $(r1_wildcard)" | tee -a tmp.err ;\
+	  echo "Perhaps try setting r1_wildcard in $<" | tee -a tmp.err ;\
+	  rm $@ ;\
+	  exit 1 ;\
+	fi
 	$(GIT) add $@
 
 
