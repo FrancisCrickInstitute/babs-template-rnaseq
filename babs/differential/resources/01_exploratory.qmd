@@ -38,6 +38,7 @@ library(ggiraph)
 library(htmltools)
 
 source("R/plot.r", local = knitr::knit_global())
+source("R/dendrogram_insert.r", local = knitr::knit_global())
 source("R/markdown.r", local = knitr::knit_global())
 source("R/rnaseq.r", local = knitr::knit_global())
 source("R/partial.r", local = knitr::knit_global())
@@ -379,6 +380,7 @@ param$set("sample_clust", postpone=TRUE)
 param$set("pc_x", 1, postpone=TRUE)
 param$set("pc_y", 2, postpone=TRUE)
 param$set("reduce_heuristic", postpone=TRUE)
+param$set("cluster_unused_samples", postpone=TRUE)
 param$set("pc_weight")
 first <- TRUE
 links <- list(

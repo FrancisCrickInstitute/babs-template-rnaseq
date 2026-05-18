@@ -11,7 +11,7 @@ sym_colour <- function(dat, lo="blue",zero="white", hi="red") {
     circlize::colorRamp2(c(0, mx), colors=c(zero, hi))
   }    
 }
-  
+
 
 #' @export
 rename_with_tag <- function(params) {
@@ -151,7 +151,7 @@ rasterize_points <- function(p, dpi = 150) {
   point_layers <- which(sapply(
     p2$layers, 
     function(l) inherits(l$geom, "GeomPoint") &&
-                !inherits(l$geom, "GeomInteractive")
+           !inherits(l$geom, "GeomInteractive")
   ))
   for (i in point_layers) {
     p2$layers[[i]] <- ggrastr::rasterise(
@@ -186,7 +186,7 @@ substitute_x_aes <- function(mapping) {
   # remap what was being represented by x to another
   # aesthetic. Supplement with x swapped to colour if necessary
   need_alt_x <- !(
-      all(all.vars(mapping$x) %in% all.vars(mapping$colour)) ||
+    all(all.vars(mapping$x) %in% all.vars(mapping$colour)) ||
       all(all.vars(mapping$x) %in% all.vars(mapping$color)) ||
       all(all.vars(mapping$x) %in% all.vars(mapping$shape))
   )
@@ -197,7 +197,7 @@ substitute_x_aes <- function(mapping) {
   }
   out
 }
-  
+
 #' @export
 aes_caption <- function(ae) {
   ae <- ae[intersect(c("colour","shape", "fill"), names(ae))]
@@ -317,8 +317,8 @@ get_colour_scales <- function(dds, mapping, flag_vars=character()) {
 
 #' @export
 height_scaler <- function(n, small, big, N) {
-        h <- small +(big-small)*(n-1)/(N-1)
-        min(h, big)
+  h <- small +(big-small)*(n-1)/(N-1)
+  min(h, big)
 }
 
 #' @export
@@ -400,18 +400,47 @@ hmap_fn <- function(dds, mat, param, cluster_transform, gene_clust, model_vars, 
     ##       width = unit(1, "cm")),
     ##     show_legend=FALSE)
     ## } else {
-         left_annotation <- NULL
+    left_annotation <- NULL
     ## }
-    
+    if (param$get("cluster_unused_samples") == "ignore") {
+      ind <- ind[dds$.influential_in_assay]
+    }
     defaults <- list(
       matrix=masked[,ind,drop=FALSE],
       column_title = column_title,
       row_title = paste0(param$get("RowNoun"),"s"),
       col = col_fn,
       cluster_columns = if (nrow(masked[,ind,drop=FALSE]) >1 && "sample_clust" %in% names(param$publish())) {
-        bluster::clusterRows(
-          t(cluster_transform(mat[,ind,drop=FALSE])),
-          adapt_hclust_param(param$get("sample_clust")), full=TRUE)$objects$hclust
+        # Get the subset of data we're actually plotting
+        mat_subset <- mat[, ind, drop=FALSE]
+        dds_subset <- dds[, ind]
+        # cluster influential samples WITHIN this subset
+        if (param$get("cluster_unused_samples") == "include") {
+            infl_ind_subset <- TRUE
+          } else {
+            infl_ind_subset <- dds_subset$.influential_in_assay
+          }
+        infl_cluster <- bluster::clusterRows(
+          t(cluster_transform(mat_subset[, infl_ind_subset, drop=FALSE])),
+          adapt_hclust_param(param$get("sample_clust")), full=TRUE
+        )$objects$hclust
+        if (all(infl_ind_subset)) {
+          infl_cluster
+        } else {
+          dfun <- adapt_hclust_param(param$get("sample_clust"))@dist.fun %||% dist
+          D <- as.matrix(dfun(t(cluster_transform(mat_subset)), method = infl_cluster$dist.method))
+          # Extract distances: new samples (rows) to base samples (columns)
+          D_new <- D[!infl_ind_subset, infl_ind_subset, drop=FALSE]
+          D_among_new <- D[!infl_ind_subset, !infl_ind_subset, drop=FALSE]
+          # Insert non-influential samples into the dendrogram
+          insert_samples_into_dendrogram(
+            infl_cluster, 
+            D_new,
+            D_among_new,
+            infl_cluster$method,
+            column_names = colnames(mat_subset)
+          )
+        }
       } else {
         FALSE
       },
@@ -445,7 +474,7 @@ hmap_fn <- function(dds, mat, param, cluster_transform, gene_clust, model_vars, 
     col_split <- rlang::eval_tidy(eval(plot_fml[[2]])$cols, colDF(dds))
     splits <- split(seq_along(col_split), col_split)
   } else {
-    splits <- setNames(TRUE, "Samples")
+    splits <- list("Samples"=seq(length=ncol(dds)))
   }
   splits <- splits[lengths(splits) != 0]
   pls <- mapply(panel_hmap,
@@ -463,10 +492,10 @@ hmap_fn <- function(dds, mat, param, cluster_transform, gene_clust, model_vars, 
 make_clusterer <- function(dds, fml) {
   cluster <- all.vars(fml[[2]]$cluster)[1]
   if (!is.na(cluster) && cluster %in% assayNames(dds)) {
-      function(mat) {
-        mat[] <- assay(dds, cluster)[row.names(mat), colnames(mat)]
-        mat
-      }
+    function(mat) {
+      mat[] <- assay(dds, cluster)[row.names(mat), colnames(mat)]
+      mat
+    }
   } else {
     identity
   }
@@ -536,39 +565,49 @@ df2colorspace <- function(df, palette) {
   centred <- sapply(df, function(x) is.numeric(x) && prod(sign(range(x, na.rm=TRUE))) == -1)
   # for numerics, which seq palette shall we use for this factor
   start_levels[is_num & !centred] <- (cumsum(is_num[is_num & !centred])-1) %% length(seq_cols) + 1
-  start_levels[is_num & centred] <- (cumsum(is_num[is_num & centred])-1) %% length(seq_cols) + 1
+  start_levels[is_num & centred] <- (cumsum(is_num[is_num & centred])-1) %% length(dev_cols) + 1
   res <- list()
   res$Heatmap <- purrr::map2(df, start_levels,
-              function(column, start_level) {
-                if (is.factor(column)) {
-                  setNames(pal[(seq(start_level, length=nlevels(column)) %% length(pal)) + 1],
-                                     levels(column))
-                } else {
-                  rng <- range(column, na.rm=TRUE)
-                  if (prod(sign(rng)) == -1) {
-                    my_cols <- RColorBrewer::brewer.pal(3, dev_cols[start_level])
-                    circlize::colorRamp2(c(-max(abs(rng)), 0, max(abs(rng))), my_cols)
-                  } else {
-                    my_cols <- RColorBrewer::brewer.pal(3, seq_cols[start_level])[-2]
-                    circlize::colorRamp2(rng, my_cols)
-                  }
-                }
-              }
-              )
+                            function(column, start_level) {
+                              if (is.factor(column)) {
+                                setNames(pal[(seq(start_level, length=nlevels(column)) %% length(pal)) + 1],
+                                         levels(column))
+                              } else if (is.logical(column)) {
+                                setNames(pal[(seq(start_level, length=length(unique(column))) %% length(pal)) + 1],
+                                         unique(column))                  
+                              } else {
+                                rng <- range(column, na.rm=TRUE)
+                                if (prod(sign(rng)) == -1) {
+                                  my_cols <- RColorBrewer::brewer.pal(3, dev_cols[start_level])
+                                  circlize::colorRamp2(c(-max(abs(rng)), 0, max(abs(rng))), my_cols)
+                                } else {
+                                  my_cols <- RColorBrewer::brewer.pal(3, seq_cols[start_level])[-2]
+                                  circlize::colorRamp2(rng, my_cols)
+                                }
+                              }
+                            }
+                            )
   res$Heatmap$.influential <- setNames(c("black", "white"), c(TRUE, FALSE))
   res$Heatmap$.involved <- setNames(c("black", "white"), c(TRUE, FALSE))
   res$ggplot <- purrr::map2(df, start_levels,
-              function(column, start_level) {
-                if (is.factor(column)) {
-                  setNames(pal[(seq(start_level, length=nlevels(column)) %% length(pal)) + 1],
-                                     levels(column))
-                } else {
-                  RColorBrewer::brewer.pal(3, seq_cols[start_level])[-2]
-                }
-              }
-              )
+                           function(column, start_level) {
+                             if (is.factor(column)) {
+                               setNames(pal[(seq(start_level, length=nlevels(column)) %% length(pal)) + 1],
+                                        levels(column))
+                             } else if (is.logical(column)) {
+                               setNames(pal[(seq(start_level, length=length(unique(column))) %% length(pal)) + 1],
+                                        unique(column))
+                             } else {
+                               rng <- range(column, na.rm=TRUE)
+                               if (prod(sign(rng)) == -1) {
+                                 RColorBrewer::brewer.pal(3, dev_cols[start_level])
+                               } else {
+                                 RColorBrewer::brewer.pal(3, seq_cols[start_level])[-2]
+                               }
+                             }
+                           }
+                           )
   res$ggplot$.influential <- setNames(c("black", "white"), c(TRUE, FALSE))
   res$ggplot$.involved <- setNames(c("black", "white"), c(TRUE, FALSE))
   res
 }
-

@@ -180,8 +180,20 @@ $(staging_dir)/$(VERSION).params.yml:  resources/make/project.mk $(staging_dir)/
 	echo 'author: [{name: "$(or $(FULLNAME),$(shell whoami))", id: $(shell whoami), roles: Analyst, affiliation: $(or $(MY_AFFILIATION),{ref: [fci]})}]' > $@
 	echo 'params: {$(foreach p,$(param_names),$p: "$($p)"$(comma))}' >> $@
 
-$(staging_dir)/index.qmd : $(source_dir)/index.qmd $(qmds) $(staging_dir)/notes.md
+$(staging_dir)/index.qmd : $(source_dir)/index.qmd $(qmds) $(staging_dir)/notes.md $(log_dir)/check_spec.log
 	sed  's#^  contents: .*#  contents: [$(subst $(space),$(comma),$(patsubst $(staging_dir)/%,%,$(qmds)))]#' $< > $@
+
+$(log_dir)/check_spec.log : $(file.spec)
+	$(R) --vanilla -e "files <- strsplit('$(file.spec)', ' +')[[1]]; \
+	  ok <- TRUE; \
+	  for (f in files) { \
+	    message('Checking ', f); \
+	    tryCatch(parse(file = f), error = function(e) { \
+	      message('ERROR in ', f, ': ', e$$message); \
+	      ok <<- FALSE \
+	    }) \
+	  }; \
+	  if (!ok) quit(status = 1)"  2>$@
 
 $(staging_dir)/R.bib: extdata/R.bib
 	cp $< $@

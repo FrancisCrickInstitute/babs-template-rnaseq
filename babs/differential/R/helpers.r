@@ -19,6 +19,7 @@ ParamList <- R6::R6Class("ParamList",
                                             baseMeanMin="Discard transcripts with few average counts per sample than {}",
                                             baseline_heuristic="Use the '{}' heuristic to centre the colour-scale",
                                             reduce_heuristic="Use the '{}' terms heuristic to test covariate-PC associations",
+                                            cluster_unused_samples="{} the non-influential samples in dendrograms",
                                             pc_weight="Use the '{}' heuristic to choose strength of PC-covariate association",
                                             LRT_effect="Use the '{}' summary of an LRT 'effect size'"
                                             ),
@@ -408,6 +409,7 @@ default_spec_settings <- function() {
     baseline_heuristic = "min",  ## For the "white" colour in differential heatmaps
     pc_weight = "equal weight", ## equal_weight/eigen (latter favours early PCs)
     reduce_heuristic="drop1",
+    cluster_unused_samples="inject", ## or include or ignore
     LRT_effect = "default"  ## For the "white" colour in differential heatmaps
   )
   attach_src(lapply(ex, eval), lapply(ex, function(x) paste(deparse(x), collapse="")))
