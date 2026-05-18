@@ -8,10 +8,6 @@ samplesheets=$(patsubst %.config,%.csv,$(configs))
 configs = $(wildcard *.config)
 metadata = $(wildcard $(experiment_table).csv)
 
-ifneq (,$(filter-out $(excluded-targets),$(MAKECMDGOALS)))
-include $(configs)
-endif
-
 .PHONY: run clean
 
 
@@ -43,10 +39,16 @@ check-samplesheets: $(samplesheets)
 	  [ $$(wc -l < $$s) -ge 2 ] || { echo "$$s has only one line" | tee -a tmp.err ;} ;\
 	done
 
-
+ifeq ($(wildcard samplesheet.csv),)
 $(samplesheets) : %.csv : %.config
 	$(eval include $<)
 	echo "sample,fastq_1,fastq_2" > $@
+ifeq ($(wildcard $(or $(r1_wildcard),fastq/*_R1_*.fastq.gz)),)
+	  echo "Error: Couldn't find fastq files matching $(r1_wildcard)" | tee -a tmp.err
+	  echo "Perhaps try setting r1_wildcard in $<" | tee -a tmp.err
+	  rm $@
+	  exit 1
+else
 	for r1 in $(or $(r1_wildcard),fastq/*_R1_*.fastq.gz); do \
 	  echo -n $$(basename $$r1) | sed 's/_.*/,/' >> $@ ;\
 	  echo -n "$$r1," >> $@ ;\
@@ -56,12 +58,11 @@ $(samplesheets) : %.csv : %.config
 	    else echo "" >> $@ ;\
 	  fi ;\
 	done
-	if [ $$(wc -l < $@) -eq 1 ]; then \
-	  echo "Error: Couldn't find fastq files matching $(r1_wildcard)" | tee -a tmp.err ;\
-	  echo "Perhaps try setting r1_wildcard in $<" | tee -a tmp.err ;\
-	  rm $@ ;\
-	  exit 1 ;\
-	fi
+endif
+else
+$(samplesheets): samplesheet.csv
+	cp $< $@
+endif
 	$(GIT) add $@
 
 

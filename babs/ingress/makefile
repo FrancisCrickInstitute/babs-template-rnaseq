@@ -12,29 +12,24 @@ run: build ## Move relevant 'docs' files here and tidy them up as necessary.
 ################################################################
 
 configs = $(patsubst %,%.config,$(alignments))
-ifneq (,$(filter-out $(excluded-targets),$(MAKECMDGOALS)))
-include $(configs)
-endif
 samplesheets=$(patsubst %.config,%.csv,$(configs))
 
 
-build: $(samplesheets) $(experiment_table).csv
-
+build: $(samplesheets) $(experiment_table).csv $(configs)
 
 ifneq ($(docs_dir),)
 $(docs_dir)/%:
 	$(MAKE) --no-print-directory -C $(docs_dir) $*
 
 $(configs): %.config: $(docs_dir)/%.config
-	tr -d '\r' < $< | sed  's/^$*\.//' > $@
+	tr -d '\r' < $<  > $@
 	grep -q "^genome_fasta" $@ || echo "WARNING: No genome_fasta set in $*.config"
 	grep -q "^gtf" $@ || echo "WARNING: No gtf set in $*.config"
-	grep -q "^universal" $@ || sed -i -e '$$auniversal=yes' $@
-	grep -q "^strandedness" $@ || sed -i -e '$$astrandedness=auto' $@
-	grep -q "^aligner" $@ || sed -i -e '$$aaligner=star_rsem' $@
+	grep -q "^universal" $@ || echo 'universal=yes'>> $@
+	grep -q "^strandedness" $@ || echo 'strandedness=auto' >> $@
+	grep -q "^aligner" $@ || echo 'aligner=star_rsem'>> $@
 	md5sum $(shell sed -n 's/^genome_fasta=//p' $<) | awk '{print "genome_fasta_md5=" $$1}' >> $@
 	md5sum $(shell sed -n 's/^gtf=//p' $<) | awk '{print "gtf_md5=" $$1}' >> $@
-	sed -i 's/^/$*./' $@
 	$(GIT) add $@ $<
 
 $(samplesheets) : % : $(docs_dir)/%

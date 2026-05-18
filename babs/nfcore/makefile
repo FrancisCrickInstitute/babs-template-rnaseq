@@ -6,13 +6,9 @@ include module.mk
 configs = $(patsubst %,%.config,$(alignments))
 samplesheets = $(patsubst %,samplesheet_%.csv,$(alignments))
 
-ifneq (,$(filter-out $(excluded-targets),$(MAKECMDGOALS)))
-include $(configs)
-endif
-
 gene_counts = $(patsubst %,results/%/merged.gene_counts.tsv,$(alignments))
 
-refdir = $($*.index_dir)/$($*.genome_fasta_md5)/$($*.gtf_md5)
+refdir = $(index_dir)/$(genome_fasta_md5)/$(gtf_md5)
 workdir = $(SCRATCH_DIR)/nf_work
 
 run: $(gene_counts) ## Generate NF-CORE alignments, one folder for each config-specific samplesheet.
@@ -21,19 +17,20 @@ run: $(gene_counts) ## Generate NF-CORE alignments, one folder for each config-s
 $(patsubst %,results/%,$(alignments)):
 	mkdir -p $@
 
-$(gene_counts) : results/%/merged.gene_counts.tsv : samplesheet_%.csv  | $(log_dir) $(workdir)
+$(gene_counts) : results/%/merged.gene_counts.tsv : samplesheet_%.csv %.config | $(log_dir) $(workdir)
+	$(eval include $*.config)
 	mkdir -p results/$*
-	if [ ! -f "$($*.genome_fasta)" ]; then \
-	  rsync -av "$($*.genome_fasta_url)" "$($*.genome_fasta)".gz && gunzip "$($*.genome_fasta)".gz ;\
+	if [ ! -f "$(genome_fasta)" ]; then \
+	  rsync -av "$(genome_fasta_url)" "$(genome_fasta)".gz && gunzip "$(genome_fasta)".gz ;\
 	fi
-	if [ ! -f "$($*.gtf)" ]; then \
-	  rsync -av "$($*.gtf_url)" "$($*.gtf)".gz && gunzip "$($*.gtf)".gz ;\
+	if [ ! -f "$(gtf)" ]; then \
+	  rsync -av "$(gtf_url)" "$(gtf)".gz && gunzip "$(gtf)".gz ;\
 	fi
 	export NXF_SINGULARITY_CACHEDIR="$(NXF_SINGULARITY_CACHEDIR)" ;\
 	export NXF_SINGULARITY_LIBRARYDIR="$(NXF_SINGULARITY_CACHEDIR)" ;\
 	export NXF_HOME=$(CURDIR) ;\
 	args=();\
-	if [ -n "$($*.index_dir)" ];\
+	if [ -n "$(index_dir)" ];\
 	  then if [ -d "$(refdir)" ];\
 	    then args+=(--rsem_index=$(refdir)/rsem/  --salmon_index=$(refdir)/salmon/) ;\
 	    else  args+=(--save_reference);\
@@ -43,28 +40,29 @@ $(gene_counts) : results/%/merged.gene_counts.tsv : samplesheet_%.csv  | $(log_d
 	$(NEXTFLOW) run nf-core/rnaseq \
 	--input $< \
 	--outdir results/$*/ \
-	--aligner $($*.aligner) \
-	--fasta $$(realpath $($*.genome_fasta)) \
-	--gtf $$(realpath $($*.gtf)) \
+	--aligner $(aligner) \
+	--fasta $$(realpath $(genome_fasta)) \
+	--gtf $$(realpath $(gtf)) \
 	-w $(workdir) \
 	-ansi-log false \
 	"$${args[@]}" \
-	$(or $($*.nfcore),$(nf_options)) $(call log,nfcore)
-	if [ -n "$($*.index_dir)" ] && [ ! -d "$(refdir)" ];\
+	$(or $(nfcore),$(nf_options)) $(call log,nfcore)
+	if [ -n "$(index_dir)" ] && [ ! -d "$(refdir)" ];\
 	    then mkdir -p "$(refdir)" && mv results/$*/genome/index/* "$(refdir)"/;\
 	fi
 	$(NEXTFLOW) clean -f
-	ln -sfn $($*.aligner)/$(subst star_,,$($*.aligner)).merged.gene_counts.tsv $@
-	ln -sfn multiqc/$($*.aligner)/ results/$*/multi-qc
+	ln -sfn $(aligner)/$(subst star_,,$(aligner)).merged.gene_counts.tsv $@
+	ln -sfn multiqc/$(aligner)/ results/$*/multi-qc
 
 
 
-field=$(shell sed '/^$$/d; s/^$*./"/;s/=.*/" TEXT/' "$*.config" | paste -sd ',')
-insfield=$(shell sed '/^$$/d; s/^$*./"/;s/=.*/"/' "$*.config" | paste -sd ',')
+field=$(shell sed '/^$$/d; s/^/"/;s/=.*/" TEXT/' "$*.config" | paste -sd ',')
+insfield=$(shell sed '/^$$/d; s/^/"/;s/=.*/"/' "$*.config" | paste -sd ',')
 vals=$(shell sed -r '/^$$/d; s/.*=(.*)/"\1"/' "$*.config" | paste -sd ',')
 
 
 $(samplesheets): samplesheet_%.csv: %.config %.csv
+	$(eval include $<)
 	rm -f '$*.db'
 	$(SQLITE) '$*.db' ".import --csv $*.csv fastqs" \
 	"ALTER TABLE fastqs ADD COLUMN universal text;" \
@@ -74,7 +72,7 @@ $(samplesheets): samplesheet_%.csv: %.config %.csv
 	'CREATE TABLE fastq AS SELECT * FROM fastqs NATURAL JOIN config ;'; \
 	$(SQLITE) -header -csv '$*.db' 'SELECT $(samplesheet_id_column) AS sample, fastq_1, fastq_2, strandedness FROM fastq;' > $@
 	rm -f '$*.db'
-	if [ ! -z "$($*.grep)" ]; then grep $($*.grep) $@ > $@.tmp; mv $@.tmp $@; fi
+	if [ ! -z "$(grep)" ]; then grep $(grep) $@ > $@.tmp; mv $@.tmp $@; fi
 	$(GIT) add $@
 
 $(workdir):
@@ -84,7 +82,7 @@ $(workdir):
 #### Bootrap all relevant data from outside
 ################################################################
 
-build: $(patsubst %,%.csv,$(alignments)) ## Build all necessary inputs: samplesheets for each matching alignment
+build: $(patsubst %,%.csv,$(alignments)) $(configs) ## Build all necessary inputs: samplesheets for each matching alignment
 
 ifneq ($(docs_dir),)
 $(docs_dir)/%:

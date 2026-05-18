@@ -69,7 +69,12 @@ $(mk0): $(staging_dir)/.make-% : $(samplesheets) $(genes_results) | $(staging_di
 	echo '$*_htmls: $$($*_htmls)'>> $@
 
 ifneq (,$(filter-out $(or $(excluded-targets),$(MAKECMDGOALS)),$(MAKECMDGOALS)))
-include $(configs)
+$(foreach c,$(conf), \
+$(eval include extdata/$(c).config) \
+$(eval $(c).org.db=$org.db) \
+$(eval $(c).categories=$categories) \
+$(eval $(c).spec=$spec) \
+$(eval $(c).nospec=$nospec))
 endif
 
 qmds=$(strip $(foreach section,$(sections),$($(section)_qmds)))
