@@ -195,7 +195,7 @@ renv: | $(log_dir)
 	for i in "$(orgs)"; do echo "library($$i)" >> resources/_dependencies.R; done
 	if [ -f renv.lock ] ; then \
 	  $(R) -e 'library(renv); activate()' ;\
-	  $(R) -e 'library(renv); restore(); install(lock=TRUE)' ;\
+	  $(R) -e 'library(renv); restore(); install(strsplit("$(orgs)", " +")[[1]], lock=TRUE)' ;\
 	else \
 	  $(GIT) stash push -m "Pipeline stashed. Use 'git stash pop' to retrieve it" -- $@ $(call log,renv) ;\
 	  $(R) -e 'library(renv); init(bioconductor=TRUE)' ;\
