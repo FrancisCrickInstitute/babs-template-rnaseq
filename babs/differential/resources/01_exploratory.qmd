@@ -79,6 +79,7 @@ if (isTRUE(getOption('knitr.in.progress'))) {
 
 ```{r}
 #| label: read-expl
+#| error: FALSE
 
 data(list=paste0("counts_", params$alignment))
 is_des <- inherits(dds, "DESeqDataSet")

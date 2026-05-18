@@ -18,7 +18,6 @@ suppressPackageStartupMessages({
   library(broom)
   library(brglm2)
   library(rio)
-  library(DEP)
   library(gt)
   library(limma)
 })

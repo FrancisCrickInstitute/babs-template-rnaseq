@@ -14,9 +14,6 @@
             "packages": "curl,renv,sf,terra,tinytex",
             "installSystemRequirements": true
         },
-        "ghcr.io/rocker-org/devcontainer-features/quarto-cli:1": {
-            "version": "1.8.25"
-        },
         "ghcr.io/jsburckhardt/devcontainer-features/uv:1": {}
     }
 }

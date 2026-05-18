@@ -12,7 +12,7 @@ load_specs <- function(file="", context) {
     list_obj <- function(my_alias, envir, post=NULL) {
       aliased_list <<- c(aliased_list, my_alias)
       assign(my_alias, function(...) {
-        out <- structure(rlang::dots_list(..., .ignore_empty="all"), constructor=my_alias)
+        out <- structure(list(...), constructor=my_alias)
         if (is.null(post)) {
           out
         } else {

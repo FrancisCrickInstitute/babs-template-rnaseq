@@ -69,12 +69,12 @@ $(mk0): $(staging_dir)/.make-% : $(samplesheets) $(genes_results) | $(staging_di
 	echo '$*_htmls: $$($*_htmls)'>> $@
 
 ifneq (,$(filter-out $(or $(excluded-targets),$(MAKECMDGOALS)),$(MAKECMDGOALS)))
-$(foreach c,$(conf), \
+$(foreach c,$(alignments), \
 $(eval include extdata/$(c).config) \
-$(eval $(c).org.db=$org.db) \
-$(eval $(c).categories=$categories) \
-$(eval $(c).spec=$spec) \
-$(eval $(c).nospec=$nospec))
+$(eval $(c).org.db=$(org.db)) \
+$(eval $(c).categories=$(categories)) \
+$(eval $(c).spec=$(spec)) \
+$(eval $(c).nospec=$(nospec)))
 endif
 
 qmds=$(strip $(foreach section,$(sections),$($(section)_qmds)))
@@ -304,7 +304,7 @@ $(nfcore_dir)/results/%/merged.gene_counts.tsv : $(docs_dir)/%.config $(docs_dir
 
 
 ## Recipes for copying & generating files from nfcore results
-$(samplesheets) : $(my_metadata)_%.csv : $(nfcore_dir)/samplesheet_%.csv $(my_metadata).csv
+$(samplesheets) : $(my_metadata)_%.csv : $(nfcore_dir)/samplesheet_%.csv $(my_metadata).csv extdata/%.config
 	rm -f '$*.db'
 	$(SQLITE) '$*.db' '.import --csv  $< $*'  ;\
 	$(SQLITE) '$*.db' '.import --csv  $(my_metadata).csv metadata'  ;\
