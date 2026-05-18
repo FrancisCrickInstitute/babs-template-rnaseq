@@ -418,7 +418,7 @@ hmap_fn <- function(dds, mat, param, cluster_transform, gene_clust, model_vars, 
         if (param$get("cluster_unused_samples") == "include") {
             infl_ind_subset <- TRUE
           } else {
-            infl_ind_subset <- dds_subset$.influential_in_assay
+            infl_ind_subset <- dds_subset$.influential_in_assay %||% TRUE
           }
         infl_cluster <- bluster::clusterRows(
           t(cluster_transform(mat_subset[, infl_ind_subset, drop=FALSE])),

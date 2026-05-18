@@ -470,7 +470,6 @@ for (dataset_id in names(dataset_model_comp)) {
         baseline_str <- paste("average", noun_to_readout(param$get("rowNoun")))
       }
       centroid_df <- list()
-      reconstruct <- cached_partial() # This memo-ised function performs model-based removal of random and/or systematic effects
       # Because heatmaps aren't really affected by anything other than y-aesthetic and partials:
       unique_heatmaps <- !duplicated(sapply(plot_formulae, function(pl) {fml <- pl[[1]]; y <- eval(fml[[2]])$y; fml[[2]] <- y; deparse1(fml)}))
       for (plot_id in names(plot_formulae)[unique_heatmaps]) {
@@ -493,15 +492,16 @@ for (dataset_id in names(dataset_model_comp)) {
           design(tidied_se) <- md$model$design
           mcols(tidied_se)$results <- mcols(this_dds)$results[row.names(tidied_se),]
           sample_order <- reorder_samples(tidied_se,model_vars)
-          assay(tidied_se) <- reconstruct(tidied_se, plot_fml, influence=tidied_se$.influential, assay=assayNames(tidied_se)[1])
+          assay(tidied_se) <- partial_reconstruct(tidied_se, plot_fml, assay=assayNames(tidied_se)[1])
+          tidied_se$.influential_in_assay  <- attr(tidied_se, "influential_in_assay")
           removed <- attr(assay(tidied_se), "removed")
           if ("visible" %in% names(plot_fml[[2]])) {
             vis_sample <- eval(plot_fml[[2]]$visible, colData(tidied_se))
           } else {
             vis_sample <- TRUE
           }
-          if (do_recentre) assay(tidied_se) <- assay(tidied_se) - rowMeans(assay(tidied_se)[,tidied_se$.influential, drop=FALSE])
-          if (do_rescale) assay(tidied_se) <- assay(tidied_se) / rowSds(assay(tidied_se)[,tidied_se$.influential, drop=FALSE])
+          if (do_recentre) assay(tidied_se) <- assay(tidied_se) - rowMeans(assay(tidied_se)[,tidied_se$.influential_in_assay, drop=FALSE])
+          if (do_rescale) assay(tidied_se) <- assay(tidied_se) / rowSds(assay(tidied_se)[,tidied_se$.influential_in_assay, drop=FALSE])
         })
         eval(prepare_plot_data)
         mat_height <- height_scaler(n=nrow(tidied_se), small=10, big=20, N=1000)
@@ -595,7 +595,7 @@ for (dataset_id in names(dataset_model_comp)) {
         orig_caption <- aes_caption(eval(plot_fml[[2]]))
         mapping <- modify_mapping(modifyList(eval(plot_fml[[2]]), aes(y=.derived.value, mask=NULL, cluster=NULL)))
         my_pc <- prcomp(
-          t(this_assay[,tidied_se$.influential,drop=FALSE]),
+          t(this_assay[,tidied_se$.influential_in_assay, drop=FALSE]),
           center = do_recentre,
           scale = FALSE)
         proj <- predict(my_pc, newdata = t(this_assay))

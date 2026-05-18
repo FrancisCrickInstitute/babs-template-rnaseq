@@ -429,9 +429,8 @@ for (dataset_id in names(ddsList)) {
             )
     #
     design(this_dds) <- model_meta$design
-    reconstruct <- cached_partial() # This memo-ised function performs model-based removal of random and/or systematic effects
     # Save the expected values across the designs reference-grid
-    expected_assay <- reconstruct(this_dds, design(this_dds), resids=FALSE, influence=this_dds$.influential)
+    expected_assay <- partial_reconstruct(this_dds, design(this_dds), resids=FALSE)
     links$expecteds <- c(links$expecteds, save_expected(expected_assay, colDF(this_dds), params))
     ## Loop through plot configurations
     for (plot_id in names(plot_formulae)) {
@@ -440,10 +439,10 @@ for (dataset_id in names(ddsList)) {
       section_hierarchy <- list(dataset=dataset_id, model=model_id, plot_config=attr(plot_fml, "name"))
       dmc_heading(ddsList, section_hierarchy, depth=strrep("#", length(section_hierarchy)))
       # Do any regressing-out for the plots
-      this_assay <- reconstruct(this_dds, plot_fml, influence=this_dds$.influential)
+      this_assay <- partial_reconstruct(this_dds, plot_fml)
       removed <- attr(this_assay, "removed")
       which_assay <- attr(this_assay, "which_assay")
-      this_dds$.influential_in_assay  <- this_dds$.influential & (metadata(this_dds)$extra_assays[[which_assay]]$influential_samples %||% TRUE)
+      this_dds$.influential_in_assay  <- attr(this_assay, "influential_in_assay")
       if ("sort_by" %in%  names(all.vars(eval(plot_fml[[2]])))) {
         sample_order <- reorder_samples(this_dds, all.vars(eval(plot_fml[[2]])$sort_by))
       } else {

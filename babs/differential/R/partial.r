@@ -151,27 +151,30 @@ assemble_partialised <- function(obj, reduced, resids = TRUE) {
   t(mat)
 }
 
-cached_partial <- function() {
-  cache <- new.env(parent = emptyenv())
-  function(obj, plot_fml, resids=TRUE, influence=TRUE, assay=NULL, ...) {
-
-    if (is.null(assay)) {
-      if ("y" %in% names(plot_fml[[2]])) {
-        assay <- as.character(plot_fml[[2]]$y)
-      } else {
-        assay <- ifelse(inherits(obj, "DESeqDataSet"), "vst", assayNames(obj)[1])
-      }
-    }
-
-    # calculate the decomposition and cache if not already
-    if (!exists(assay, envir = cache, inherits = FALSE)) {
-      cache[[assay]] <- partialise(obj, assay=assay, influence=influence)
-    }
-
-    if (formula_equal(design(obj), plot_fml)) {
-      removed <- if (resids) "" else " having removed noise"
+partial_reconstruct <- function(obj, plot_fml, resids=TRUE,  assay=NULL, ...) {
+  influential <- obj$.influential %||% TRUE
+  if (is.null(assay)) {
+    if ("y" %in% names(plot_fml[[2]])) {
+      assay <- as.character(plot_fml[[2]]$y)
     } else {
-      txt <- dropped_terms(cache[[assay]], update(plot_fml, NULL ~ .))
+      assay <- ifelse(inherits(obj, "DESeqDataSet"), "vst", assayNames(obj)[1])
+    }
+  }
+  influential_in_assay <- influential & (metadata(obj)$extra_assays[[assay]]$influential_samples %||% TRUE)
+  if (formula_equal(design(obj), plot_fml) && resids) {
+    structure(
+      assay(obj, assay),
+      which_assay=assay,
+      removed="",
+      ind=!duplicated(model.matrix(design(obj), colDF(obj))),
+      influential_in_assay=influential_in_assay
+    )
+  } else {
+    deconstructed <- partialise(obj, assay=assay, influence=influential_in_assay)
+    if (formula_equal(design(obj), plot_fml)) {
+      removed <- " having removed noise"
+    } else {
+      txt <- dropped_terms(deconstructed, update(plot_fml, NULL ~ .))
       tr_list <- modifyList(setNames(as.list(txt), txt),  metadata(obj)$termNames)
       removed <- paste0(" having removed effect of ",
                        if (resids) "" else "noise and ",
@@ -179,10 +182,11 @@ cached_partial <- function() {
                        )
     }
     structure(
-      assemble_partialised(cache[[assay]], reduced=update(plot_fml, NULL ~ .),  resids=resids),
+      assemble_partialised(deconstructed, reduced=update(plot_fml, NULL ~ .),  resids=resids),
       which_assay=assay,
       removed=removed,
-      ind=!duplicated(model.matrix(design(obj), colDF(obj)))
+      ind=!duplicated(model.matrix(design(obj), colDF(obj))),
+      influential_in_assay=influential_in_assay
     )
   }
 }
