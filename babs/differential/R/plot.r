@@ -405,21 +405,28 @@ hmap_fn <- function(dds, mat, param, cluster_transform, gene_clust, model_vars, 
     if (param$get("cluster_unused_samples") == "ignore") {
       ind <- ind[dds$.influential_in_assay]
     }
+    mat_subset <- mat[, ind, drop=FALSE]
+    dds_subset <- dds[, ind]
+    if (param$get("cluster_unused_samples") == "include") {
+      infl_ind_subset <- TRUE
+    } else {
+      infl_ind_subset <- dds_subset$.influential_in_assay %||% TRUE
+    }
+    N_infl <- length(mat_subset[1,][infl_ind_subset])
+    if (N_infl<=1) { #Flip so as not to leave one or fewer samples in the tree
+      infl_ind_subset <- !infl_ind_subset 
+      N_infl <- length(mat_subset[1,][infl_ind_subset])#update
+      if (N_infl <=1) infl_ind_subset <- TRUE #Still one or fewer, so bundle them together
+      N_infl <- length(mat_subset[1,][infl_ind_subset])#update
+    }
     defaults <- list(
       matrix=masked[,ind,drop=FALSE],
       column_title = column_title,
       row_title = paste0(param$get("RowNoun"),"s"),
       col = col_fn,
-      cluster_columns = if (nrow(masked[,ind,drop=FALSE]) >1 && "sample_clust" %in% names(param$publish())) {
+      cluster_columns = if (N_infl >1 && "sample_clust" %in% names(param$publish())) {
         # Get the subset of data we're actually plotting
-        mat_subset <- mat[, ind, drop=FALSE]
-        dds_subset <- dds[, ind]
         # cluster influential samples WITHIN this subset
-        if (param$get("cluster_unused_samples") == "include") {
-            infl_ind_subset <- TRUE
-          } else {
-            infl_ind_subset <- dds_subset$.influential_in_assay %||% TRUE
-          }
         infl_cluster <- bluster::clusterRows(
           t(cluster_transform(mat_subset[, infl_ind_subset, drop=FALSE])),
           adapt_hclust_param(param$get("sample_clust")), full=TRUE
@@ -456,7 +463,7 @@ hmap_fn <- function(dds, mat, param, cluster_transform, gene_clust, model_vars, 
       ), 
       show_heatmap_legend=first,
       show_row_names = FALSE,
-      show_column_names = TRUE)
+      show_column_names = ncol(dds)<=12)
     row_behaviour <- plot_fml[[2]]$sort %||% NA
     if (row_behaviour %in% names(mcols(dds)$results)) {
       defaults$row_order <- order(mcols(dds)$results[[row_behaviour]])

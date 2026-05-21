@@ -103,7 +103,6 @@ dmc_heading <- function(obj, hierarchy,  depth="##", numbered=TRUE, describe=TRU
   }
   if (!describe) text <- ""
   cat(paste0(heading, "\n\n", text, "\n\n"))
-
 }
 
 ## dmc_heading <- function(obj, dataset=1, model=NULL, comparison=NULL, plot=NULL, depth="##", numbered=TRUE, describe=TRUE) {

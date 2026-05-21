@@ -239,21 +239,6 @@ results_apply <- function(object, dataset, model, comparison, fn, depth="compari
 
 
 
-#' @export
-dataset_name <- function(dds) {
-  metadata(dds)$dmc$dataset
-}
-#' @export
-model_name <- function(dds) {
-  metadata(dds)$dmc$model
-}
-#' @export
-comparison_name <- function(dds) {
-  metadata(dds)$dmc$comparison
-}
-
-
-
 
 
 #' rbind nested lists of data-frames

@@ -450,9 +450,7 @@ for (dataset_id in names(dataset_model_comp)) {
       cat("\n\n", strrep("#", length(section_hierarchy)+1), " Heatmap\n\n", sep="")
       do_plot(pl,
               label= "legend-a",
-              caption=paste("Metadata colour-codings for",
-                            metadata(dataset_se)$dmc$dataset_name %||% metadata(dataset_se)$dmc$dataset
-                            ),
+              caption=paste("Metadata colour-codings for",dtag(dataset_id)),
               plot_meta=section_hierarchy
               )
       cat("\n\n---\n\n")
@@ -492,9 +490,10 @@ for (dataset_id in names(dataset_model_comp)) {
           design(tidied_se) <- md$model$design
           mcols(tidied_se)$results <- mcols(this_dds)$results[row.names(tidied_se),]
           sample_order <- reorder_samples(tidied_se,model_vars)
-          assay(tidied_se) <- partial_reconstruct(tidied_se, plot_fml, assay=assayNames(tidied_se)[1])
-          tidied_se$.influential_in_assay  <- attr(tidied_se, "influential_in_assay")
-          removed <- attr(assay(tidied_se), "removed")
+          my_assay <- partial_reconstruct(tidied_se, plot_fml, assay=assayNames(tidied_se)[1])
+          assay(tidied_se) <- my_assay
+          tidied_se$.influential_in_assay  <- attr(my_assay, "influential_in_assay")
+          removed <- attr(my_assay, "removed")
           if ("visible" %in% names(plot_fml[[2]])) {
             vis_sample <- eval(plot_fml[[2]]$visible, colData(tidied_se))
           } else {
@@ -525,7 +524,6 @@ for (dataset_id in names(dataset_model_comp)) {
           this_clust <- cluster_ind()
           gene_clust$clusters <- if (keep_names) row.names(tidied_se) else cluster_cardinality(gene_clust$clusters, this_clust)
         }
-        removed <- attr(assay(tidied_se), "removed")
         capt <- paste0(tooltip(md, comparison_id), comp_type, param$get("rowNoun"),"s  of ", mtag(model_id), " in ", dtag(dataset_id), removed)
         cc <- cluster_calc(assay(tidied_se), clusterID=gene_clust$clusters)
         hmap_data <- assay(tidied_se)

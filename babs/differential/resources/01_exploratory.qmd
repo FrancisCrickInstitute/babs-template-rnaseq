@@ -392,7 +392,6 @@ girafe_ind <- counter()
 
 for (dataset_id in names(ddsList)) {
   section_hierarchy <- list(dataset=dataset_id)
-  dataset_name <- metadata(ddsList[[dataset_id]])$dmc$dataset_name %||% dataset_id
   dmc_heading(ddsList, section_hierarchy, depth=strrep("#", length(section_hierarchy)))
   src2bullets(metadata(ddsList[[dataset_id]]), c("subset", "extra_assays", "influential_samples"))
   mdls <- sapply(
@@ -600,7 +599,8 @@ for (dataset_id in names(ddsList)) {
       cat("\n\n", strrep("#", length(section_hierarchy)+1), " 1PC\n\n", sep="")
       #Can use weights=my_pc$sdev^2/sum(my_pc$sdev^2) in the following line, if we want to de-emphasise low-order PCs
       pc_weights <- if (param$get("pc_weight")=="eigen") my_pc$sdev^2/sum(my_pc$sdev^2) else NULL
-      covar_x_pc <- mat_x_terms(proj, model_meta$design, colDF(this_dds), weights=pc_weights, type=param$get("reduce_heuristic"))
+      maxpc <- min(40, ncol(proj))
+      covar_x_pc <- mat_x_terms(proj[,1:maxpc], model_meta$design, colDF(this_dds), weights=pc_weights[1:maxpc], type=param$get("reduce_heuristic"))
       pl <- ggplot(covar_x_pc, aes(x = column, y = Covariate, fill = Assoc)) + 
        geom_raster() +
        facet_wrap(~wrap, scales = "free_x",ncol = 1)  +

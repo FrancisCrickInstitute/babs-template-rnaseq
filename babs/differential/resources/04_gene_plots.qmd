@@ -121,15 +121,12 @@ first <- TRUE
 
 for (dataset in names(dds_model_comp)) {
   dmc_heading(dds_model_comp, dataset=dataset, model=NULL, depth="##")
-  met <- metadata(dds_model_comp[[dataset]][[1]][[1]])$dmc
   for (mdl in names(dds_model_comp[[dataset]])) {
-    met <- metadata(dds_model_comp[[dataset]][[mdl]][[1]])$dmc
     dmc_heading(dds_model_comp, dataset=dataset, model=mdl, depth="###")
     this_mdl <- dds_model_comp[[dataset]][[mdl]]
     for (comp_name in names(this_mdl)) {
       dds <- this_mdl[[comp_name]]
       res <- as.data.frame(mcols(this_mdl[[comp_name]])$results)
-      md <- metadata(this_mdl[[comp_name]])
       filt <- expression(grepl('.*\\*$', class))
       genes <- row.names(res)[eval(filt,res)][1:5]
       plotFrames <- lapply(genes, function(i) cbind(as.data.frame(colData(dds)), Y=assay(dds, "vst")[i,], .gene=i))

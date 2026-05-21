@@ -155,15 +155,19 @@ recode_within <- function(inner, ...) {
 }
 
 
-
 default_namer <- function() {
   offsets <- list() 
-  function(obj, prefix="") {
+  function(obj, prefix = "") {
     if (!prefix %in% names(offsets)) offsets[[prefix]] <- 0
-    if (is.null(names(obj))) names(obj) <- rep("", length(obj))
-    out <- ifelse(names(obj)=="", paste0(prefix, seq_along(obj)+offsets[[prefix]]), names(obj))
-    offsets[[prefix]] <<- offsets[[prefix]] + length(obj)
-    out
+    new_names <- names(obj) %||% rep("", length(obj))
+    unnamed <- which(new_names == "") # Identify unnamed elements
+    names(obj)[unnamed] <- paste0(
+      prefix,
+      seq_along(unnamed) + offsets[[prefix]] # Only use counter for unnamed
+    )
+    offsets[[prefix]] <<- offsets[[prefix]] + length(unnamed) # Increment for unnamed elements only
+    for (i in names(obj)) obj[[i]]$name <- obj[[i]]$name %||% i
+    obj
   }
 }
 
@@ -252,15 +256,15 @@ build_dds_list <- function(dds, spec) {
   metadata(colData(dds))$palette <- default_palette
   ddsList <- list()
   default_names <- default_namer()
-  names(spec$sample_sets) <- default_names(spec$sample_sets, prefix="D")
+  spec$sample_sets <- default_names(spec$sample_sets, prefix="D")
   for (dataset_i in seq_along(spec$sample_sets)) {
-    names(spec$sample_sets[[dataset_i]]$models) <- default_names(spec$sample_sets[[dataset_i]]$models, prefix="M")
+    spec$sample_sets[[dataset_i]]$models <- default_names(spec$sample_sets[[dataset_i]]$models, prefix="M")
     for (model_i in seq_along(spec$sample_sets[[dataset_i]]$models)) {
       if ("comparisons" %in% names(spec$sample_sets[[dataset_i]]$models[[model_i]])) {
-        names(spec$sample_sets[[dataset_i]]$models[[model_i]]$comparisons) <- default_names(spec$sample_sets[[dataset_i]]$models[[model_i]]$comparisons, prefix="C")
+        spec$sample_sets[[dataset_i]]$models[[model_i]]$comparisons <- default_names(spec$sample_sets[[dataset_i]]$models[[model_i]]$comparisons, prefix="C")
       }
       if ("profile_plots" %in% names(spec$sample_sets[[dataset_i]]$models[[model_i]])) {
-        names(spec$sample_sets[[dataset_i]]$models[[model_i]]$profile_plots) <- default_names(spec$sample_sets[[dataset_i]]$models[[model_i]]$profile_plots, prefix="P")
+        spec$sample_sets[[dataset_i]]$models[[model_i]]$profile_plots <- default_names(spec$sample_sets[[dataset_i]]$models[[model_i]]$profile_plots, prefix="P")
       }
     }
     dataset_spec <- spec$sample_sets[[dataset_i]]
@@ -400,8 +404,8 @@ build_dds_list <- function(dds, spec) {
         new_cols <- c(new_cols, old_cols[is_modified])
         for (ir in old_cols[!is_modified]) {
           if (is.factor(colData(obj)[[ir]])) {
-            metadata(colData(obj))$palette$Heatmap[[ir]] <- metadata(colData(obj))$palette$Heatmap[[ir]][match(names(metadata(colData(obj))$palette$Heatmap[[ir]]), levels(colData(obj)[[ir]]))]
-            metadata(colData(obj))$palette$ggplot[[ir]] <- metadata(colData(obj))$palette$ggplot[[ir]][match(names(metadata(colData(obj))$palette$ggplot[[ir]]), levels(colData(obj)[[ir]]))]
+            metadata(colData(obj))$palette$Heatmap[[ir]] <- metadata(colData(obj))$palette$Heatmap[[ir]][match(levels(colData(obj)[[ir]]), names(metadata(colData(obj))$palette$Heatmap[[ir]]) )]
+            metadata(colData(obj))$palette$ggplot[[ir]] <- metadata(colData(obj))$palette$ggplot[[ir]][match(levels(colData(obj)[[ir]]), names(metadata(colData(obj))$palette$ggplot[[ir]]))]
           }
         }
       }
@@ -464,7 +468,6 @@ fit_models <- function(dds, param, ...) {
       metadata(y)$dmc$model <- mname
       metadata(y)$dmc$model_name <- metadata(y)$model$name
       metadata(y)$dmc$model_description <- metadata(y)$model$description
-#      metadata(y)$dmc$comparison_name <- metadata(y)$dmc$comparison
       metadata(y)$dmc$model_description <- metadata(y)$dmc$description
       y})
   })
@@ -1362,7 +1365,7 @@ mat_x_terms <- function(mat, fml, fitFrame, weights=rep(1, nrow(mat)), type) {
   covar_x_mat$wrap <- (covar_x_mat$column - 1)%/%20
   covar_x_mat$wrap <- paste0(covar_x_mat$wrap * 20 +  1,
                             "-",
-                            min((covar_x_mat$wrap + 1) * 20, nmat))
+                            pmin((covar_x_mat$wrap + 1) * 20, nmat))
   covar_x_mat$column <- sprintf("%02d", covar_x_mat$column)
   covar_x_mat$wrap <- paste("PCs",covar_x_mat$wrap)
   if (any(covar_x_mat$pvalue<=0.05, na.rm=TRUE)) {
