@@ -253,6 +253,7 @@ sort_vars <- function(x, target) {
 #' @export
 modify_mapping <- function(aes_obj) {
   aes_obj$extra <- NULL
+  aes_obj$residuals <- NULL
   aes_obj <- handle_flag_aes(aes_obj)
   if (!is.null(aes_obj$tooltip)) return(aes_obj)
   vars_used <- unique(unlist(lapply(aes_obj, all.vars)))
@@ -384,24 +385,17 @@ hmap_fn <- function(dds, mat, param, cluster_transform, gene_clust, model_vars, 
   }
   mat <- mat[, vis_sample, drop=FALSE]
   dds <- dds[,vis_sample, drop=FALSE]
+  if (length(unique(dds$.influential))>1 & !".influential" %in% model_vars) {
+    model_vars <- c(model_vars, ".influential")
+  }
   panel_hmap <- function(ind=TRUE, first, last, column_title, args) {
     masked <- mat
     mask <- all.vars(plot_fml[[2]]$mask)[1]
     if (!is.na(mask) && mask %in% assayNames(dds)) {
       masked[assay(dds, mask)[row.names(masked), colnames(masked)]] <- NA
     }
-    col_fn <- sym_colour(masked[,colData(dds)$.influential$.influential])
-    ## if (first && !is.null(gene_clust)) {
-    ##   cluster_size_per_row <- (table(gene_clust$cluster))[gene_clust$cluster]
-    ##   left_annotation <- ComplexHeatmap::rowAnnotation(
-    ##     size = anno_barplot(
-    ##       as.vector(cluster_size_per_row),
-    ##       bar_width=0.6,
-    ##       width = unit(1, "cm")),
-    ##     show_legend=FALSE)
-    ## } else {
+    col_fn <- sym_colour(masked[,colData(dds)$.influential])
     left_annotation <- NULL
-    ## }
     if (param$get("cluster_unused_samples") == "ignore") {
       ind <- ind[dds$.influential_in_assay]
     }
@@ -594,8 +588,10 @@ df2colorspace <- function(df, palette) {
                               }
                             }
                             )
-  res$Heatmap$.influential <- setNames(c("black", "white"), c(TRUE, FALSE))
-  res$Heatmap$.involved <- setNames(c("black", "white"), c(TRUE, FALSE))
+  res$Heatmap$.influential_in_assay <-
+    res$Heatmap$.involved <- 
+      res$Heatmap$.influential <-
+        setNames(c("black", "white"), c(TRUE, FALSE))
   res$ggplot <- purrr::map2(df, start_levels,
                            function(column, start_level) {
                              if (is.factor(column)) {
@@ -614,7 +610,9 @@ df2colorspace <- function(df, palette) {
                              }
                            }
                            )
-  res$ggplot$.influential <- setNames(c("black", "white"), c(TRUE, FALSE))
-  res$ggplot$.involved <- setNames(c("black", "white"), c(TRUE, FALSE))
+  res$ggplot$.influential_in_assay <-
+    res$ggplot$.involved <- 
+      res$ggplot$.influential <-
+        setNames(c("black", "white"), c(TRUE, FALSE))
   res
 }

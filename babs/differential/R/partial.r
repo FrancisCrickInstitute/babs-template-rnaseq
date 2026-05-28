@@ -157,15 +157,9 @@ partial_reconstruct <- function(obj, plot_fml, resids=TRUE,  assay=NULL, ...) {
       assay <- ifelse(inherits(obj, "DESeqDataSet"), "vst", assayNames(obj)[1])
     }
   }
-  influential_in_assay <- (obj$.influential$.influential %||% TRUE) & (obj$.influential[[assay]] %||% TRUE)
+  influential_in_assay <- (obj$.influential %||% TRUE) & (obj$.influential_in_assay[[assay]] %||% TRUE)
   if (formula_equal(design(obj), plot_fml) && resids) {
-    structure(
-      assay(obj, assay),
-      which_assay=assay,
-      removed="",
-      ind=!duplicated(model.matrix(design(obj), colDF(obj))),
-      influential_in_assay=influential_in_assay
-    )
+    assays(obj) <- assays(obj)[assay]
   } else {
     deconstructed <- partialise(obj, assay=assay, influence=influential_in_assay)
     if (formula_equal(design(obj), plot_fml)) {
@@ -177,12 +171,10 @@ partial_reconstruct <- function(obj, plot_fml, resids=TRUE,  assay=NULL, ...) {
                        paste(txt, collapse=", ")
                        )
     }
-    structure(
-      assemble_partialised(deconstructed, reduced=update(plot_fml, NULL ~ .),  resids=resids),
-      which_assay=assay,
-      removed=removed,
-      ind=!duplicated(model.matrix(design(obj), colDF(obj))),
-      influential_in_assay=influential_in_assay
-    )
+    assays(obj) <- setNames(list(assemble_partialised(deconstructed, reduced=update(plot_fml, NULL ~ .),  resids=resids)), assay)
   }
+  metadata(obj)$removed <- ""
+  metadata(obj)$ind <- !duplicated(model.matrix(design(obj), colDF(obj)))
+  obj$.influential_in_assay <- influential_in_assay
+  obj
 }
