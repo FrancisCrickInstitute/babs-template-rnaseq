@@ -427,7 +427,7 @@ sample_X_dataset_table <- function(dds, obj) {
     setNames(names(ddsList), names(ddsList)),
     function(x) {
       newcols <- as.data.frame(colData(ddsList[[x]])[, setdiff(names(colData(ddsList[[x]])),  c(names(samp), ".influential", ".involved")),drop=FALSE])
-      newcols[[paste0(x, "+")]] <- ifelse(ddsList[[x]]$.influential$.influential, "✓", "")
+      newcols[[paste0(x, "+")]] <- ifelse(ddsList[[x]]$.influential, "✓", "")
       m <- merge(
         setNames(data.frame(ifelse(colnames(dds) %in% colnames(ddsList[[x]]), "✓", ""), row.names=row.names(samp)), x),
         newcols,
@@ -512,21 +512,20 @@ assayPlus <- function(dds, i) {
   out
 }
 
-save_expected <- function(mat, df, params){
-  which_assay <- attr(mat, "which_assay")
-  defaults <- attr(mat, "defaults")
-  ind <- attr(mat, "ind")
-  head_frame <- df[ind, , drop=FALSE]
+save_expected <- function(se, params, hierarchy){
+  which_assay <- assayNames(se)
+  ind <- metadata(se)$ind
+  head_frame <- colDF(se)[ind, , drop=FALSE]
   head_frame[] <- sapply(head_frame, as.character)
   fname <- p2filename(params,
                      paste(
                        "expected",
-                       which_assay, defaults$dataset, defaults$model,
+                       which_assay, hierarchy$dataset, hierarchy$model,
                        sep="_"),
                      "tsv")
   dir.create(dirname(fname), recursive=TRUE)
   write.table(t(head_frame), file=fname, quote=FALSE, sep="\t", col.names=FALSE)
-  write.table(mat[,ind], file=fname,
+  write.table(assay(se)[,ind], file=fname,
               quote=FALSE, sep="\t", append=TRUE, col.names=FALSE)
-  paste0("<a class=\"download-excel btn btn-primary\" href=\"", attr(fname, "link"), "\">Expected ", which_assay, " modeled as ", defaults$model, " in ", defaults$dataset, "</a>", sep="")
+  paste0("<a class=\"download-excel btn btn-primary\" href=\"", attr(fname, "link"), "\">Expected ", which_assay, " modeled as ", hierarchy$model, " in ", hierarchy$dataset, "</a>", sep="")
 }

@@ -344,7 +344,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
     external_list <- model$external_list
     if (!is.null(external_list)) {
       external_list <- read.csv(file.path(base_dir, external_list))
-      external_list <- subset(external_list, ID %in% row.names(this_model[[1]]))
+      external_list <- subset(external_list, ID %in% row.names(model$object[[1]]))
       external_list$Cluster[is.na(external_list$Cluster)] <- external_list$ID[is.na(external_list$Cluster)]
     }
     for (comparison_id in c(names(model$comparisons), unique(external_list$Comparison))) {
@@ -353,11 +353,9 @@ for (dataset_id in names(ddsList$sample_sets)) {
       dmc_heading(ddsList, section_hierarchy, depth=strrep("#", length(section_hierarchy)))
       is_external <- is.null(comparison)
       if (is_external) {
-        this_dds <- this_model[[1]]
-        is_significant <- row.names(this_dds) %in% external_list$ID[external_list$Comparison==comparison_id]
+        is_significant <- row.names(model$object) %in% external_list$ID[external_list$Comparison==comparison_id]
         comp_type <- " "
       } else {
-#        this_dds <- this_model[[comparison_id]]
         is_significant <- grepl("\\*$", comparison$results$class)
         comp_type <- "-differential "
         if (!any(is_significant)) {
@@ -366,10 +364,10 @@ for (dataset_id in names(ddsList$sample_sets)) {
       }
       involved <- comparison$involved
       if (is.null(involved)) { # Fall back for contrasts that don't (yet) memorise which samples they're affected by
-        dataset$object$.involved <- dataset$object$.influential$.influential
+        dataset$object$.involved <- dataset$object$.influential
       } else {
         dataset$object$.involved <- FALSE
-        dataset$object$.involved[dataset$object$.influential$.influential] <- involved
+        dataset$object$.involved[dataset$object$.influential] <- involved
       }
       plot_formulae <- get_in_section(model$profile_plots, c("all", "differential"))
       ## MA Plot
@@ -485,46 +483,43 @@ for (dataset_id in names(ddsList$sample_sets)) {
           }
           design(tidied_se) <- model$design
           mcols(tidied_se)$results <- comparison$results[row.names(tidied_se),]
-          sample_order <- reorder_samples(tidied_se,model_vars)
-          my_assay <- partial_reconstruct(tidied_se, plot_fml, assay=assayNames(tidied_se)[1])
-          assay(tidied_se) <- my_assay
-          tidied_se$.influential_in_assay  <- attr(my_assay, "influential_in_assay")
-          removed <- attr(my_assay, "removed")
+          plot_se <- partial_reconstruct(tidied_se, plot_fml, assay=assayNames(tidied_se)[1])
+          sample_order <- reorder_samples(plot_se, model_vars)
           if ("visible" %in% names(plot_fml[[2]])) {
             vis_sample <- eval(plot_fml[[2]]$visible, colData(tidied_se))
           } else {
             vis_sample <- TRUE
           }
-          if (do_recentre) assay(tidied_se) <- assay(tidied_se) - rowMeans(assay(tidied_se)[,tidied_se$.influential_in_assay, drop=FALSE])
-          if (do_rescale) assay(tidied_se) <- assay(tidied_se) / rowSds(assay(tidied_se)[,tidied_se$.influential_in_assay, drop=FALSE])
+          if (do_recentre) assay(plot_se) <- assay(plot_se) - rowMeans(assay(plot_se)[,plot_se$.influential_in_assay, drop=FALSE])
+          if (do_rescale) assay(plot_se) <- assay(plot_se) / rowSds(assay(plot_se)[,plot_se$.influential_in_assay, drop=FALSE])
         })
         eval(prepare_plot_data)
-        mat_height <- height_scaler(n=nrow(tidied_se), small=10, big=20, N=1000)
+        mat_height <- height_scaler(n=nrow(plot_se), small=10, big=20, N=1000)
         hc <- param$get("gene_clust")
         keep_names <- FALSE
-        if ("cut.params" %in% slotNames(hc) && "k" %in% names(slot(hc, "cut.params")) && slot(hc, "cut.params")$k >= nrow(tidied_se)) {
-          slot(hc, "cut.params") <- modifyList(slot(hc, "cut.params"), list(k=nrow(tidied_se)))
+        if ("cut.params" %in% slotNames(hc) && "k" %in% names(slot(hc, "cut.params")) && slot(hc, "cut.params")$k >= nrow(plot_se)) {
+          slot(hc, "cut.params") <- modifyList(slot(hc, "cut.params"), list(k=nrow(plot_se)))
           keep_names <- TRUE
         }
-        if (nrow(tidied_se)>1) {
-          gene_clust <- bluster::clusterRows(assay(tidied_se)[,model$object$.involved,drop=FALSE], adapt_hclust_param(hc), full=TRUE)
+        if (nrow(plot_se)>1) {
+          gene_clust <- bluster::clusterRows(assay(plot_se)[,dataset$object$.involved,drop=FALSE], adapt_hclust_param(hc), full=TRUE)
           if (is_external) {
             gene_clust$clusters <- match(names(gene_clust$clusters), external_list$ID)
           }
         } else {
           gene_clust <- list(
-            clusters=setNames(factor(1), row.names(tidied_se)),
+            clusters=setNames(factor(1), row.names(plot_se)),
             objects=list(hclust=FALSE))
         }
         if (!is_external) {
           this_clust <- cluster_ind()
-          gene_clust$clusters <- if (keep_names) row.names(tidied_se) else cluster_cardinality(gene_clust$clusters, this_clust)
+          gene_clust$clusters <- if (keep_names) row.names(plot_se) else cluster_cardinality(gene_clust$clusters, this_clust)
         }
-        capt <- paste0(tooltip(model, comparison_id), comp_type, param$get("rowNoun"),"s  of ", mtag(model_id), " in ", dtag(dataset_id), removed)
-        cc <- cluster_calc(assay(tidied_se), clusterID=gene_clust$clusters)
-        hmap_data <- assay(tidied_se)
+        capt <- paste0(tooltip(model, comparison_id), comp_type, param$get("rowNoun"),"s  of ", mtag(model_id), " in ", dtag(dataset_id), metadata(plot_se)$removed)
+        cc <- cluster_calc(assay(plot_se), clusterID=gene_clust$clusters)
+        hmap_data <- assay(plot_se)
         pls <- hmap_fn(
-          dds=tidied_se[,sample_order, drop=FALSE], mat=hmap_data[,sample_order, drop=FALSE], param=param,
+          dds=plot_se[,sample_order, drop=FALSE], mat=hmap_data[,sample_order, drop=FALSE], param=param,
           cluster_transform=identity, gene_clust = gene_clust,
           model_vars = model_vars,
           plot_fml =plot_fml,
@@ -543,7 +538,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
         ### Design-based column ordering of  heatmap
         cat("\n\n---\n\n")
         pls <- hmap_fn(
-          dds=tidied_se[,sample_order, drop=FALSE], mat=hmap_data[,sample_order, drop=FALSE], param=param,
+          dds=plot_se[,sample_order, drop=FALSE], mat=hmap_data[,sample_order, drop=FALSE], param=param,
           cluster_transform=identity, gene_clust = gene_clust,
           model_vars = model_vars,
           row_split = if ("cut.params" %in% slotNames(hc) && "k" %in% names(slot(hc, "cut.params"))) slot(hc, "cut.params")$k  else NULL,
@@ -560,7 +555,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
                 )
                 )
         
-        centroid_df[[plot_id]] <- cbind(cc, colDF(tidied_se))[vis_sample,,drop=FALSE] %>%
+        centroid_df[[plot_id]] <- cbind(cc, colDF(plot_se))[vis_sample,,drop=FALSE] %>%
           pivot_longer(cols=any_of(names(cc)), names_to=".derived", values_to=".derived.value") %>%
           mutate(.derived=factor(.derived, levels=names(cc)))
         attr(centroid_df[[plot_id]], "caption") <- capt
@@ -584,21 +579,21 @@ for (dataset_id in names(ddsList$sample_sets)) {
         section_hierarchy <- list(dataset=dataset_id, model=model_id, comparison=comparison_id, plot_config=plot_formulae[[plot_id]]$name %||% plot_id)
         dmc_heading(ddsList, section_hierarchy, depth=strrep("#", length(section_hierarchy)+1), numbered=FALSE)
         eval(prepare_plot_data)
-        this_assay <- assay(tidied_se)
+        this_assay <- assay(plot_se)
         colour_aes <- eval(plot_fml[[2]])["colour"]
         orig_caption <- aes_caption(eval(plot_fml[[2]]))
         mapping <- modify_mapping(modifyList(eval(plot_fml[[2]]), aes(y=.derived.value, mask=NULL, cluster=NULL)))
         my_pc <- prcomp(
-          t(this_assay[,tidied_se$.influential_in_assay, drop=FALSE]),
+          t(this_assay[,plot_se$.influential_in_assay, drop=FALSE]),
           center = do_recentre,
           scale = FALSE)
         proj <- predict(my_pc, newdata = t(this_assay))
         my_percent <- round(100 * my_pc$sdev^2/sum(my_pc$sdev^2))
-        pc.df <- cbind(colDF(tidied_se),
+        pc.df <- cbind(colDF(plot_se),
                         data.frame(
                           PC1 = proj[, param$get("pc_x")],
                           PC2 = proj[, param$get(if (nrow(this_assay) != 1) "pc_y" else "pc_x")], 
-                          sample = rownames(colDF(tidied_se))))
+                          sample = rownames(colDF(plot_se))))
         aes_list <- lapply(substitute_x_aes(eval(plot_fml[[2]])),function(m)  modify_mapping(modifyList(m, aes(y=.derived.value, mask=NULL, cluster=NULL))))
         for (this_aes in aes_list) {
           pl <- ggplot(transform(pc.df[vis_sample,],.derived="", .derived.value=""),
@@ -622,7 +617,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
           }
           do_plot(pl,
                   label= "twopc",
-                  caption=paste("Annotated by", this_caption, "in", dtag(dataset_id), removed),
+                  caption=paste("Annotated by", this_caption, "in", dtag(dataset_id), metadata(plot_se)$removed),
                   plot_meta=section_hierarchy)
           cat("\n\n")
         } # Repeat if need to annotate by an overwritten 'x'

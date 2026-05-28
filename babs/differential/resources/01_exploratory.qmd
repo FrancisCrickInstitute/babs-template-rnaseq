@@ -140,7 +140,6 @@ param$set("baseMeanMin")
 
 ddsList <- build_dds_list(dds, specs)
 gt(summarise_filters(ddsList))
-
 ddsList <- leaf_modify(ddsList,
                       function(leaf, layers) {
                         leaf$object <- leaf$object[mcols(leaf$object)$filter$univeral %||% TRUE, , drop=FALSE]
@@ -404,34 +403,29 @@ cluster_ind <- counter(post_fn=to_letter)
 girafe_ind <- counter()
 
 for (dataset_id in names(ddsList$sample_sets)) {
-  dataset_meta <- ddsList$sample_sets[[dataset_id]]
+  dataset <- ddsList$sample_sets[[dataset_id]]
   section_hierarchy <- list(dataset=dataset_id)
   dmc_heading(ddsList, section_hierarchy, depth=strrep("#", length(section_hierarchy)))
-  src2bullets(ddsList$sample_sets[[dataset_id]], c("subset", "extra_assays", "influential_samples"))
-  mdls <- sapply(
-    ddsList$sample_sets[[dataset_id]]$models,
-    function(m) !is.null(m$profile_plots) &&
-      length(get_in_section(m$profile_plots, c("all", "exploratory"))) > 0
-    )
-  for (model_id in names(mdls[mdls])) {
-    this_dds <- ddsList$sample_sets[[dataset_id]]$object
+  src2bullets(dataset, c("subset", "extra_assays", "influential_samples"))
+  mdls <- Filter(function(m) {
+    !is.null(dataset$models[[m]]$profile_plots) &&
+      length(get_in_section(dataset$models[[m]]$profile_plots, c("all", "exploratory"))) > 0},
+    names(dataset$models))
+  for (model_id in mdls) {
+    model <- dataset$models[[model_id]]
+    model_se <- dataset$object
+    design(model_se) <- model$design
     section_hierarchy <- list(dataset=dataset_id, model=model_id)
-    model_meta <- ddsList$sample_sets[[dataset_id]]$models[[model_id]]
-    ## for (new_name in names(metadata(this_dds)$extra_assays)) {
-    ##   assay(this_dds, new_name) <- generate_assay(
-    ##     args=modifyList(list(from="imputed", design=model_meta$design), metadata(this_dds)$extra_assays[[new_name]]),
-    ##     this_dds)
-    ## }
-    plot_formulae <- get_in_section(model_meta$profile_plots, c("all", "exploratory"))
+    plot_formulae <- get_in_section(model$profile_plots, c("all", "exploratory"))
     model_vars <- sort_vars(
-      unique(c(all.vars(model_meta$design),
+      unique(c(all.vars(model$design),
                unique(unlist(lapply(plot_formulae, function(x) all.vars(x[[1]]))))
                )),
-      model_meta$variables)
-    model_vars <- intersect(model_vars, names(colDF(this_dds)))
+      model$variables)
+    model_vars <- intersect(model_vars, names(colDF(model_se)))
     dmc_heading(ddsList, section_hierarchy, depth=strrep("#", length(section_hierarchy)))
     # Show an overall legend
-    nice_legends <- separate_legend(this_dds, model_vars)
+    nice_legends <- separate_legend(model_se, model_vars)
     pl <- do.call(gridExtra::arrangeGrob, c(
       nice_legends,
       ncol=ceiling(sqrt(length(nice_legends)))))
@@ -441,10 +435,9 @@ for (dataset_id in names(ddsList$sample_sets)) {
             plot_meta=section_hierarchy
             )
     #
-    design(this_dds) <- model_meta$design
     # Save the expected values across the designs reference-grid
-    expected_assay <- partial_reconstruct(this_dds, design(this_dds), resids=FALSE)
-    links$expecteds <- c(links$expecteds, save_expected(expected_assay, colDF(this_dds), params))
+    expected_assay <- partial_reconstruct(model_se, design(model_se), resids=FALSE)
+    links$expecteds <- c(links$expecteds, save_expected(expected_assay, params, section_hierarchy))
     ## Loop through plot configurations
     for (plot_id in names(plot_formulae)) {
       plot_fml <- plot_formulae[[plot_id]][[1]]
@@ -452,31 +445,29 @@ for (dataset_id in names(ddsList$sample_sets)) {
       section_hierarchy <- list(dataset=dataset_id, model=model_id, plot_config=attr(plot_fml, "name"))
       dmc_heading(ddsList, section_hierarchy, depth=strrep("#", length(section_hierarchy)))
       # Do any regressing-out for the plots
-      this_assay <- partial_reconstruct(this_dds, plot_fml)
-      removed <- attr(this_assay, "removed")
-      which_assay <- attr(this_assay, "which_assay")
-      this_dds$.influential_in_assay  <- attr(this_assay, "influential_in_assay")
+      plot_se <- partial_reconstruct(model_se, plot_fml, extra_assays=dataset$extra_assays)
+      which_assay <- assayNames(plot_se)
       if ("sort_by" %in%  names(all.vars(eval(plot_fml[[2]])))) {
-        sample_order <- reorder_samples(this_dds, all.vars(eval(plot_fml[[2]])$sort_by))
+        sample_order <- reorder_samples(plot_se, all.vars(eval(plot_fml[[2]])$sort_by))
       } else {
-        sample_order <- reorder_samples(this_dds, model_vars)
+        sample_order <- reorder_samples(plot_se, model_vars)
       }
-      y_hint <- dataset_meta$extra_assays[[which_assay]]$hint %||% which_assay
-      this_assay <- this_assay[mcols(this_dds)$filter$exploratory %||% TRUE, , drop=FALSE]
+      y_hint <- dataset$extra_assays[[which_assay]]$hint %||% which_assay
+      plot_se <- plot_se[mcols(plot_se)$filter$exploratory %||% TRUE, , drop=FALSE]
       #
       ## Heatmaps
       cat('\n\n::: {.panel-tabset .unnumbered group="explot"}\n\n')
       cat("\n\n", strrep("#", length(section_hierarchy)+1), " Heatmap\n\n", sep="")
-      cluster_transform <- make_clusterer(this_dds, plot_fml)
+      cluster_transform <- make_clusterer(plot_se, plot_fml)
       top <- order(
-        apply(cluster_transform(this_assay[,this_dds$.influential_in_assay,drop=FALSE]), 1, sd),
-        decreasing = TRUE)[1:min(nrow(this_assay),param$get("top_n_variable"))]
-      hmap_data <- this_assay[top, ]
-      colnames(hmap_data) <- rownames(colDF(this_dds))
-      do_labels <- nrow(colDF(this_dds)) < 10
+        apply(cluster_transform(assay(plot_se)[,plot_se$.influential_in_assay,drop=FALSE]), 1, sd),
+        decreasing = TRUE)[1:min(nrow(plot_se),param$get("top_n_variable"))]
+      hmap_data <- assay(plot_se)[top, ]
+      colnames(hmap_data) <- rownames(colDF(plot_se))
+      do_labels <- nrow(colDF(plot_se)) < 10
       do_z <- attr(terms(plot_fml), "intercept") == 1
-      do_rescale <- dataset_meta$extra_assays[[which_assay]]$rescale %||% do_z
-      do_recentre <- dataset_meta$extra_assays[[which_assay]]$recentre %||% do_z
+      do_rescale <- dataset$extra_assays[[which_assay]]$rescale %||% do_z
+      do_recentre <- dataset$extra_assays[[which_assay]]$recentre %||% do_z
       if (param$get("sample_clust")@metric %in% c("binary")) {
         measure_name <- paste("Binary", noun_to_readout(param$get("RowNoun")))
       } else {
@@ -485,24 +476,27 @@ for (dataset_id in names(ddsList$sample_sets)) {
           ifelse(do_rescale, "Scaled ", ""),
           noun_to_readout(param$get("RowNoun"))
         )
-        if (do_recentre) hmap_data <- hmap_data - rowMeans(hmap_data[,this_dds$.influential_in_assay, drop=FALSE])
-        if (do_rescale) hmap_data <- hmap_data / rowSds(hmap_data[,this_dds$.influential_in_assay, drop=FALSE])
+        if (do_recentre) hmap_data <- hmap_data - rowMeans(hmap_data[,plot_se$.influential_in_assay, drop=FALSE])
+        if (do_rescale) hmap_data <- hmap_data / rowSds(hmap_data[,plot_se$.influential_in_assay, drop=FALSE])
       }
       measure_name <- paste(measure_name, y_hint)
-      my_caption <- paste0(measure_name, " in ",  dtag(dataset_id), removed)
-      gene_clust <- bluster::clusterRows(cluster_transform(hmap_data[,this_dds$.influential_in_assay]), adapt_hclust_param(param$get("gene_clust")), full=TRUE)
+      my_caption <- paste0(measure_name, " in ",  dtag(dataset_id), metadata(plot_se)$removed)
+      gene_clust <- bluster::clusterRows(
+        cluster_transform(hmap_data[,plot_se$.influential_in_assay]),
+        adapt_hclust_param(param$get("gene_clust")),
+        full=TRUE)
       this_clust <- cluster_ind()
       gene_clust$clusters <- cluster_cardinality(gene_clust$clusters, this_clust)
       cc <- cluster_calc(hmap_data, clusterID=gene_clust$clusters)
       if ("visible" %in% names(plot_fml[[2]])) {
-        vis_sample <- eval(plot_fml[[2]]$visible, colDF(this_dds))
+        vis_sample <- eval(plot_fml[[2]]$visible, colDF(plot_se))
       } else {
         vis_sample <- TRUE
       }
       #
       ## Empirically column-ordered heatmap
       pls <- hmap_fn(
-        dds=this_dds[,sample_order, drop=FALSE], mat=hmap_data[,sample_order, drop=FALSE], param=param,
+        dds=plot_se[,sample_order, drop=FALSE], mat=hmap_data[,sample_order, drop=FALSE], param=param,
         row_split = if ("cut.params" %in% slotNames(param$get("gene_clust")) && "k" %in% names(slot(param$get("gene_clust"), "cut.params"))) slot(param$get("gene_clust"), "cut.params")$k  else NULL,
         cluster_transform=cluster_transform, gene_clust = gene_clust,
         model_vars = model_vars, plot_fml =plot_fml, measure_name =measure_name)
@@ -516,7 +510,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
       #
       ## Design-based column ordering of  heatmap
       cat("\n\n---\n\n")
-      pls <- hmap_fn(dds=this_dds[,sample_order, drop=FALSE], mat=hmap_data[,sample_order, drop=FALSE], param=param,
+      pls <- hmap_fn(dds=plot_se[,sample_order, drop=FALSE], mat=hmap_data[,sample_order, drop=FALSE], param=param,
                     row_split = if ("cut.params" %in% slotNames(param$get("gene_clust")) && "k" %in% names(slot(param$get("gene_clust"), "cut.params"))) slot(param$get("gene_clust"), "cut.params")$k  else NULL,
                     cluster_transform=cluster_transform, gene_clust = gene_clust,   model_vars = model_vars,   plot_fml =plot_fml,   measure_name = measure_name, cluster_columns = FALSE)
       do_plot(Reduce(`+`, pls),
@@ -530,7 +524,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
       #
       ## Feature-cluster aggregate profile plots
       cat("\n\n", strrep("#", length(section_hierarchy)+1), " Profiles\n\n", sep="")     
-      centroid_df <- cbind(cc, colDF(this_dds)[model_vars])[vis_sample,,drop=FALSE] %>%
+      centroid_df <- cbind(cc, colDF(plot_se)[model_vars])[vis_sample,,drop=FALSE] %>%
         pivot_longer(cols=any_of(names(cc)), names_to=".derived", values_to=".derived.value") %>%
         mutate(.derived=factor(.derived, levels=names(cc)))
       mapping <- modify_mapping(modifyList(eval(plot_fml[[2]]), aes(y=.derived.value, mask=NULL, cluster=NULL)))
@@ -542,7 +536,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
         geom_point_interactive(size = 3, shape = 21) +
         labs(y=paste(noun_to_readout(param$get("RowNoun")),y_hint)) 
       if ("group" %in% names(mapping)) {
-        group_df <- cbind(cc, colDF(this_dds)[model_vars])[vis_sample,,drop=FALSE]  %>%
+        group_df <- cbind(cc, colDF(plot_se)[model_vars])[vis_sample,,drop=FALSE]  %>%
           pivot_longer(cols=any_of(names(cc)), names_to=".derived", values_to=".derived.value") %>%
           mutate(.derived=factor(.derived, levels=names(cc)))
         pl <- pl +
@@ -553,12 +547,12 @@ for (dataset_id in names(ddsList$sample_sets)) {
                     stat="summary",
                     fun=mean)
       }
-      pl <- pl + get_colour_scales(this_dds, mapping, flag_vars)
+      pl <- pl + get_colour_scales(plot_se, mapping, flag_vars)
 
       if ("ScaleDiscrete" %in% class(layer_scales(pl)$x)) {
         pl <- pl + scale_x_discrete(guide=guide_axis(n.dodge=2))
       }
-      capt <- paste0("Cluster profiles annotated with ", orig_caption, " in ", dtag(dataset_id), removed)
+      capt <- paste0("Cluster profiles annotated with ", orig_caption, " in ", dtag(dataset_id), metadata(plot_se)$removed)
       do_plot(pl,
               label= "clustProfile",
               caption=capt,
@@ -572,16 +566,16 @@ for (dataset_id in names(ddsList$sample_sets)) {
       ## Two-dimensional PC plots
       cat("\n\n", strrep("#", length(section_hierarchy)+1), " 2PC\n\n", sep="")
       my_pc <- prcomp(
-        t(this_assay[,this_dds$.influential_in_assay]),
+        t(assay(plot_se)[,plot_se$.influential_in_assay]),
         center = do_recentre,
         scale = FALSE)
-      proj <- predict(my_pc, newdata = t(this_assay))
+      proj <- predict(my_pc, newdata = t(assay(plot_se)))
       my_percent <- round(100 * my_pc$sdev^2/sum(my_pc$sdev^2))
-      pc.df <- cbind(colDF(this_dds),
+      pc.df <- cbind(colDF(plot_se),
                     data.frame(
                       PC1 = proj[, param$get("pc_x")],
                       PC2 = proj[, param$get("pc_y")], 
-                      sample = rownames(colDF(this_dds))))
+                      sample = rownames(colDF(plot_se))))
       aes_list <- lapply(substitute_x_aes(eval(plot_fml[[2]])),function(m)  modify_mapping(modifyList(m, aes(y=.derived.value, mask=NULL, cluster=NULL))))
       for (this_aes in aes_list) {
         pl <- ggplot(transform(pc.df[vis_sample,],.derived="", .derived.value=""),
@@ -593,7 +587,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
         if (do_labels) {
           pl <- pl + geom_text_repel(aes(label = sample))
         }
-        pl <- pl + get_colour_scales(this_dds, this_aes, flag_vars)
+        pl <- pl + get_colour_scales(plot_se, this_aes, flag_vars)
         cat("\n\n")
         if (identical(this_aes,aes_list[[1]])) {
           this_caption <- orig_caption
@@ -604,7 +598,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
         }
         do_plot(pl,
                 label= "twopc",
-                caption=paste("Annotated by", this_caption, "in", dtag(dataset_id), removed),
+                caption=paste("Annotated by", this_caption, "in", dtag(dataset_id), metadata(plot_se)$removed),
                 plot_meta=section_hierarchy)
         cat("\n\n")
       } # Repeat if need to annotate by an overwritten 'x'
@@ -614,7 +608,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
       #Can use weights=my_pc$sdev^2/sum(my_pc$sdev^2) in the following line, if we want to de-emphasise low-order PCs
       pc_weights <- if (param$get("pc_weight")=="eigen") my_pc$sdev^2/sum(my_pc$sdev^2) else NULL
       maxpc <- min(40, ncol(proj))
-      covar_x_pc <- mat_x_terms(proj[,1:maxpc], model_meta$design, colDF(this_dds), weights=pc_weights[1:maxpc], type=param$get("reduce_heuristic"))
+      covar_x_pc <- mat_x_terms(proj[,1:maxpc], model$design, colDF(plot_se), weights=pc_weights[1:maxpc], type=param$get("reduce_heuristic"))
       pl <- ggplot(covar_x_pc, aes(x = column, y = Covariate, fill = Assoc)) + 
        geom_raster() +
        facet_wrap(~wrap, scales = "free_x",ncol = 1)  +
@@ -622,11 +616,11 @@ for (dataset_id in names(ddsList$sample_sets)) {
        theme(aspect.ratio = length(unique(covar_x_pc$Covariate))/min(20, ncol(pc)))
       do_plot(pl,
               label="covar",
-              caption=paste("Covariate association in", dtag(dataset_id), removed),
+              caption=paste("Covariate association in", dtag(dataset_id), metadata(plot_se)$removed),
               plot_meta=section_hierarchy
               )
       cat("\n\n---\n\n")
-      long_dat <- transform(extract_hits(covar_x_pc, proj[vis_sample,], colDF(this_dds)[vis_sample,model_vars, drop=FALSE]), .derived=PC, .derived.value=value)
+      long_dat <- transform(extract_hits(covar_x_pc, proj[vis_sample,], colDF(plot_se)[vis_sample,model_vars, drop=FALSE]), .derived=PC, .derived.value=value)
       pl <- ggplot(long_dat, modifyList(mapping, aes(y=.derived.value))) +
         geom_point_interactive(size = 3, shape = 21) +
         facet_wrapper(mapping, default=aes(facets = .derived), scales="free_y") 
@@ -637,10 +631,10 @@ for (dataset_id in names(ddsList$sample_sets)) {
       if ("ScaleDiscrete" %in% class(layer_scales(pl)$x)) {
         pl <- pl + scale_x_discrete(guide=guide_axis(n.dodge=2))
       }
-      pl <- pl + get_colour_scales(this_dds, mapping, flag_vars)
+      pl <- pl + get_colour_scales(plot_se, mapping, flag_vars)
       do_plot(pl,
               label= "onepc",
-              caption=paste("Annotated by", orig_caption, "in", dtag(dataset_id), removed),
+              caption=paste("Annotated by", orig_caption, "in", dtag(dataset_id), metadata(plot_se)$removed),
               plot_meta=section_hierarchy
               )
       cat("\n\n---\n\n")
