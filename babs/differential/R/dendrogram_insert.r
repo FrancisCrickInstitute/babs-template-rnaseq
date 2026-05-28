@@ -4,6 +4,9 @@
 #' @param D_new A distance matrix where rows are new samples to insert and 
 #'   columns are the existing samples in the dendrogram. Column names must
 #'   match the dendrogram labels exactly.
+#' @param D_among_new A distance matrix among the new samples (square, with
+#'   rownames/colnames matching rownames of D_new). If NULL, new samples are
+#'   inserted independently.
 #' @param linkage Linkage method used to create the dendrogram. One of:
 #'   "average", "complete", "single", "wardD2", "ward.D2"
 #'
@@ -65,9 +68,11 @@ insert_samples_into_dendrogram <- function(dend, D_new, D_among_new=NULL, linkag
     stop("Unsupported linkage method: ", linkage)
   }
   
-  # Find insertion points
+  # Find insertion points individually first
   attach_results <- find_insertion_points(hc, D_new, linkage_fns[[linkage]])
-  attach_results <- build_grouped_insertions(attach_results, D_among_new, linkage)
+  
+  # Group new samples that should merge with each other before the tree
+  attach_results <- group_new_samples(attach_results, D_among_new, D_new, hc, linkage_fns[[linkage]], linkage)
 
   # Insert samples
   dend_expanded <- insert_into_dendrogram(dend, attach_results)
@@ -111,7 +116,7 @@ insert_samples_into_dendrogram <- function(dend, D_new, D_among_new=NULL, linkag
     node
   })
   
-  
+  dend_expanded <- push_new_samples_right(dend_expanded, base_labels)  
   return(dend_expanded)
 }
 
@@ -174,23 +179,22 @@ find_insertion_points <- function(hc, D_new, linkage_fn) {
       
       clusters[[n_base + i]] <- new_members
 
-  if (closest_base_idx %in% new_members) {
-    # This merge step involves our tracked cluster.
-    # Would X have merged with the PREVIOUS cluster before this step?
-    if (prev_d <= hc$height[i]) {
-      best_attachment <- list(
-        sample_name = new_sample_name,
-        cluster_members = prev_labels,
-        attach_height = prev_d,
-        merge_height = hc$height[i],
-        merge_step = i
-      )
-      break
-    }
-    # X didn't merge yet — continue tracking the larger cluster
-    prev_labels <- new_labels
-    prev_d <- linkage_fn(D_new[j, new_labels], new_size)
-
+      if (closest_base_idx %in% new_members) {
+        # This merge step involves our tracked cluster.
+        # Would X have merged with the PREVIOUS cluster before this step?
+        if (prev_d <= hc$height[i]) {
+          best_attachment <- list(
+            sample_name = new_sample_name,
+            cluster_members = prev_labels,
+            attach_height = prev_d,
+            merge_height = hc$height[i],
+            merge_step = i
+          )
+          break
+        }
+        # X didn't merge yet — continue tracking the larger cluster
+        prev_labels <- new_labels
+        prev_d <- linkage_fn(D_new[j, new_labels], new_size)
       }
     }
     
@@ -198,6 +202,143 @@ find_insertion_points <- function(hc, D_new, linkage_fn) {
   }
   
   return(results)
+}
+
+#' Group new samples that should merge with each other before attaching to the tree
+#' @keywords internal
+group_new_samples <- function(attach_results, D_among_new, D_new, hc, linkage_fn, linkage) {
+  if (is.null(D_among_new) || length(attach_results) <= 1) {
+    return(attach_results)
+  }
+  
+  nms <- sapply(attach_results, `[[`, "sample_name")
+  attach_heights <- sapply(attach_results, `[[`, "attach_height")
+  
+  # Build adjacency: two new samples should group if their mutual distance
+  # is less than both of their individual attach heights (meaning they'd
+  # merge with each other before either merges with the base tree)
+  n <- length(nms)
+  adj <- matrix(FALSE, n, n, dimnames = list(nms, nms))
+  for (i in seq_len(n)) {
+    for (j in seq_len(n)) {
+      if (i < j) {
+        threshold <- min(attach_heights[i], attach_heights[j])
+        if (D_among_new[nms[i], nms[j]] < threshold) {
+          adj[i, j] <- adj[j, i] <- TRUE
+        }
+      }
+    }
+  }
+  
+  # Find connected components via simple BFS
+  visited <- rep(FALSE, n)
+  names(visited) <- nms
+  components <- list()
+  
+  for (i in seq_len(n)) {
+    if (visited[nms[i]]) next
+    # BFS
+    queue <- nms[i]
+    component <- character(0)
+    while (length(queue) > 0) {
+      current <- queue[1]
+      queue <- queue[-1]
+      if (visited[current]) next
+      visited[current] <- TRUE
+      component <- c(component, current)
+      neighbours <- nms[adj[current, ]]
+      queue <- c(queue, neighbours[!visited[neighbours]])
+    }
+    components <- c(components, list(component))
+  }
+  
+  # Build results: one entry per component
+  out <- list()
+  for (comp in components) {
+    if (length(comp) == 1) {
+      # Singleton — keep original result
+      out <- c(out, list(attach_results[[comp]]))
+      next
+    }
+    
+    # Build mini-dendrogram for the group from D_among_new
+    d_sub <- as.dist(D_among_new[comp, comp, drop = FALSE])
+    mini_hc <- hclust(d_sub, method = linkage)
+    mini_dend <- as.dendrogram(mini_hc)
+    
+    # Find a single insertion point for the group:
+    # Compute the group's linkage distance to each base sample
+    # (apply linkage_fn across all group members for each base sample)
+    base_labels <- hc$labels
+    n_base <- length(base_labels)
+    group_d_to_base <- numeric(n_base)
+    names(group_d_to_base) <- base_labels
+    for (b in seq_len(n_base)) {
+      group_d_to_base[b] <- linkage_fn(D_new[comp, base_labels[b]], length(comp))
+    }
+    
+    # Now walk the tree as in find_insertion_points but using group distances
+    closest_base_idx <- which.min(group_d_to_base)
+    closest_base_name <- names(group_d_to_base)[closest_base_idx]
+    min_dist <- group_d_to_base[closest_base_idx]
+    
+    clusters <- as.list(seq_len(n_base))
+    best_attachment <- list(
+      sample_name = NULL,
+      subtree = mini_dend,
+      cluster_members = closest_base_name,
+      attach_height = min_dist,
+      merge_height = min_dist,
+      merge_step = 0
+    )
+    prev_labels <- closest_base_name
+    prev_d <- min_dist
+    
+    for (i in seq_len(nrow(hc$merge))) {
+      merge_row <- hc$merge[i, ]
+      
+      get_cluster <- function(idx) {
+        if (idx < 0) {
+          return(list(members = -idx, labels = hc$labels[-idx], size = 1))
+        }
+        cluster_id <- n_base + idx
+        return(list(members = clusters[[cluster_id]], labels = hc$labels[clusters[[cluster_id]]], size = length(clusters[[cluster_id]])))
+      }
+      
+      c1 <- get_cluster(merge_row[1])
+      c2 <- get_cluster(merge_row[2])
+      
+      new_members <- c(c1$members, c2$members)
+      new_labels <- c(c1$labels, c2$labels)
+      new_size <- c1$size + c2$size
+      
+      clusters[[n_base + i]] <- new_members
+      
+      if (closest_base_idx %in% new_members) {
+        if (prev_d <= hc$height[i]) {
+          best_attachment <- list(
+            sample_name = NULL,
+            subtree = mini_dend,
+            cluster_members = prev_labels,
+            attach_height = prev_d,
+            merge_height = hc$height[i],
+            merge_step = i
+          )
+          break
+        }
+        prev_labels <- new_labels
+        # Group linkage distance to the merged cluster
+        prev_d <- linkage_fn(
+          as.vector(D_new[comp, new_labels]),
+          new_size
+        )
+      }
+    }
+    
+    out <- c(out, list(best_attachment))
+  }
+  
+  out
 }
 
 #' Insert samples into dendrogram structure
@@ -301,7 +442,8 @@ insert_into_dendrogram <- function(dend, attach_results) {
     result <- recurse(tree)
     
     if (!result$inserted) {
-      stop(sprintf("Failed to insert sample '%s'", res$sample_name))
+      stop(sprintf("Failed to insert sample '%s'", 
+                    res$sample_name %||% paste(labels(res$subtree), collapse=",")))
     }
     
     result$node
@@ -327,41 +469,37 @@ insert_into_dendrogram <- function(dend, attach_results) {
   })
   return(dend)
 }
+
 get_dend_labels <- function(node) {
   if (is.leaf(node)) return(attr(node, "label"))
   unlist(lapply(node, get_dend_labels))
 }
-build_grouped_insertions <- function(attach_results, D_among_new, linkage) {
-  if (is.null(D_among_new) || length(attach_results) <= 1) {
-    return(attach_results)
-  }
-  
-  # Group by attachment target (same cluster_members)
-  target_key <- function(res) paste(sort(res$cluster_members), collapse = "\t")
-  groups <- split(attach_results, sapply(attach_results, target_key))
-  
-  out <- list()
-  for (grp in groups) {
-    if (length(grp) == 1) {
-      out <- c(out, grp)
-      next
+
+#' Reorder dendrogram so branches with more non-original samples go right
+#' @keywords internal
+push_new_samples_right <- function(dend, original_labels) {
+  reorder_node <- function(node) {
+    if (is.leaf(node)) return(node)
+    
+    # Recurse first
+    for (i in seq_along(node)) {
+      node[[i]] <- reorder_node(node[[i]])
     }
     
-    # Build mini-dendrogram from pairwise distances
-    nms <- sapply(grp, `[[`, "sample_name")
-    d_sub <- as.dist(D_among_new[nms, nms, drop = FALSE])
-    mini_hc <- hclust(d_sub, method = linkage)
-    mini_dend <- as.dendrogram(mini_hc)
+    # Count fraction of non-original labels in each child
+    new_frac <- sapply(node, function(child) {
+      labs <- get_dend_labels(child)
+      mean(!labs %in% original_labels)
+    })
     
-    # Use the max attach_height from the group
-    attach_height <- max(sapply(grp, `[[`, "attach_height"))
+    # Sort children: lowest new-fraction first (= left), highest last (= right)
+    ord <- order(new_frac)
+    if (!identical(ord, seq_along(node))) {
+      node[] <- node[ord]
+    }
     
-    # Create a single grouped result
-    representative <- grp[[1]]
-    representative$sample_name <- NULL
-    representative$subtree <- mini_dend
-    representative$attach_height <- attach_height
-    out <- c(out, list(representative))
+    node
   }
-  out
+  
+  reorder_node(dend)
 }
