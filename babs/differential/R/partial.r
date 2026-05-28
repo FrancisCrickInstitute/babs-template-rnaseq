@@ -87,7 +87,6 @@ partialise.DESeqDataSet <- function(obj, assay="vst", influence=TRUE) {
   } else {
     mat <-assay(vst(obj, nsub=min(1000, nrow(obj))))
   }
-  influence <- influence & (metadata(obj)$extra_assays$influential_samples %||% TRUE)
   partialise.matrix(
     obj=mat,
     cdata=as.data.frame(colData(obj)),
@@ -98,7 +97,6 @@ partialise.DESeqDataSet <- function(obj, assay="vst", influence=TRUE) {
 
 partialise.SummarizedExperiment <- function(obj, assay=1, fml=design(obj), influence=TRUE) {
   mat <- assay(obj, assay)
-  influence <- influence & (metadata(obj)$extra_assays$influential_samples %||% TRUE)
   partialise.matrix(
     obj=mat,
     cdata=as.data.frame(colData(obj)),
@@ -152,7 +150,6 @@ assemble_partialised <- function(obj, reduced, resids = TRUE) {
 }
 
 partial_reconstruct <- function(obj, plot_fml, resids=TRUE,  assay=NULL, ...) {
-  influential <- obj$.influential %||% TRUE
   if (is.null(assay)) {
     if ("y" %in% names(plot_fml[[2]])) {
       assay <- as.character(plot_fml[[2]]$y)
@@ -160,7 +157,7 @@ partial_reconstruct <- function(obj, plot_fml, resids=TRUE,  assay=NULL, ...) {
       assay <- ifelse(inherits(obj, "DESeqDataSet"), "vst", assayNames(obj)[1])
     }
   }
-  influential_in_assay <- influential & (metadata(obj)$extra_assays[[assay]]$influential_samples %||% TRUE)
+  influential_in_assay <- (obj$.influential$.influential %||% TRUE) & (obj$.influential[[assay]] %||% TRUE)
   if (formula_equal(design(obj), plot_fml) && resids) {
     structure(
       assay(obj, assay),
@@ -175,10 +172,9 @@ partial_reconstruct <- function(obj, plot_fml, resids=TRUE,  assay=NULL, ...) {
       removed <- " having removed noise"
     } else {
       txt <- dropped_terms(deconstructed, update(plot_fml, NULL ~ .))
-      tr_list <- modifyList(setNames(as.list(txt), txt),  metadata(obj)$termNames)
       removed <- paste0(" having removed effect of ",
                        if (resids) "" else "noise and ",
-                       paste(unlist(tr_list), collapse=", ")
+                       paste(txt, collapse=", ")
                        )
     }
     structure(

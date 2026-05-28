@@ -85,7 +85,7 @@ set.seed(param$set("seed", postpone=TRUE))
 param$set("spec",  params$spec, "Using analysis plan '{}'.", postpone=TRUE)
 param$set("alignment", params$alignment, "Using alignment settings '{}'")
 data(list=paste0(params$spec, "_x_", params$alignment))
-dataset_model_comp <-  decompress_dmc(dataset_model_comp)
+
 
 if  ("symbol_source" %in% names(metadata(dds)) && metadata(dds)$symbol_source== "row.names") {
   cat('\n\n::: {.callout-warning title="No annotation"}\nSkipping enrichment analysis as we could not find an R package with the required organism transcript mappings.\n:::\n\n')
@@ -238,111 +238,73 @@ broadly similar magnitudes but opposite directions...)
 
 #param$set("showCategory")
 
-# Get a data.frame with the dds objects in a column
-dds_df <- dmc2df(dataset_model_comp)
-
-# Enumerate all functional-approach x dds combos
-approach_df <- cross_join(
-  tibble(approach_name=names(approaches), approach_params=approaches),
-  dds_df)
-
-# Apply the functional approach to the dds
-approach_df$approach_res <- 
-  mapply(
-    function(x,y) do.call(functional_api, modifyList(x, list(dds=y, post_process=NULL))),
-    approach_df$approach_params,
-    approach_df$dds
-)
-
-approach_df <- approach_df[!sapply(approach_df$approach_res, is.null),]
-approach_df <- approach_df[sapply(approach_df$approach_res, nrow)!=0,]
-
-
-# Gather results into common functional approaches, a list of
-# dataframes where each element corresponds to an approach, which
-# is grouped by the grouping structure (e.g. model within dataset),
-# and the rows in a group are the comparisons.
-grouper <- ~ dataset + model
-approach_res_list <- lapply(
-  unique(approach_df$approach_name) |> (function(x) setNames(x,x))(),
-  function(f) {
-    grp_vars <- all.vars(grouper)
-    within_vars <- setdiff(c("dataset","model","comparison"), grp_vars)
-    approach_df %>%
-      filter(approach_name==f) %>%
-      unite("inner", all_of(within_vars)) %>%
-      group_by(across(all_of(grp_vars))) %>%
-      mutate(df=map2(approach_res, inner, ~data.frame(as.data.frame(.x), inner=.y))) %>%
-      summarise(df=list(map_dfr(df, identity)))
+enrich_tree <- nested_modify(ddsList, function(obj, layers) {
+  di <- layers[[1]]
+  mi <- layers[[2]]
+  ci <- layers[[3]]
+  res <- obj$sample_sets[[di]]$models[[mi]]$comparisons[[ci]]$results
+  org <- metadata(obj$sample_sets[[di]]$models[[mi]]$object)$organism$org
+  out <- lapply(approaches, function(app) {
+    do.call(functional_api, modifyList(app, list(res=res, org=org, post_process=NULL)))
+  })
+  out <- out[!sapply(out, is.null)]
+  out <- out[sapply(out, nrow)!=0]
+  if (length(out)>0) {
+    obj$sample_sets[[di]]$models[[mi]]$comparisons[[ci]]$enrich <- out
+  } else {
+    obj$sample_sets[[di]]$models[[mi]]$comparisons[[ci]] <- NULL
+  }
+  obj
   })
 
+original_order <- c("sample_sets", "models", "comparisons", "enrich")
+desired_order <- c("sample_sets", "enrich", "models", "comparisons")
+enrich_tree <- permute_nested(simplify_nest(enrich_tree, FUN=identity, layers=original_order),
+                             match(desired_order, original_order))
 
-
-## Speculative - recursively structure the document
-if (do_approach_df_recurse <- FALSE) {
-  struct <- list(method=list(source=list("dataset","model")))
-  destruct(
-    approach_df, struct,
-    function(df, group) {
-      approach <- unique(df$approach_name)
-    })
-}
-
-
-## Put the results into the report
-# For each approach produce a section,
-# for each group of comparisons within an
-# approach, produce a plot.
-
-for (approach in names(approach_res_list)) {
-  cat("\n\n## ", approach, "\n\n")
-  groups <- approach_res_list[[approach]] %>%
-    unite("grp", -df, sep=" ") %>%
-    pull(grp)
-  if ("post_process" %in% names(approaches[[approach]])) { # post_process allows filtering on a case-by-case basis
-    if (is.list(approaches[[approach]]$post_process)) {# chose the method-specific post-processing
-      my_post_process <- approaches[[approach]]$post_process[[approaches[[approach]]$method]]
-    } else { # post_process can also be given as a single function
-      my_post_process <- approaches[[approach]]$post_process
+big_fn <- function(x) max(c(0, abs(x)), na.rm=TRUE)
+for (di in names(enrich_tree)) {
+  cat("\n\n## ", di, "\n\n")
+  for (ei in names(enrich_tree[[di]])) {
+    cat("\n\n### ", ei, "\n\n")
+    if ("post_process" %in% names(approaches[[ei]])) { # post_process allows filtering on a case-by-case basis
+      if (is.list(approaches[[ei]]$post_process)) {# chose the method-specific post-processing
+        my_post_process <- approaches[[ei]]$post_process[[approaches[[ei]]$method]]
+      } else { # post_process can also be given as a single function
+        my_post_process <- approaches[[ei]]$post_process
+      }
+    } else { # or drop back to the default if not specified.
+      my_post_process <- default_post_process(method=approaches[[ei]]$method)
     }
-  } else { # or drop back to the default if not specified.
-    my_post_process <- default_post_process(method=approaches[[approach]]$method)
-  }
-  biggest_effect <- max(abs(sapply(
-    approach_res_list[[approach]]$df,
-    function(x) range(my_post_process(x)$effect, na.rm=TRUE))
-    ))
-  effect_label <- list(OR="Relative effect", enrichment="NES")[[approaches[[approach]]$method]]
-  for (grp in 1:nrow(approach_res_list[[approach]])) {
-    df <- approach_res_list[[approach]]$df[[grp]] %>%
-      my_post_process() %>%
-      tidyr::complete(inner, ID)
-    df$ID <- factor(df$ID, levels=unique(df$ID[order_enrichments(df)]))
-    capt <- paste(approach, groups[grp], sep=" - ")
-    size <- NULL#fall-back if post-processing doesn't define a 'size'
-    pl <- ggplot(df, aes(x=inner, y=Description, colour=effect, size=size)) +
-      geom_point() +
-      labs(x="Comparison", y="Annotation", title=capt, colour=effect_label, size="Proportion of differential") +
-      scale_colour_distiller(type="div", palette="RdYlBu", limits=c(-1,1)* biggest_effect) +
-      scale_y_discrete(labels = function(x) stringr::str_wrap(x, width = 40))+
-      scale_x_discrete(labels = function(x) stringr::str_wrap(x, width = 10)) +
-      theme_bw() +
-      theme(
-        axis.ticks=element_line(size=0.4),
-        plot.background=element_blank(),
-        panel.border=element_blank()
-      ) +
-      theme(legend.position="bottom", legend.box = "horizontal")
-    do_plot(pl,
-            label=approach,
-            caption=capt,
-            height_opt=paste0(
-              "#| fig-height: ",
-              height_scaler(n=nlevels(df$ID), small=5, big=20, N=600))
-            )
+    biggest_effect <- lapply(enrich_tree[[di]][[ei]], function(x) lapply(x, function(res) big_fn(my_post_process(as.data.frame(res))$effect)))
+    biggest_effect <- max(unlist(biggest_effect))
+    effect_label <- list(OR="Relative effect", enrichment="NES")[[approaches[[ei]]$method]]
+    for (mi in names(enrich_tree[[di]][[ei]])) {
+        df <- my_post_process(bind_rows(lapply(enrich_tree[[di]][[ei]][[mi]], as.data.frame), .id="comparison"))
+        capt <- paste(di, ei, mi)
+        size <- NULL#fall-back if post-processing doesn't define a 'size'
+        pl <- ggplot(df, aes(x=comparison, y=Description, colour=effect, size=size)) +
+          geom_point() +
+          labs(x="Comparison", y="Annotation", title="", colour=effect_label, size="Proportion of differential") +
+          scale_colour_distiller(type="div", palette="RdYlBu", limits=c(-1,1)* biggest_effect) +
+          scale_y_discrete(labels = function(x) stringr::str_wrap(x, width = 40))+
+          scale_x_discrete(labels = function(x) stringr::str_wrap(x, width = 10)) +
+          theme_bw() +
+          theme(
+            axis.ticks=element_line(size=0.4),
+            plot.background=element_blank(),
+            panel.border=element_blank()
+          ) +
+          theme(legend.position="bottom", legend.box = "horizontal")
+        do_plot(pl,
+                label=gsub(" ", "-", paste(di,ei,mi)),
+                caption=capt,
+                height_opt=paste0(
+                  "#| fig-height: ",
+                  height_scaler(n=nlevels(df$ID), small=5, big=20, N=600))
+                )
     cat("\n\n")
     tbl <- df %>%
-      rename(Comparison=inner) %>%
       filter(!is.na(Description)) %>%
       mutate(core_enrichment=NULL,
              geneID=NULL) %>%
@@ -356,11 +318,13 @@ for (approach in names(approach_res_list)) {
     tab_header(title=capt) %>%
     opt_interactive()
     do_tbl(tbl,
-           label=approach,
+           label=gsub(" ", "-", paste(di,ei,mi)),
            caption=capt)
+    }
   }
 }
 
+ 
 ```
 
 # Terms Of Use

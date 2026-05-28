@@ -140,11 +140,23 @@ param$set("baseMeanMin")
 
 ddsList <- build_dds_list(dds, specs)
 gt(summarise_filters(ddsList))
-ddsList <- lapply(ddsList, function(dds) dds[mcols(dds)$filter$universal %||% TRUE, , drop=FALSE])
 
-ddsList <- lapply(ddsList, sample_norm)
-ddsList <- removeLow(ddsList, preserve_across=TRUE, baseMeanMin=param$get("baseMeanMin"))
-ddsList <- lapply(ddsList, add_extra_assays)
+ddsList <- leaf_modify(ddsList,
+                      function(leaf, layers) {
+                        leaf$object <- leaf$object[mcols(leaf$object)$filter$univeral %||% TRUE, , drop=FALSE]
+                        leaf},
+                      layers="sample_sets")
+ddsList <- leaf_modify(ddsList,
+                      function(leaf, layers) {
+                        leaf$object <- sample_norm(leaf)
+                        leaf},
+                      layers="sample_sets")
+ddsList <- removeLow(ddsList)
+ddsList <- leaf_modify(ddsList,
+                      function(leaf, layers) {
+                        leaf$object <- add_extra_assays(leaf$object, leaf$extra_assays)
+                        leaf},
+                      layers="sample_sets")
 
 dtag <- dmc_factory(ddsList, type="dataset")
 mtag <- dmc_factory(ddsList, type="model")
@@ -174,7 +186,9 @@ sample_X_dataset_table(dds, ddsList) %>%
 #| label: save-assay
 
 assay_files <- list()
-anames <- unique(unlist(lapply(ddsList, assayNames)))
+anames <- unique(unlist(leaf_modify(
+  ddsList,
+  function(leaf, layers) {assayNames(leaf$object)}, layers="sample_sets")$sample_sets))
 if (is_des) anames <- c(anames, "norm")
 anames <- intersect(anames, c("counts", "vst", "norm", "abundance", "imputed"))
 for (aname in anames) {
@@ -228,17 +242,16 @@ specify these approaches:
 ```{r}
 #| label: formulae
 
-for (dataset in names(ddsList)) {
+for (dataset in names(ddsList$sample_sets)) {
   dmc_heading(ddsList, list(dataset=dataset), depth="##")
-  src2bullets(metadata(ddsList[[dataset]]), c("subset", "extra_assays", "influential_samples"))
-  met <- metadata(ddsList[[dataset]])
-  mdls <- lapply(met$models, function(x) x$design)
-  mdls <- mdls[sapply(met$models, function(x) "comparisons" %in% names(x))]
-  for (mdl in names(mdls)) {
+  src2bullets(ddsList$sample_set[[dataset]], c("subset", "extra_assays", "influential_samples"))
+  mdls <- ddsList$sample_sets[[dataset]]$models
+  designs <- lapply(mdls[sapply(mdls, function(m) "comparisons" %in% names(m))], function(x) x$design)
+  for (mdl in names(designs)) {
     dmc_heading(ddsList, list(dataset=dataset, model=mdl), depth="###", numbered=FALSE)
-    src2bullets(metadata(ddsList[[dataset]])$models[[mdl]], c("subset", "influential_samples", "extra_assays"))
+    src2bullets(ddsList$sample_sets[[dataset]]$models[[mdl]], c("subset", "influential_samples", "extra_assays"))
     cat("`",
-      Reduce(paste, sub("~", paste0(noun_to_readout(param$get("RowNoun"))," ~ "), deparse(mdls[[mdl]]))),
+      Reduce(paste, sub("~", paste0(noun_to_readout(param$get("RowNoun"))," ~ "), deparse(designs[[mdl]]))),
       "`\n\n"
         )
   }
@@ -390,19 +403,20 @@ links <- list(
 cluster_ind <- counter(post_fn=to_letter)
 girafe_ind <- counter()
 
-for (dataset_id in names(ddsList)) {
+for (dataset_id in names(ddsList$sample_sets)) {
+  dataset_meta <- ddsList$sample_sets[[dataset_id]]
   section_hierarchy <- list(dataset=dataset_id)
   dmc_heading(ddsList, section_hierarchy, depth=strrep("#", length(section_hierarchy)))
-  src2bullets(metadata(ddsList[[dataset_id]]), c("subset", "extra_assays", "influential_samples"))
+  src2bullets(ddsList$sample_sets[[dataset_id]], c("subset", "extra_assays", "influential_samples"))
   mdls <- sapply(
-    metadata(ddsList[[dataset_id]])$models,
+    ddsList$sample_sets[[dataset_id]]$models,
     function(m) !is.null(m$profile_plots) &&
       length(get_in_section(m$profile_plots, c("all", "exploratory"))) > 0
     )
   for (model_id in names(mdls[mdls])) {
-    this_dds <- ddsList[[dataset_id]]
+    this_dds <- ddsList$sample_sets[[dataset_id]]$object
     section_hierarchy <- list(dataset=dataset_id, model=model_id)
-    model_meta <- metadata(this_dds)$models[[model_id]]
+    model_meta <- ddsList$sample_sets[[dataset_id]]$models[[model_id]]
     ## for (new_name in names(metadata(this_dds)$extra_assays)) {
     ##   assay(this_dds, new_name) <- generate_assay(
     ##     args=modifyList(list(from="imputed", design=model_meta$design), metadata(this_dds)$extra_assays[[new_name]]),
@@ -417,7 +431,7 @@ for (dataset_id in names(ddsList)) {
     model_vars <- intersect(model_vars, names(colDF(this_dds)))
     dmc_heading(ddsList, section_hierarchy, depth=strrep("#", length(section_hierarchy)))
     # Show an overall legend
-    nice_legends <- separate_legend(ddsList[[dataset_id]], model_vars)
+    nice_legends <- separate_legend(this_dds, model_vars)
     pl <- do.call(gridExtra::arrangeGrob, c(
       nice_legends,
       ncol=ceiling(sqrt(length(nice_legends)))))
@@ -447,7 +461,7 @@ for (dataset_id in names(ddsList)) {
       } else {
         sample_order <- reorder_samples(this_dds, model_vars)
       }
-      y_hint <- metadata(this_dds)$extra_assays[[which_assay]]$hint %||% which_assay
+      y_hint <- dataset_meta$extra_assays[[which_assay]]$hint %||% which_assay
       this_assay <- this_assay[mcols(this_dds)$filter$exploratory %||% TRUE, , drop=FALSE]
       #
       ## Heatmaps
@@ -461,8 +475,8 @@ for (dataset_id in names(ddsList)) {
       colnames(hmap_data) <- rownames(colDF(this_dds))
       do_labels <- nrow(colDF(this_dds)) < 10
       do_z <- attr(terms(plot_fml), "intercept") == 1
-      do_rescale <- metadata(this_dds)$extra_assays[[which_assay]]$rescale %||% do_z
-      do_recentre <- metadata(this_dds)$extra_assays[[which_assay]]$recentre %||% do_z
+      do_rescale <- dataset_meta$extra_assays[[which_assay]]$rescale %||% do_z
+      do_recentre <- dataset_meta$extra_assays[[which_assay]]$recentre %||% do_z
       if (param$get("sample_clust")@metric %in% c("binary")) {
         measure_name <- paste("Binary", noun_to_readout(param$get("RowNoun")))
       } else {
@@ -658,7 +672,7 @@ cat(links$expecteds, sep="\n\n")
 cat("\n\n## Cluster Composition\n\n")
 
 fname <- write_clusters(links$clusters,
-                        mcols(ddsList[[1]]),
+                        mcols(ddsList$sample_sets[[1]]$object),
                         p=params,
                         prefix="exploratory-clusters")
 

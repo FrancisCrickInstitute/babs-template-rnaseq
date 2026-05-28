@@ -20,7 +20,8 @@ p2filename <- function(p, prefix, suffix) {
 #' @return A list of file paths to the excel files
 #' @author Gavin Kelly
 #' @export
-write_assay <- function(ddsList, aname="vst", p) {
+write_assay <- function(obj, aname="vst", p) {
+  ddsList <- flatten_nest(obj, function(leaf) leaf$object, layers="sample_sets")
   out <- list()
   for (i in names(ddsList)) {
     x <- assayPlus(ddsList[[i]], aname)
@@ -80,6 +81,23 @@ write_clusters <- function(clust, mcols, p, prefix="clusters") {
   fname
 }
 
+summarise_results <- function(obj, inds) {
+  res <- get_nest(obj, inds)$results
+  out <- as.data.frame(table(
+    Group=sub("\\*$","",res$class),
+    Significant=factor(ifelse(grepl("\\*$",res$class), "Significant", "not"), levels=c("Significant","not"))
+  )) %>%
+    tidyr::spread(Significant, Freq) %>%
+    dplyr::mutate(Total=not+Significant) %>%
+    dplyr::select(-not) %>%
+    dplyr::arrange(desc(Significant/Total))
+  obj$sample_sets[[inds[[1]]]]$models[[inds[[2]]]]$comparisons[[inds[[3]]]]$summary <- modifyList(out, list(
+    dname = inds[[1]],
+    mname = inds[[2]],
+    cname = inds[[3]]))
+  obj
+}    
+
 #' Xlsx reporting of results
 #'
 #' Store all the differential gene-lists and supporting materials
@@ -101,44 +119,42 @@ write_results <- function(dmc, param, params, assays=NULL) {
                     border = "Bottom")
   hs2 <- createStyle(fgFill = crick_colours$secondary$blue, textDecoration = "italic",
                     border = "Bottom")
-  summaries <- map_depth(dmc, 3, summarise_results)
+
+  summaries <- nested_modify(dmc, summarise_results)
+  summaries <- Reduce(rbind, flatten_nest(summaries, function(x) x$summary))
+  
   out <- lapply(dmc, function(x) "")
-  for (dataset in names(dmc)) {
+  for (dataset_id in names(dmc$sample_sets)) {
+    dataset <- dmc$sample_sets[[dataset_id]]
     wb <- openxlsx::createWorkbook(title="Differential Analysis",
                                   creator="BABS")
     tmp <- param$describe()
-    dframe <- data.frame(id=names(tmp), description=unlist(tmp))
     sn <- "Parameters"
     addWorksheet(wb, sn)
-    writeData(wb, sn, dframe,rowNames=FALSE, colNames=TRUE)
+    writeData(wb, sn,  data.frame(id=names(tmp), description=unlist(tmp)), rowNames=FALSE, colNames=TRUE)
     ## Design
-    samples_used <- as.data.frame(colData(dmc[[dataset]][[1]][[1]]))
     sn <- "Design"
     addWorksheet(wb, sn)
-    writeData(wb, sn, samples_used, headerStyle=hs2)
+    writeData(wb, sn, as.data.frame(colData(dataset$object)), headerStyle=hs2)
     sn <- "Class Sizes"
     addWorksheet(wb, sn)
-    dframe <- rbind_summary(
-      summaries[[dataset]],
-      levels=c("Design","Comparison")
-    )
-    writeData(wb, sn, dframe, headerStyle=hs2)
+    writeData(wb, sn, subset(summaries, dname==dataset_id), headerStyle=hs2)
     ## Differential gene-lists
     comparison_name_lookup <- list()
     addWorksheet(wb, "Comparison Key")
-    for (model_ind in 1:length(dmc[[dataset]])) {
-      model_id <- names(dmc[[dataset]])[model_ind]
-      for (comparison_id in names(dmc[[dataset]][[model_ind]])) {
-        model_name <- metadata(dmc[[dataset]][[model_ind]][[comparison_id]])$dmc$model_name %||% model_id
-        comparison_name <- metadata(dmc[[dataset]][[model_ind]][[comparison_id]])$dmc$comparison_name %||% comparison_id
-        mc <- mcols(dmc[[dataset]][[model_ind]][[comparison_id]])
+    models <- dataset$models
+    for (model_id in names(models)) {
+      model <- models[[model_id]]
+      model_name <- model$name %||% model_id
+      comparisons <- model$comparisons
+      for (comparison_id in names(comparisons)) {
+        comparison <- comparisons[[comparison_id]]
+        comparison_name <- comparison$name %||% comparison_id
+        mc <- mcols(get_nest(dmc, list(dataset_id, 1))$object)
         ind <- sapply(mc, function(x) is.null(dim(x)))
-        dframe <- as.data.frame(mc[,ind,drop=FALSE])
-        if (any(!ind)) {
-          dframe <- cbind(dframe, do.call(cbind, mc[,!ind, drop=FALSE]))
-        }
+        dframe <- as.data.frame(comparison$results)
         for (assay_name in assays) {
-          this_assay <- assayPlus(dmc[[dataset]][[model_ind]][[comparison_id]], assay_name)
+          this_assay <- assayPlus(get_nest(dmc, list(dataset_id, model_id, comparison_id)), assay_name)
           if (is.null(this_assay)) {
             warning(assay_name, " not an assay, so not added to output")
             next
@@ -151,9 +167,9 @@ write_results <- function(dmc, param, params, assays=NULL) {
         dframe <- dframe %>%
           tibble::rownames_to_column("id") %>%
 #          dplyr::filter(padj<param$get("alpha")) %>%
-          dplyr::arrange(desc(abs(results.shrunkLFC))) %>%
-          dplyr::select(-results.padj)
-        if (length(dmc[[dataset]])==1) {
+          dplyr::arrange(desc(abs(shrunkLFC))) %>%
+          dplyr::select(-padj)
+        if (length(dataset$models)==1) {
           sn <- comparison_name
           if (nchar(sn) > 31) {sn <- comparison_id; comparison_name_lookup[[sn]] <- comparison_name}
         } else {
@@ -170,10 +186,11 @@ write_results <- function(dmc, param, params, assays=NULL) {
           comparison_name_lookup[[alpha_key]] <- sn
           sn <- alpha_key
         }
-        addWorksheet(wb, sn, tabColour=crick_colours$secondary[[model_ind]])
+        col_ind <- ((match(model_id, names(models)) - 1) %% length(crick_colours$secondary)) + 1
+        addWorksheet(wb, sn, tabColour=crick_colours$secondary[[col_ind]])
         writeData(wb, sn, dframe, headerStyle=hs1, withFilter=TRUE)
-        groupRows(wb, sn, rows=which(!grepl("\\*$", dframe$results.class))+1, hidden=TRUE)
-        filtCol <- match("results.class", names(dframe))
+        groupRows(wb, sn, rows=which(!grepl("\\*$", dframe$class))+1, hidden=TRUE)
+        filtCol <- match("class", names(dframe))
         if (!is.na(filtCol)) {
           filt_string <- sprintf(
             '><filterColumn colId="%s"><customFilters><customFilter val="*~*"/></customFilters></filterColumn></autoFilter>',
@@ -204,32 +221,11 @@ write_results <- function(dmc, param, params, assays=NULL) {
                                  value = unlist(si$platform),
                                  stringsAsFactors = FALSE),
               headerStyle=hs2)
-    out[[dataset]] <- p2filename(params, prefix=paste0("differential_", dataset), suffix="xlsx")
-    dir.create(dirname(out[[dataset]]), recursive=TRUE)
-    (saveWorkbook(wb, out[[dataset]], overwrite=TRUE))
+    out[[dataset_id]] <- p2filename(params, prefix=paste0("differential_", dataset_id), suffix="xlsx")
+    dir.create(dirname(out[[dataset_id]]), recursive=TRUE)
+    (saveWorkbook(wb, out[[dataset_id]], overwrite=TRUE))
   }
   out
-}
-
-#' Store results as text files
-#'
-#' Save unfiltered versions of the results in text files
-#' @title Store results as text files
-#' @param dmc A depth-3 list of [DESeq2::DESeqDataSet-class()] objects containing results in the [S4Vectors::mcols()] slot
-#' @param dir Directory to store the results in
-#' @return 
-#' @author Gavin Kelly
-#' @export
-write_all_results <- function(dmc, dir=".") {
-  for (i in names(dmc)) {
-    for (j in names(dmc[[i]])) { 
-      for (k in names(dmc[[i]][[j]])) { 
-        readr::write_excel_csv(
-          path=file.path(dir, sprintf("allgenes_%s_%s_%s.csv", i, j, k)),
-          x=as.data.frame(mcols(dmc[[i]][[j]][[k]])$results) %>% dplyr::select(log2FoldChange, stat, symbol, class))
-      }
-    }
-  }
 }
 
 
@@ -418,54 +414,26 @@ fname=fname
 ## }
 
 
-compress_dmc <-function(dmc) {
-  lapply(dmc,
-         function(d) {
-           lapply(d,
-                  function(m) {
-                    list(dds=m[[1]],
-                         comps=lapply(m, function(comp) {
-                           res <- mcols(comp)$results
-                           metadata(res) <- metadata(comp)
-                           res
-                         })
-                         )
-                  })
-         })
-}
 
-
-#' @export
-decompress_dmc <- function(dmc) {
-  lapply(dmc,
-         function(d) {
-           lapply(d,
-                  function(m) {
-                    lapply(m$comps, function(comp) {
-                      dds <- m$dds
-                      mcols(dds)$results <- comp
-                      metadata(dds) <- metadata(comp)
-                      dds
-                    })
-                  })
-         })
-}
 
 
 
 #' @export
-sample_X_dataset_table <- function(dds, ddsList) {
+sample_X_dataset_table <- function(dds, obj) {
   samp <- as.data.frame(colData(dds))
+  ddsList <- flatten_nest(obj, function(leaf) leaf$object, layers="sample_sets")
   # Extra columns introduced by datasets
   extra_meta <- lapply(
     setNames(names(ddsList), names(ddsList)),
     function(x) {
+      newcols <- as.data.frame(colData(ddsList[[x]])[, setdiff(names(colData(ddsList[[x]])),  c(names(samp), ".influential", ".involved")),drop=FALSE])
+      newcols[[paste0(x, "+")]] <- ifelse(ddsList[[x]]$.influential$.influential, "✓", "")
       m <- merge(
         setNames(data.frame(ifelse(colnames(dds) %in% colnames(ddsList[[x]]), "✓", ""), row.names=row.names(samp)), x),
-        as.data.frame(colData(ddsList[[x]])[, setdiff(names(colData(ddsList[[x]])),  names(samp)),drop=FALSE]),
+        newcols,
         by=0, all.x=TRUE
       )
-      transform(m, row.names=Row.names, Row.names=NULL, .influential=ifelse(is.na(.influential) | !.influential, "", "✓"))[row.names(samp),,drop=FALSE]
+      transform(m, row.names=Row.names, Row.names=NULL)[row.names(samp),,drop=FALSE]
     }
   )
 

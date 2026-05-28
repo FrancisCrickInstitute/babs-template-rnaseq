@@ -220,7 +220,6 @@ build_dds_list <- function(dds, spec) {
   spec <- trickle_down(field="drop_incomplete", to="models")
   spec <- trickle_down(field="varNames", to="sample_sets", merge_fn=modifyList, default=list())
   spec <- trickle_down(field="varDescriptions", to="sample_sets", merge_fn=modifyList, default=list())
-  spec <- trickle_down(field="termNames", to="sample_sets", merge_fn=modifyList, default=list())
   spec <- trickle_down(field="filterFeatures", to="sample_sets", default=spec$settings$filterFeatures)
   spec <- trickle_down(field="filterQC", to="sample_sets", default=spec$settings$filterQC)
   spec <- trickle_down(field="feature_filters", to="sample_sets", default=alist(universal=TRUE))
@@ -267,36 +266,30 @@ build_dds_list <- function(dds, spec) {
         spec$sample_sets[[dataset_i]]$models[[model_i]]$profile_plots <- default_names(spec$sample_sets[[dataset_i]]$models[[model_i]]$profile_plots, prefix="P")
       }
     }
-    dataset_spec <- spec$sample_sets[[dataset_i]]
-    dds$.influential <- dataset_spec$influential_samples
+    dds$.influential <- data.frame(.influential = spec$sample_sets[[dataset_i]]$influential_samples)
+    for (ea in names(spec$sample_sets[[dataset_i]]$extra_assays)) {
+      dds$.influential[[ea]] <- spec$sample_sets[[dataset_i]]$extra_assays[[ea]]$influential_samples %||% TRUE
+    }
     obj <- dds
-    # ensure any sample indices take into account dataset subsetting
-    for (lower_level_subset in intersect(names(dataset_spec), c("influential_samples"))) {
-      a <- attr(dataset_spec[[lower_level_subset]], "src")
-      dataset_spec[[lower_level_subset]] <- dataset_spec[[lower_level_subset]][dataset_spec$subset]
-      attr(dataset_spec[[lower_level_subset]], "src") <- a
-    }
-    for (ea in seq_along(dataset_spec$extra_assays)) {
-      a <- attr(dataset_spec$extra_assays[[ea]]$influential_samples, "src")
-      dataset_spec$extra_assays[[ea]]$influential_samples <- dataset_spec$extra_assays[[ea]]$influential_samples[dataset_spec$subset] %||% TRUE
-      attr(dataset_spec$extra_assays[[ea]]$influential_samples, "src") <- a
-    }
-    metadata(obj) <- modifyList(metadata(obj), dataset_spec)
-    if ("baseline" %in% names(dataset_spec)) {
-      if (!is.list(dataset_spec$baseline$ind)) {
-        is_numerator <- !is.na(dataset_spec$baseline$ind)
-        norm <- counts(obj[,dataset_spec$baseline$ind[is_numerator]]) + dataset_spec$baseline$adj
+    # Potentially handle case where we want to handle ratio data by putting denominator samples into the normalisation
+    if ("baseline" %in% names(spec$sample_sets[[dataset_i]])) {
+# TODO: Properly implement this and consider the impact on sample ordering/indexing      
+      warning("Ratio-handling via baseline is untested")
+      if (!is.list(spec$sample_sets[[dataset_i]]$baseline$ind)) {
+        is_numerator <- !is.na(spec$sample_sets[[dataset_i]]$baseline$ind)
+        norm <- counts(obj[,spec$sample_sets[[dataset_i]]$baseline$ind[is_numerator]]) + spec$sample_sets[[dataset_i]]$baseline$adj
       } else {
-        is_numerator <- sapply(dataset_spec$baseline$ind, function(x) !all(is.na(x)))!=0
-        norm <- sapply(dataset_spec$baseline$ind[is_numerator], function(x) rowSums(counts(obj[,x]))) + dataset_spec$baseline$adj
+        is_numerator <- sapply(spec$sample_sets[[dataset_i]]$baseline$ind, function(x) !all(is.na(x)))!=0
+        norm <- sapply(spec$sample_sets[[dataset_i]]$baseline$ind[is_numerator], function(x) rowSums(counts(obj[,x]))) + spec$sample_sets[[dataset_i]]$baseline$adj
       }
       obj <- obj[,is_numerator]
       normalizationFactors(obj) <- norm
     }
-    mdlList <- dataset_spec$models
-    obj <- obj[, dataset_spec$subset]
+    
+    obj <- obj[, spec$sample_sets[[dataset_i]]$subset]
+    # TODO: check we can spec$sample_sets[[dataset_i]]$subset <- NULL
     colData(obj) <- droplevels(colData(obj))
-    ff <- dataset_spec$feature_filters
+    ff <- spec$sample_sets[[dataset_i]]$feature_filters
     deps <- list(post_norm="universal", exploratory=c("post_norm", "universal"), differential=c("post_norm", "universal"))
     if (is.list(ff)) {
       mcols(obj)$filter <- as.data.frame(
@@ -307,6 +300,7 @@ build_dds_list <- function(dds, spec) {
     } else {
       mcols(obj)$filter <- data.frame(universal=eval_dds(obj, ff, assays=c(assayNames(obj), "norm", "missing")))
     }
+    
     for (f in names(mcols(obj)$filter)) {
       # Separate 'and' clauses of an individual filter
       conjuncts <- split_conjuncts(ff[[f]])
@@ -319,39 +313,31 @@ build_dds_list <- function(dds, spec) {
         attr(mcols(obj)$filter[[f]], "subpreds") <-paste0("(", paste(sprintf("%0.0f%%", percent), collapse=","), ")")
       }
     }
-    if (!is.null(dataset_spec$filterQC)) {#DEPRECATED
-      mcols(obj)$filter$exploratory <- eval_dds(obj, dataset_spec$filterQC, assays=c(assayNames(obj), "norm", "missing"))
+    if (!is.null(spec$sample_sets[[dataset_i]]$filterQC)) {#DEPRECATED
+      mcols(obj)$filter$exploratory <- eval_dds(obj, spec$sample_sets[[dataset_i]]$filterQC, assays=c(assayNames(obj), "norm", "missing"))
     }    
-    if (!is.null(dataset_spec$filterFeatures)) {
-      mcols(obj)$filter$universal <- eval_dds(obj, dataset_spec$filterFeatures, assays=c(assayNames(obj), "norm", "missing"))
-    }
-    if ("termNames" %in% names(dataset_spec)) {
-      metadata(obj)$termNames <- dataset_spec$termNames
-    } else {
-      metadata(obj)$termNames <- list()
-    }
-    if ("varNames" %in% dataset_spec) {
-      varNames <- sapply(names(colData(obj)), identity)
-      varNames[names(dataset_spec$varNames)] <- unlist(dataset_spec$varNames)
-      mcols(colData(obj))$name <- varNames
-    }
-    if ("varDescriptions" %in% dataset_spec) {
-      varDescriptions <- sapply(names(colData(obj)), identity)
-      varDescriptions[names(dataset_spec$varDescriptions)] <- unlist(dataset_spec$varDescriptions)
-      mcols(colData(obj))$description <- varDescriptions
+    if (!is.null(spec$sample_sets[[dataset_i]]$filterFeatures)) {
+      mcols(obj)$filter$universal <- eval_dds(obj, spec$sample_sets[[dataset_i]]$filterFeatures, assays=c(assayNames(obj), "norm", "missing"))
     }
 
-    for (i in seq_along(mdlList)) {
-      if (! "profile_plots" %in% names(mdlList[[i]])) {
+    varNames <- sapply(names(colData(obj)), identity)
+    varNames[names(spec$sample_sets[[dataset_i]]$varNames)] <- unlist(spec$sample_sets[[dataset_i]]$varNames)
+    mcols(colData(obj))$name <- varNames
+    varDescriptions <- sapply(names(colData(obj)), identity)
+    varDescriptions[names(spec$sample_sets[[dataset_i]]$varDescriptions)] <- unlist(spec$sample_sets[[dataset_i]]$varDescriptions)
+    mcols(colData(obj))$description <- varDescriptions
+
+    for (i in seq_along(spec$sample_sets[[dataset_i]]$models)) {
+      if (! "profile_plots" %in% names(spec$sample_sets[[dataset_i]]$models[[i]])) {
         # default to the set of models removing any terms that will preserve marginality
-        pp <- find_simpler_models(mdlList[[i]]$design, do_aes=TRUE, type="design")
-        mdlList[[i]]$profile_plots <- structure(pp, src="Auto-generated")
+        pp <- find_simpler_models(spec$sample_sets[[dataset_i]]$models[[i]]$design, do_aes=TRUE, type="design")
+        spec$sample_sets[[dataset_i]]$models[[i]]$profile_plots <- structure(pp, src="Auto-generated")
       } else {
-        mdlList[[i]]$profile_plots <- lapply(
-          mdlList[[i]]$profile_plots,
+        spec$sample_sets[[dataset_i]]$models[[i]]$profile_plots <- lapply(
+          spec$sample_sets[[dataset_i]]$models[[i]]$profile_plots,
           function(p) {
             fml <- p[[1]]
-            o <- update(mdlList[[i]]$design, fml)
+            o <- update(spec$sample_sets[[dataset_i]]$models[[i]]$design, fml)
             attributes(o) <- attributes(fml)
             attr(o, "src") <- paste0(deparse(fml), collapse="")
             p[[1]] <- o
@@ -359,17 +345,17 @@ build_dds_list <- function(dds, spec) {
           })
       }
     }
-    metadata(obj)$models <- mdlList
-    if ("sample_swap" %in% names(dataset_spec)) {
-      for (x1 in names(dataset_spec$sample_swap)) {
+# TODO: metadata(obj)$models no longer exists, swap all references to spec$sample_sets[[dataset_i]]$models instead
+    if ("sample_swap" %in% names(spec$sample_sets[[dataset_i]])) {
+      for (x1 in names(spec$sample_sets[[dataset_i]]$sample_swap)) {
         i1 <- match(x1, colData(obj)$ID)
-        i2 <- match(dataset_spec$sample_swap[[x1]], colData(obj)$ID)
+        i2 <- match(spec$sample_sets[[dataset_i]]$sample_swap[[x1]], colData(obj)$ID)
         tmp <- colData(obj)[i1, -1, drop=FALSE]
         colData(obj)[i1, -1] <- colData(obj)[i2, -1, drop=FALSE]
         colData(obj)[i2, -1] <- tmp
       }
     }
-    tr <- dataset_spec$transform
+    tr <- spec$sample_sets[[dataset_i]]$transform
     mc <- mcols(colData(obj))
     if ("stringsAsFactors" %in% names(spec$settings) && spec$settings$stringsAsFactors) {
       for (i in names(colData(obj))) {
@@ -380,11 +366,14 @@ build_dds_list <- function(dds, spec) {
       }
     }
     if (!is.null(tr)) {
-      .mu <- purrr::partial(mutate, .data=as.data.frame(colData(obj)))
+      ind <- names(colData(obj))!=".influential"
+      infl <- obj$.influential
+      .mu <- purrr::partial(mutate, .data=as.data.frame(colData(obj)[ind]))
       tr[[1]] <- .mu
       cnames <- colnames(obj)
       md <- metadata(colData(obj))
       colData(obj) <- S4Vectors::DataFrame(eval(tr))
+      obj$.influential <- infl
       metadata(colData(obj)) <- md
       colnames(obj) <- cnames
       if (".include" %in% names(colData(obj))) {
@@ -418,27 +407,20 @@ build_dds_list <- function(dds, spec) {
         metadata(colData(obj))$palette$ggplot[new_cols] <- new_meta$ggplot[new_cols]
       }
     }
-    if ("collapse" %in% names(dataset_spec)) {
-      mf <- model.frame(dataset_spec$collapse, data.frame(colData(obj)))
+    if ("collapse" %in% names(spec$sample_sets[[dataset_i]])) {
+      mf <- model.frame(spec$sample_sets[[dataset_i]]$collapse, data.frame(colData(obj)))
       ind <- match(do.call(paste, c(mf, sep="\r")),
                    do.call(paste, c(unique(mf), sep="\r")))
       obj <- collapseReplicates(obj, groupby=factor(ind), renameCols=FALSE)
+      if (any(rowSums(table(ind, obj$.influential$.influential)>0)>1)) warning("Replicate groups contain mixes of influential and non-influential samples!")
     }
     obj$.involved <- TRUE
-    ddsList[[names(spec$sample_sets)[dataset_i]]] <- obj
+    spec$sample_sets[[dataset_i]]$influential_samples <- obj$.influential$.influential
+    spec$sample_sets[[dataset_i]]$object <- obj
   }
   colour_toml <- "extdata/colours.toml"
   if (!file.exists(colour_toml)) save_palettes(ddsList, fname="extdata/colours.toml")
-  
-  ddsList <- imap(ddsList,
-                  function(obj, dname) {
-                    metadata(obj)$dmc <- list(
-                      dataset=dname,
-                      dataset_name=spec$sample_sets[[dname]]$name,
-                      dataset_description=spec$sample_sets[[dname]]$description)
-                    obj
-                  }
-                  )
+  spec
 }
 
 
@@ -454,76 +436,41 @@ build_dds_list <- function(dds, spec) {
 #' @return
 #' @author Gavin Kelly
 #' @export
-fit_models <- function(dds, param, ...) {
-  has_comparisons <- sapply(metadata(dds)$models, function(m) "comparisons" %in% names(m) && length(m$comparisons) > 0)
-  model_comp <- lapply(
-    metadata(dds)$models[has_comparisons],
+fit_models <- function(dmc, inds, param, ...) {
+  di <- inds[[1]]
+  sampleset <- dmc$sample_sets[[di]]
+  has_comparisons <- sapply(sampleset$models, function(m) length(m$comparisons) > 0)
+  sampleset$models <- lapply(
+    sampleset$models[has_comparisons],
     function(mdl) {
-      fit_model(mdl, dds, ...)
-    }
-  )
-  model_comp <- model_comp[lengths(model_comp)!=0]
-  model_comp <- imap(model_comp, function(obj, mname) {
-    lapply(obj, function(y) {
-      metadata(y)$dmc$model <- mname
-      metadata(y)$dmc$model_name <- metadata(y)$model$name
-      metadata(y)$dmc$model_description <- metadata(y)$model$description
-      metadata(y)$dmc$model_description <- metadata(y)$dmc$description
-      y})
-  })
-  model_comp
+      fit_model(modifyList(mdl, list(object=sampleset$object, ...)))
+    })
+  dmc$sample_sets[[di]] <- sampleset
+  dmc
 }
 
-subset_model <- function(model_dds) {
-  if (".influential" %in% names(colData(model_dds))) {
-    model_dds <- model_dds[, model_dds$.influential]
-    colData(model_dds) <- droplevels(colData(model_dds))
+subset_model <- function(model) {
+  if (".influential" %in% names(colData(model$object))) {
+    model$object <- model$object[, model$object$.influential$.influential]
+    colData(model$object) <- droplevels(colData(model$object))
   }
-  model_dds
+  model
 }
   
 
-fit_model <- function(mdl, dds, ...) {
+fit_model <- function(mdl, ...) {
   message("Processing model ", mdl$name)
-  model_dds <- dds
-  design(model_dds) <- mdl$design
-  metadata(model_dds)$model <- mdl
-  model_dds <- subset_model(model_dds)
-  model_dds <- check_model(model_dds)
-  if (any(metadata(model_dds)$model$dropped)) {
-    design(model_dds) <- metadata(model_dds)$model$mat
+  design(mdl$object) <- mdl$design
+  mdl <- subset_model(mdl)
+  mdl <- check_model(mdl)
+  if (any(mdl$dropped)) {
+    design(model_dds) <- mdl$mat
   }
-  ## Generate a nested list - single comparisons will be singletons, expanded mult_comps may not be.
-  out <- list()
-  metadata(model_dds)$model_fit_done <- FALSE
-  out <- list()
-  for (comp_ind in seq(along=mdl$comparisons)) {
+  for (comp_ind in rev(seq(along=mdl$comparisons))) {
     message("Processing comparison ", comp_ind)
-    metadata(model_dds)$dmc$comparison <- names(mdl$comparisons)[comp_ind]
-    fit <- fit_comparison(comp=mdl$comparisons[[comp_ind]], model_dds=model_dds, mdl=mdl,  ...)
-    if (length(fit) != 1) {
-      names(fit) <- paste(names(mdl$comparisons)[comp_ind],  seq_along(fit), sep=".")
-    } else {
-      names(fit) <- names(mdl$comparisons)[comp_ind]
-    }
-    out <- c(out, fit)
-    if (length(fit)!=0 && metadata(fit[[1]])$model_fit_done && !metadata(model_dds)$model_fit_done) {
-      model_dds <- fit[[1]]
-    }
+    mdl <- fit_comparison(mdl=mdl, comparison_ind=comp_ind,  ...)
   }
-  out <- imap(out, function(obj, cname) {
-    metadata(obj)$comparison_code <- paste0("res <- results(dds, contrast=",deparse1(metadata(obj)$comparison),")")
-#    metadata(obj)$dmc$comparison <- cname
-    comp <- metadata(obj)$comparison
-    if (is.character(comp) && length(comp)==1) {#'name' contrast so baseline is intercept
-      #TODO Set baseline_contrast to intercept
-    }
-    if (is.list(comp)) { # a character contrast
-      #TODO - Maybe a way to set baseline_contrast in this situation
-    }
-    obj
-  })
-  return(out)
+  return(mdl)
 }
 
 
@@ -535,90 +482,88 @@ get_design_matrix <- function(dds) {
   }
 }
 
-fit_comparison <- function(comp, model_dds, mdl, ...) {
-  if (inherits(comp, "post_hoc")) { #Multiple-comparisons
-    strip <- c("spec","name","description")
-    contrs <- emcontrasts(dds=model_dds, comp=comp)
-    if (length(contrs)==0) return(list())
-    if (comp$LRT %||% FALSE) { # Do LRT-equivalents of the multiple ward tests
-      mdl_mat <- metadata(model_dds)$model$mat %||% model.matrix(mdl$design, as.data.frame(colData(model_dds)))
-      return(lapply(
-        contrs,
-        function(contr) {fitContrastLRT(model_dds, mdl=mdl_mat, contr=contr, ...)}
-      )
-      )
-    } else if ((mdl$approach %||% "DESeq2")=="voom"){
-      ## TODO: possibly optimise/cache repeated calls to fitVoom, like 'model_fit_done'
-      fit <- fitVoom(model_dds, mdl)
-      fit <- apply_contrasts_with_estimability(fit, contrs, rowwise = FALSE)
-      metadata(model_dds)$limma <- fit
-    } else if ((mdl$approach %||% "DESeq2")=="limma" || !inherits(model_dds, "DESeqDataSet")){
-      ## TODO: possibly optimise/cache repeated calls to fitVoom, like 'model_fit_done'
-      fit <- limma::lmFit(assay(model_dds), get_design_matrix(model_dds))
-      metadata(model_dds)$lmfit <- fit
-      fit <- apply_contrasts_with_estimability(fit, contrs, assay_mat = assay(model_dds), rowwise = TRUE)
-      metadata(model_dds)$limma <- fit
-    } else {
-      if (!metadata(model_dds)$model_fit_done) {
-        model_dds <- DESeq2::DESeq(model_dds, test="Wald", ...)
-        metadata(model_dds)$model_fit_done <- TRUE
-      } # no need for an 'else': the model fit has already been done
-    }
-    # Return a list of DESeq2 objects, with the comparison metadata set.
-    id <- metadata(model_dds)$dmc$comparison
-    return(imap(contrs, function(contr, cname) {
-      metadata(model_dds)$models <- NULL
-      metadata(model_dds)$comparisons <- NULL
-      metadata(model_dds)$comparison <- contr
-      metadata(model_dds)$dmc$comparison <- paste(id, match(cname, names(contrs)), sep=".")
-      metadata(model_dds)$dmc$comparison_name <- cname
-      model_dds}
-      ))
-  } else if (is_formula(comp[[1]])) { # Do the usual DESeq2 LRT
-    return(fitLRT(model_dds, mdl=mdl, reduced=comp[[1]], ...))
-  } else {
+fit_comparison <- function(mdl, comparison_ind, ...) {
+  comparison <- mdl$comparisons[[comparison_ind]]
+  approach <- dplyr::case_when(
+    comparison$LRT %||% FALSE             ~ "wald2LRT",
+    !is.null(mdl$approach)                ~  mdl$approach %||% "",
+    !inherits(mdl$object, "DESeqDataSet") ~ "limma",
+    inherits(comparison, "post_hoc")      ~ "multiWald",
+    is_formula(comparison[[1]])           ~ "LRT",
+    .default                              = "Wald"
+  )
+
+  if (approach=="LRT") { # Do the usual DESeq2 LRT
+    return(fitLRT(mdl=mdl, comparison_ind=comparison_ind, ...))
+  }
+
+  if (approach=="Wald") {
     # Just a single DESeq2 Wald
     ## TODO: We should handle limma here as well, using retrieve_contrasts to cast DESeq's comparisons as limma contasts
-    if (!metadata(model_dds)$model_fit_done) {
-      model_dds <- DESeq2::DESeq(model_dds, test="Wald", ...)
-      metadata(model_dds)$model_fit_done <- TRUE
+    if (!"dispGeneEst" %in% mcols(mdl$object)) {
+      mdl$object <- DESeq2::DESeq(mdl$object, test="Wald", ...)
     }
-    metadata(model_dds)$models <- NULL
-    metadata(model_dds)$comparisons <- NULL
-    metadata(model_dds)$comparison <- comp[[1]]
-    return(list(model_dds))
+    return(mdl)
   }
+
+  ## We're now in multi-comparison territory:
+  comparisons <- emcontrasts(mdl=mdl, comparison_ind=comparison_ind)
+  if (length(comparisons)==0) {
+    mdl$comparisons[comparison_ind] <- NULL
+    return(mdl)
+  }
+  
+  if (approach == "wald2LRT") { # Do LRT-equivalents of the multiple ward tests
+    comparisons <- lapply(comparisons, function(comparison) {
+      fitContrastLRT(mdl, contr=comparison, ...)}
+      )
+  }
+  
+  if (approach=="voom"){
+    ## TODO: possibly optimise/cache repeated calls to fitVoom, like 'model_fit_done'
+    mdl$lmfit <- fitVoom(mdl$object, mdl)
+    comparisons <- apply_contrasts_with_estimability(mdl, comparisons, rowwise = FALSE)
+  }
+  
+  if (approach=="limma"){
+    ## TODO: possibly optimise/cache repeated calls to fitVoom, like 'model_fit_done'
+    mdl$lmfit <- limma::lmFit(assay(mdl$object), get_design_matrix(mdl$object))
+    comparisons <- apply_contrasts_with_estimability(mdl, comparisons,  rowwise = TRUE)
+  }
+  
+  if (approach=="multiWald") {
+    if (!"dispGeneEst" %in% names(mcols(mdl$object))) {
+      mdl$object <- DESeq2::DESeq(mdl$object, test="Wald", ...)
+    } # no need for an 'else': the model fit has already been done
+  }
+  mdl$comparisons <- append(mdl$comparisons, comparisons, comparison_ind)[-comparison_ind]
+  return(mdl)
 }
 
 
-apply_contrasts_with_estimability <- function(fit, contrs, assay_mat = NULL, rowwise = FALSE) {
-  # Apply contrasts
-  C <- do.call(cbind, contrs)
-  fit <- limma::contrasts.fit(fit, C)
+apply_contrasts_with_estimability <- function(mdl, comparisons, rowwise = FALSE) {
+  contr_mat <- do.call(cbind, lapply(comparisons, "[[", "comparison"))
+  fit <- limma::contrasts.fit(mdl$lmfit, contr_mat)
 
-  if (rowwise && !is.null(assay_mat)) {
+  if (rowwise) {
     design <- fit$design
-    obs <- !is.na(assay_mat)
-
+    obs <- !is.na(assay(mdl$object))
     nb <- lapply(seq_len(nrow(obs)), function(i) {
       idx <- obs[i, ]
       if (all(idx)) return(NULL)
       estimability::nonest.basis(design[idx, , drop = FALSE])
     })
-
-    isEst <- vapply(seq_len(ncol(C)), function(j) {
+    isEst <- vapply(seq_len(ncol(contr_mat)), function(j) {
       vapply(seq_along(nb), function(i) {
-        if (is.null(nb[[i]])) TRUE else estimability::is.estble(C[, j], nb[[i]])
+        if (is.null(nb[[i]])) TRUE else estimability::is.estble(contr_mat[, j], nb[[i]])
       }, logical(1))
     }, logical(nrow(obs)))
-
   } else {
     # global estimability (voom case)
     nb <- estimability::nonest.basis(fit$design)
-    isEst <- apply(C, 2, function(cc) estimability::is.estble(cc, nb))
-
+    isEst <- apply(contr_mat, 2, function(cc) estimability::is.estble(cc, nb))
     # expand to matrix for consistent handling
-    isEst <- matrix(isEst, nrow = nrow(fit$coefficients), ncol = ncol(C), byrow = TRUE)
+    isEst <- matrix(isEst, nrow = nrow(fit$coefficients), ncol = ncol(contr_mat), byrow = TRUE)
   }
 
   # Mask non-estimable entries
@@ -626,9 +571,8 @@ apply_contrasts_with_estimability <- function(fit, contrs, assay_mat = NULL, row
   fit$stdev.unscaled[!isEst] <- NA
 
   # eBayes AFTER masking
-  fit <- limma::eBayes(fit)
-
-  fit
+  ebayes <- limma::eBayes(fit)
+  lapply(seq_along(comparisons), function(ci) modifyList(comparison[[ci]], list(comparisons=ci, limma=ebayes)))
 }
 
 annihilator <- function(x) diag(nrow = nrow(x)) - x %*% solve(t(x) %*% x) %*% t(x)
@@ -657,33 +601,31 @@ reduced_design.fit <- function(fit, reduced_design){
 #' @return 
 #' @author Gavin Kelly
 #' @export
-check_model <- function(dds) {
-  mdl <- metadata(dds)$model
-  mdl$dropped <- FALSE
+check_model <- function(mdl) {
+  dropped <- FALSE
+  constraint <- mdl$constraint
+  mat <- NULL
   if (is_formula(mdl$design) ) {
-    df <- as.data.frame(colData(dds))
+    df <- as.data.frame(colData(mdl$object))
     na_covars <- apply(is.na(df[all.vars(mdl$design)]), 1, any)
     if ("drop_incomplete" %in% names(mdl) && mdl$drop_incomplete && any(na_covars)) {
       warning("Dropping samples ", paste0(row.names(df)[na_covars], collapse=", "), " as they have incomplete metadata")
-      dds <- dds[, !na_covars]
-      colData(dds) <- droplevels(colData(dds))
-      df <- as.data.frame(colData(dds))
+      mdl$object <- mdl$object[, !na_covars]
+      colData(mdl$object) <- droplevels(colData(mdl$object))
+      df <- as.data.frame(colData(mdl$object))
     }
-    if (inherits(dds, "DESeqDataSet")) {
-      df$.x <- counts(dds, norm=TRUE)[1,]
+    if (inherits(mdl$object, "DESeqDataSet")) {
+      df$.x <- counts(mdl$object, norm=FALSE)[1,]
     } else {
-      df$.x <- rnorm(ncol(dds))
+      df$.x <- rnorm(ncol(mdl$object))
     }
     fml <- update(mdl$design, .x ~ .)
     fit <- lm(fml, data=df)
-    mdl$lm <- fit
-    if ("constraint" %in% names(mdl)) {
-      if (is.expression(mdl$constraint)) {
-        mdl$constraint <- em_constraint(fit, mdl$constraint)
-      }
+    if (is.expression(mdl$constraint)) {
+      constraint <- em_constraint(fit, mdl$constraint)
     }
     if ("drop_unsupported_combinations" %in% names(mdl) && mdl$drop_unsupported_combinations) {
-      mdl$dropped <- is.na(coef(fit))
+      dropped <- is.na(coef(fit))
     } else {
       if (any(is.na(coef(fit)))) {
         warning("Can't estimate some coefficients in ", mdl$design, ".\n In unbalanced nested designs, use the option 'drop_unsupported_combinations=TRUE,' in the problematic model. Other causes are complete confounding or conditions with no observations.")
@@ -691,36 +633,19 @@ check_model <- function(dds) {
     }
   }
   
-  if (any(mdl$dropped)) {
-    X <- model.matrix(mdl$design, as.data.frame(colData(dds)))[,!mdl$dropped, drop=FALSE]
+  if (any(dropped)) {
+    X <- model.matrix(mdl$design, as.data.frame(colData(mdl$object)))[,!dropped, drop=FALSE]
     colnames(X) <- .resNames(colnames(X))
-    if ("constraint" %in% names(mdl)) {
-      X <- X %*% MASS::Null(mdl$constraint)
+    if (!is.null(constraint)) {
+      X <- X %*% MASS::Null(constraint)
     }
-    mdl$mat <- X
-    metadata(dds)$model_code <-c(
-      "# Warning - creates long lines.  May be necessary to chunk it into smaller continuation lines in R console",
-      paste0("df <- eval(parse(text='", deparse1(as.data.frame(colData(dds)), collapse="\n"),"'))"),
-      paste0("X <- model.matrix(",deparse1(mdl$design),",df)[,-c(",paste(which(mdl$dropped), collapse=", "),")]"),
-      "colnames(X)[colnames(X)==\"(Intercept)\"] <- \"Intercept\"",
-      "colnames(X) <- make.names(colnames(X))",
-      "colData(dds) <- df",
-      "design(dds) <- X"
-    ) 
-  } else if  ("constraint" %in% names(mdl)) {
-    X <- model.matrix(mdl$design, as.data.frame(colData(dds)))
+    mat <- X
+  } else if  (!is.null(constraint)) {
+    X <- model.matrix(mdl$design, as.data.frame(colData(mdl$object)))
     colnames(X) <- .resNames(colnames(X))
-    mdl$mat <- X %*% MASS::Null(mdl$constraint)
-    metadata(dds)$model_code <- "TODO"
-  } else {
-    metadata(dds)$model_code <- c(
-      paste0("df <- eval(parse(text='", deparse1(as.data.frame(colData(dds))),"'))"),
-      "colData(dds) <- df",
-      paste0("design(dds) <- ", deparse1(mdl$design))
-    )
+    mat <- X %*% MASS::Null(constraint)
   }
-  metadata(dds)$model <- mdl
-  dds
+  c(mdl, list(dropped=dropped, mat=mat, lm=fit))
 }
 
 
@@ -749,62 +674,73 @@ mult_comp <- function(spec, name=NULL, description=NULL, omnibus=FALSE, keep=TRU
 #' @param spec 
 #' @return 
 #' @author Gavin Kelly
-emcontrasts <- function(dds, comp, prefix="my") {
-  em_extra <- comp[setdiff(names(comp), c("spec", "keep", "LRT", "omni", "trend", "name", "description"))]
-  mdl <- metadata(dds)$model
-  if (comp$trend) {
+emcontrasts <- function(mdl, comparison_ind, prefix="my") {
+  comparison <- mdl$comparisons[[comparison_ind]]
+  em_extra <- comparison[setdiff(names(comparison), c("spec", "keep", "LRT", "omni", "trend", "name", "description"))]
+  if (comparison$trend) {
     em_fn <- emmeans::emtrends
   } else {
     em_fn <- emmeans::emmeans
   }
   #TODO - add the constraint handling (and make sure the $lm that reaches here also does so)
-  emc <- do.call(em_fn, c(list(object=mdl$lm, specs= comp$spec), em_extra))$contrasts
+  emc <- do.call(em_fn, c(list(object=mdl$lm, specs= comparison$spec), em_extra))$contrasts
   contr_frame <- as.data.frame(summary(emc))
   ind_est <- !is.na(contr_frame$estimate)
   contr_frame <- contr_frame[ind_est,1:(which(names(contr_frame)=="estimate")-1), drop=FALSE]
   contr_frame[] <- lapply(contr_frame, function(x) sub("|", "†", x, fixed=TRUE))
   contr_mat <- emc@linfct[ind_est, !mdl$dropped, drop=FALSE]
-  if (inherits(dds, "DESeqDataSet")) {
+  if (inherits(mdl$object, "DESeqDataSet")) {
     colnames(contr_mat) <- .resNames(colnames(contr_mat))
   }
   new_emmc <- sub("\\.emmc$", "", ls("package:emmeans", pattern="*.emmc"))
-  embaseline <- do.call(em_fn, c(list(object=mdl$lm, specs= replace_emmc(comp$spec, new_emmc)), em_extra))
+  embaseline <- do.call(em_fn, c(list(object=mdl$lm, specs= replace_emmc(comparison$spec, new_emmc)), em_extra))
   baseline_mat <- embaseline$contrast@linfct[ind_est, !mdl$dropped, drop=FALSE]
   byvars <- names(contr_frame) %in% (attr(emc, "misc")$by.vars %||% character())
-  if (comp$omni) {
+  if (comparison$omni) {
+    ## TODO: Check if/where I use this - looks like a way of getting revpairwise(~a | b) to give an LRT per value of b
     split_idx <- split(which(ind_est), interaction(emc@grid[ind_est, emc@misc$by.vars], drop = TRUE))
     tooltip <- list()
   } else {
-    split_idx <- setNames(
-      seq_len(nrow(contr_frame)),
-      paste(
-        do.call(paste,  c(lapply(contr_frame[!byvars], function(column) sub("(.*) - (.*)", "(\\1-\\2)", column)),sep= "×")),
-        do.call(paste,  c(lapply(contr_frame[ byvars], function(column) sub("(.*) - (.*)", "(\\1-\\2)", column)),sep= ",")),
-        sep=ifelse(length(byvars)==0, "", "|"))
+    split_idx <-  paste(
+      if(sum(!byvars)>1) {
+        do.call(paste,  c(lapply(contr_frame[!byvars], function(column) sub("(.*) - (.*)", "(\\1-\\2)", column)),sep= "×"))
+      } else {
+        sub("(.*) - (.*)", "\\1-\\2", contr_frame[[!byvars]])
+      },
+      do.call(paste,  c(contr_frame[ byvars] ,sep= ",")),
+      sep=ifelse(any(byvars), "|", "")
     )
+    if (nrow(contr_frame)>1) {
+      names(split_idx) <- paste(names(mdl$comparisons)[comparison_ind], seq_len(nrow(contr_frame)), sep=".")
+    } else {
+      names(split_idx) <- names(mdl$comparisons)[comparison_ind]
+    }
     tooltip <- do.call(paste, c(mapply(function(a, b) paste0(a," = ", b), names(contr_frame), contr_frame, SIMPLIFY=FALSE), sep="<br/>"))
   }
-  contr <- lapply(split_idx, function(i) t(contr_mat[i,,drop=FALSE]))
-  if ("mat" %in% names(mdl)) {
+  if (!is.null(mdl$mat)) {
     X <- mdl$mat
   } else {
     X <- model.matrix(mdl$lm)
   }
-  contr <- mapply( function(cont, base, tip) {
-    attr(cont, "spec") <- comp$spec
-    if (!comp$omni) {
-      attr(cont, "baseline_contrast") <- base
-      attr(cont, "tooltip") <- tip
-      sample_weights <-  X %*% MASS::ginv(t(X) %*% X) %*% cont #X %*% solve(t(X) %*% X) %*% cont
-      attr(cont, "involved") <- abs(sample_weights) > 1e-8
-    }
-    cont},
-    contr,
-    lapply(split_idx, function(i) t(baseline_mat[i,,drop=FALSE])),
-    tooltip,
-    SIMPLIFY=FALSE)
-  contr  <- contr[comp$keep]
-  contr
+  comparisons <- lapply(
+    setNames(seq_along(split_idx), names(split_idx)),
+    function(i)  {
+      cont <- t(contr_mat[i,,drop=FALSE])
+      modifyList(comparison, c(
+        list(
+          comparison=cont,
+          name=split_idx[i]),
+        if (comparison$omni) {list()} else {
+          sample_weights <-  X %*% MASS::ginv(t(X) %*% X) %*% cont #X %*% solve(t(X) %*% X) %*% cont
+          list(
+            baseline_contrast=t(baseline_mat[i,,drop=FALSE]),
+            tooltip=tooltip[i],
+            involved = abs(sample_weights) > 1e-8
+          )
+        }
+      ))
+    })
+  comparisons[comparison$keep]
 }
 
 fitVoom <- function(model_dds, mdl) {
@@ -838,68 +774,74 @@ fitVoom <- function(model_dds, mdl) {
 #' @param ... 
 #' @return 
 #' @author Gavin Kelly
-fitLRT <- function(dds, mdl, reduced, ...) {
-  mdl <- metadata(dds)$model
-  metadata(dds)$comparison <- reduced
+fitLRT <- function(mdl, comparison_ind, ...) {
+  reduced <- mdl$comparisons[[comparison_ind]][[1]]
+ # metadata(dds)$comparison <- reduced
   if (any(mdl$dropped)) {
     full <- mdl$mat
-    reduced <- model.matrix(reduced, colData(dds))
+    reduced <- model.matrix(reduced, colData(mdl$object))
     ## unsupported_ind <- apply(reduced==0, 2, all)
     ## reduced <- reduced[, !unsupported_ind]
     ## colnames(reduced) <- .resNames(colnames(reduced))
     reduced <- reduced[,.resNames(colnames(reduced)) %in% colnames(full), drop=FALSE]
-    metadata(dds)$reduced_mat <- reduced
+    mdl$comparisons[[comparison_ind]]$reduced_mat <- reduced
   } else {
     full <- mdl$design
   }
   if (is_formula(reduced) && grepl("\\|", as.character(reduced)[[2]])) {
-    emc <- emmeans(metadata(dds)$model$lm,
+    emc <- emmeans(mdl$lm,
                   update.formula(reduced, trt.vs.ctrl ~ .))$contrasts
     split_idx <- split(seq_len(nrow(emc@grid)), interaction(emc@grid[emc@misc$by.vars], drop = TRUE))
     linfct_by_stratum <- lapply(split_idx, function(idx) t(emc@linfct[idx, , drop = FALSE]))
     # TODO: Need to generate n=|stratum| separate reduced model matrices
-    if (inherits(dds, "DESeqDataSet")) {
+    if (inherits(mdl$object, "DESeqDataSet")) {
       stop("DEseq2 stratified ANOVA not implemented yet")
     } else {
-      mm <- model.matrix(design(dds), colData(dds))
-      fit <- limma::lmFit(assay(dds), mm)
-      metadata(dds)$lmfit <- fit
-      return(
-        lapply(
+      mm <- model.matrix(design(mdl$object), colData(mdl$object))
+      fit <- limma::lmFit(assay(mdl$object), mm)
+      mdl$comparisons[[comparison_ind]]$lmfit <- fit
+      comparisons <- lapply(
           linfct_by_stratum,
           function(cntrst) {
-            out <- dds
-            metadata(out)$limma <- limma::eBayes(limma::contrasts.fit(fit, contrast = cntrst))
-            out
-          })
+             c(
+              mdl$comparisons[[comparison_ind]],
+              lmfit=fit,
+              limma=limma::eBayes(limma::contrasts.fit(fit, contrast = cntrst))
+             )
+          }
       )
+      names(comparisons) <- paste(names(mdl$comparisons)[comparison_ind], seq_along(comparisons), sep=".")
+      mdl$comparisons <- append(mode$comparisons, comparisons, comparison_ind)[-comparison_ind]
+      return(mdl)
     } 
   }
+  dds <- mdl$object
   if (inherits(dds, "DESeqDataSet")) {
     DESeq2::design(dds) <- full
     dds <- DESeq2::DESeq(dds, test="LRT", full=full, reduced=reduced, ...)
-    metadata(dds)$LRTterms=setdiff(
+    mdl$comparisons[[comparison_ind]]$LRTterms=setdiff(
       colnames(attr(dds, "modelMatrix")),
       colnames(attr(dds, "reducedModelMatrix"))
     )
+    mdl$comparisons[[comparison_ind]]$object <- dds
   } else {
     design(dds) <- full
     fit <- limma::lmFit(assay(dds), get_design_matrix(dds))
-    metadata(dds)$lmfit <- fit
+    mdl$comparisons[[comparison_ind]]$lmfit <- fit
     if (is_formula(reduced)) {
       reduced <- model.matrix(reduced, colData(dds))
     }
     fit <- reduced_design.fit(fit, reduced)
     fit <- limma::eBayes(fit)
-    metadata(dds)$limma <- fit
+    mdl$comparisons[[comparison_ind]]$limma <- fit
   }
-  metadata(dds)$models <- NULL
-  metadata(dds)$comparisons <- NULL
-  list(dds)
+  mdl
 }
 
 
-fitContrastLRT <- function(dds, mdl_mat, contr, ...) {
+#fitContrastLRT <- function(dds, mdl_mat, contr, ...) {
+fitConstrastLRT <- function(mdl, contr, ...) {
+  mdl_mat <- mdl$mat %||% model.matrix(mdl$design, as.data.frame(colData(mdl$object)))  
   ind <- contr!=0
   # Insert a new final column that is the contrast, and remove a column that is now linearly dependent
   # (we chose the right-most column that is involved in the contrast)
@@ -909,14 +851,14 @@ fitContrastLRT <- function(dds, mdl_mat, contr, ...) {
   # The reduced model space is spanned by the constraint that the contrast is zero
   # ie the final column of the new parametrisation
   reduced <- mdl_mat[,-ncol(mdl_mat),drop=FALSE]
-  metadata(dds)$comparison <- contr
-  metadata(dds)$reduced_mat <- reduced
   DESeq2::design(dds) <- mdl_mat
   dds <- DESeq2::DESeq(dds, test="LRT", full=mdl_mat, reduced=reduced, ...)
-  metadata(dds)$LRTterms <- "contrast_column"
-  metadata(dds)$models <- NULL
-  metadata(dds)$comparisons <- NULL
-  dds
+  list(
+    object=dds,
+    comparison =contr,
+    LRTterms = "contrast_column",
+    reduced_mat = reduced
+  )
 }
 
 
@@ -933,9 +875,15 @@ fitContrastLRT <- function(dds, mdl_mat, contr, ...) {
 #' @return 
 #' @author Gavin Kelly
 #' @export
-get_result <- function(dds, mcols=c("symbol", "entrez"), filterFun=IHW::ihw, lfcThreshold=0, alpha=0.1, LRT_effect="default", ...) {
+get_result <- function(dmc, inds, mcols=c("symbol", "entrez"), filterFun=IHW::ihw, lfcThreshold=0, alpha=0.1, LRT_effect="default", ...) {
   if (is.null(filterFun)) filterFun <- rlang::missing_arg()
-  comp <- metadata(dds)$comparison
+  di <- inds[[1]]
+  mi <- inds[[2]]
+  ci <- inds[[3]]
+  dataset <- dmc$sample_sets[[di]]
+  model <- dataset$models[[mi]]
+  comparison <- model$comparisons[[ci]]
+  comp <- comparison$comparison
   if (length(alpha)>1) {
     alpha <- sort(alpha)
     alpha1 <- alpha[1]
@@ -943,35 +891,35 @@ get_result <- function(dds, mcols=c("symbol", "entrez"), filterFun=IHW::ihw, lfc
     alpha1 <- alpha
   }
   if (is_formula(comp)) { # it's LRT (or F test for limma)
-    if (inherits(dds, "DESeqDataSet")) {
-      r <- results(dds, filterFun=filterFun, alpha=alpha1, ...)
+    if (inherits(comparison$object, "DESeqDataSet")) {
+      fitted_se <- comparison$object
+      r <- results(fitted_se, filterFun=filterFun, alpha=alpha1, ...)
     } else {
-      lim <- metadata(dds)$limma
-      r <- limma::topTable(lim, coef=NULL,
-                          genelist=row.names(lim$genes),
+      r <- limma::topTable(model$limma, coef=NULL,
+                          genelist=row.names(model$limma$genes),
                           number=Inf, sort.by="none")
       co_mat <- cbind(as.matrix(r[,1:(which(names(r)=="AveExpr")-1), drop=FALSE]), 0)
       r <- with(r, DataFrame(baseMean=2^AveExpr,
                             log2FoldChange=apply(co_mat, 1, function(x) diff(range(x))),
-                            lfcSE=lim$sigma,
+                            lfcSE=model$limma$sigma,
                             class="",#colnames(co_mat)[ind],
                             pvalue=P.Value,
                             padj=adj.P.Val,
-                            row.names=row.names(dds)))
+                            row.names=row.names(fitted_se)))
       metadata(r)$alpha <- alpha1
     }
   } else {  # Wald
+    fitted_se <- model$object
     if (is.character(comp) && length(comp)==1) { #  it's a name
-      r <- DESeq2::results(dds, filterFun=filterFun, lfcThreshold=lfcThreshold, name=metadata(dds)$comparison, alpha=alpha1, ...)
+      r <- DESeq2::results(fitted_se, filterFun=filterFun, lfcThreshold=lfcThreshold, name=comp, alpha=alpha1, ...)
     } else { # it's a contrast
       if (is.list(comp) && "listValues" %in% names(comp)) {
-        r <- DESeq2::results(dds, filterFun=filterFun, lfcThreshold=lfcThreshold, contrast=metadata(dds)$comparison[names(comp) != "listValues"], listValues=comp$listValues, alpha=alpha1, ...)
+        r <- DESeq2::results(fitted_se, filterFun=filterFun, lfcThreshold=lfcThreshold, contrast=comp[names(comp) != "listValues"], listValues=comp$listValues, alpha=alpha1, ...)
       } else {
-        if ("limma" %in% names(metadata(dds))) {
-          lim <- metadata(dds)$limma
-          this_contr <- apply(comp, 2, function(x) which(apply(metadata(dds)$limma$contrasts, 2, function(y) all(x==y))))
-          r <- limma::topTable(lim, coef=this_contr,
-                              genelist=row.names(lim$genes),
+        if ("limma" %in% names(model)) {
+          this_contr <- apply(comp, 2, function(x) which(apply(model$limma$contrasts, 2, function(y) all(x==y))))
+          r <- limma::topTable(model$limma, coef=this_contr,
+                              genelist=row.names(model$limma$genes),
                               number=Inf, sort.by="none")
           if (!"logFC" %in% names(r)) {
             is_coef <- grepl("^Coef[0-9]+$", names(r))
@@ -981,11 +929,11 @@ get_result <- function(dds, mcols=c("symbol", "entrez"), filterFun=IHW::ihw, lfc
                                 log2FoldChange=logFC,
                                 pvalue=P.Value,
                                 padj=adj.P.Val,
-                                lfcSE=apply(lim$stdev.unscaled[,this_contr,drop=FALSE], 1, mean) * lim$sigma,
-                                row.names=row.names(dds)))
+                                lfcSE=apply(model$limma$stdev.unscaled[,this_contr,drop=FALSE], 1, mean) * model$limma$sigma,
+                                row.names=row.names(fitted_se)))
           metadata(r)$alpha <- alpha1
         } else {
-          r <- DESeq2::results(dds, filterFun=filterFun, lfcThreshold=lfcThreshold, contrast=metadata(dds)$comparison, alpha=alpha1, ...)
+          r <- DESeq2::results(fitted_se, filterFun=filterFun, lfcThreshold=lfcThreshold, contrast=comp, alpha=alpha1, ...)
         }
       }
     }
@@ -1004,18 +952,18 @@ get_result <- function(dds, mcols=c("symbol", "entrez"), filterFun=IHW::ihw, lfc
     sigs[ind] <- paste0(prev_alpha, "-", a)
     prev_alpha <- a
   }
-  my_mcols <- intersect(mcols, colnames(mcols(dds)))
+  my_mcols <- intersect(mcols, colnames(mcols(fitted_se)))
   if (length(my_mcols)>0) {
-    r[my_mcols] <- mcols(dds)[my_mcols]
+    r[my_mcols] <- mcols(fitted_se)[my_mcols]
   }
   r$sig <- sigs
-  if ("LRTPvalue" %in% names(mcols(dds))) {
-    r$class <- mcols(dds)$class
+  if ("LRTPvalue" %in% names(mcols(fitted_se))) {
+    r$class <- mcols(fitted_se)$class
     r$class[is.na(r$padj) | is.na(r$pvalue) | r$baseMean==0] <- NA
-    term <-  metadata(dds)$LRTterms
+    term <-  model$LRTterms
     # take the biggest fold-change vs baseline, for MA and reporting?
-    if (all(term %in% names(mcols(dds))) && LRT_effect!="none") {
-      effect_matrix <- cbind(I=rep(0, nrow(dds)),as.matrix(mcols(dds)[,term,drop=FALSE]))
+    if (all(term %in% names(mcols(fitted_se))) && LRT_effect!="none") {
+      effect_matrix <- cbind(I=rep(0, nrow(fitted_se)),as.matrix(mcols(fitted_se)[,term,drop=FALSE]))
       split_effects <- strsplit(term, "_vs_")
       # if a main effect is dropped, then all the terms are probably named A vs (intercept)
       # we can make the class a bit more interpretable by renaming the case where e.g.
@@ -1035,8 +983,8 @@ get_result <- function(dds, mcols=c("symbol", "entrez"), filterFun=IHW::ihw, lfc
       r$maxLog2FoldChange <- effect_matrix[cbind(1:length(imax), imax)] -
         effect_matrix[cbind(1:length(imin), imin)]
       maxlfcSE <- sqrt(
-      (as.matrix(mcols(dds)[,paste0("SE_", c("Intercept", term))])[cbind(1:length(imax), imax)])^2 +
-        (as.matrix(mcols(dds)[,paste0("SE_", c("Intercept", term))])[cbind(1:length(imin), imin)])^2
+      (as.matrix(mcols(fitted_se)[,paste0("SE_", c("Intercept", term))])[cbind(1:length(imax), imax)])^2 +
+        (as.matrix(mcols(fitted_se)[,paste0("SE_", c("Intercept", term))])[cbind(1:length(imin), imin)])^2
       )
       fit <- ashr::ash(r$maxLog2FoldChange, maxlfcSE, mixcompdist = "normal", 
                        method = "shrink")
@@ -1045,18 +993,18 @@ get_result <- function(dds, mcols=c("symbol", "entrez"), filterFun=IHW::ihw, lfc
       r$class <- paste(colnames(effect_matrix)[imax], "V", colnames(effect_matrix)[imin])
     } else {
       warning("Couldn't work out relevant group ordering in LRT")
-      r$shrunkLFC <- lfcShrink(dds, res=r, type="ashr", quiet=TRUE)$log2FoldChange
+      r$shrunkLFC <- lfcShrink(fitted_se, res=r, type="ashr", quiet=TRUE)$log2FoldChange
       r$class <- ""
     }
   }  else {
-    if ("limma" %in% names(metadata(dds))) {
+    if ("limma" %in% names(model)) {
       fit_sh <- ashr::ash(
         r$log2FoldChange,
         r$lfcSE, mixcompdist = "normal", 
         method = "shrink")
       r$shrunkLFC <- fit_sh$result$PosteriorMean
     } else {
-      r$shrunkLFC <- lfcShrink(dds, res=r, type="ashr", quiet=TRUE)$log2FoldChange
+      r$shrunkLFC <- lfcShrink(fitted_se, res=r, type="ashr", quiet=TRUE)$log2FoldChange
     }
     if (!"class" %in% names(r)) {
       r$class <- ifelse(r$log2FoldChange >0, "Up", "Down")
@@ -1067,8 +1015,8 @@ get_result <- function(dds, mcols=c("symbol", "entrez"), filterFun=IHW::ihw, lfc
   r$class[is.na(r$padj)] <- "Low Count"
   r$class[is.na(r$pvalue)] <- "Outlier"
   r$class[r$baseMean==0] <- "Zero Count"
-  mcols(dds)$results <- r
-  dds
+  dmc$sample_sets[[di]]$models[[mi]]$comparisons[[ci]]$results <- r
+  dmc
 }
 
 .resNames <- function(names) {
@@ -1076,28 +1024,6 @@ get_result <- function(dds, mcols=c("symbol", "entrez"), filterFun=IHW::ihw, lfc
  make.names(names)
 }
 
-#' Tabulate genelists
-#'
-#' Get genelist sizes - up, down and classed
-#' @title Tabulate the size of the differential lists
-#' @param dds 
-#' @return 
-#' @author Gavin Kelly
-#' @export
-summarise_results <- function(dds) {
-  res <- mcols(dds)$results
-  out <- as.data.frame(table(
-    Group=sub("\\*$","",res$class),
-    Significant=factor(ifelse(grepl("\\*$",res$class), "Significant", "not"), levels=c("Significant","not"))
-  )) %>%
-    tidyr::spread(Significant, Freq) %>%
-    dplyr::mutate(Total=not+Significant) %>%
-    dplyr::select(-not) %>%
-    dplyr::arrange(desc(Significant/Total))
-  out$mname <- metadata(dds)$dmc$model_name %||% ""
-  out$cname <- metadata(dds)$dmc$comparison_name %||% ""
-  out
-}    
 
 #' @export
 tidy_significant_se <- function(se, ind = TRUE, weights=NULL, assay= (if (inherits(se, "DESeqDataSet")) "vst" else assayNames(se)[1])) {
@@ -1113,13 +1039,6 @@ tidy_significant_se <- function(se, ind = TRUE, weights=NULL, assay= (if (inheri
   se
 }
 
-#' @export
-scale_se <- function(se, ind=TRUE, centre=TRUE, scale=TRUE) {
-  if (centre) assay(se) <- assay(se)-rowMeans(assay(se)[, ind, drop=FALSE])
-  if (scale) assay(se) <- assay(se)/rowSds(assay(se)[, ind, drop=FALSE])
-  se
-}
-
 
 #' @export
 colDF <- function(se) {
@@ -1129,6 +1048,7 @@ colDF <- function(se) {
 
 #' @export
 reorder_samples <- function(se, columns) {
+  colData(se)$.influential <- colData(se)$.influential.influential
   cols <- intersect(c(unique(unlist(columns)), ".influential", ".involved"), colnames(colData(se)))
   colData(se) <- colData(se)[,cols,drop=FALSE]
   colData(se)[] <- lapply(colData(se), function(x) {
@@ -1140,6 +1060,7 @@ reorder_samples <- function(se, columns) {
 
 
 retrieve_contrast <- function (object, expanded = FALSE, listValues=c(1,-1)) {
+  stop("Not Tested")
   comparison <- metadata(object)$comparison
   resNames <- resultsNames(object)
   resReady <- FALSE
@@ -1314,13 +1235,6 @@ find_simpler_models <- function(fml, do_aes=FALSE, type=c("simplest", "drop1", "
   }
 }
 
-#' @export
-translate_terms <- function(txt, obj) {
-  tr_list <- metadata(obj)$termNames
-  ind <- txt %in% names(tr_list)
-  txt[ind] <- unlist(tr_list[txt[ind]])
-  txt
-}
 
 
 #' @export
@@ -1343,7 +1257,7 @@ mat_x_terms <- function(mat, fml, fitFrame, weights=rep(1, nrow(mat)), type) {
   covar_x_mat$Assoc <- NA
   covar_x_mat$pvalue <- NA
   fit_selected <- list()
-  infl <- fitFrame$.influential
+  infl <- fitFrame$.influential_in_assay
   for (imat in 1:nmat) {
     fitFrame[[yvar]] <- mat[, imat]
     fit1 <- lm(fml, data = fitFrame[infl,,drop=FALSE])
@@ -1442,50 +1356,61 @@ replace_emmc <- function(expr, replacements, prefix="my") {
 
 
 #' @export
-removeLow <- function(ddsList, preserve_across=TRUE, baseMeanMin) {
-  is_des <- sapply(ddsList, inherits, "DESeqDataSet")
+removeLow <- function(dmc, preserve_across=TRUE, baseMeanMin = -Inf) {
   if (preserve_across) {
-    all_zero <- Reduce(f=`&`,
-                      x=lapply(ddsList[is_des], function(x) apply(counts(x)==0,1, all)),
-                      init=TRUE)
-    ddsList[is_des] <- lapply(ddsList[is_des], function(dds) dds[!all_zero,])
-  } else {
-    ddsList[is_des] <- lapply(ddsList[is_des], function(dds) dds[apply(counts(dds)!=0, 1, any),])
+    per_dataset <- leaf_modify(
+      dmc,
+      function(leaf, layers) {
+        if (inherits(leaf$object, "DESeqDataSet")) apply(counts(leaf$object)==0, 1, all) else TRUE
+      }, "sample_sets")$sample_sets
+    all_zero <- Reduce(f=`&`, per_dataset, init=TRUE)
+    dmc <- leaf_modify(
+      dmc,
+      function(leaf, layers) {
+        if (inherits(leaf$object, "DESeqDataSet")) leaf$object <- leaf$object[!all_zero,]
+        leaf}, "sample_sets")
+  } else  {
+    dmc <- leaf_modify(
+      dmc,
+      function(leaf, layers) {
+        if (inherits(leaf$object, "DESeqDataSet")) leaf$object <- leaf$object[apply(counts(leaf$object)!=0, 1, any),]
+        leaf
+      }, layers="sample_sets")
   }
   if (baseMeanMin>0) {
-    ddsList[is_des] <- lapply(ddsList[is_des],
-                     function(x) x[rowMeans(counts(x, normalized=TRUE)) >= baseMeanMin,]
-                     )
+    dmc <- leaf_modify(
+      dmc,
+      function(leaf, layers) {
+        if (inherits(leaf$object, "DESeqDataSet")) leaf$object <- leaf$object[rowMeans(counts(leaf$object, normalized=TRUE)) >= baseMeanMin,]
+        leaf
+      }, layers="sample_sets")
   }
-  ddsList
+  dmc
 }
 
 
-sample_norm <- function(x) UseMethod("sample_norm")
 
-
-# method for DESeqDataSet
-sample_norm.DESeqDataSet <- function(se) {
-      if ("controlGenes" %in% names(metadata(se))) {
-        controlGenes <- eval(metadata(se)$controlGenes, transform(rowData(se), ID=row.names(se)))
-        se <- estimateSizeFactors(se, controlGenes=controlGenes)
-      } else {
-        se <- estimateSizeFactors(se)
-      }
-      if ("subsetGenes" %in% names(metadata(se))) {
-        se <- se[eval(metadata(se)$subsetGenes, transform(rowData(se), ID=row.names(se))),]
-      }
-      assay(se, "vst") <- assay(vst(se, nsub=min(1000, nrow(se))))
-
-      return(se)
-}
-
-sample_norm.SummarizedExperiment <- function(se) {
+sample_norm <- function(obj) {
+  se <- obj$object
+  if (inherits(se, "DESeqDataSet")) {
+    if ("controlGenes" %in% names(obj)) {
+      controlGenes <- eval(obj$controlGenes, transform(rowData(se), ID=row.names(se)))
+      se <- estimateSizeFactors(se, controlGenes=controlGenes)
+    } else {
+      se <- estimateSizeFactors(se)
+    }
+    if ("subsetGenes" %in% names(obj)) {
+      se <- se[eval(obj$subsetGenes, transform(rowData(se), ID=row.names(se))),]
+    }
+    assay(se, "vst") <- assay(vst(se, nsub=min(1000, nrow(se))))
+    
+    return(se)
+  } else {
     assayNames(se)[1] <- noun_to_readout(rowNoun)
     rowData(se)$nna <- apply(is.na(assay(se)), 1, sum)
-    strata <- get_strata(metadata(se)$strata, se)
+    strata <- get_strata(obj$strata, se)
     grp <- lapply(strata, "[[", "samples")
-    if ((metadata(se)$normalise %||% "none") =="vsn") {
+    if ((obj$normalise %||% "none") =="vsn") {
       out <- assay(se)
       scale_factors <- data.frame(a=rep(NA_real_, ncol(out)), b=rep(NA_real_, ncol(out)))
       for (stratum in seq_along(strata)) {
@@ -1499,17 +1424,17 @@ sample_norm.SummarizedExperiment <- function(se) {
       assays(se) <- setFirstAssay(se, vst= out)
       colData(se)$.scale_factors <- scale_factors
     }
-    imp <- metadata(se)$impute
+    imp <- obj$impute
     if (!is.null(imp)) {
       assay(se, "na") <- is.na(assay(se))
       for (stratum in seq_along(strata)) {
         i <- strata[[stratum]]$samples
         pre <- reduce_by_mcol(se, strata[[stratum]])
         invisible(capture.output({
-        out[, i] <- MSnbase::exprs(do.call(
-          MSnbase::impute,
-          modifyList(imp,
-                     list(object=as(SummarizedExperiment(pre), "MSnSet"), differential=NULL))))[attr(pre, "ind"),,drop=FALSE]
+          out[, i] <- MSnbase::exprs(do.call(
+            MSnbase::impute,
+            modifyList(imp,
+                       list(object=as(SummarizedExperiment(pre), "MSnSet"), differential=NULL))))[attr(pre, "ind"),,drop=FALSE]
         }))
       }
       assays(se) <- setFirstAssay(
@@ -1517,6 +1442,7 @@ sample_norm.SummarizedExperiment <- function(se) {
         imputed=out)
     }
     se
+  }
 }
 
 get_strata <- function(e, se) {
@@ -1559,8 +1485,7 @@ parse_stratum <- function(q, se) {
 
 
 #' @export
-add_extra_assays <- function(dds) {
-  extras <- metadata(dds)$extra_assays
+add_extra_assays <- function(dds, extras) {
   for (i in names(extras)) {
     assay(dds,i) <-  generate_assay(extras[[i]], dds)
   }
@@ -1675,25 +1600,25 @@ em_constraint <- function(fit, constraint) {
 }
 
 
-summarise_filters <- function(ddsList) {
+summarise_filters <- function(obj) {
  dfs <- mapply(
-    function(dds, id) {
+    function(ds, id) {
       passes <- sapply(
-        mcols(dds)$filter,
+        mcols(ds$object)$filter,
         function(pass) sprintf("%0.1f%%", 100 * mean(pass))
       )
       df <- data.frame(
         dataset=id,
         filter=names(passes),
         success=passes,
-        condition=sapply(metadata(dds)$feature_filters, deparse1)
+        condition=sapply(ds$feature_filters, deparse1)
       )
-      subs <- sapply(mcols(dds)$filter, attr, "subpreds")
+      subs <- sapply(mcols(ds$object)$filter, attr, "subpreds")
       if (is.character(subs) && length(subs)==nrow(df)) df$stages <- subs
       df
     },
-    ddsList,
-    names(ddsList),
+    obj$sample_sets,
+    names(obj$sample_sets),
     SIMPLIFY=FALSE
  )
  df <- bind_rows(dfs)

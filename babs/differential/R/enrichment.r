@@ -10,9 +10,7 @@
 #' @return The clusterProfiler object
 #' @author Gavin Kelly
 #' @export
-functional_api <- function (dds, method, source,  ...) {
-  org <- metadata(dds)$organism$org
-  res <- mcols(dds)$results
+functional_api <- function (res, method, source, org,  ...) {
   ind <- grepl("\\*", res$class)
   if (method!="OR") ind <- TRUE
   res <- res[ind & !is.na(res$entrez),]
@@ -45,14 +43,21 @@ functional_api <- function (dds, method, source,  ...) {
   )
 }
 
+parse_ratio <- function(ratio) {
+    ratio <- sub("^\\s*", "", as.character(ratio))
+    ratio <- sub("\\s*$", "", ratio)
+    numerator <- as.numeric(sub("/\\d+$", "", ratio))
+    denominator <- as.numeric(sub("^\\d+/", "", ratio))
+    return(numerator/denominator)
+}
 
 #' @export
 default_post_process <- function(alpha=0.05, n=100, threshold=-Inf, method=NA) {
   ret <- list(
     OR = function(x) {
       filter(x, p.adjust<alpha) %>%
-        mutate(effect=log(DOSE::parse_ratio(GeneRatio)/DOSE::parse_ratio(BgRatio)),
-               size=DOSE::parse_ratio(GeneRatio)) %>%
+        mutate(effect=log(parse_ratio(GeneRatio)/parse_ratio(BgRatio)),
+               size=parse_ratio(GeneRatio)) %>%
         filter(abs(effect) > threshold) %>%
         slice_max(abs(effect), n=n)
     },

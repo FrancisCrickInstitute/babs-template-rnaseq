@@ -1,3 +1,88 @@
+
+nested_modify <- function(obj,  FUN=NULL, layers=c("sample_sets", "models", "comparisons"), cur=obj, level = 1, ...) {
+  if (level > length(layers)) {
+    return(FUN(obj, layers, ...))  # Pass the full `layers` as positional info
+  }
+  my_level <- layers[[level]]
+  for (i in rev(seq_along(cur[[my_level]]))) {
+    layers[[level]] <- names(cur[[my_level]])[i]  # Populate the current index for this level
+    obj <- nested_modify(
+      obj,
+      FUN,
+      layers=layers,
+      cur=cur[[my_level]][[i]],
+      level = level + 1,
+      ...
+    )
+  }
+  obj
+}
+
+leaf_modify <- function(obj,  FUN=NULL, layers=c("sample_sets", "models", "comparisons"),  level = 1, ...) {
+  if (level > length(layers)) {
+    return(FUN(obj, layers, ...))  # Pass the full `layers` as positional info
+  }
+  my_level <- layers[[level]]
+  for (i in rev(seq_along(obj[[my_level]]))) {
+    layers[[level]] <- names(obj[[my_level]])[i]  # Populate the current index for this level
+    obj[[my_level]][[i]] <- leaf_modify(
+      obj[[my_level]][[i]],
+      FUN,
+      layers=layers,
+      level = level + 1,
+      ...
+    )
+  }
+  obj
+}
+
+
+flatten_nest <- function(obj, FUN=identity, layers=c("sample_sets", "models", "comparisons"),  ...) {
+  if (length(layers)==0) {
+    return(list(FUN(obj, ...)))
+  } else {
+    do.call(c, lapply(obj[[layers[1]]], flatten_nest, FUN,  layers[-1]))
+  }
+}
+simplify_nest <- function(obj, FUN=identity, layers=c("sample_sets", "models", "comparisons"),  ...) {
+  if (length(layers)==0) {
+    return(FUN(obj, ...))
+  } else {
+    lapply(obj[[layers[1]]], simplify_nest, FUN,  layers[-1])
+  }
+}
+
+permute_nested <- function(tree, perm)  {
+  flatten_paths <- function(x, path = list()) {
+    if (!is.list(x)) return(list(list(path = path, value = x)))
+    do.call(c, lapply(names(x), function(nm) flatten_paths(x[[nm]], c(path, nm))))
+  }  
+  assign_path <- function(lst, path, value) {
+    if (length(path) == 1) {
+      lst[[path[[1]]]] <- value
+    } else {
+      if (is.null(lst[[path[[1]]]])) lst[[path[[1]]]] <- list()
+      lst[[path[[1]]]] <- assign_path(lst[[path[[1]]]], path[-1], value)
+    }
+    lst
+  }
+  paths <- flatten_paths(tree)
+  result <- list()
+  for (p in paths) {
+    result <- assign_path(result, p$path[perm], p$value)
+  }
+  result
+}
+
+
+
+get_nest <- function(obj, inds, layers=c("sample_sets", "models", "comparisons")[seq_along(inds)]) {
+  if (length(inds)==1)
+    obj[[layers[1]]][[inds[[1]]]]
+  else
+    get_nest(obj[[layers[1]]][[inds[[1]]]], inds[-1], layers[-1])
+}
+
 #' R6 class representing the set of parameters used in an analysis
 #' 
 #' @export
@@ -129,167 +214,6 @@ counter <- function(post_fn=identity) {
   }
 }
 
-#' @export
-map_dmc <- function(data, f, depth="comparison",...) {
-  if (class(data[[1]])!="list" || depth=="dataset") {
-    return(map(data,f, ...))
-  }
-  if (class(data[[1]][[1]])!="list" || depth=="model") {
-    return(map_depth(data, 2, f, ...))
-  }
-  map_depth(data, 3, f, ...)
-}
-
-
-
-
-#' Descend a result-tree
-#'
-#' Scripts create a Dataset > Model > Comparison nested list,
-#' with everything stored at the third level of this list. results_apply
-#' provides a way to traverse this list, applying a function to each dds object,
-#' and reporting the results of that function aggregated to a particular level.
-#'
-#' For instance, the counts are universal to every model within a dataset, and
-#' also to every comparison done within each model in that dataset.  But the
-#' actual fitted coeffecients are specific to each comparison.
-#' 
-#' @title Apply a function to a results list
-#' @param object The list of results returned by get_result
-#' @param dataset The name of the dataset you want to restrict the traversal to - optional, and if omitted all datasets will be traversed.
-#' @param model The name of the model you want to restrict the traversal to - optional, and if omitted all models will be traversed.
-#' @param comparison The name of the comparison you want to restrict the traversal to - optional, and if omitted all comparisons will be traversed.
-#' @param fn The function that should be applied to each dds object encountered
-#' @param depth The depth to which traversal should be carried out.
-#' @return A (nested) list of values that represent the return value of fn on the corresponding dds
-#' @author Gavin Kelly
-#' @export
-results_apply <- function(object, dataset, model, comparison, fn, depth="comparison") {
-  if (!missing(dataset)) {
-    if (!missing(model)) {
-      if (!missing(comparison)) {
-        return(fn(object[[dataset]][[model]][[comparison]]))
-      } else {
-        ret <- lapply(
-          names(object[[dataset]][[model]]),
-          function(comp) results_apply(object, dataset, model, comp, fn, depth)
-        )
-        if (depth != "comparison") {
-          if (all(sapply(ret, function(x) identical(x, ret[[1]])))) {
-            ret <- ret[[1]]
-          } else {
-            stop("Summarising at the level of ", depth, " but some comparisons are different")
-          }
-        }
-        return(ret)
-      }
-    } else {
-      ret <- lapply(
-        names(object[[dataset]]),
-        function(mdl)  results_apply(object, dataset, mdl, fn=fn, depth=depth)
-      )
-      if (!(depth %in% c("comparison", "model"))) {
-        if (all_identical(ret)) {
-          ret <- ret[[1]]
-        } else {
-          stop("Summarising at the level of ", depth, " but some models are different")
-        }
-      }
-      return(ret)
-    }
-  } else {
-    ret <- lapply(
-      names(object),
-      function(dset)  results_apply(object, dset, fn=fn, depth=depth)
-    )
-    return(ret)
-  }
-}
-
-
-
-
-
-
-
-
-#' Map over each component of a DESeq nested  object
-#'
-#' If you want to loop through datasets that have been fitted,
-#' then use this function as a wrapped so that reports
-#' can generate formatted output, and transformations can be applied.
-#'
-#' This should be the first process in a pipeline, and be followed by
-#' either a per_model or per_comparison call: the primary function .f
-#' will be applied to the output.  For each dataset in the dds
-#' object, the 'before' function will be called before passing things
-#' on (and so can be used to print a header, for example), and the
-#' 'after' function will be called after (to produce captions).  All
-#' functions have access to a variable '.dataset' that will take the
-#' name of the current dataset
-#' 
-#' @title Wrap dataset-model-comparison object
-#' @param .dmc A three-level list in the standard hierarchy dataset > model > comparison
-#' @param .f The function that will be called on the output of the per_model or per_comparison.
-#' @param before A function that will be invoked before .f
-#' @param after A function that will be invoked after .f
-#' @return The return value of .f, as applied to the list of child outputs
-#' @author Gavin Kelly 
-
-
-
-
-
-
-#' rbind nested lists of data-frames
-#'
-#' Walk through a 3-deep hierarchy of summaries, and join them
-#' into one big summary table
-#' @title rbind nested lists of data-frames
-#' @param x the list of summaries
-#' @param levels The vector of names of the levels of the hierarchy that will be used in the data-frame
-#' @return The big table
-#' @author Gavin Kelly
-#' @export
-rbind_summary <- function(x, levels=c("Dataset", "Design", "Comparison")) {
-  if (inherits(x[[1]], "list")) {
-    do.call(rbind, mapply(function(df, name) {
-      extended <- cbind(name, df)
-      names(extended)[1] <- levels[1]
-      return(extended)
-    }, lapply(x, rbind_summary, levels[-1]), names(x), SIMPLIFY=FALSE))
-  } else {
-    do.call(rbind, mapply(function(df, name) {
-      extended <- cbind(name, df)
-      names(extended)[1] <- levels[1]
-      return(extended)
-    }
-   ,x, names(x), SIMPLIFY=FALSE))
-  }
-}
-
-
-
-
-#' Convert dataset-model-comparison hierarchy into data.frame
-#'
-#' Create a data.frame with columns for dataset, model, and comparison
-#' alongside a list-column containing the dds object
-#' @title Convert DMC to dataframe
-#' @param dmc A triple-level list
-#' @return A data.frame of the expanded list
-#' @author Gavin Kelly
-#' @export
-dmc2df <- function(dmc) {
-  dds <- do.call(c, lapply(dmc, function(d) {do.call(c, lapply(d, function(m) {m}))}))
-  df <- tibble::tibble(
-    dataset=sapply(dds, function(x) metadata(x)$dmc$dataset),
-    model=sapply(dds, function(x) metadata(x)$dmc$model),
-    comparison=make.unique(sapply(dds, function(x) metadata(x)$dmc$comparison)),
-    dds=I(dds)
-  )
-  df
-}
 
 #' @export
 choose_staging <- function(resource, staging="staging") {
@@ -303,8 +227,6 @@ choose_staging <- function(resource, staging="staging") {
     file.path(staging, sub(".qmd$", "", files[menu(files, title="Select which staging file to use for parameters")]))
   }
 }
-
-
 
 
 #' @export

@@ -165,7 +165,7 @@ rasterize_points <- function(p, dpi = 150) {
 
 
 #' @export
-separate_legend <- function(dds, vars=unique(unlist(lapply(metadata(dds)$models, function(x) all.vars(x$design))))) {
+separate_legend <- function(dds, vars) {
   lapply(
     intersect(vars, names(metadata(colData(dds))$palette$Heatmap)),
     function(md_name) {
@@ -390,7 +390,7 @@ hmap_fn <- function(dds, mat, param, cluster_transform, gene_clust, model_vars, 
     if (!is.na(mask) && mask %in% assayNames(dds)) {
       masked[assay(dds, mask)[row.names(masked), colnames(masked)]] <- NA
     }
-    col_fn <- sym_colour(masked[,colData(dds)$.influential])
+    col_fn <- sym_colour(masked[,colData(dds)$.influential$.influential])
     ## if (first && !is.null(gene_clust)) {
     ##   cluster_size_per_row <- (table(gene_clust$cluster))[gene_clust$cluster]
     ##   left_annotation <- ComplexHeatmap::rowAnnotation(
