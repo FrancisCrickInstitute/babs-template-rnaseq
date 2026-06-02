@@ -91,10 +91,21 @@ summarise_results <- function(obj, inds) {
     dplyr::mutate(Total=not+Significant) %>%
     dplyr::select(-not) %>%
     dplyr::arrange(desc(Significant/Total))
-  obj$sample_sets[[inds[[1]]]]$models[[inds[[2]]]]$comparisons[[inds[[3]]]]$summary <- modifyList(out, list(
-    dname = inds[[1]],
-    mname = inds[[2]],
-    cname = inds[[3]]))
+  meta <- list(
+    dataset = obj$sample_sets[[inds[[1]]]]$name,
+    model = obj$sample_sets[[inds[[1]]]]$models[[inds[[2]]]]$name,
+    comparison = obj$sample_sets[[inds[[1]]]]$models[[inds[[2]]]]$comparisons[[inds[[3]]]]$name
+  )
+  obj$sample_sets[[inds[[1]]]]$models[[inds[[2]]]]$comparisons[[inds[[3]]]]$summary <- modifyList(out, meta)
+  obj
+}    
+
+pval_df <- function(obj, inds) {
+  res <- get_nest(obj, inds)$results
+  res$dataset <- obj$sample_sets[[inds[[1]]]]$name
+  res$model <- obj$sample_sets[[inds[[1]]]]$models[[inds[[2]]]]$name
+  res$comparison <- obj$sample_sets[[inds[[1]]]]$models[[inds[[2]]]]$comparisons[[inds[[3]]]]$name
+  obj$sample_sets[[inds[[1]]]]$models[[inds[[2]]]]$comparisons[[inds[[3]]]] <- res
   obj
 }    
 

@@ -49,6 +49,8 @@ RESULTS_DIR = results
 # csv file names (excluding ext)
 log_dir=logs
 
+notesfile=$(firstword $(wildcard NOTES.org NOTES.md) CHANGELOG.md)
+
 ################################################################
 # Executables and their versions
 ################################################################
@@ -206,7 +208,7 @@ ifeq ($(EXECUTOR),singularity)
 CONTAINER= $(call ml,$(SINGULARITY_MODULE)); singularity
 CONTAINER_IMAGE=${source_dir}/docker/$(sif_file)
 SIF_ORIGIN=$(or $(SINGULARITY_IMAGEDIR),$(or $(SINGULARITY_CACHEDIR),$(HOME)/.singularity/cache)/library)/$(sif_file)
-CONTAINER_BIND=--bind $(BIND_DIR),/tmp,$(renv_root)
+CONTAINER_BIND=--bind $(BIND_DIR),/tmp,$(renv_root)$(if $(wildcard $(notesfile)),$(comma)$(realpath $(notesfile)),)
 CONTAINER_ENV=--env SQLITE_TMPDIR=/tmp,$\
   OMP_NUM_THREADS=$(NUM_THREADS),OPENBLAS_NUM_THREADS=$(NUM_THREADS),BIOCPARALLEL_WORKER_NUMBER=$(NUM_THREADS),$\
   SLURM_JOB_ID="$${SLURM_JOB_ID}",SLURM_ARRAY_TASK_ID="$${SLURM_ARRAY_TASK_ID}"

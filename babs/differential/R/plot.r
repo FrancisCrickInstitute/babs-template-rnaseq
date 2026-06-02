@@ -1,6 +1,8 @@
 #' @export
-sym_colour <- function(dat, lo="blue",zero="white", hi="red") {
-  mx <- quantile(abs(dat), 0.9, na.rm=TRUE)
+sym_colour <- function(dat, lo="blue",zero="white", hi="red", mx=NULL) {
+  if (is.null(mx)) {
+    mx <- quantile(abs(dat), 0.9, na.rm=TRUE)
+  }
   lowest <- min(dat, na.rm=TRUE)
   highest <- max(dat, na.rm=TRUE)
   if (lowest < 0 && highest > 0) {
@@ -251,13 +253,12 @@ sort_vars <- function(x, target) {
 
 
 #' @export
-modify_mapping <- function(aes_obj) {
-  aes_obj$extra <- NULL
-  aes_obj$residuals <- NULL
-  aes_obj <- handle_flag_aes(aes_obj)
-  if (!is.null(aes_obj$tooltip)) return(aes_obj)
+modify_mapping <- function(plot_config, add_aes=NULL) {
+  aes_obj <- handle_flag_aes(plot_config)
+  aes_obj <- modifyList(aes_obj, add_aes)
+  if (! "tooltip" %in% names(plot_config$extra)) return(aes_obj)
   vars_used <- unique(unlist(lapply(aes_obj, all.vars)))
-  data_id_var <- if (!is.null(aes_obj$data_id)) all.vars(aes_obj$data_id) else character(0)
+  data_id_var <-  all.vars(aes_obj$data_id)
   vars_ordered <- c(data_id_var, setdiff(vars_used, data_id_var))
   tooltip_expr <- rlang::parse_expr(
     paste0(
@@ -267,19 +268,19 @@ modify_mapping <- function(aes_obj) {
     )
   )
   aes_obj$tooltip <- tooltip_expr
-  return(aes_obj)
+  aes_obj
 }
 
 
-handle_flag_aes <- function(aes_obj) {
-  has_flag <- "flag" %in% names(aes_obj)
+handle_flag_aes <- function(plot_config) {
+  aes_obj <- eval(plot_config[[1]][[2]])
   if ("fill" %in% names(aes_obj) || !"colour" %in% names(aes_obj)) return(aes_obj)
   aes_obj <- as.list(aes_obj)  # make editable
   colour_expr <- aes_obj$colour
   aes_obj$fill <- colour_expr
-  if (has_flag) {
-    flag_expr <- aes_obj$flag
-    flag_true <- paste(all.vars(aes_obj$flag), collapse=",")
+  if ("flag" %in% names(plot_config$extra)) {
+    flag_expr <- plot_config$extra$flag
+    flag_true <- paste(all.vars(plot_config$extra$flag), collapse=",")
     aes_obj$colour <- expr(factor(ifelse(!!flag_expr, !!flag_true, as.character(!!colour_expr)), levels=c(levels(!!colour_expr), !!flag_true)))
     aes_obj$flag   <- NULL
   }
@@ -363,7 +364,7 @@ distinct_formulae <- function(flist) {
 }
 
 
-adapt_hclust_param <- function(param) {
+adapt_hclust_param <- function(param, zero_by=NULL) {
   metric <- param@metric %||% "default"
   if (metric %in% c("pearson", "kendall", "spearman")) {
     # Replace metric with a custom distfun
@@ -373,28 +374,62 @@ adapt_hclust_param <- function(param) {
     # Clear the metric slot since distfun is now used
     param@metric <- NULL
   }
+  if (!is.null(zero_by)) {
+    .zero_by <- outer(zero_by, zero_by, `==`)[lower.tri(matrix(FALSE, length(zero_by), length(zero_by)))]
+    if (!is.null(param@dist.fun)) {
+      if (!is.null(param@metric)) {
+        param@dist.fun <- function(x, method) {
+          tmp <- param@dist.fun(x, method=metric)
+          tmp[.zero_by] <- 0
+          tmp
+        }
+        param@metric <- NULL
+      } else {
+        param@dist.fun <- function(x, method) {
+          tmp <- param@dist.fun(x, method=method)
+          tmp[.zero_by] <- 0
+          tmp
+        }
+      }
+    } else{
+      if (!is.null(param@metric)) {
+        param@dist.fun <- function(x, method) {
+          tmp <- dist(x, method=metric)
+          tmp[.zero_by] <- 0
+          tmp
+        }
+        param@metric <- NULL
+      } else {
+        param@dist.fun <- function(x, method) {
+          tmp <- dist(x)
+          tmp[.zero_by] <- 0
+          tmp
+        }
+      }
+    }
+  }
   return(param)
 }
 
 
-hmap_fn <- function(dds, mat, param, cluster_transform, gene_clust, model_vars, plot_fml, measure_name, ...) {
-  if ("visible" %in% names(plot_fml[[2]])) {
-    vis_sample <- eval(plot_fml[[2]]$visible, colDF(dds))
+hmap_fn <- function(dds, mat, param, cluster_transform, gene_clust, model_vars, plot_config, measure_name, colour_saturates,  ...) {
+  if ("visible" %in% names(plot_config$extra)) {
+    vis_sample <- eval(plot_config$extra$visible, colDF(dds))
   } else {
     vis_sample <- TRUE
   }
   mat <- mat[, vis_sample, drop=FALSE]
-  dds <- dds[,vis_sample, drop=FALSE]
+  dds <- dds[row.names(mat),vis_sample, drop=FALSE]
   if (length(unique(dds$.influential))>1 & !".influential" %in% model_vars) {
     model_vars <- c(model_vars, ".influential")
   }
   panel_hmap <- function(ind=TRUE, first, last, column_title, args) {
     masked <- mat
-    mask <- all.vars(plot_fml[[2]]$mask)[1]
+    mask <- all.vars(plot_config$extra$mask)[1]
     if (!is.na(mask) && mask %in% assayNames(dds)) {
       masked[assay(dds, mask)[row.names(masked), colnames(masked)]] <- NA
     }
-    col_fn <- sym_colour(masked[,colData(dds)$.influential])
+    col_fn <- sym_colour(masked[,colData(dds)$.influential], mx=colour_saturates)
     left_annotation <- NULL
     if (param$get("cluster_unused_samples") == "ignore") {
       ind <- ind[dds$.influential_in_assay]
@@ -458,7 +493,7 @@ hmap_fn <- function(dds, mat, param, cluster_transform, gene_clust, model_vars, 
       show_heatmap_legend=first,
       show_row_names = FALSE,
       show_column_names = ncol(dds)<=12)
-    row_behaviour <- plot_fml[[2]]$sort %||% NA
+    row_behaviour <- plot_config$extra$sort %||% NA
     if (row_behaviour %in% names(mcols(dds)$results)) {
       defaults$row_order <- order(mcols(dds)$results[[row_behaviour]])
       defaults$cluster_rows <- FALSE
@@ -471,8 +506,8 @@ hmap_fn <- function(dds, mat, param, cluster_transform, gene_clust, model_vars, 
     if (first) defaults$name <- measure_name
     do.call(ComplexHeatmap::Heatmap, modifyList(defaults, args))
   }
-  if ("cols" %in% names(plot_fml[[2]])) {
-    col_split <- rlang::eval_tidy(eval(plot_fml[[2]])$cols, colDF(dds))
+  if ("cols" %in% names(plot_config$extra)) {
+    col_split <- rlang::eval_tidy(eval(plot_config$extra)$cols, colDF(dds))
     splits <- split(seq_along(col_split), col_split)
   } else {
     splits <- list("Samples"=seq(length=ncol(dds)))
@@ -615,4 +650,44 @@ df2colorspace <- function(df, palette) {
       res$ggplot$.influential <-
         setNames(c("black", "white"), c(TRUE, FALSE))
   res
+}
+
+## in cases like e.g. aes(x=time, y=expression, colour=time, group=interaction(condition))
+## we don't want the line-colour to vary along the path, so
+babs_first <- function(x) x[1]
+
+transform_colour_min <- function(mapping) {
+  if (length(intersect(all.vars(mapping$x), all.vars(mapping$colour)))==0) {
+    return(mapping)
+  }
+  x_expr <- rlang::quo_get_expr(mapping$x)
+  if (!is.symbol(x_expr)) {
+    return(mapping)
+  }
+  x_var <- as.character(x_expr)
+  # Transform colour expression
+  col_quo  <- mapping$colour
+  col_expr <- rlang::quo_get_expr(col_quo)
+  replace_var_with_summary <- function(expr, var) {
+    if (rlang::is_quosure(expr)) {
+      inner <- rlang::quo_get_expr(expr)
+      env <- rlang::quo_get_env(expr)
+      new_inner <- replace_var_with_summary(inner, var)
+      return(rlang::new_quosure(new_inner, env))
+    }
+    if (is.symbol(expr) && as.character(expr) == var) {
+      return(call("babs_first", expr))
+    }
+    if (!is.call(expr)) {
+      return(expr)
+    }
+    fn <- expr[[1]]
+    old_args <- as.list(expr[-1])
+    new_args <- lapply(old_args, replace_var_with_summary, var = var)
+    as.call(c(list(fn), new_args))
+  }
+  new_expr <- replace_var_with_summary(col_expr, x_var)
+  # Rewrap with original environment
+  mapping$colour <- rlang::new_quosure(new_expr, rlang::quo_get_env(col_quo))
+  mapping
 }

@@ -29,7 +29,7 @@ dmc_heading <- function(obj, hierarchy,  depth="##", numbered=TRUE, describe=TRU
     ## Doing a dataset
     met <- modifyList(list(id=dataset), obj$sample_sets[[dataset]])[c("id","name","description")]
     heading <- c(heading, "Dataset", met$id)
-    if (!is.null(met$name)) {
+    if (!is.null(met$name) & met$name != met$id) {
       heading <- c(heading, ":", met$name)
     }
     if (!is.null(met$description)) {
@@ -38,11 +38,11 @@ dmc_heading <- function(obj, hierarchy,  depth="##", numbered=TRUE, describe=TRU
   } else if (!is.null(plot)) {
     ## Doing a plot
     met <- modifyList(list(id=plot), obj$sample_sets[[dataset]]$models[[model]]$profile_plots[[plot]])[c("id","name","description")]
-    heading <- c(heading, "Plot config", met$id)
-    if (!is.null(met$name)) {
+    heading <- c(heading, "Plot", met$id)
+    if (!is.null(met$name) & met$name != met$id) {
       heading <- c(heading, ":", met$name)
     }
-    fml <- profile_to_string(obj$sample_sets[[dataset]]$models[[model]]$profile_plots[[plot]][[1]])
+    fml <- profile_to_string(obj$sample_sets[[dataset]]$models[[model]]$profile_plots[[plot]])
     if (!is.null(met$description)) {
       text <- paste0(met$description, "\n\n",
                     fml, "\n\n")
@@ -55,7 +55,7 @@ dmc_heading <- function(obj, hierarchy,  depth="##", numbered=TRUE, describe=TRU
     if (comparison %in% names(comparisons)) { # otherwise an external list
       met <- modifyList(list(id=comparison), comparisons[[comparison]])[c("id","name","description")]
       heading <- c(heading, "Comparison", met$id)
-      if (!is.null(met$name)) {
+      if (!is.null(met$name) & met$name != met$id) {
         heading <- c(heading, ":", met$name)
       }
       if (!is.null(met$description)) {
@@ -71,7 +71,7 @@ dmc_heading <- function(obj, hierarchy,  depth="##", numbered=TRUE, describe=TRU
     ## Doing a model
     met <- modifyList(list(id=model), obj$sample_sets[[dataset]]$models[[model]])[c("id","name","description")]
     heading <- c(heading, "Model", met$id)
-    if (!is.null(met$name)) {
+    if (!is.null(met$name) & met$name != met$id) {
       heading <- c(heading, ":", met$name)
     }
     if (!is.null(met$description)) {
@@ -121,27 +121,41 @@ dmc_factory <- function(obj, type, report=report_span) {
 
 
 
-profile_to_string <- function(fml) {
+profile_to_string <- function(plot_config) {
+  fml <- plot_config[[1]]
   mapping <- eval(fml[[2]])
-  renamer <- as.list(setNames(names(mapping), names(mapping)))
-  renamer$data_id <- "hover grouping"
-  renamer$group <- "grouping variables"
-  renamer$sort_by <- "sort by"
-  renamer$flag <- "sample highlighter"
-  renamer$cols <- "column splitter"
-  renamer$mask <- "assay for masking"
-  renamer$cluster <- "assay to base clusters on"
-  parts <- vapply(names(mapping), function(nm) {
-    expr <- mapping[[nm]]
-    rnm <- renamer[[nm]]
-    paste0(toupper(substr(rnm, 1, 1)), substr(rnm, 2, nchar(rnm)), " = ", rlang::as_label(expr))
-  }, character(1))
+  
+  parts <- lapply(names(mapping), function(nm) {
+    paste0(toupper(substr(nm, 1, 1)), substr(nm, 2, nchar(nm)), " = ", rlang::as_label(mapping[[nm]]))
+  })
   out <- paste0("Aesthetics:\n\n", paste0("- ", parts, collapse="\n"), "\n\n")
+
+  extras <- list(
+    "sort_by" = "Sort samples by ",
+    "visible" = "Visibility criterion ",
+    "flag" =  "Highlight samples by ",
+    "mask" = "Mask assay on ",
+    "cluster" = "Base clusters on assay ",
+    "extra" = "Extra variables added to annotation: ",
+    "expand_rows" = "Expand top variable genes to include rows match on ",
+    "tooltip" = "Hover over dotplots using ",
+    "data_id" = "Hover grouping by ",
+    "sort" = "Sort dendrogram rows by ",
+    "cols" = "Facet columns on ",
+    "rows" = "Facet rows on ",
+    "facets" = "Facet on "
+  )
+  parts <- lapply(
+    intersect(names(plot_config$extra), names(extras)),
+    function(v) paste0(extras[[v]],  ifelse(is_formula(plot_config$extra[[v]]), rlang::as_label(plot_config$extra[[v]]), paste(plot_config$extra[[v]], collape=",")))
+  )
+                
+  out <- paste0(out, "\n\nOptions:\n\n", paste0("- ", parts, collapse="\n"), "\n\n")
   recon <- paste(deparse(as.formula(attr(fml, "src"))[[3]]), collapse="")
   if (recon==".") {
     out
     } else {
-      paste(out, "Reconstruction:", recon, "\n\n")
+      paste(out, "\n\nReconstruction:\n\n", recon, "\n\n")
     }
 }
 

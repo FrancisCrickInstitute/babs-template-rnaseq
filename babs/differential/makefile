@@ -130,10 +130,9 @@ notes: $(staging_dir)/notes.md
 	$(QUARTO) render $< $(quarto_opts)
 	cp  $(staging_dir)/$(RESULTS_DIR)/$(VERSION)/notes.html $(RESULTS_DIR)/$(VERSION)/
 
-notesfile=$(firstword $(wildcard NOTES.org NOTES.md))
-$(staging_dir)/notes.md: $(notesfile) CHANGELOG.md
+$(staging_dir)/notes.md: $(notesfile)
 	:> $@
-	[ -z "$(notesfile)" ] || [ "$(suffix $(notesfile))" = md ] || pandoc --lua-filter=resources/_extensions/notes.lua -s -o $@ $<  
+	[ "$(suffix $(notesfile))" = md ] || pandoc -s -o $@ $<  
 	[ "$(notesfile)" = CHANGELOG.md ] || cat CHANGELOG.md >> $@
 
 CHANGELOG.md:

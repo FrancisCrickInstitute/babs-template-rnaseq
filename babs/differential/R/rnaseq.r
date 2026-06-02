@@ -236,7 +236,7 @@ build_dds_list <- function(dds, spec) {
         if (is_formula(y$design))
           d <- all.vars(update(y$design, NULL ~ .))
         if ("profile_plots" %in% names(y))
-            d <- c(d, unlist(lapply(y$profile_plots, function(x) all.vars(x[[1]]))))
+            d <- c(d, unlist(lapply(y$profile_plots, function(x) c(all.vars(x[[1]]), unlist(lapply(x$extra, all.vars))) )))
         d
       })
     })
@@ -388,7 +388,7 @@ build_dds_list <- function(dds, spec) {
                                function(x) {
                                  if (class(colData(obj)[[x]]) != class(colData(dds)[[x]])) return(TRUE)
                                  if (is.factor(colData(obj)[[x]])) return(!all(levels(colData(obj)[[x]]) %in%  levels(colData(dds)[[x]])))
-                                 if (is.character(colData(obj)[[x]])) return(!all(unique(colData(obj)[[x]]) %in%  levels(unique(dds)[[x]])))
+                                 if (is.character(colData(obj)[[x]])) return(!all(unique(colData(obj)[[x]]) %in%  unique(dds[[x]])))
                                  return(!all(range(colData(obj)[[x]], na.rm=TRUE)==range(colData(dds)[[x]], na.rm=TRUE)))
                                })
         new_cols <- c(new_cols, old_cols[is_modified])
@@ -707,7 +707,7 @@ emcontrasts <- function(mdl, comparison_ind, prefix="my") {
       if(sum(!byvars)>1) {
         do.call(paste,  c(lapply(contr_frame[!byvars], function(column) sub("(.*) - (.*)", "(\\1-\\2)", column)),sep= "×"))
       } else {
-        sub("(.*) - (.*)", "\\1-\\2", contr_frame[[!byvars]])
+        sub("(.*) - (.*)", "\\1-\\2", contr_frame[[which(!byvars)]])
       },
       do.call(paste,  c(contr_frame[ byvars] ,sep= ",")),
       sep=ifelse(any(byvars), "|", "")
@@ -1432,6 +1432,7 @@ sample_norm <- function(obj) {
     }
     imp <- obj$impute
     if (!is.null(imp)) {
+      out <- assay(se)
       assay(se, "na") <- is.na(assay(se))
       for (stratum in seq_along(strata)) {
         i <- strata[[stratum]]$samples
@@ -1508,7 +1509,7 @@ generate_assay <- function(args, dds) {
   curAssay <- assay(dds, args$from)
   if (args$method=="normalise") {
     curFrame <- as.data.frame(colData(dds))
-    margs <- modifyList(args, list(from=NULL, method=NULL, design=NULL, recentre=NULL, rescale=NULL, hint=NULL, influential_samples=NULL))
+    margs <- modifyList(args, list(from=NULL, method=NULL, design=NULL, recentre=NULL, rescale=NULL, hint=NULL, influential_samples=NULL, colour_saturates=NULL))
     baseFrame <-do.call(
       transform,
       modifyList(margs, list(`_data`=curFrame))
