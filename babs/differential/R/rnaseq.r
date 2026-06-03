@@ -256,6 +256,15 @@ build_dds_list <- function(dds, spec) {
   ddsList <- list()
   default_names <- default_namer()
   spec$sample_sets <- default_names(spec$sample_sets, prefix="D")
+  multi_dataset <- rev(which(sapply(spec$sample_sets, function(x) is_formula(x$split))))
+  for (di in multi_dataset) {
+    inject <- subsets_from_formula(spec$sample_sets[[di]], colDF(dds))
+    inject <- inject[sapply(inject, any)]
+    inject <- lapply(inject, function(insplit) modifyList(spec$sample_sets[[di]], list(subset = insplit)))
+    spec$sample_sets <- append(spec$sample_sets, inject, di )
+    spec$sample_sets[[di]] <- NULL
+  }
+
   for (dataset_i in seq_along(spec$sample_sets)) {
     spec$sample_sets[[dataset_i]]$models <- default_names(spec$sample_sets[[dataset_i]]$models, prefix="M")
     for (model_i in seq_along(spec$sample_sets[[dataset_i]]$models)) {
@@ -1690,4 +1699,13 @@ clean_formula <- function(formula, data) {
   } else {
     as.formula(paste("~", paste(new_terms, collapse = " + ")))
   }
+}
+
+subsets_from_formula <- function(ss, df) {
+  vars <- all.vars(ss$split)
+  combos <- unique(df[vars])
+  lapply(setNames(seq_len(nrow(combos)), do.call(interaction, combos)), function(i) {
+    row <- combos[i, ]
+    apply(df[vars], 1, function(x) all(x == row)) & ss$subset
+  })
 }
