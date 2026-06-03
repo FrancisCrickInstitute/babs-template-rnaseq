@@ -29,7 +29,7 @@ dmc_heading <- function(obj, hierarchy,  depth="##", numbered=TRUE, describe=TRU
     ## Doing a dataset
     met <- modifyList(list(id=dataset), obj$sample_sets[[dataset]])[c("id","name","description")]
     heading <- c(heading, "Dataset", met$id)
-    if (!is.null(met$name) & met$name != met$id) {
+    if (!is.null(met$name) && met$name != met$id) {
       heading <- c(heading, ":", met$name)
     }
     if (!is.null(met$description)) {
@@ -39,7 +39,7 @@ dmc_heading <- function(obj, hierarchy,  depth="##", numbered=TRUE, describe=TRU
     ## Doing a plot
     met <- modifyList(list(id=plot), obj$sample_sets[[dataset]]$models[[model]]$profile_plots[[plot]])[c("id","name","description")]
     heading <- c(heading, "Plot", met$id)
-    if (!is.null(met$name) & met$name != met$id) {
+    if (!is.null(met$name) && met$name != met$id) {
       heading <- c(heading, ":", met$name)
     }
     fml <- profile_to_string(obj$sample_sets[[dataset]]$models[[model]]$profile_plots[[plot]])
@@ -55,7 +55,7 @@ dmc_heading <- function(obj, hierarchy,  depth="##", numbered=TRUE, describe=TRU
     if (comparison %in% names(comparisons)) { # otherwise an external list
       met <- modifyList(list(id=comparison), comparisons[[comparison]])[c("id","name","description")]
       heading <- c(heading, "Comparison", met$id)
-      if (!is.null(met$name) & met$name != met$id) {
+      if (!is.null(met$name) && met$name != met$id) {
         heading <- c(heading, ":", met$name)
       }
       if (!is.null(met$description)) {
@@ -71,7 +71,7 @@ dmc_heading <- function(obj, hierarchy,  depth="##", numbered=TRUE, describe=TRU
     ## Doing a model
     met <- modifyList(list(id=model), obj$sample_sets[[dataset]]$models[[model]])[c("id","name","description")]
     heading <- c(heading, "Model", met$id)
-    if (!is.null(met$name) & met$name != met$id) {
+    if (!is.null(met$name) && met$name != met$id) {
       heading <- c(heading, ":", met$name)
     }
     if (!is.null(met$description)) {

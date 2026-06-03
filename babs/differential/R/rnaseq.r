@@ -259,7 +259,7 @@ build_dds_list <- function(dds, spec) {
   multi_dataset <- rev(which(sapply(spec$sample_sets, function(x) is_formula(x$split))))
   for (di in multi_dataset) {
     inject <- subsets_from_formula(spec$sample_sets[[di]], colDF(dds))
-    inject <- inject[sapply(inject, any)]
+    inject <- inject[sapply(inject, sum)>1]
     inject <- lapply(inject, function(insplit) modifyList(spec$sample_sets[[di]], list(subset = insplit)))
     spec$sample_sets <- append(spec$sample_sets, inject, di )
     spec$sample_sets[[di]] <- NULL
@@ -455,6 +455,7 @@ fit_models <- function(dmc, inds, param, ...) {
     function(mdl) {
       fit_model(modifyList(mdl, list(object=sampleset$object, ...)))
     })
+  sampleset$models <- sampleset$models[!sapply(sampleset$models, is.null)]
   dmc$sample_sets[[di]] <- sampleset
   dmc
 }
@@ -473,6 +474,10 @@ fit_model <- function(model, ...) {
   design(model$object) <- model$design
   model <- subset_model(model)
   model <- check_model(model)
+  if (nrow(model$mat) <= ncol(model$mat)) {
+    warning("Model is being dropped as there is no replication")
+    return(NULL)
+  }
   if (any(model$dropped)) {
     design(model$object) <- model$mat
   }
@@ -1417,7 +1422,7 @@ sample_norm <- function(obj) {
     if ("subsetGenes" %in% names(obj)) {
       se <- se[eval(obj$subsetGenes, transform(rowData(se), ID=row.names(se))),]
     }
-    assay(se, "vst") <- assay(vst(se, nsub=min(1000, nrow(se))))
+    assay(se, "vst") <- assay(vst(se, nsub=min(10, nrow(se))))
     
     return(se)
   } else {

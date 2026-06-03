@@ -149,7 +149,7 @@ write_results <- function(dmc, param, params, assays=NULL) {
     writeData(wb, sn, as.data.frame(colData(dataset$object)), headerStyle=hs2)
     sn <- "Class Sizes"
     addWorksheet(wb, sn)
-    writeData(wb, sn, subset(summaries, dname==dataset_id), headerStyle=hs2)
+    writeData(wb, sn, subset(summaries, dataset==dataset_id), headerStyle=hs2)
     ## Differential gene-lists
     comparison_name_lookup <- list()
     addWorksheet(wb, "Comparison Key")
