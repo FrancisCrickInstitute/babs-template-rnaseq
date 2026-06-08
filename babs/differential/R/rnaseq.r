@@ -398,7 +398,7 @@ build_dds_list <- function(dds, spec) {
                                  if (class(colData(obj)[[x]]) != class(colData(dds)[[x]])) return(TRUE)
                                  if (is.factor(colData(obj)[[x]])) return(!all(levels(colData(obj)[[x]]) %in%  levels(colData(dds)[[x]])))
                                  if (is.character(colData(obj)[[x]])) return(!all(unique(colData(obj)[[x]]) %in%  unique(dds[[x]])))
-                                 return(!all(range(colData(obj)[[x]], na.rm=TRUE)==range(colData(dds)[[x]], na.rm=TRUE)))
+                                 return(FALSE)#For numerics - makes sense to keep the original range
                                })
         new_cols <- c(new_cols, old_cols[is_modified])
         for (ir in old_cols[!is_modified]) {
@@ -456,7 +456,11 @@ fit_models <- function(dmc, inds, param, ...) {
       fit_model(modifyList(mdl, list(object=sampleset$object, ...)))
     })
   sampleset$models <- sampleset$models[!sapply(sampleset$models, is.null)]
-  dmc$sample_sets[[di]] <- sampleset
+  if (length(sampleset$models)>0) {
+    dmc$sample_sets[[di]] <- sampleset
+  } else {
+    dmc$sample_sets[[di]] <- NULL
+  }
   dmc
 }
 
@@ -474,7 +478,7 @@ fit_model <- function(model, ...) {
   design(model$object) <- model$design
   model <- subset_model(model)
   model <- check_model(model)
-  if (nrow(model$mat) <= ncol(model$mat)) {
+  if (!is.null(model$mat) && nrow(model$mat) <= ncol(model$mat)) {
     warning("Model is being dropped as there is no replication")
     return(NULL)
   }
@@ -906,7 +910,7 @@ get_result <- function(dmc, inds, mcols=c("symbol", "entrez"), filterFun=IHW::ih
   } else {
     alpha1 <- alpha
   }
-  if (is_formula(comp) || all(c("lmfit", "ebayes") %in% names(comparison))) { # it's LRT (or F test for limma)
+  if (!is.null(comparison$object) || all(c("lmfit", "ebayes") %in% names(comparison))) { # it's LRT (or F test for limma)
     if (inherits(comparison$object, "DESeqDataSet")) {
       fitted_se <- comparison$object
       r <- results(fitted_se, filterFun=filterFun, alpha=alpha1, ...)
@@ -976,7 +980,7 @@ get_result <- function(dmc, inds, mcols=c("symbol", "entrez"), filterFun=IHW::ih
   if ("LRTPvalue" %in% names(mcols(fitted_se))) {
     r$class <- mcols(fitted_se)$class
     r$class[is.na(r$padj) | is.na(r$pvalue) | r$baseMean==0] <- NA
-    term <-  model$LRTterms
+    term <-  comparison$LRTterms
     # take the biggest fold-change vs baseline, for MA and reporting?
     if (all(term %in% names(mcols(fitted_se))) && LRT_effect!="none") {
       effect_matrix <- cbind(I=rep(0, nrow(fitted_se)),as.matrix(mcols(fitted_se)[,term,drop=FALSE]))

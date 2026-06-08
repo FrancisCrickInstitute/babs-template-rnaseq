@@ -618,7 +618,11 @@ df2colorspace <- function(df, palette) {
                                   circlize::colorRamp2(c(-max(abs(rng)), 0, max(abs(rng))), my_cols)
                                 } else {
                                   my_cols <- RColorBrewer::brewer.pal(3, seq_cols[start_level])[-2]
-                                  circlize::colorRamp2(rng, my_cols)
+                                  if (length(unique(rng))==2) {
+                                    circlize::colorRamp2(rng, my_cols)
+                                  } else {
+                                    circlize::colorRamp2(rng-c(1,0), my_cols)
+                                  }
                                 }
                               }
                             }

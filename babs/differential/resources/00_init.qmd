@@ -52,6 +52,14 @@ if (file.exists(file.path("results", paste0("multiqc-", params$alignment)))) {
 
 
 ```{r}
+#| label: make
+preprocessor <- file.path("extdata", align_params$makefile %||%  paste0(params$alignment, ".mk"))
+if (file.exists(preprocessor)) {
+  system2("make", c("-f", preprocessor, align_params$target))
+}
+```
+
+```{r}
 #| label: rda
 
 preprocessed <- file.path("extdata", align_params$rda %||%  paste0(params$alignment, ".rda"))
@@ -204,9 +212,13 @@ if (file.exists(csv)) {
                              )
   assay(dds)[is.nan(assay(dds))] <- NA
   if (any(is.na(assay(dds)))) dds$'.percentNA' <- 100 *apply(is.na(assay(dds)), 2, mean)
-  mcols(dds) <- df[setdiff(names(df), colnames(mat))]
-  mcols(dds)$symbol <- mcols(dds)[[align_params$symbolColumn %||% 1]]
-  dds <- add_org_annotation(dds, organism$org, keytype=align_params$keytype, count_source=params$count_source)
+  if (length(setdiff(names(df), colnames(mat)))>0) {
+    mcols(dds) <- df[setdiff(names(df), colnames(mat))]
+    mcols(dds)$symbol <- mcols(dds)[[align_params$symbolColumn %||% 1]]
+  } else {
+    mcols(dds)$symbol <- row.names(dds)
+  }
+  #dds <- add_org_annotation(dds, organism$org, keytype=align_params$keytype, count_source=params$count_source)
   colnames(dds) <- as.character(dds[[name_col]])
   row.names(dds) <- rowData(dds)[[1]]
   save(dds, file=file.path("data",paste0("counts_", params$alignment, ".rda")))
