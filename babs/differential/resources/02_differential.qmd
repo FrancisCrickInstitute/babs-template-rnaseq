@@ -111,11 +111,8 @@ if (!is.null(metadata(dds)$organism$org)) {
 }
 
 
-param <- ParamList$new(defaults=ddsList$settings)
 # Calling the setter without a value will pick up the default (from the spec), _and_ alert it in the markdown, and return the default
-set.seed(param$set("seed", postpone=TRUE))
-param$set("spec",  params$spec, "Using analysis plan '{}'.", postpone=TRUE)
-param$set("alignment", params$alignment, "Using alignment settings '{}'")
+set.seed(ddsList$settings$seed)
 align_params <- get_align_params(params$alignment)
 rowNoun <- align_params$rowNoun %||% "gene"
 RowNoun <- stringr::str_to_title(rowNoun)
@@ -123,8 +120,6 @@ if ("missing" %in% names(align_params)) {
   attr(rowNoun, "readout") <- "missingness"
   attr(RowNoun, "readout") <- "Missingness"
 }
-param$set("rowNoun", rowNoun)
-param$set("RowNoun", RowNoun)
 cluster_ind <- counter(post_fn=to_letter)      
 
 
@@ -133,9 +128,9 @@ mtag <- dmc_factory(ddsList, type="model")
 
 ```
 
-# Find differential `{r} param$get("rowNoun")`s
+# Find differential `{r} rowNoun`s
 
- We use DESeq2 [@pkg_DESeq2] to find differential `{r} param$get("rowNoun")`s using the
+ We use DESeq2 [@pkg_DESeq2] to find differential `{r} rowNoun`s using the
 negative binomial distribution to model counts, with IHW [@IHW2016]
 for multiple-testing correction with greater power than
 Benjamini-Hochberg, and ashr [@pkg_ashr] for effect-size shrinkage
@@ -145,15 +140,6 @@ to ensure reported fold-changes are more robust.
 ```{r}
 #| label: differential
 
-param$set("alpha", postpone=TRUE)
-param$set("lfcThreshold", postpone=TRUE)
-param$set("filterFun", postpone=TRUE)
-param$set("LRT_effect", postpone=TRUE)
-param$set("gene_clust", postpone=TRUE)
-param$set("pc_x", 1, postpone=TRUE)
-param$set("pc_y", 2, postpone=TRUE)
-param$set("cluster_unused_samples", postpone=TRUE)
-param$set("sample_clust")
 
 rds_name <- file.path("data", paste0(basename(params$spec),"_x_", params$alignment, ".rds"))
 
@@ -169,7 +155,6 @@ ddsList <- nested_modify(
   ddsList,
   fit_models,
   layers="sample_sets",
-  param=param,
   minReplicatesForReplace = Inf
 )
 
@@ -177,11 +162,7 @@ ddsList <- nested_modify(
 ## Now put results in each comparison object
 ddsList <- nested_modify(
   ddsList,
-  get_result,
-  filterFun=param$get("filterFun"),
-  alpha=param$get("alpha"),
-  lfcThreshold=param$get("lfcThreshold"),
-  LRT_effect=param$get("LRT_effect", metadata(dds)$models)
+  get_result
 )
 
 
@@ -190,12 +171,8 @@ save(ddsList, file=sub("rds$", "rda", rds_name))
 
 
 xl_files <- write_results(ddsList,
-                         param,
                          params
                          )
-iwalk(xl_files,
-     ~cat("\n\n<a class=\"download-excel btn btn-primary\" href=\"", attr(.x, "link"), "\"> Open Spreadsheet '", .y,"'</a>\n\n", sep="")
-     )
 
 if (FALSE) {
 leaf_apply(ddsList,
@@ -217,20 +194,20 @@ within which the different models, and their null hypotheses, are
 enumerated.
 
 In the 'Significant' column we tally the number of significant
-`{r} param$get("rowNoun")`s (for pairwise comparisons, separated into up or down, where
-A-B being labelled up means `{r} noun_to_readout(param$get("rowNoun"))` is higher in A; for omnibus
+`{r} rowNoun`s (for pairwise comparisons, separated into up or down, where
+A-B being labelled up means `{r} noun_to_readout(rowNoun)` is higher in A; for omnibus
 comparisons, a broad categorisation of the most extreme groups, as
-described above.) We also tally the total number of `{r} param$get("rowNoun")`s
+described above.) We also tally the total number of `{r} rowNoun`s
 exhibiting that behaviour (ie not necessarily statistically
 signficant) - these might not always add up to the same value, as
-there is an independent filter of low-signal `{r} param$get("rowNoun")`s whose effect
+there is an independent filter of low-signal `{r} rowNoun`s whose effect
 varies from comparison to comparison.
 
 Our naming convention for a comparison often looks like `A-B|M` -
 again, because this is an semi-automated report, this mightn't be
 optimal, but the rationale is `A-B` refers to the two experimental
 conditions being compared (a 'upward' fold change will be reported
-if the `{r} noun_to_readout(param$get("rowNoun"))` is higher in `A` than it is in `B`). The `|M` part
+if the `{r} noun_to_readout(rowNoun)` is higher in `A` than it is in `B`). The `|M` part
 refers to the fact that we may have looked at that `A-B` comparison
 conditional upon some other variable (which in this example takes the
 value `M`):  anything before the `|` symbol identifies the
@@ -243,7 +220,7 @@ solid peak on the left, and then make a reasonable plateau across
 higher p-values: gross deviations from this can indicate an absence of
 differential behaviour (lack of left-peak) or a model
 mis-specification that might need investigating. The blue tracks
-indicate p-values corresponding to `{r} param$get("rowNoun")`s with very low `{r} noun_to_readout(param$get("rowNoun"))`, which
+indicate p-values corresponding to `{r} rowNoun`s with very low `{r} noun_to_readout(rowNoun)`, which
 would typically struggle to provide evidence of differential
 behaviour, and so show an example of what a 'bad' pink trace might
 look like.
@@ -254,13 +231,16 @@ look like.
 summaries <- nested_modify(ddsList, summarise_results)
 summaries <- Reduce(rbind, flatten_nest(summaries, function(x) x$summary))
 
-unclassed <- summaries %>%
-  subset(Group %in% c('Zero Count', 'Low Count', 'Outlier')) %>%
-  group_by(dataset, model, Group) %>%
-  summarise(N=paste(unique(Total), collapse=";")) %>%
-  ungroup() %>%
-  pivot_wider(id_cols=c(model, dataset), names_from=Group, values_from=N)
-
+if (is.null(summaries)) {
+  cat("\n\nNo datasets had models that were successful\n\n")
+} else {
+  unclassed <- summaries %>%
+    subset(Group %in% c('Zero Count', 'Low Count', 'Outlier')) %>%
+    group_by(dataset, model, Group) %>%
+    summarise(N=paste(unique(Total), collapse=";")) %>%
+    ungroup() %>%
+    pivot_wider(id_cols=c(model, dataset), names_from=Group, values_from=N)
+}
 
 pval_frame <- nested_modify(ddsList, pval_df)
 pval_frame <- Reduce(rbind, flatten_nest(pval_frame, function(x) x))
@@ -282,7 +262,7 @@ for (dataset_id in seq_along(unique(summaries$dataset))) {
       "  style = cell_fill(color = '#bee2e9'),",
       "  locations = cells_row_groups()",
       ") %>% ",
-      paste0("tab_header(title=\"",param$get("RowNoun"),"List summary\", subtitle=dataset_name)"),
+      paste0("tab_header(title=\"",RowNoun,"List summary\", subtitle=dataset_name)"),
       "```",
       "",
       ""
@@ -338,7 +318,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
     dmc_heading(ddsList, list(dataset=dataset_id, model=model_id), depth=strrep("#", length(section_hierarchy)))
     src2bullets(model, c("subset", "extra_assays", "influential_samples"))
     cat("`",
-        Reduce(paste, sub("~", paste0(noun_to_readout(param$get("RowNoun"))," ~ "), deparse(model$design))),
+        Reduce(paste, sub("~", paste0(noun_to_readout(RowNoun)," ~ "), deparse(model$design))),
         "`\n\n"
         )
     first <- TRUE
@@ -422,7 +402,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
         cat("\n\n", strrep("#", length(section_hierarchy)+1), " MA\n\n", sep="")
         do_plot(pl,
                 label="MA",
-                caption=paste0("MA plot of ", tooltip(model, comparison_id), "-differential ", param$get("rowNoun"),"s for ",mtag(model_id), " in ", dtag(dataset_id)),
+                caption=paste0("MA plot of ", tooltip(model, comparison_id), "-differential ", rowNoun,"s for ",mtag(model_id), " in ", dtag(dataset_id)),
                 preview=first,
                 plot_meta=section_hierarchy,
                 dpi=150, interactive=FALSE
@@ -459,10 +439,10 @@ for (dataset_id in names(ddsList$sample_sets)) {
       #TODO check why baseline not appearing
       if (!is_external && "baseline_contrast" %in% names(comparison)) {
         weights[colnames(model$object)] <- t(as.vector(comparison$baseline_contrast) %*% MASS::ginv(mmat))
-        baseline_str <- paste("baseline", noun_to_readout(param$get("rowNoun")))
+        baseline_str <- paste("baseline", noun_to_readout(rowNoun))
       } else {
         weights[colnames(model$object)] <- rep(1/nrow(mmat), times=nrow(mmat))
-        baseline_str <- paste("average", noun_to_readout(param$get("rowNoun")))
+        baseline_str <- paste("average", noun_to_readout(rowNoun))
       }
       centroid_df <- list()
       # Because heatmaps aren't really affected by anything other than y-aesthetic and partials:
@@ -500,7 +480,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
         })
         eval(prepare_plot_data)
         mat_height <- height_scaler(n=nrow(plot_se), small=10, big=20, N=1000)
-        hc <- param$get("gene_clust")
+        hc <- plot_config$extra$gene_clust
         keep_names <- FALSE
         if ("cut.params" %in% slotNames(hc) && "k" %in% names(slot(hc, "cut.params")) && slot(hc, "cut.params")$k >= nrow(plot_se)) {
           slot(hc, "cut.params") <- modifyList(slot(hc, "cut.params"), list(k=nrow(plot_se)))
@@ -520,46 +500,44 @@ for (dataset_id in names(ddsList$sample_sets)) {
           this_clust <- cluster_ind()
           gene_clust$clusters <- if (keep_names) row.names(plot_se) else cluster_cardinality(gene_clust$clusters, this_clust)
         }
-        capt <- paste0(tooltip(model, comparison_id), comp_type, param$get("rowNoun"),"s  of ", mtag(model_id), " in ", dtag(dataset_id), metadata(plot_se)$removed)
+        capt <- paste0(tooltip(model, comparison_id), comp_type, rowNoun,"s  of ", mtag(model_id), " in ", dtag(dataset_id), metadata(plot_se)$removed)
         cc <- cluster_calc(assay(plot_se), clusterID=gene_clust$clusters)
         hmap_data <- assay(plot_se)
         pls <- hmap_fn(
-          dds=plot_se[,sample_order, drop=FALSE], mat=hmap_data[,sample_order, drop=FALSE], param=param,
-          cluster_transform=identity, gene_clust = gene_clust,
+          dds=plot_se[,sample_order, drop=FALSE], mat=hmap_data[,sample_order, drop=FALSE],
+          cluster_transform=identity, gene_clust = gene_clust, row_title = paste0(RowNoun, "s"),
           model_vars = model_vars,
           plot_config =plot_config,
           row_split = if ("cut.params" %in% slotNames(hc) && "k" %in% names(slot(hc, "cut.params"))) slot(hc, "cut.params")$k  else NULL,
-          measure_name=paste(c(noun_to_readout(param$get("RowNoun")), y_hint), collapse=" "),
+          measure_name=paste(c(noun_to_readout(RowNoun), y_hint), collapse=" "),
           colour_saturates=NULL,
           show_column_names=TRUE)
         do_plot(Reduce(`+`, pls),
                 label="Heatmap",
                 caption=paste0("Heatmap on ", capt,  ". White for ", baseline_str),
+                height_opt=c(
+                  paste0("#| fig-height: [", 1.5*attr(pls[[1]], "predicted_height"), ",", attr(pls[[1]], "predicted_height") ,"]"),
+                  "#| out-height: 800px"),
                 plot_meta=section_hierarchy,
-                height_opt=paste0(
-                  "#| fig-height: ",
-                  mat_height 
-                )
                 )
         ### Design-based column ordering of  heatmap
         cat("\n\n---\n\n")
         pls <- hmap_fn(
-          dds=plot_se[,sample_order, drop=FALSE], mat=hmap_data[,sample_order, drop=FALSE], param=param,
-          cluster_transform=identity, gene_clust = gene_clust,
+          dds=plot_se[,sample_order, drop=FALSE], mat=hmap_data[,sample_order, drop=FALSE],
+          cluster_transform=identity, gene_clust = gene_clust, row_title = paste0(RowNoun, "s"),
           model_vars = model_vars,
           row_split = if ("cut.params" %in% slotNames(hc) && "k" %in% names(slot(hc, "cut.params"))) slot(hc, "cut.params")$k  else NULL,
           plot_config =plot_config, 
           colour_saturates=NULL,
-          measure_name=paste(c(noun_to_readout(param$get("RowNoun")), y_hint), collapse=" "),
+          measure_name=paste(c(noun_to_readout(RowNoun), y_hint), collapse=" "),
           show_column_names=TRUE, cluster_columns = FALSE)
         do_plot(Reduce(`+`, pls),
                 label="Heatmap",
                 caption=paste0("Sorted heatmap on ", capt,  ". White for ", baseline_str),
                 plot_meta=section_hierarchy,
-                height_opt=paste0(
-                  "#| fig-height: ",
-                  mat_height 
-                )
+                height_opt=c(
+                  paste0("#| fig-height: [", 1.5*attr(pls[[1]], "predicted_height"), ",", attr(pls[[1]], "predicted_height") ,"]"),
+                  "#| out-height: 800px"),
                 )
         
         centroid_df[[plot_id]] <- cbind(cc, colDF(plot_se))[vis_sample,,drop=FALSE] %>%
@@ -599,8 +577,8 @@ for (dataset_id in names(ddsList$sample_sets)) {
         my_percent <- round(100 * my_pc$sdev^2/sum(my_pc$sdev^2))
         pc.df <- cbind(colDF(plot_se),
                         data.frame(
-                          PC1 = proj[, param$get("pc_x")],
-                          PC2 = proj[, param$get(if (nrow(this_assay) != 1) "pc_y" else "pc_x")], 
+                          PC1 = proj[, plot_config$extra$pc_x],
+                          PC2 = proj[, plot_config$extra[[if (nrow(this_assay) != 1) "pc_y" else "pc_x"]]], 
                           sample = rownames(colDF(plot_se))))
         aes_list <- substitute_x_aes(mapping)
         for (this_aes in aes_list) {
@@ -608,8 +586,8 @@ for (dataset_id in names(ddsList$sample_sets)) {
                       modifyList(this_aes, aes(x=PC1, y=PC2))) + 
             geom_point_interactive(size = 5, shape = 21) +
             facet_wrapper(mapping, this_aes) + 
-            xlab(paste0("PC ", param$get("pc_x"), ": ", my_percent[param$get("pc_x")], "% variance")) +
-            ylab(paste0("PC ", param$get("pc_y"), ": ", my_percent[param$get("pc_y")], "% variance"))
+            xlab(paste0("PC ", plot_config$extra$pc_x, ": ", my_percent[plot_config$extra$pc_x], "% variance")) +
+            ylab(paste0("PC ", plot_config$extra$pc_y, ": ", my_percent[plot_config$extra$pc_y], "% variance"))
           do_labels <- nrow(colDF(dataset$object)) < 10
           if (do_labels) {
             pl <- pl + geom_text_repel(aes(label = sample))
@@ -651,7 +629,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
           facet_wrapper(mapping, default=aes(facets = .derived), scales="free_y") + 
           theme_bw() +
           geom_point_interactive(aes(y= .derived.value), size = 3, shape = 21) +
-          labs(y=paste(c(noun_to_readout(param$get("RowNoun")), y_hint), collapse=" "))
+          labs(y=paste(c(noun_to_readout(RowNoun), y_hint), collapse=" "))
         pl <- pl + my_alpha_scale(pl)
         if ("group" %in% names(mapping)) {
           pl <- pl+geom_line(colour_aes, stat="summary", fun=mean)
@@ -684,18 +662,19 @@ for (dataset_id in names(ddsList$sample_sets)) {
 #| label: downloads
 
 iwalk(xl_files,
-     ~cat("\n\n<a class=\"download-excel btn btn-primary\" href=\"", attr(.x, "link"), "\"> Differential ",param$get("rowNoun")," for '", .y,"'</a>", sep="")
+     ~cat("\n\n<a class=\"download-excel btn btn-primary\" href=\"", attr(.x, "link"), "\"> Differential ",rowNoun," for '", .y,"'</a>", sep="")
      )
 
-fname <- write_clusters(all_clusters,
-                          mcols(ddsList[[1]]),
-                          p=params,
-                          prefix="differential-clusters")
-
-cat('\n\n<a class="download-excel btn btn-primary" href="',
-    attr(fname,"link"),
-    '">',param$get("RowNoun"),'-Cluster mappings</a>', sep="")
-
+if (length(all_clusters)>0) {
+  fname <- write_clusters(all_clusters,
+                         mcols(ddsList$sample_sets[[1]]$object),
+                         p=params,
+                         prefix="differential-clusters")
+  
+  cat('\n\n<a class="download-excel btn btn-primary" href="',
+      attr(fname,"link"),
+      '">',RowNoun,'-Cluster mappings</a>', sep="")
+}
 
 ```
 

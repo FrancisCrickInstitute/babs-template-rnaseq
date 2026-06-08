@@ -29,8 +29,8 @@ source("R/rnaseq.r")
 source("R/partial.r")
 source("R/output.r")
 source("R/helpers.r")
-param <- ParamList$new()
-param$set("RowNoun","Measure")
+RowNoun <- "Measure"
+rowNoun <- "measure"
 
 shiny_profile <- function(dds, plot_fml, row) {
 }
@@ -233,11 +233,10 @@ server <- function(input, output, session) {
                )),
       model_meta$variables)
     model_vars <- intersect(model_vars, names(colDF(dds)))
-    mat <- cached_partial()(dds, plot_fml, influence=dds$.influential$.influential)
+    mat <- cached_partial()(dds, plot_fml, influence=dds$.influential)
     pls <- hmap_fn(
       dds=dds[inds(),, drop=FALSE],
       mat=mat[inds(),, drop=FALSE],
-      param=param,
       cluster_transform=identity,
       model_vars = model_vars,
       plot_fml = plot_fml,
@@ -263,7 +262,7 @@ server <- function(input, output, session) {
     plot_fml <- metadata(dmc()[[input$dmc_d]][[input$dmc_m]]$comps[[1]])$model$profile_plots[[input$dmc_profile]]
     mapping <- eval(plot_fml[[2]])
     plotFrame <- as.data.frame(colData(dds))
-    this_assay <- cached_partial()(dds, plot_fml, influence=dds$.influential$.influential)
+    this_assay <- cached_partial()(dds, plot_fml, influence=dds$.influential)
     plotFrame$.derived.value <- this_assay[selected_row(),]
     flag_vars <- all.vars(mapping$flag)
     mapping <- modify_mapping(modifyList(mapping, aes(y=.derived.value, mask=NULL, cluster=NULL, rows=NULL)))

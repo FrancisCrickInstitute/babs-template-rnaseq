@@ -110,7 +110,7 @@ plot_tracker <- function(my_params) {
         text=c("```{r}",
                '#| label: fig-{{chunk_label}}',
                '#| fig-path: "{{script}}/{{fprefix}}-"',
-               '{{height_opt}}',
+               height_opt,
                'fn()',
                '```'),
         fprefix=sprintf("%0.3i",fig_n)
@@ -245,6 +245,7 @@ my_alpha_scale <- function(pl, decay=0.3) {
 sort_vars <- function(x, target) {
   targets <- all.vars(target)
   if (length(targets)!=0) {
+    x <- intersect(x, targets)
     x[order(match(x, targets))]
   } else {
     x
@@ -412,7 +413,7 @@ adapt_hclust_param <- function(param, zero_by=NULL) {
 }
 
 
-hmap_fn <- function(dds, mat, param, cluster_transform, gene_clust, model_vars, plot_config, measure_name, colour_saturates,  ...) {
+hmap_fn <- function(dds, mat, cluster_transform, gene_clust, model_vars, plot_config, measure_name, colour_saturates,  ...) {
   if ("visible" %in% names(plot_config$extra)) {
     vis_sample <- eval(plot_config$extra$visible, colDF(dds))
   } else {
@@ -431,12 +432,12 @@ hmap_fn <- function(dds, mat, param, cluster_transform, gene_clust, model_vars, 
     }
     col_fn <- sym_colour(masked[,colData(dds)$.influential], mx=colour_saturates)
     left_annotation <- NULL
-    if (param$get("cluster_unused_samples") == "ignore") {
+    if (plot_config$extra$cluster_unused_samples == "ignore") {
       ind <- ind[dds$.influential_in_assay]
     }
     mat_subset <- mat[, ind, drop=FALSE]
     dds_subset <- dds[, ind]
-    if (param$get("cluster_unused_samples") == "include") {
+    if (plot_config$extra$cluster_unused_samples == "include") {
       infl_ind_subset <- TRUE
     } else {
       infl_ind_subset <- dds_subset$.influential_in_assay %||% TRUE
@@ -448,42 +449,44 @@ hmap_fn <- function(dds, mat, param, cluster_transform, gene_clust, model_vars, 
       if (N_infl <=1) infl_ind_subset <- TRUE #Still one or fewer, so bundle them together
       N_infl <- length(mat_subset[1,][infl_ind_subset])#update
     }
+    if (N_infl >1 && "sample_clust" %in% plot_config) {
+      # Get the subset of data we're actually plotting
+      # cluster influential samples WITHIN this subset
+      infl_cluster <- bluster::clusterRows(
+        t(cluster_transform(mat_subset[, infl_ind_subset, drop=FALSE])),
+        adapt_hclust_param(plot_config$extra$sample_clust), full=TRUE
+      )$objects$hclust
+      if (all(infl_ind_subset)) {
+        cluster_columns <- infl_cluster
+      } else {
+        dfun <- adapt_hclust_param(plot_config$extra$sample_clust)@dist.fun %||% dist
+        D <- as.matrix(dfun(t(cluster_transform(mat_subset)), method = infl_cluster$dist.method))
+        # Extract distances: new samples (rows) to base samples (columns)
+        D_new <- D[!infl_ind_subset, infl_ind_subset, drop=FALSE]
+        D_among_new <- D[!infl_ind_subset, !infl_ind_subset, drop=FALSE]
+        # Insert non-influential samples into the dendrogram
+        cluster_columns <- insert_samples_into_dendrogram(
+          infl_cluster, 
+          D_new,
+          D_among_new,
+          infl_cluster$method,
+          column_names = colnames(mat_subset)
+        )
+      }
+    } else {
+      cluster_columns <- FALSE
+    }
+    rheight <- eval(plot_config$extra$row_height) %||% unit(1, "mm")
     defaults <- list(
       matrix=masked[,ind,drop=FALSE],
       column_title = column_title,
-      row_title = paste0(param$get("RowNoun"),"s"),
       col = col_fn,
-      cluster_columns = if (N_infl >1 && "sample_clust" %in% names(param$publish())) {
-        # Get the subset of data we're actually plotting
-        # cluster influential samples WITHIN this subset
-        infl_cluster <- bluster::clusterRows(
-          t(cluster_transform(mat_subset[, infl_ind_subset, drop=FALSE])),
-          adapt_hclust_param(param$get("sample_clust")), full=TRUE
-        )$objects$hclust
-        if (all(infl_ind_subset)) {
-          infl_cluster
-        } else {
-          dfun <- adapt_hclust_param(param$get("sample_clust"))@dist.fun %||% dist
-          D <- as.matrix(dfun(t(cluster_transform(mat_subset)), method = infl_cluster$dist.method))
-          # Extract distances: new samples (rows) to base samples (columns)
-          D_new <- D[!infl_ind_subset, infl_ind_subset, drop=FALSE]
-          D_among_new <- D[!infl_ind_subset, !infl_ind_subset, drop=FALSE]
-          # Insert non-influential samples into the dendrogram
-          insert_samples_into_dendrogram(
-            infl_cluster, 
-            D_new,
-            D_among_new,
-            infl_cluster$method,
-            column_names = colnames(mat_subset)
-          )
-        }
-      } else {
-        FALSE
-      },
       cluster_rows = if ("objects" %in% names(gene_clust)) gene_clust$objects$hclust else FALSE,
+      cluster_columns = cluster_columns,
       heatmap_legend_param = list(direction = "horizontal"),
       left_annotation=left_annotation,
       row_split=gene_clust$cluster,
+      height= rheight *  nrow(masked),
       top_annotation = ComplexHeatmap::HeatmapAnnotation(
         df = as.data.frame(colData(dds))[ind, model_vars, drop=FALSE], 
         col = metadata(colData(dds))$palette$Heatmap[model_vars],
@@ -492,7 +495,8 @@ hmap_fn <- function(dds, mat, param, cluster_transform, gene_clust, model_vars, 
       ), 
       show_heatmap_legend=first,
       show_row_names = FALSE,
-      show_column_names = ncol(dds)<=12)
+      show_column_names = ncol(dds)<=12
+    )
     row_behaviour <- plot_config$extra$sort %||% NA
     if (row_behaviour %in% names(mcols(dds)$results)) {
       defaults$row_order <- order(mcols(dds)$results[[row_behaviour]])
@@ -503,8 +507,34 @@ hmap_fn <- function(dds, mat, param, cluster_transform, gene_clust, model_vars, 
     if (row_behaviour %in% paste0("+", names(mcols(dds)$results))) {
       defaults$row_dend_reorder <- mcols(dds)$results[[sub("^\\+", "", row_behaviour)]]
     }
-    if (first) defaults$name <- measure_name
-    do.call(ComplexHeatmap::Heatmap, modifyList(defaults, args))
+    if (first) {
+      defaults$name <- measure_name
+      pre_size <- expand.grid(mat_row=c(10,20), anno_row=1:2)
+      pre_size$y <- 0.0
+      for (i in 1:nrow(pre_size)) {
+        tmp_args <- modifyList(defaults, args)
+        tmp_args$matrix <- tmp_args$matrix[rep(1, pre_size$mat_row[i]),]
+        tmp_args$height <- rheight * nrow(tmp_args$matrix)
+        tmp_args$row_split <- NULL
+        tmp_args$cluster_rows <- FALSE
+        tmp_args$top_annotation <- ComplexHeatmap::HeatmapAnnotation(
+          df = as.data.frame(colData(dds))[ind, model_vars, drop=FALSE][,rep(1, pre_size$anno_row[i]),drop=FALSE], 
+          show_legend=FALSE,
+          show_annotation_name=last
+        )
+        hm <- do.call(ComplexHeatmap::Heatmap, tmp_args)
+        pdf(NULL)
+        ht_height = sum(component_height(draw(hm, heatmap_legend_side = "bottom"))) + unit(4, "mm")
+        dev.off()
+        pre_size$y[i] <- convertHeight(ht_height, "inch", valueOnly = TRUE)
+      }
+      size_fit <- lm(y ~ mat_row + anno_row, data=pre_size)
+    }
+
+    structure(
+      do.call(ComplexHeatmap::Heatmap, modifyList(defaults, args)),
+      predicted_height= predict(size_fit,data.frame(mat_row=nrow(defaults$matrix), anno_row=length(model_vars)))
+    )
   }
   if ("cols" %in% names(plot_config$extra)) {
     col_split <- rlang::eval_tidy(eval(plot_config$extra)$cols, colDF(dds))
@@ -520,7 +550,6 @@ hmap_fn <- function(dds, mat, param, cluster_transform, gene_clust, model_vars, 
                column_title=names(splits),
                args=list(list(...))
                )
-  
 }
 
 

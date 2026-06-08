@@ -49,6 +49,9 @@ dmc_heading <- function(obj, hierarchy,  depth="##", numbered=TRUE, describe=TRU
     } else {
       text <- paste0(fml, "\n\n")
     }
+    text <- paste(text,
+                 describe_for_dmc(obj$sample_sets[[dataset]]$models[[model]]$profile_plots[[plot]]$extra), sep="\n\n")
+    text
   } else if (!is.null(comparison)) {
     ## Doing a comparison
     comparisons <- obj$sample_sets[[dataset]]$models[[model]]$comparisons
@@ -147,10 +150,10 @@ profile_to_string <- function(plot_config) {
   )
   parts <- lapply(
     intersect(names(plot_config$extra), names(extras)),
-    function(v) paste0(extras[[v]],  ifelse(is_formula(plot_config$extra[[v]]), rlang::as_label(plot_config$extra[[v]]), paste(plot_config$extra[[v]], collape=",")))
+    function(v) paste0(extras[[v]],  ifelse(is_formula(plot_config$extra[[v]]), rlang::as_label(plot_config$extra[[v]]), paste(plot_config$qextra[[v]], collape=",")))
   )
                 
-  out <- paste0(out, "\n\nOptions:\n\n", paste0("- ", parts, collapse="\n"), "\n\n")
+  out <- paste0(out, "\n\nOptions:\n\n", paste0("- ", parts, collapse="\n"))
   recon <- paste(deparse(as.formula(attr(fml, "src"))[[3]]), collapse="")
   if (recon==".") {
     out

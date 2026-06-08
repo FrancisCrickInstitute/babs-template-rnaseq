@@ -47,113 +47,119 @@ console.log(stringify(quarto, {lineWidth: -1}).replace(/\n$/, ''));
 function expandAxesForNav(axes, staging) {
     const flatList = [];
 
-    function recurse(keys, prefix={}) {
-	if (keys.length === 0) {
-	    const fname =
-		  Object.keys(prefix).reverse().map(k => prefix[k]).filter(v => v != null && v !== "").join("_") + ".qmd";
-	    
-	    const nav = qmd2nav(fname, staging, Object.keys(prefix));
-	    if (nav) {
-		flatList.push(nav.href);
-		return [nav];
-	    }
-	    return [];
-	}
+function recurse(keys, prefix = {}) {
+    if (keys.length === 0) {
+        const fname =
+            Object.keys(prefix)
+                .reverse()
+                .map((k) => prefix[k])
+                .filter((v) => v != null && v !== "")
+                .join("_") + ".qmd";
 
-	const [currentKey, ...restKeys] = keys;
-	const values = axes[currentKey];
-	var results = [];
-
-	for (const val of values) {
-	    const nodePrefix = { ...prefix, [currentKey]: val };
-	    const children = recurse(restKeys, nodePrefix);
-
-	    if (children.length > 0) {
-		if (val === null) {
-		    // Flatten null branch
-		    results.push(...children);
-		} else {
-		    // Use params from first child for section label
-		    const nameVal = children.reduce((found, child) =>
-			found || child.params?.[currentKey + "name"] || null, null
-		    );
-		    // capture specname (non-empty) before params are deleted
-		    const nonEmptyNameVal = nameVal || null;
-		    
-		    let label = capitalizeFirstLetter(
-			nonEmptyNameVal ||
-			    children[0].params?.[currentKey] ||
-			    val
-		    );
-		    
-		    const filteredParams = Object.fromEntries(
-			[currentKey, ...Object.keys(prefix)]
-			    .flatMap(k => {
-				const sourceForK     = children.find(c => k in (c.params || {}) && c.params[k] !== '');
-				const sourceForKName = children.find(c => (k+"name") in (c.params || {}) && c.params[k+"name"] !== '');
-				const entries = [];
-				if (sourceForK)     entries.push([k, sourceForK.params[k]]);
-				if (sourceForKName) entries.push([k+"name", sourceForKName.params[k+"name"]]);
-				return entries;
-			    })
-		    );
-		    
-		    // only delete params AFTER filteredParams is built
-		    children.forEach(child => {
-    delete child.params;
-		    });
-		    if (
-		        children.length === 1 &&
-			    children[0] &&
-			    typeof children[0].href === "string" &&
-			    typeof children[0].text === "string" &&
-			    !("section" in children[0])
-		    ) {
-			results.push({
-			    ...children[0],
-			    params: filteredParams
-			});
-		    } else {
-			
-			results.push({
-			    section: (quarto?._prefixes?.[currentKey] ?? "") + label + ":",
-			    contents: children,
-			    params: filteredParams
-			});
-		    }
-		}
-	    }
-	}
-	const sectionNodes = results.filter(item => "section" in item);
-	// Only collapse structural wrapper if it is a pure passthrough
-	if (sectionNodes.length === 1 && results.length === 1) {
-	    const only = sectionNodes[0];
-	    
-	    // Collapse only if the section adds no real grouping value
-	    if (Array.isArray(only.contents)) {
-		results = only.contents;
-	    }
-	}
-	// If this axis has only one non-null value,
-	// promote its section contents upward
-	if (
-	    values.filter(v => v !== null).length === 1
-	) {
-	    const promoted = [];
-	    for (const item of results) {
-		if (item.section && Array.isArray(item.contents)) {
-		    promoted.push(...item.contents);
-		} else {
-		    promoted.push(item);
-		}
-	    }
-	    results = promoted;
-	}
-	// results.forEach(child => {
-	//     delete child.params;
-	// });
-	return results;
+        const nav = qmd2nav(fname, staging, Object.keys(prefix));
+        if (nav) {
+            flatList.push(nav.href);
+            return [nav];
+        }
+        return [];
     }
+
+    const [currentKey, ...restKeys] = keys;
+    const values = axes[currentKey];
+    let results = [];
+
+    for (const val of values) {
+        const nodePrefix = { ...prefix, [currentKey]: val };
+        const children = recurse(restKeys, nodePrefix);
+
+        if (children.length > 0) {
+            if (val === null) {
+                // Flatten null branch
+                results.push(...children);
+            } else {
+                const nameVal = children.reduce(
+                    (found, child) =>
+                        found || child.params?.[currentKey + "name"] || null,
+                    null
+                );
+
+                let label = capitalizeFirstLetter(
+                    nameVal ||
+                        children[0].params?.[currentKey] ||
+                        val
+                );
+
+                const filteredParams = Object.fromEntries(
+                    [currentKey, ...Object.keys(prefix)]
+                        .flatMap((k) => {
+                            const sourceForK = children.find(
+                                (c) =>
+                                    k in (c.params || {}) &&
+                                    c.params[k] !== ""
+                            );
+                            const sourceForKName = children.find(
+                                (c) =>
+                                    k + "name" in (c.params || {}) &&
+                                    c.params[k + "name"] !== ""
+                            );
+                            const entries = [];
+                            if (sourceForK)
+                                entries.push([k, sourceForK.params[k]]);
+                            if (sourceForKName)
+                                entries.push([
+                                    k + "name",
+                                    sourceForKName.params[k + "name"],
+                                ]);
+                            return entries;
+                        })
+                );
+
+                // only delete params AFTER filteredParams is built
+                children.forEach((child) => {
+                    delete child.params;
+                });
+
+                if (
+                    children.length === 1 &&
+                    children[0] &&
+                    typeof children[0].href === "string" &&
+                    typeof children[0].text === "string" &&
+                    !("section" in children[0])
+                ) {
+                    results.push({
+                        ...children[0],
+                        params: filteredParams,
+                    });
+                } else {
+                    results.push({
+                        section:
+                            (quarto?._prefixes?.[currentKey] ?? "") +
+                            label +
+                            ":",
+                        contents: children,
+                        params: filteredParams,
+                    });
+                }
+            }
+        }
+    }
+
+    // Collapse condition: If an axis has only one non-null unique value, promote children
+    const nonNullValues = values.filter((v) => v !== null);
+    if (nonNullValues.length === 1) {
+        const promoted = [];
+        for (const item of results) {
+            if (item.section && Array.isArray(item.contents)) {
+                promoted.push(...item.contents);
+            } else {
+                promoted.push(item);
+            }
+        }
+        results = promoted;
+    }
+
+    return results;
+}
 
     const navTree = recurse(Object.keys(axes).filter(k => k !=="_prefixes"));
     return { navTree, flatList };

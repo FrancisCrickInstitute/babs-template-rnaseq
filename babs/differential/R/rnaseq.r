@@ -26,7 +26,7 @@ load_specs <- function(file="", context) {
     list_obj("model", envir=e)
     list_obj("specification", envir=e)
     list_obj("extra_assay", envir=e)
-    list_obj("profile_plot", envir=e, post=function(x) {x$section <- x$section %||% "all"; x} )
+    list_obj("profile_plot", envir=e, post=function(x) {if (is.list(x)) x else list(x)} )
     list_obj("comparison", envir=e, post=function(x) {if (is_formula(x[[1]]) && length(x[[1]])==3) do.call(mult_comp, x) else x})
 
     # List wrappers - either evaluating or not
@@ -87,7 +87,7 @@ load_specs <- function(file="", context) {
       specs <- wrap_exposed(specs, singleton)
     }
     assign("sample_set", expression, envir=e) # avoid evaluating any examples sample_sets.
-    pkg_defaults <-default_spec_settings()
+    pkg_defaults <-default_settings()
     new_settings <- setdiff(names(pkg_defaults), names(specs$settings))
     if (length(new_settings)>0) {
       string_rep <- lapply(pkg_defaults[new_settings], deparse1)
@@ -183,8 +183,7 @@ default_namer <- function() {
 #' @export
 build_dds_list <- function(dds, spec) {
   # Function to recurse down the spec > sample_sets > models > comparisons hierarchy, and cascade down values of a given field as it encounters them.
-  trickle_down <- function(field, to="comparisons", default=NULL, merge_fn=function(x,y) {if (is.null(x)) y else x}, obj=spec, current_level="spec"){
-    levels <- c("spec", "sample_sets", "models", "comparisons")
+  trickle_down <- function(field, to="comparisons", default=NULL, merge_fn=function(x,y) {if (is.null(x)) y else x}, obj=spec, current_level="spec", levels=c("spec", "sample_sets", "models", "comparisons")) {
     if (field %in% names(obj)) {
       default_src <- attr(default, "src")
       default <- merge_fn(obj[[field]], default)
@@ -199,7 +198,7 @@ build_dds_list <- function(dds, spec) {
     }
     next_level <- levels[match(current_level, levels) + 1] 
     obj[[next_level]] <- mapply(
-      function(x) trickle_down(field=field, to=to, default=default, merge_fn=merge_fn, obj=x, current_level=next_level),
+      function(x) trickle_down(field=field, to=to, default=default, merge_fn=merge_fn, obj=x, current_level=next_level, levels=levels),
       obj[[next_level]],
       SIMPLIFY=FALSE
     )
@@ -222,11 +221,21 @@ build_dds_list <- function(dds, spec) {
   spec <- trickle_down(field="varDescriptions", to="sample_sets", merge_fn=modifyList, default=list())
   spec <- trickle_down(field="filterFeatures", to="sample_sets", default=spec$settings$filterFeatures)
   spec <- trickle_down(field="filterQC", to="sample_sets", default=spec$settings$filterQC)
+  spec <- trickle_down(field="baseMeanMin", to="sample_sets", default=spec$settings$baseMeanMin)
   spec <- trickle_down(field="feature_filters", to="sample_sets", default=alist(universal=TRUE))
   spec <- trickle_down(field="impute", to="sample_sets", default=spec$settings$impute)
   spec <- trickle_down(field="normalise", to="sample_sets", default=spec$settings$normalise)
   spec <- trickle_down(field="external_list", to="models", default=NULL)
   spec <- trickle_down(field="extra_assays", to="sample_sets", default=NULL)
+  ## Comparison-specific stuff
+  spec <- trickle_down(field="alpha", to="comparisons", default=spec$settings$alpha)
+  spec <- trickle_down(field="lfcThreshold", to="comparisons", default=spec$settings$lfcThreshold)
+  spec <- trickle_down(field="LRT_effect", to="comparisons", default=spec$settings$LRT_effect)
+  spec <- trickle_down(field="filterFun", to="comparisons", default=spec$settings$filterFun)
+  
+  ## Cascade down any plot-specific stuff
+  spec <- trickle_down(field="extra", to="profile_plots", levels=c("spec", "sample_sets", "models", "profile_plots"), merge_fn=modifyList, default=default_plot_extra())
+  
   modelled_terms <- lapply(
     spec$sample_sets,
     function(x) {lapply(
@@ -241,9 +250,6 @@ build_dds_list <- function(dds, spec) {
       })
     })
   modelled_terms <-  setdiff(unique(unlist(modelled_terms)), ".")
-  if (!"palette" %in% names(spec$settings)) {
-    spec$settings$palette <- "Set1"
-  }
   if (is.list(spec$settings$palette)) {
     default_palette <- spec$settings$palette
   } else {
@@ -446,7 +452,7 @@ build_dds_list <- function(dds, spec) {
 #' @return
 #' @author Gavin Kelly
 #' @export
-fit_models <- function(dmc, inds, param, ...) {
+fit_models <- function(dmc, inds, ...) {
   di <- inds[[1]]
   sampleset <- dmc$sample_sets[[di]]
   has_comparisons <- sapply(sampleset$models, function(m) length(m$comparisons) > 0)
@@ -504,7 +510,7 @@ get_design_matrix <- function(dds) {
 fit_comparison <- function(model, comparison_ind, ...) {
   comparison <- model$comparisons[[comparison_ind]]
   approach <- dplyr::case_when(
-    comparison$LRT %||% FALSE             ~ "wald2LRT",
+    comparison[["LRT"]] %||% FALSE             ~ "wald2LRT",
     !is.null(model$approach)                ~  model$approach %||% "",
     inherits(comparison, "post_hoc") && inherits(model$object, "DESeqDataSet") ~ "multiWald",
     inherits(comparison, "post_hoc") ~ "limma",
@@ -895,15 +901,16 @@ fitConstrastLRT <- function(mdl, contr, ...) {
 #' @return 
 #' @author Gavin Kelly
 #' @export
-get_result <- function(dmc, inds, mcols=c("symbol", "entrez"), filterFun=IHW::ihw, lfcThreshold=0, alpha=0.1, LRT_effect="default", ...) {
-  if (is.null(filterFun)) filterFun <- rlang::missing_arg()
+get_result <- function(dmc, inds, mcols=c("symbol", "entrez"), ...) {
   di <- inds[[1]]
   mi <- inds[[2]]
   ci <- inds[[3]]
   dataset <- dmc$sample_sets[[di]]
   model <- dataset$models[[mi]]
   comparison <- model$comparisons[[ci]]
+  filterFun <- eval(comparison$filterFun) %||% rlang::missing_arg()
   comp <- comparison$comparison
+  alpha <- comparison$alpha
   if (length(alpha)>1) {
     alpha <- sort(alpha)
     alpha1 <- alpha[1]
@@ -932,10 +939,10 @@ get_result <- function(dmc, inds, mcols=c("symbol", "entrez"), filterFun=IHW::ih
   } else {  # Wald
     fitted_se <- model$object
     if (is.character(comp) && length(comp)==1) { #  it's a name
-      r <- DESeq2::results(fitted_se, filterFun=filterFun, lfcThreshold=lfcThreshold, name=comp, alpha=alpha1, ...)
+      r <- DESeq2::results(fitted_se, filterFun=filterFun, lfcThreshold=comparison$lfcThreshold, name=comp, alpha=alpha1, ...)
     } else { # it's a contrast
       if (is.list(comp) && "listValues" %in% names(comp)) {
-        r <- DESeq2::results(fitted_se, filterFun=filterFun, lfcThreshold=lfcThreshold, contrast=comp[names(comp) != "listValues"], listValues=comp$listValues, alpha=alpha1, ...)
+        r <- DESeq2::results(fitted_se, filterFun=filterFun, lfcThreshold=comparison$lfcThreshold, contrast=comp[names(comp) != "listValues"], listValues=comp$listValues, alpha=alpha1, ...)
       } else {
         if ("lmfit" %in% names(model)) {
           r <- limma::topTable(comparison$ebayes, coef=comparison$comparison,
@@ -953,7 +960,7 @@ get_result <- function(dmc, inds, mcols=c("symbol", "entrez"), filterFun=IHW::ih
                                 row.names=row.names(fitted_se)))
           metadata(r)$alpha <- alpha1
         } else {
-          r <- DESeq2::results(fitted_se, filterFun=filterFun, lfcThreshold=lfcThreshold, contrast=comp, alpha=alpha1, ...)
+          r <- DESeq2::results(fitted_se, filterFun=filterFun, lfcThreshold=comparison$lfcThreshold, contrast=comp, alpha=alpha1, ...)
         }
       }
     }
@@ -982,7 +989,7 @@ get_result <- function(dmc, inds, mcols=c("symbol", "entrez"), filterFun=IHW::ih
     r$class[is.na(r$padj) | is.na(r$pvalue) | r$baseMean==0] <- NA
     term <-  comparison$LRTterms
     # take the biggest fold-change vs baseline, for MA and reporting?
-    if (all(term %in% names(mcols(fitted_se))) && LRT_effect!="none") {
+    if (all(term %in% names(mcols(fitted_se))) && comparison$LRT_effect!="none") {
       effect_matrix <- cbind(I=rep(0, nrow(fitted_se)),as.matrix(mcols(fitted_se)[,term,drop=FALSE]))
       split_effects <- strsplit(term, "_vs_")
       # if a main effect is dropped, then all the terms are probably named A vs (intercept)
@@ -1380,7 +1387,7 @@ replace_emmc <- function(expr, replacements, prefix="my") {
 
 
 #' @export
-removeLow <- function(dmc, preserve_across=TRUE, baseMeanMin = -Inf) {
+removeLow <- function(dmc, preserve_across=TRUE) {
   if (preserve_across) {
     per_dataset <- leaf_modify(
       dmc,
@@ -1401,14 +1408,13 @@ removeLow <- function(dmc, preserve_across=TRUE, baseMeanMin = -Inf) {
         leaf
       }, layers="sample_sets")
   }
-  if (baseMeanMin>0) {
-    dmc <- leaf_modify(
-      dmc,
-      function(leaf, layers) {
-        if (inherits(leaf$object, "DESeqDataSet")) leaf$object <- leaf$object[rowMeans(counts(leaf$object, normalized=TRUE)) >= baseMeanMin,]
-        leaf
-      }, layers="sample_sets")
-  }
+  
+  dmc <- leaf_modify(
+    dmc,
+    function(leaf, layers) {
+      if (inherits(leaf$object, "DESeqDataSet")) leaf$object <- leaf$object[rowMeans(counts(leaf$object, normalized=TRUE)) >= leaf$baseMeanMin,]
+      leaf
+    }, layers="sample_sets")
   dmc
 }
 
@@ -1661,7 +1667,7 @@ summarise_filters <- function(obj) {
 get_in_section <- function(lst, sections) {
   ind <- sapply(
     lst,
-    function(item)  item$section %in% sections %||% TRUE
+    function(item)  item$extra$section %in% sections %||% TRUE
   )
   lst[ind]
 }

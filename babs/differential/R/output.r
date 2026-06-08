@@ -120,7 +120,7 @@ pval_df <- function(obj, inds) {
 #' @return A list of file paths to the excel files
 #' @author Gavin Kelly
 #' @export
-write_results <- function(dmc, param, params, assays=NULL) {
+write_results <- function(dmc, params, assays=NULL) {
   si <- session_info()
   crick_colours <-list(
     primary=list(red="#e3001a",yellow="#ffe608",blue="#4066aa",green="#7ab51d",purple="#bb90bd"),
@@ -134,15 +134,18 @@ write_results <- function(dmc, param, params, assays=NULL) {
   summaries <- nested_modify(dmc, summarise_results)
   summaries <- Reduce(rbind, flatten_nest(summaries, function(x) x$summary))
   
-  out <- lapply(dmc, function(x) "")
+  out <- lapply(dmc$sample_sets, function(x) "")
   for (dataset_id in names(dmc$sample_sets)) {
     dataset <- dmc$sample_sets[[dataset_id]]
     wb <- openxlsx::createWorkbook(title="Differential Analysis",
                                   creator="BABS")
-    tmp <- param$describe()
     sn <- "Parameters"
     addWorksheet(wb, sn)
-    writeData(wb, sn,  data.frame(id=names(tmp), description=unlist(tmp)), rowNames=FALSE, colNames=TRUE)
+    writeData(wb, sn,
+              data.frame(
+                id=names(ddsList$settings),
+                description=sapply(ddsList$settings, function(x) if (is.null(x)) "Null" else attr(x, "src")), rowNames=FALSE, colNames=TRUE)
+              )
     ## Design
     sn <- "Design"
     addWorksheet(wb, sn)
@@ -177,7 +180,6 @@ write_results <- function(dmc, param, params, assays=NULL) {
         }
         dframe <- dframe %>%
           tibble::rownames_to_column("id") %>%
-#          dplyr::filter(padj<param$get("alpha")) %>%
           dplyr::arrange(desc(abs(shrunkLFC))) %>%
           dplyr::select(-padj)
         if (length(dataset$models)==1) {
@@ -468,7 +470,8 @@ sample_X_dataset_table <- function(dds, obj) {
     cols_label(.list=clabel) %>%
     tab_spanner(label="Metadata",
                 columns=seq_along(samp)) %>%
-    Reduce(f=function(gti, x) tab_spanner(gti, label=x$name,columns=x$cols + ncol(samp)), x=ts_extra, init=.)
+    Reduce(f=function(gti, x) tab_spanner(gti, label=x$name,columns=x$cols + ncol(samp)), x=ts_extra, init=.) %>%
+    opt_interactive(page_size_default=25)
 }
 
 #' @export
