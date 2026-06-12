@@ -82,7 +82,7 @@ if (isTRUE(getOption('knitr.in.progress'))) {
 #| label: read-expl
 #| error: FALSE
 
-data(list=paste0("counts_", params$alignment))
+data(list=paste0("counts_", params$data_source))
 is_des <- inherits(dds, "DESeqDataSet")
 
 
@@ -91,10 +91,10 @@ if (!is.null(metadata(dds)$organism$org)) {
 }
 
 specs   <- load_specs(file=paste0(params$spec, ".spec"), context=dds)
-align_params <- get_align_params(params$alignment)
-rowNoun <- align_params$rowNoun %||% "gene"
+data_source_params <- get_data_source_params(params$data_source)
+rowNoun <- data_source_params$rowNoun %||% "gene"
 RowNoun <- stringr::str_to_title(rowNoun)
-if ("missing" %in% names(align_params)) {
+if ("missing" %in% names(data_source_params)) {
   attr(rowNoun, "readout") <- "missingness"
   attr(RowNoun, "readout") <- "Missingness"
 }
@@ -190,7 +190,7 @@ for (aname in anames) {
 }
 
 save(ddsList,
-     file=file.path("data",paste0("ddsList_", params$alignment, "_", params$spec, ".rda")))
+     file=file.path("data",paste0("ddsList_", params$data_source, "_", params$spec, ".rda")))
 
 ```
 

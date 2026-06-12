@@ -37,4 +37,4 @@ code-summary: "Show the code"
 concise: false
 _prefixes:
   spec: ⚙
-  alignment: 📁
+  data_source: 📁

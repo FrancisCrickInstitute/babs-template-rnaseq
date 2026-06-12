@@ -8,8 +8,8 @@
 
 res_dir = $(RESULTS_DIR)/$(VERSION)
 file_col = $(metadata_id_column)
-metadata = $(my_metadata)_$(alignment).csv
-counts =  $(my_counts_dir)/$(alignment)/
+metadata = $(my_metadata)_$(data_source).csv
+counts =  $(my_counts_dir)/$(data_source)/
 
 ## Let later processes know which of those to include in every section -
 ## variable _names_ need to be stored in the `param_names` variable:
@@ -34,6 +34,6 @@ sections=00_init 01_exploratory 02_differential 03_enrichment
 ## for 'make pages' we can specify a `section`_parent variable
 ################################################################
 
-01_exploratory_parent = 00_init_$(ialign)
-02_differential_parent = 01_exploratory_$(ispec)_$(ialign)
-03_enrichment_parent = 02_differential_$(ispec)_$(ialign)
+01_exploratory_parent = 00_init_$(idata)
+02_differential_parent = 01_exploratory_$(ispec)_$(idata)
+03_enrichment_parent = 02_differential_$(ispec)_$(idata)

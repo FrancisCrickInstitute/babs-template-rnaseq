@@ -113,13 +113,13 @@ choose_staging <- function(resource, staging="staging") {
 
 
 #' @export
-get_align_params <- function(name) {
+get_data_source_params <- function(name) {
   my_config <- readLines(paste0(file.path("extdata", name), ".config"))
-  align_params <- strsplit(sub(paste0("^", name, "\\."),
+  data_source_params <- strsplit(sub(paste0("^", name, "\\."),
                               "",
                               my_config), "=")
-  names(align_params) <- sapply(align_params, "[", 1)
-  lapply(align_params, function(x) sub("*#.*$", "", x[[2]]))
+  names(data_source_params) <- sapply(data_source_params, "[", 1)
+  lapply(data_source_params, function(x) sub("*#.*$", "", x[[2]]))
 }
 
 noun_to_readout <- function(noun) {

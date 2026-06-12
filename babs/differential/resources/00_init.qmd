@@ -36,42 +36,42 @@ if (!isTRUE(getOption('knitr.in.progress'))) {
   gt(list2df(params))
 }
 
-align_params <- get_align_params(params$alignment)
-align_params$keytype <- align_params$keytype %||% "ENSEMBL"
+data_source_params <- get_data_source_params(params$data_source)
+data_source_params$keytype <- data_source_params$keytype %||% "ENSEMBL"
 
-organism <- list(org=align_params$org.db)
+organism <- list(org=data_source_params$org.db)
 if (!is.null(organism$org)) {
   if (!requireNamespace(organism$org, quietly=TRUE)) renv::install(paste0("bioc::", organism$org), lock=TRUE)
 }
 
-if (file.exists(file.path("results", paste0("multiqc-", params$alignment)))) {
+if (file.exists(file.path("results", paste0("multiqc-", params$data_source)))) {
   cat("\n\n## MultiQC\n\n")
-  cat('\n\n[MultiQC report for ', params$alignment, '](../multiqc-', params$alignment, '/multiqc_report.html){target="_blank"}\n\n', sep="")
+  cat('\n\n[MultiQC report for ', params$data_source, '](../multiqc-', params$data_source, '/multiqc_report.html){target="_blank"}\n\n', sep="")
 }
 ```
 
 
 ```{r}
 #| label: make
-preprocessor <- file.path("extdata", align_params$makefile %||%  paste0(params$alignment, ".mk"))
+preprocessor <- file.path("extdata", data_source_params$makefile %||%  paste0(params$data_source, ".mk"))
 if (file.exists(preprocessor)) {
-  system2("make", c("-f", preprocessor, align_params$target))
+  system2("make", c("-f", preprocessor, data_source_params$target))
 }
 ```
 
 ```{r}
 #| label: rda
 
-preprocessed <- file.path("extdata", align_params$rda %||%  paste0(params$alignment, ".rda"))
+preprocessed <- file.path("extdata", data_source_params$rda %||%  paste0(params$data_source, ".rda"))
 if (file.exists(preprocessed)) {
   cat("\n\n## Loading data from a pre-generated 'rda' binary object\n\n")
-  print(gt(list2df(c('Data-source Type'="Binary RDA", File=preprocessed, align_params))))
+  print(gt(list2df(c('Data-source Type'="Binary RDA", File=preprocessed, data_source_params))))
   objNames <- load(preprocessed)
   is_ok <- sapply(objNames, function(x) class(get(x))=="DESeqDataSet")
   if (any(is_ok)) {
     if (length(which(is_ok))>1) warning(preprocessed, " contains many DESeqDataSet objects, only using ", objnames[is_ok][1])
     dds <- get(objNames[is_ok][1])
-    dds <- add_org_annotation(dds, organism$org, keytype=align_params$keytype, count_source=params$count_source)
+    dds <- add_org_annotation(dds, organism$org, keytype=data_source_params$keytype, count_source=params$count_source)
   } else {
     is_ok <- sapply(objNames, function(x) is(get(x),"SummarizedExperiment"))
     if (!any(is_ok)) {
@@ -81,15 +81,15 @@ if (file.exists(preprocessed)) {
     dds <- get(objNames[is_ok][1])
     assay(dds)[is.nan(assay(dds))] <- NA
     if (is.null(assayNames(dds))) {
-      assayNames(dds)[1] <- align_params$rowNoun %||% "assay"
+      assayNames(dds)[1] <- data_source_params$rowNoun %||% "assay"
     }
     if (any(is.na(assay(dds)))) dds$'.percentNA' <- 100 *apply(is.na(assay(dds)), 2, mean)
   }
   if (!"symbol" %in% names(mcols(dds))) {
-    mcols(dds)$symbol <- mcols(dds)[[align_params$symbolColumn %||% 1]]
+    mcols(dds)$symbol <- mcols(dds)[[data_source_params$symbolColumn %||% 1]]
   }
-  save(dds, file=file.path("data",paste0("counts_", params$alignment, ".rda")))
-  saveRDS(dds, file=file.path("data",paste0("counts_", params$alignment, ".rds")))
+  save(dds, file=file.path("data",paste0("counts_", params$data_source, ".rda")))
+  saveRDS(dds, file=file.path("data",paste0("counts_", params$data_source, ".rds")))
   knitr::knit_exit()
 }
 ```
@@ -98,13 +98,13 @@ if (file.exists(preprocessed)) {
 ```{r}
 #| label: rds
 
-preprocessed <- file.path("extdata", align_params$rds %||% paste0(params$alignment, ".rds"))
+preprocessed <- file.path("extdata", data_source_params$rds %||% paste0(params$data_source, ".rds"))
 if (file.exists(preprocessed)) {
   cat("\n\n## Loading data from a pre-generated 'rds' binary object\n\n")
-  print(gt(list2df(c('Data-source Type'="Binary RDS", File=preprocessed, align_params))))
+  print(gt(list2df(c('Data-source Type'="Binary RDS", File=preprocessed, data_source_params))))
   obj <- readRDS(preprocessed)
   if (is(obj, "DESeqDataSet")) {
-    dds <- add_org_annotation(obj, organism$org, keytype=align_params$keytype, count_source=params$count_source)
+    dds <- add_org_annotation(obj, organism$org, keytype=data_source_params$keytype, count_source=params$count_source)
   } else if (is(obj,"SummarizedExperiment")) {
     dds <- obj
   } else {
@@ -112,14 +112,14 @@ if (file.exists(preprocessed)) {
   }
   assay(dds)[is.nan(assay(dds))] <- NA
   if (is.null(assayNames(dds))) {
-    assayNames(dds)[1] <- align_params$rowNoun %||% "assay"
+    assayNames(dds)[1] <- data_source_params$rowNoun %||% "assay"
   }
   if (any(is.na(assay(dds)))) dds$'.percentNA' <- 100 *apply(is.na(assay(dds)), 2, mean)
   if (!"symbol" %in% names(mcols(dds))) {
-    mcols(dds)$symbol <- mcols(dds)[[align_params$symbolColumn %||% 1]]
+    mcols(dds)$symbol <- mcols(dds)[[data_source_params$symbolColumn %||% 1]]
   }
-  save(dds, file=file.path("data",paste0("counts_", params$alignment, ".rda")))
-  saveRDS(dds, file=file.path("data",paste0("counts_", params$alignment, ".rds")))
+  save(dds, file=file.path("data",paste0("counts_", params$data_source, ".rda")))
+  saveRDS(dds, file=file.path("data",paste0("counts_", params$data_source, ".rds")))
   knitr::knit_exit()
 }
 ```
@@ -164,7 +164,7 @@ if (all(is.na(sample_sheet[[file_col]]))) {
     'Data-source Type'="Random Simulation",
     'Basis of simulation'=params$metadata,
     'Column of names'=name_col,
-    align_params))))
+    data_source_params))))
 
   dds <- DESeqDataSetFromMatrix(
     countData=matrix(
@@ -175,9 +175,9 @@ if (all(is.na(sample_sheet[[file_col]]))) {
     design=~1,
     )
   colnames(dds) <- as.character(dds[[name_col]])
-  dds <- add_org_annotation(dds, organism$org, keytype=align_params$keytype, count_source=params$count_source)
-  save(dds, file=file.path("data",paste0("counts_", params$alignment, ".rda")))
-  saveRDS(dds, file=file.path("data",paste0("counts_", params$alignment, ".rds")))
+  dds <- add_org_annotation(dds, organism$org, keytype=data_source_params$keytype, count_source=params$count_source)
+  save(dds, file=file.path("data",paste0("counts_", params$data_source, ".rda")))
+  saveRDS(dds, file=file.path("data",paste0("counts_", params$data_source, ".rds")))
   knitr::knit_exit()
 }
 ```
@@ -187,12 +187,12 @@ if (all(is.na(sample_sheet[[file_col]]))) {
 #| label: csv
 
 ## If a csv file, use sample_sheet to distinguish assay columns from roweData columns
-missing <- "missing" %in% names(align_params)
+missing <- "missing" %in% names(data_source_params)
 
 if (missing) {
-  csv <- file.path("extdata", paste0(align_params$missing, ".csv"))
+  csv <- file.path("extdata", paste0(data_source_params$missing, ".csv"))
 } else {
-  csv <- file.path("extdata", paste0(align_params$csv %||% params$alignment, ".csv"))
+  csv <- file.path("extdata", paste0(data_source_params$csv %||% params$data_source, ".csv"))
 }
 if (file.exists(csv)) {
   cat("\n\n## Using a CSV text file of assay data\n\n")
@@ -206,7 +206,7 @@ if (file.exists(csv)) {
   print(gt(list2df(c(
     'Data-source Type'=paste0("Text data", ifelse(missing," binarised", "")),
     'Source file'=csv,
-    align_params))))
+    data_source_params))))
   dds <- SummarizedExperiment(assays=SimpleList(raw=mat),
                              colData=sample_sheet[as.character(sample_sheet[[file_col]]) %in% colnames(mat),]
                              )
@@ -214,15 +214,15 @@ if (file.exists(csv)) {
   if (any(is.na(assay(dds)))) dds$'.percentNA' <- 100 *apply(is.na(assay(dds)), 2, mean)
   if (length(setdiff(names(df), colnames(mat)))>0) {
     mcols(dds) <- df[setdiff(names(df), colnames(mat))]
-    mcols(dds)$symbol <- mcols(dds)[[align_params$symbolColumn %||% 1]]
+    mcols(dds)$symbol <- mcols(dds)[[data_source_params$symbolColumn %||% 1]]
   } else {
     mcols(dds)$symbol <- row.names(dds)
   }
-  #dds <- add_org_annotation(dds, organism$org, keytype=align_params$keytype, count_source=params$count_source)
+  #dds <- add_org_annotation(dds, organism$org, keytype=data_source_params$keytype, count_source=params$count_source)
   colnames(dds) <- as.character(dds[[name_col]])
   row.names(dds) <- rowData(dds)[[1]]
-  save(dds, file=file.path("data",paste0("counts_", params$alignment, ".rda")))
-  saveRDS(dds, file=file.path("data",paste0("counts_", params$alignment, ".rds")))
+  save(dds, file=file.path("data",paste0("counts_", params$data_source, ".rda")))
+  saveRDS(dds, file=file.path("data",paste0("counts_", params$data_source, ".rds")))
   knitr::knit_exit()
 }
 ```
@@ -255,7 +255,7 @@ not_here <- !file.exists(tx_path)
 print(gt(list2df(c(
   'Data-source Type' = paste("Nextflow", tx_args$type),
   'Source file'= paste0(ifelse(not_here, "!!", ""),tx_path),
-  align_params))))
+  data_source_params))))
 
 names(tx_path) <- as.character(sample_sheet[[file_col]])
 
@@ -281,7 +281,7 @@ ind <- rowSums(counts(dds)!=0) > 0
 dds <- dds[ind,]
 txi[c("abundance", "counts", "length")] <- map(txi[c("abundance", "counts", "length")], ~ .[ind,])
 
-dds <- add_org_annotation(dds, organism$org, keytype=align_params$keytype, count_source=params$count_source)
+dds <- add_org_annotation(dds, organism$org, keytype=data_source_params$keytype, count_source=params$count_source)
 
 trim_names <- function(names) {
   chars <- strsplit(names, "")
@@ -293,6 +293,6 @@ trim_names <- function(names) {
 
 colnames(dds) <- trim_names(colnames(dds))
 
-save(dds, file=file.path("data",paste0("counts_", params$alignment, ".rda")))
-saveRDS(dds, file=file.path("data",paste0("counts_", params$alignment, ".rds")))
+save(dds, file=file.path("data",paste0("counts_", params$data_source, ".rda")))
+saveRDS(dds, file=file.path("data",paste0("counts_", params$data_source, ".rds")))
 ```

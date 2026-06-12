@@ -39,7 +39,7 @@ console.log(stringify(quarto, {lineWidth: -1}).replace(/\n$/, ''));
  * Recursively expand axes into a nested nav tree,
  * passing params from qmd2nav and collecting a flat list of hrefs.
  *
- * axes: object with arrays for each axis (e.g., { align, spec, script })
+ * axes: object with arrays for each axis (e.g., { data_source, spec, script })
  * args: arguments including `staging` path
  *
  * Returns: { navTree, flatList }

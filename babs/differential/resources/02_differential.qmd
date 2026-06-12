@@ -88,8 +88,8 @@ if (isTRUE(getOption('knitr.in.progress'))) {
 #| label: read-diff
 
 base_dir <- getwd()
-data(list=paste0("counts_", params$alignment))
-data(list=paste0("ddsList_", params$alignment, "_", params$spec))
+data(list=paste0("counts_", params$data_source))
+data(list=paste0("ddsList_", params$data_source, "_", params$spec))
 ddsList <- leaf_modify(ddsList,
                       function(leaf, layers) {
                         leaf$object <- leaf$object[mcols(leaf$object)$filter$differential %||% TRUE, , drop=FALSE]
@@ -113,10 +113,10 @@ if (!is.null(metadata(dds)$organism$org)) {
 
 # Calling the setter without a value will pick up the default (from the spec), _and_ alert it in the markdown, and return the default
 set.seed(ddsList$settings$seed)
-align_params <- get_align_params(params$alignment)
-rowNoun <- align_params$rowNoun %||% "gene"
+data_source_params <- get_data_source_params(params$data_source)
+rowNoun <- data_source_params$rowNoun %||% "gene"
 RowNoun <- stringr::str_to_title(rowNoun)
-if ("missing" %in% names(align_params)) {
+if ("missing" %in% names(data_source_params)) {
   attr(rowNoun, "readout") <- "missingness"
   attr(RowNoun, "readout") <- "Missingness"
 }
@@ -141,7 +141,7 @@ to ensure reported fold-changes are more robust.
 #| label: differential
 
 
-rds_name <- file.path("data", paste0(basename(params$spec),"_x_", params$alignment, ".rds"))
+rds_name <- file.path("data", paste0(basename(params$spec),"_x_", params$data_source, ".rds"))
 
 if (interactive() && file.exists(rds_name)) {
   ddsList <- readRDS(rds_name)
