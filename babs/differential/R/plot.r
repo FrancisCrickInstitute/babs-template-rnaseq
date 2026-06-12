@@ -18,7 +18,7 @@ sym_colour <- function(dat, lo="blue",zero="white", hi="red", mx=NULL) {
 #' @export
 rename_with_tag <- function(params) {
   function(path, options) {
-    path2 <- file.path(dirname(path), gsub("([0-9]+)-fig-(.*)-1\\.(.*)", paste0("fig-\\1-\\2", params$TAG, ".\\3"), basename(path)))
+    path2 <- file.path(dirname(path), gsub("([0-9]+)-fig-(.*)-1\\.(.*)", paste0("fig-\\1-\\2", params$GIT_REF, ".\\3"), basename(path)))
     file.rename(path, path2)
     path2
   }
@@ -49,11 +49,11 @@ plot_tracker <- function(my_params) {
     fig_n <- get_tally()
     label_n <- get_tally(label)
     chunk_label <- paste0(gsub("[^[:alnum:]]+", "-", label), "-", label_n)
-    chunk_caption <- paste0("[", caption, "](", script, "/","fig-", sprintf("%0.3i",fig_n), "-", chunk_label, my_params$TAG, ".pdf", ")")
+    chunk_caption <- paste0("[", caption, "](", script, "/","fig-", sprintf("%0.3i",fig_n), "-", chunk_label, my_params$GIT_REF, ".pdf", ")")
     chunk_caption <- paste0(
       caption,
-      " [png](", script, "/","fig-", sprintf("%0.3i",fig_n), "-", chunk_label, my_params$TAG, ".png", ")",
-      " [pdf](", script, "/","fig-", sprintf("%0.3i",fig_n), "-", chunk_label, my_params$TAG, ".pdf", ")"
+      " [png](", script, "/","fig-", sprintf("%0.3i",fig_n), "-", chunk_label, my_params$GIT_REF, ".png", ")",
+      " [pdf](", script, "/","fig-", sprintf("%0.3i",fig_n), "-", chunk_label, my_params$GIT_REF, ".pdf", ")"
     )
     has_interactivity <- interactive &&  inherits(pl, "ggplot") &&
       any(
@@ -94,7 +94,7 @@ plot_tracker <- function(my_params) {
       this_plot_meta <- modifyList(
         plot_meta,
         list(
-          png=file.path(script, paste0("fig-", sprintf("%0.3i",fig_n), "-", chunk_label, my_params$TAG, ".png")),
+          png=file.path(script, paste0("fig-", sprintf("%0.3i",fig_n), "-", chunk_label, my_params$GIT_REF, ".png")),
           label=label,
           ind=label_n
         )

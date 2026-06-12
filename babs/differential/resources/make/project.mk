@@ -13,7 +13,7 @@ counts =  $(my_counts_dir)/$(data_source)/
 
 ## Let later processes know which of those to include in every section -
 ## variable _names_ need to be stored in the `param_names` variable:
-param_names = res_dir VERSION TAG staging_dir file_col name_col metadata counts
+param_names = res_dir VERSION GIT_REF staging_dir file_col name_col metadata counts
 
 
 ################################################################

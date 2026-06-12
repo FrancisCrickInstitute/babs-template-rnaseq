@@ -2,8 +2,8 @@
 p2filename <- function(p, prefix, suffix) {
   prefix <- gsub(" ", "-", prefix)
   section <- basename(file.path(tools::file_path_sans_ext(p$script)))
-  fname <- file.path(p$res_dir, section,  sprintf("%s%s.%s", prefix, p$TAG, suffix))
-  attr(fname, "link") <- file.path(section, sprintf("%s%s.%s", prefix, p$TAG, suffix))
+  fname <- file.path(p$res_dir, section,  sprintf("%s%s.%s", prefix, p$GIT_REF, suffix))
+  attr(fname, "link") <- file.path(section, sprintf("%s%s.%s", prefix, p$GIT_REF, suffix))
   fname
 }
 

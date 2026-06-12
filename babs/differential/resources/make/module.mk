@@ -29,7 +29,6 @@ EXECUTOR = singularity
 SQLITE_MODULE=SQLite/3.42.0-GCCcore-12.3.0
 SQLITE = $(call ml,$(SQLITE_MODULE)); sqlite3
 
-
 datasets_dep=$(patsubst $(docs_dir)/%.config,%,$(wildcard $(docs_dir)/*.config))
 datasets=$(datasets_dep) $(filter-out $(datasets_dep),$(patsubst extdata/%.config,%,$(wildcard extdata/*.config)))
 
@@ -37,11 +36,10 @@ specfiles_dep=$(patsubst $(docs_dir)/%.spec,extdata/%.spec,$(wildcard $(docs_dir
 specfiles=$(specfiles_dep) $(filter-out $(specfiles_dep),$(wildcard extdata/*.spec))
 specs=$(patsubst extdata/%.spec,%,$(specfiles))
 
-covariate_files_dep = $(patsubst %,$(my_metadata)_%.csv,$(al_docs))
+covariate_files_dep = $(patsubst %,$(my_metadata)_%.csv,$(datasets_dep))
 covariate_files = $(patsubst %,$(my_metadata)_%.csv,$(datasets))
 
 configs = $(patsubst %,extdata/%.config,$(datasets))
-genes_results = $(patsubst %,$(my_counts_dir)/%,$(al_docs))
-
+genes_results = $(patsubst %,$(my_counts_dir)/%,$(datasets_dep))
 
 excluded-targets += check-isolated

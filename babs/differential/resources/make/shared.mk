@@ -96,31 +96,26 @@ VERSION := $(and $(GIT_BRANCH),$(GIT_BRANCH).)$(shell $(GIT) diff --quiet --igno
           ($(GIT) describe --tags --exact-match 2>/dev/null || \
 	  printf "unreleased") || \
           printf "modified")# ie v0.1.2 or unreleased or modified
-TAG = _$(VERSION)-$(shell $(GIT) rev-parse --short HEAD 2>/dev/null || echo "uncontrolled")# e.g. _v1.0.2-ace1729a
+GIT_REF = _$(VERSION)-$(shell $(GIT) rev-parse --short=8 HEAD 2>/dev/null || echo "uncontrolled")# e.g. _v1.0.2-ace1729a
 git-ignore=touch .gitignore && grep -qxF '$(1)' .gitignore || echo '$(1)' >> .gitignore
 
 
 # canned recipe to create checkpoint after a run
-define post_run_checkpoint
-echo "GIT_REF=$(TAG)" > .latest
-$(GIT) branch -D "$(1)" 2>/dev/null || true
-$(GIT) checkout -b "$(1)"
-$(GIT) add -u
-$(GIT) commit -m "Pipeline pre-run checkpoint" --allow-empty
-$(GIT) checkout -
-$(GIT) checkout "$(1)" -- .
-$(GIT) reset .
+define save_checkpoint
+@start_ref=$$(cut -d= -f2 .latest); [ "$(GIT_REF)" = "$$start_ref" ] || echo "WARNING: Git state has changed from $$start_ref to $(GIT_REF) during the run."
+@echo "asrun.GIT_REF=$(GIT_REF)" >> .latest
+@echo "asrun.VERSION=$(VERSION)" >> .latest
+@echo "asrun.DATE=$$(date -Iseconds)" >> .latest
 endef
 
 # canned recipe to test compatibility with checkpoint pre retag
 define test_checkpoint
-if ! $(GIT) diff --quiet "$(1)" -- .; then \
+if [ "$(asrun.GIT_REF)" != "$(asrun.START_GIT_REF)" ]; then echo "ERROR: The results changed git-state whilst being generated, so can't be retagged"; exit 1; fi
+if [ "$(asrun.GIT_REF)" != "$(GIT_REF)" ]; then \
   if [ -z "$(force-retag)" ]; then \
     echo "------------------------------------------------------------"; \
-    echo "ERROR: Working tree has drifted from checkpoint branch '$(1)'"; \
-    echo "Review changes below, and use 'force-retag=1' to override if you insist:"; \
-    echo "------------------------------------------------------------"; \
-    $(GIT) diff --stat "$(1)" -- .; \
+    echo "ERROR: Working tree has drifted from checkpoint '$(asrun.GIT_REF)'"; \
+    echo "Review changes, and use 'force-retag=1' to override if you insist:"; \
     echo "------------------------------------------------------------"; \
     exit 1; \
   else \
