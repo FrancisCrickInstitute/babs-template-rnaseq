@@ -1,7 +1,7 @@
 .PHONY: makefile resources/make/module.mk resources/make/shared.mk resources/make/project.mk
 .PHONY: clean maintainer-clean geo R-local
 .DEFAULT_GOAL=help
-diff_dir=.
+
 include resources/make/shared.mk
 include resources/make/module.mk   ## Anything we need to over-ride from shared
 include resources/make/project.mk  ## Describe analysis structure of the qmds etc
@@ -16,8 +16,8 @@ endif
 
 
 ## Create a makefile per section. It will set up target-specific
-## variables to inform subsequent targets of the alignment, spec-file,
-## and section for each alignment:spec combo. It will also set up the
+## variables to inform subsequent targets of the data_source, spec-file,
+## and section for each data_source:spec combo. It will also set up the
 ## global variables 'section'_(pages|qmds|htmls) which
 ## enumerate the individual combos.  Because these makefiles are
 ## 'included' they will automatically get remade as necessary, and if
@@ -25,24 +25,24 @@ endif
 
 mk0 = $(patsubst %,$(staging_dir)/.make-%,$(filter 00_%,$(sections)))
 mk = $(patsubst %,$(staging_dir)/.make-%,$(filter-out 00_%,$(sections)))
-qmd_path=$(staging_dir)/$*_$(ispec)_$(ialign).qmd
-qmd0_path=$(staging_dir)/$*_$(ialign).qmd
+qmd_path=$(staging_dir)/$*_$(ispec)_$(idata).qmd
+qmd0_path=$(staging_dir)/$*_$(idata).qmd
 
-spec_of_align=$(filter-out $($(1).nospec),$(if $($(1).spec),$(filter $($(1).spec),$(specfiles)),$(specfiles)))
-$(mk): $(staging_dir)/.make-% : $(file.spec) $(samplesheets) | $(staging_dir)
-	printf "%s\n" $(foreach ispec,$(specfiles),\
-	   $(foreach ialign,$(alignments),\
-	   '$(qmd_path): alignment=$(ialign)'\
+spec_of_data_source=$(filter-out $($(1).nospec),$(if $($(1).spec),$(filter $($(1).spec),$(specs)),$(specs)))
+$(mk): $(staging_dir)/.make-% : $(specfiles) $(covariate_files) | $(staging_dir)
+	printf "%s\n" $(foreach ispec,$(specs),\
+	   $(foreach idata,$(datasets),\
+	   '$(qmd_path): data_source=$(idata)'\
 	   '$(qmd_path): spec=$(ispec)'\
-	   '$(qmd_path): script=$*_$(ispec)_$(ialign)'\
+	   '$(qmd_path): script=$*_$(ispec)_$(idata)'\
 	   '$(qmd_path): section=$*'\
 	   '$(qmd_path): cat1=$(or $(shell sed -n "s/^#$(squote)[[:space:]]*@categories[[:space:]]\+\(.*\)/\1/p" extdata/$(ispec).spec | head -n1),$(ispec))'\
-	   '$(qmd_path): cat2=$(or $($(ialign).categories), $(ialign))'\
+	   '$(qmd_path): cat2=$(or $($(idata).categories), $(idata))'\
 	   '$(qmd_path): specname=$(or $(shell sed -n "s/^#$(squote)[[:space:]]*@specname[[:space:]]\+\(.*\)/\1/p" extdata/$(ispec).spec | head -n1),$(ispec))'\
 	   '$(qmd_path): $(source_dir)/$*.qmd'\
-	   '$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$*_$(ispec)_$(ialign).html: $(my_counts_dir)/$(ialign) $(ispec).spec $(my_metadata)_$(ialign).csv $(qmd_path) $(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$($*_parent).html'\
+	   '$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$*_$(ispec)_$(idata).html: $(my_counts_dir)/$(idata) $(ispec).spec $(my_metadata)_$(idata).csv $(qmd_path) $(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$($*_parent).html'\
 	)) > $@
-	echo '$*_pages=$(foreach ialign,$(alignments),$(foreach ispec,$(call spec_of_align,$(ialign)),$*_$(ispec)_$(ialign)))' >> $@
+	echo '$*_pages=$(foreach idata,$(datasets),$(foreach ispec,$(call spec_of_data_source,$(idata)),$*_$(ispec)_$(idata)))' >> $@
 	echo '$*_qmds = $$(patsubst %,$(staging_dir)/%.qmd,$$($*_pages))'>> $@
 	echo '$*_htmls = $$(patsubst %,$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/%.html,$$($*_pages))'>> $@
 	echo '$*_htmls: $$($*_htmls)'>> $@
@@ -53,23 +53,23 @@ $(mk): $(staging_dir)/.make-% : $(file.spec) $(samplesheets) | $(staging_dir)
 # yet-to-be-run nfcore results.  Here, we ensure that the
 # genes_results are made before the makefile that describes the dependencies
 # of the 00_init.qmd's:
-$(mk0): $(staging_dir)/.make-% : $(samplesheets) $(genes_results) | $(staging_dir)
-	printf "%s\n" $(foreach ialign,$(alignments),\
-	 '$(qmd0_path): alignment=$(ialign)'\
-	 '$(qmd0_path): script=$*_$(ialign)'\
+$(mk0): $(staging_dir)/.make-% : $(covariate_files) $(genes_results) | $(staging_dir)
+	printf "%s\n" $(foreach idata,$(datasets),\
+	 '$(qmd0_path): data_source=$(idata)'\
+	 '$(qmd0_path): script=$*_$(idata)'\
 	 '$(qmd0_path): section=$*'\
-	 '$(qmd0_path): cat1=$($(ialign).categories)'\
+	 '$(qmd0_path): cat1=$($(idata).categories)'\
 	 '$(qmd_path): specname=$(or $(shell sed -n "s/^#$(squote)[[:space:]]*@specname[[:space:]]\+\(.*\)/\1/p" extdata/$(ispec).spec | head -n1),$(ispec))'\
-	 '$(qmd0_path): $(source_dir)/$*.qmd $(my_counts_dir)/$(ialign)'\
-	 '$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$*_$(ialign).html: $(my_metadata)_$(ialign).csv $(qmd0_path)'\
+	 '$(qmd0_path): $(source_dir)/$*.qmd $(my_counts_dir)/$(idata)'\
+	 '$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$*_$(idata).html: $(my_metadata)_$(idata).csv $(qmd0_path)'\
 	) > $@
-	echo '$*_pages=$(foreach ialign,$(alignments),$*_$(ialign))' >> $@
+	echo '$*_pages=$(foreach idata,$(datasets),$*_$(idata))' >> $@
 	echo '$*_qmds = $$(patsubst %,$(staging_dir)/%.qmd,$$($*_pages))'>> $@
 	echo '$*_htmls = $$(patsubst %,$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/%.html,$$($*_pages))'>> $@
 	echo '$*_htmls: $$($*_htmls)'>> $@
 
 ifneq (,$(filter-out $(or $(excluded-targets),$(MAKECMDGOALS)),$(MAKECMDGOALS)))
-$(foreach c,$(alignments), \
+$(foreach c,$(datasets), \
 $(eval include extdata/$(c).config) \
 $(eval $(c).org.db=$(org.db)) \
 $(eval $(c).categories=$(categories)) \
@@ -97,7 +97,7 @@ ifeq ($(WRAP),none)
 quarto_opts=--output-dir $(RESULTS_DIR)/$(VERSION) --execute-dir $(CURDIR) -M repo:$(repo)
 
 ## Render the qmds to html in one quarto call
-run: $(qmds) $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(samplesheets)| $(log_dir) data $(RESULTS_DIR)/$(VERSION)  $(genes_results)  ## Create objects in `data` that store the results of applying each spec file, along with a versioned html report in `results`.
+run: $(qmds) $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(covariate_files)| $(log_dir) data $(RESULTS_DIR)/$(VERSION)  $(genes_results)  ## Create objects in `data` that store the results of applying each spec file, along with a versioned html report in `results`.
 	$(GIT) commit -m "Adding files generated by a differential run" || echo "No additional differential files needed adding"
 	sed  -i 's#^  contents: .*#  contents: [$(subst $(space),$(comma),$(patsubst $(staging_dir)/%,%,$(qmds)))]#' $(staging_dir)/index.qmd
 	rm -rf $(staging_dir)/$(RESULTS_DIR)/$(VERSION)
@@ -119,7 +119,7 @@ pages: $(html_reports) ## Generate the renders individually
 	ln -sfn  $(VERSION) $(RESULTS_DIR)/latest
 
 ## Render an individual page
-$(html_reports) : $(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%.html : $(staging_dir)/%.qmd $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(samplesheets)| $(log_dir) $(RESULTS_DIR)/$(VERSION) $(staging_dir)/$(RESULTS_DIR)/$(VERSION)
+$(html_reports) : $(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%.html : $(staging_dir)/%.qmd $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(covariate_files)| $(log_dir) $(RESULTS_DIR)/$(VERSION) $(staging_dir)/$(RESULTS_DIR)/$(VERSION)
 	$(QUARTO) render '$<' $(quarto_opts) $(call log,html-$*)
 
 html-%: $(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%.html ## Create a single html file to be placed in the staging directory, '%' is a simplified filename e.g. `make html-01_exploratory_per-plan_GRCh38`.
@@ -149,19 +149,19 @@ $(qmds) : $(staging_dir)/%.qmd : $(staging_dir)/%.yml $(staging_dir)/$(VERSION).
 	sed -i -e 's#choose_staging("$(section)")#"$(staging_dir)/$*"#' $@
 
 $(qmds:qmd=yml):
-	echo "title: $(alignment) $(or $(specname),$(spec))" > $@
-	echo "description: $(alignment)-aligned data$(if $(spec), according to plan '$(spec)')" >> $@
+	echo "title: $(data_source) $(or $(specname),$(spec))" > $@
+	echo "description: $(data_source)-aligned data$(if $(spec), according to plan '$(spec)')" >> $@
 	echo "categories: [$(if $(cat1),$(if $(cat2),$(cat1)$(comma)$(cat2),$(cat1)),$(cat2))]" >> $@
 	echo "params:" >> $@
-	echo "  alignment: $(alignment)" >> $@
+	echo "  data_source: $(data_source)" >> $@
 	echo "  spec: $(or $(spec),'')" >> $@
 	echo "  specname: $(or $(specname),'')" >> $@
 	echo "  script: $(@:yml=qmd)" >> $@
 
 
 $(staging_dir)/_quarto.yml: $(source_dir)/_quarto.yml $(qmds) $(css) $(includes)
-	echo 'alignment: [$(subst $(space),$(comma)$(space),$(alignments))]' > ${staging_dir}/_sidebar.yml
-	echo 'spec: [null,$(subst $(space),$(comma)$(space),$(specfiles))]' >> ${staging_dir}/_sidebar.yml
+	echo 'data_source: [$(subst $(space),$(comma)$(space),$(datasets))]' > ${staging_dir}/_sidebar.yml
+	echo 'spec: [null,$(subst $(space),$(comma)$(space),$(specs))]' >> ${staging_dir}/_sidebar.yml
 	echo 'section: [$(subst $(space),$(comma)$(space),$(sections))]' >> ${staging_dir}/_sidebar.yml
 	$(QUARTO) run $(source_dir)/typescript/sidebar.ts\
 	 --template=$< \
@@ -182,8 +182,8 @@ $(staging_dir)/$(VERSION).params.yml:  resources/make/project.mk $(staging_dir)/
 $(staging_dir)/index.qmd : $(source_dir)/index.qmd $(qmds) $(staging_dir)/notes.md $(log_dir)/check_spec.log
 	sed  's#^  contents: .*#  contents: [$(subst $(space),$(comma),$(patsubst $(staging_dir)/%,%,$(qmds)))]#' $< > $@
 
-$(log_dir)/check_spec.log : $(file.spec)
-	$(R) --vanilla -e "files <- strsplit('$(file.spec)', ' +')[[1]]; \
+$(log_dir)/check_spec.log : $(specfiles)
+	$(R) --vanilla -e "files <- strsplit('$(specfiles)', ' +')[[1]]; \
 	  ok <- TRUE; \
 	  for (f in files) { \
 	    message('Checking ', f); \
@@ -200,7 +200,7 @@ $(staging_dir)/R.bib: extdata/R.bib
 extdata/R.bib: | renv
 	$(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")' $(call log,bib)
 
-renv: orgs=$(strip $(foreach align,$(alignments),$($(align).org.db)))
+renv: orgs=$(strip $(foreach data_source,$(datasets),$($(data_source).org.db)))
 renv: | $(log_dir)
 	sed -i '/\#DO NOT EDIT AFTER THIS LINE/q' resources/_dependencies.R
 	for i in "$(orgs)"; do echo "library($$i)" >> resources/_dependencies.R; done
@@ -234,16 +234,16 @@ endif
 
 
 # .PHONY: geo
-# geo: geo/md5.txt  ## Gather everything into the 'geo' folder. Specify `version=`, `alignment=` and `spec=` to customise. Remember to `make clean-geo` when the files have been upload.
+# geo: geo/md5.txt  ## Gather everything into the 'geo' folder. Specify `VERSION=`, `data_source=` and `spec=` to customise. Remember to `make clean-geo` when the files have been upload.
 # geo/md5.txt:
 # 	mkdir -p $(SCRATCH_DIR)geo
 # 	mkdir -p shortcuts
 # 	ln -s $(SCRATCH_DIR)geo shortcuts/geo
-# 	ln -fn $(my_counts_dir)/$(alignment)/*.genes.results shortcuts/geo/
-# 	ln -fn $(RESULTS_DIR)/$(VERSION)/$(alignment)/$(spec)/*.xlsx shortcuts/geo/
-# 	$(SQLITE) extdata/$(samples_db) 'select fastq_1 from fastqs  where config_file="$(alignment)";' | \
+# 	ln -fn $(my_counts_dir)/$(data_source)/*.genes.results shortcuts/geo/
+# 	ln -fn $(RESULTS_DIR)/$(VERSION)/$(data_source)/$(spec)/*.xlsx shortcuts/geo/
+# 	$(SQLITE) extdata/$(samples_db) 'select fastq_1 from fastqs  where config_file="$(data_source)";' | \
 # 	while read -r fq ; do cp $${fq} shortcuts/geo/ ; done
-# 	$(SQLITE) extdata/$(samples_db) 'select fastq_2 from fastqs  where config_file="$(alignment)";' | \
+# 	$(SQLITE) extdata/$(samples_db) 'select fastq_2 from fastqs  where config_file="$(data_source)";' | \
 # 	while read -r fq ; do cp $${fq} shortcuts/geo/ ; done
 # 	pushd shortcuts/geo; md5sum *.* > geo.md5.txt; popd
 
@@ -284,38 +284,30 @@ retag: ## If you've changed the git tag for the source code but sourcecode is th
 #### Bootstrap all relevant data from outside
 ################################################################
 
-ifneq ($(docs_dir),)
-$(docs_dir)/%:
-	$(MAKE) --no-print-directory -C $(docs_dir) $*
-$(file.spec): extdata/% : $(docs_dir)/% | extdata
+#' Get external spec files
+$(specfiles_dep): extdata/% : $(docs_dir)/% | extdata
 	cp $< $@
 	$(GIT) add $@ $<
-$(my_metadata).csv: $(docs_dir)/$(experiment_table).csv | $(dir $(my_metadata))
+
+#' Get external experiment table
+$(my_metadata).csv: $(wildcard $(docs_dir)/$(experiment_table).csv) | $(dir $(my_metadata))
+ifeq ($(wildcard $(docs_dir)/$(experiment_table).csv),)
+	@echo "You must create $@, which assigns covariates' values to your samples"
+	@exit 1
+else
 	$(MAKE) --no-print-directory -C $(ingress_dir) $(experiment_table).csv
 	cp $(ingress_dir)/$(experiment_table).csv $@
 	$(GIT) add $@ $<
-$(configs): extdata/%.config: $(docs_dir)/%.config | extdata
+endif
+
+#' Get external configs
+$(patsubst %,extdata/%.config,$(datasets_dep)): extdata/%.config: $(docs_dir)/%.config | extdata
 	$(MAKE) --no-print-directory -C $(ingress_dir) $*.config
 	cp $(ingress_dir)/$*.config $@
 	$(GIT) add $@ $<
-else
-$(my_metadata).csv $(configs):
-	touch $@
-endif
 
-
-ifneq ($(nfcore_dir),)
-$(nfcore_dir)/%:
-	$(MAKE) --no-print-directory -C $(nfcore_dir) $*
-
-# All the nfcore dependencies on docs - if docs samplesheet changes, recalculate everything.  If a config changes, just recalc that.
-
-$(nfcore_dir)/samplesheet_%.csv: $(docs_dir)/%.config $(docs_dir)/%.csv
-$(nfcore_dir)/results/%/merged.gene_counts.tsv : $(docs_dir)/%.config $(docs_dir)/%.csv
-
-
-## Recipes for copying & generating files from nfcore results
-$(samplesheets) : $(my_metadata)_%.csv : $(nfcore_dir)/samplesheet_%.csv $(my_metadata).csv extdata/%.config
+#' Get subtables of experiment table for external samplesheets
+$(covariate_files_dep) : $(my_metadata)_%.csv : $(nfcore_dir)/samplesheet_%.csv $(my_metadata).csv extdata/%.config
 	rm -f '$*.db'
 	$(SQLITE) '$*.db' '.import --csv  $< $*'  ;\
 	$(SQLITE) '$*.db' '.import --csv  $(my_metadata).csv metadata'  ;\
@@ -323,6 +315,11 @@ $(samplesheets) : $(my_metadata)_%.csv : $(nfcore_dir)/samplesheet_%.csv $(my_me
 	rm -f '$*.db'
 	$(GIT) add $@
 
+$(nfcore_dir)/samplesheet_%.csv: $(docs_dir)/%.config $(docs_dir)/%.csv
+	$(MAKE) --no-print-directory -C $(nfcore_dir) $*
+
+
+#' nfcore-specific genes-results folder
 $(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/results/%/merged.gene_counts.tsv 
 	dir=$(if $($*.group-as),$($*.group-as),$*);\
 	mkdir -p $(my_counts_dir)/$${dir} ;\
@@ -334,12 +331,9 @@ $(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/results/%/merged.gene_counts
 	fi
 	mkdir -p $(RESULTS_DIR)/multiqc-$*
 	cp -lr $(nfcore_dir)/results/$*/multi-qc/. $(RESULTS_DIR)/multiqc-$* || cp -r $(nfcore_dir)/results/$*/multi-qc/. $(RESULTS_DIR)/multiqc-$*
-else
-$(samplesheets):
-	touch $@
-$(genes_results):
-	mkdir -p $@
-endif
+
+$(nfcore_dir)/results/%/merged.gene_counts.tsv : $(docs_dir)/%.config $(docs_dir)/%.csv
+	$(MAKE) --no-print-directory -C $(nfcore_dir) $*
 
 
 ################################################################
@@ -365,4 +359,3 @@ clean-geo:  ## Remove the GEO files from scratch
 
 
 MAKEFLAGS += --no-builtin-rules
-

@@ -86,7 +86,7 @@ test: airway/fastq ## Generate a test folder setup for the airway data
 	if [ -n "$(aligner)" ]; then echo "aligner=$(aligner)" >> docs/GRCh38.config; fi && \
 	git commit --allow-empty -m "Restart git repo for testing" && \
 	git tag v9.9.9 )
-	cd $@/babs/ingress && make run
+	#cd $@/babs/ingress && make run
 
 .PHONY: test-ff-nfcore test-differential
 test-ff-nfcore: test/babs/nfcore/results ## Fast-forward to before the differential analysis, by using a cached run of nfcore

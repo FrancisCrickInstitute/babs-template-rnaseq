@@ -29,26 +29,19 @@ EXECUTOR = singularity
 SQLITE_MODULE=SQLite/3.42.0-GCCcore-12.3.0
 SQLITE = $(call ml,$(SQLITE_MODULE)); sqlite3
 
-################################################################
-## Propagation of docs files
-## 'Earliest' presence of a propagated file is taken as definitive.
-################################################################
-early_spec_dir=$(firstword $(wildcard $(docs_dir) $(diff_dir)/extdata))
-specfiles=$(patsubst $(early_spec_dir)/%.spec,%,$(wildcard $(early_spec_dir)/*.spec))
 
-samplesheets = $(patsubst %,$(my_metadata)_%.csv,$(alignments))
-configs = $(patsubst %,extdata/%.config,$(alignments))
-genes_results = $(patsubst %,$(my_counts_dir)/%,$(alignments))
-file.spec = $(patsubst %,extdata/%.spec,$(specfiles))
+datasets_dep=$(patsubst $(docs_dir)/%.config,%,$(wildcard $(docs_dir)/*.config))
+datasets=$(datasets_dep) $(filter-out $(datasets_dep),$(patsubst extdata/%.config,%,$(wildcard extdata/*.config)))
 
-################################################################
-## GEO settings
-################################################################
-## For submission to GEO, we need to know the version, spec and
-## aligment settings that are to be submitted.
-################################################################
-geo: version=latest
-geo: alignment=$(firstword $(alignments))
-geo: spec=$(firstword $(specfiles))
+specfiles_dep=$(patsubst $(docs_dir)/%.spec,extdata/%.spec,$(wildcard $(docs_dir)/*.spec))
+specfiles=$(specfiles_dep) $(filter-out $(specfiles_dep),$(wildcard extdata/*.spec))
+specs=$(patsubst extdata/%.spec,%,$(specfiles))
+
+covariate_files_dep = $(patsubst %,$(my_metadata)_%.csv,$(al_docs))
+covariate_files = $(patsubst %,$(my_metadata)_%.csv,$(datasets))
+
+configs = $(patsubst %,extdata/%.config,$(datasets))
+genes_results = $(patsubst %,$(my_counts_dir)/%,$(al_docs))
+
 
 excluded-targets += check-isolated

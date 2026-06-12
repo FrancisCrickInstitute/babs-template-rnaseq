@@ -1,13 +1,11 @@
 .PHONY: run build copy publish clean
-nfcore_dir=.
 include shared.mk
 include module.mk
 
+alignments_dep=$(patsubst $(docs_dir)/%.config,%,$(wildcard $(docs_dir)/*.config))
+alignments=$(alignments_dep) $(filter-out $(alignments_dep),$(patsubst %.config,%,$(wildcard *.config)))
 configs = $(patsubst %,%.config,$(alignments))
-samplesheets = $(patsubst %,samplesheet_%.csv,$(alignments))
-
 gene_counts = $(patsubst %,results/%/merged.gene_counts.tsv,$(alignments))
-
 refdir = $(index_dir)/$(genome_fasta_md5)/$(gtf_md5)
 workdir = $(SCRATCH_DIR)/nf_work
 
@@ -61,6 +59,7 @@ insfield=$(shell sed '/^$$/d; s/^/"/;s/=.*/"/' "$*.config" | paste -sd ',')
 vals=$(shell sed -r '/^$$/d; s/.*=(.*)/"\1"/' "$*.config" | paste -sd ',')
 
 
+samplesheets = $(patsubst %,samplesheet_%.csv,$(alignments))
 $(samplesheets): samplesheet_%.csv: %.config %.csv
 	$(eval include $<)
 	rm -f '$*.db'
@@ -82,22 +81,23 @@ $(workdir):
 #### Bootrap all relevant data from outside
 ################################################################
 
-build: $(patsubst %,%.csv,$(alignments)) $(configs) ## Build all necessary inputs: samplesheets for each matching alignment
 
-ifneq ($(docs_dir),)
-$(docs_dir)/%:
-	$(MAKE) --no-print-directory -C $(docs_dir) $*
-$(configs): %.config: $(docs_dir)/%.config
+configs_dep=$(patsubst %,%.config,$(alignments_dep))
+$(configs_dep): %.config: $(docs_dir)/%.config
 	$(MAKE) --no-print-directory -C $(ingress_dir) $*.config
 	cp $(ingress_dir)/$*.config $@
 	$(GIT) add $@ $<
-$(patsubst %,%.csv,$(alignments)): %.csv: $(docs_dir)/%.csv
+
+unfiltered_samplesheets_dep=$(patsubst %,%.csv,$(alignments_dep))
+$(unfiltered_samplesheets_dep): %.csv: $(docs_dir)/%.csv
 	$(MAKE) --no-print-directory -C $(ingress_dir) $*.csv
 	cp $(ingress_dir)/$*.csv $@
 	$(GIT) add $@ $<
 
-endif
+$(docs_dir)/%:
+	$(MAKE) --no-print-directory -C $(docs_dir) $*
 
+build: $(configs_dep) $(unfiltered_samplesheets_dep) ## Build all necessary inputs: samplesheets for each matching alignment
 
 $(log_dir):
 	mkdir -p $@

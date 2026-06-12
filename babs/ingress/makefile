@@ -1,25 +1,21 @@
-ingress_dir=.
 include shared.mk
 
-.PHONY: run build copy publish clean run-clean build-clean
+.PHONY: run copy publish clean run-clean build-clean
 
-run: build ## Move relevant 'docs' files here and tidy them up as necessary.
-
-
-
-################################################################
-#### Bootrap all relevant data from outside
-################################################################
-
-configs = $(patsubst %,%.config,$(alignments))
+configs=$(patsubst $(docs_dir)/%.config,%.config,$(wildcard $(docs_dir)/*.config))
 samplesheets=$(patsubst %.config,%.csv,$(configs))
 
+run: $(samplesheets) $(experiment_table).csv $(configs) ## Move relevant 'docs' files here and tidy them up as necessary.
 
-build: $(samplesheets) $(experiment_table).csv $(configs)
+$(samplesheets) : % : $(docs_dir)/%
+	cp $< $@
+	tr -d '\r' < $< > $@
+	$(GIT) add $@ $<
 
-ifneq ($(docs_dir),)
-$(docs_dir)/%:
-	$(MAKE) --no-print-directory -C $(docs_dir) $*
+$(experiment_table).csv:  $(docs_dir)/$(experiment_table).csv
+	cp $< $@
+	tr -d '\r' < $< > $@
+	$(GIT) add $@ $< 
 
 $(configs): %.config: $(docs_dir)/%.config
 	tr -d '\r' < $<  > $@
@@ -32,16 +28,8 @@ $(configs): %.config: $(docs_dir)/%.config
 	md5sum $(shell sed -n 's/^gtf=//p' $<) | awk '{print "gtf_md5=" $$1}' >> $@
 	$(GIT) add $@ $<
 
-$(samplesheets) : % : $(docs_dir)/%
-	cp $< $@
-	tr -d '\r' < $< > $@
-	$(GIT) add $@ $<
-
-$(experiment_table).csv:  $(docs_dir)/$(experiment_table).csv
-	cp $< $@
-	tr -d '\r' < $< > $@
-	$(GIT) add $@ $< 
-endif
+$(docs_dir)/%:
+	$(MAKE) --no-print-directory -C $(docs_dir) $*
 
 copy:
 
