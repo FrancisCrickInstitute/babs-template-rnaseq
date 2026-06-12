@@ -524,8 +524,9 @@ for (dataset_id in names(ddsList$sample_sets)) {
       cat("\n\n---\n\n")
       #
       ## Feature-cluster aggregate profile plots
+      
       cat("\n\n", strrep("#", length(section_hierarchy)+1), " Profiles\n\n", sep="")     
-      centroid_df <- cbind(cc, colDF(plot_se)[model_vars])[vis_sample,,drop=FALSE] %>%
+      centroid_df <- cbind(cc, colDF(plot_se))[vis_sample,,drop=FALSE] %>%
         pivot_longer(cols=any_of(names(cc)), names_to=".derived", values_to=".derived.value") %>%
         mutate(.derived=factor(.derived, levels=names(cc)))
       mapping <- modify_mapping(plot_config, aes(y=.derived.value))
@@ -537,7 +538,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
         geom_point_interactive(size = 3, shape = 21) +
         labs(y=paste(noun_to_readout(RowNoun),y_hint)) 
       if ("group" %in% names(mapping)) {
-        group_df <- cbind(cc, colDF(plot_se)[model_vars])[vis_sample,,drop=FALSE]  %>%
+        group_df <- cbind(cc, colDF(plot_se))[vis_sample,,drop=FALSE]  %>%
           pivot_longer(cols=any_of(names(cc)), names_to=".derived", values_to=".derived.value") %>%
           mutate(.derived=factor(.derived, levels=names(cc)))
         pl <- pl +
@@ -622,7 +623,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
               plot_meta=section_hierarchy
               )
       cat("\n\n---\n\n")
-      long_dat <- transform(extract_hits(covar_x_pc, proj[vis_sample,], colDF(plot_se)[vis_sample,model_vars, drop=FALSE]), .derived=PC, .derived.value=value)
+      long_dat <- transform(extract_hits(covar_x_pc, proj[vis_sample,], colDF(plot_se)[vis_sample,, drop=FALSE]), .derived=PC, .derived.value=value)
       pl <- ggplot(long_dat, modifyList(mapping, aes(y=.derived.value))) +
         geom_point_interactive(size = 3, shape = 21) +
         facet_wrapper(mapping, default=aes(facets = .derived), scales="free_y") 

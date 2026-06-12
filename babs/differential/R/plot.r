@@ -424,6 +424,7 @@ hmap_fn <- function(dds, mat, cluster_transform, gene_clust, model_vars, plot_co
   if (length(unique(dds$.influential))>1 & !".influential" %in% model_vars) {
     model_vars <- c(model_vars, ".influential")
   }
+  size_fit <- NULL
   panel_hmap <- function(ind=TRUE, first, last, column_title, args) {
     masked <- mat
     mask <- all.vars(plot_config$extra$mask)[1]
@@ -449,7 +450,7 @@ hmap_fn <- function(dds, mat, cluster_transform, gene_clust, model_vars, plot_co
       if (N_infl <=1) infl_ind_subset <- TRUE #Still one or fewer, so bundle them together
       N_infl <- length(mat_subset[1,][infl_ind_subset])#update
     }
-    if (N_infl >1 && "sample_clust" %in% plot_config) {
+    if (N_infl >1 && "sample_clust" %in% names(plot_config$extra)) {
       # Get the subset of data we're actually plotting
       # cluster influential samples WITHIN this subset
       infl_cluster <- bluster::clusterRows(
@@ -528,7 +529,7 @@ hmap_fn <- function(dds, mat, cluster_transform, gene_clust, model_vars, plot_co
         dev.off()
         pre_size$y[i] <- convertHeight(ht_height, "inch", valueOnly = TRUE)
       }
-      size_fit <- lm(y ~ mat_row + anno_row, data=pre_size)
+      size_fit <<- lm(y ~ mat_row + anno_row, data=pre_size)
     }
 
     structure(

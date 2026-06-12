@@ -77,7 +77,6 @@ if (!is.null(metadata(dds)$organism$org)) {
 
 specs <- load_specs(file=paste0(params$spec, ".spec"), context=dds)
 
-
 # Calling the setter without a value will pick up the default (from the spec), _and_ alert it in the markdown, and return the default
 set.seed(specs$settings$seed)
 
