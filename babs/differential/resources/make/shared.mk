@@ -96,25 +96,36 @@ VERSION := $(and $(GIT_BRANCH),$(GIT_BRANCH).)$(shell $(GIT) diff --quiet --igno
           ($(GIT) describe --tags --exact-match 2>/dev/null || \
 	  printf "unreleased") || \
           printf "modified")# ie v0.1.2 or unreleased or modified
-GIT_REF = _$(VERSION)-$(shell $(GIT) rev-parse --short=8 HEAD 2>/dev/null || echo "uncontrolled")# e.g. _v1.0.2-ace1729a
+GIT_HASH=$(GIT) rev-parse --short=8 HEAD 2>/dev/null || echo "uncontrolled"
+GIT_REF = _$(VERSION)-$(shell $(GIT_HASH))# e.g. _v1.0.2-ace1729a
 git-ignore=touch .gitignore && grep -qxF '$(1)' .gitignore || echo '$(1)' >> .gitignore
 
+define init_checkpoint
+@echo "asrun.START_GIT_HASH=$$($(GIT_HASH))" > .latest
+@echo "asrun.START_DIFF=$$(git diff HEAD | git hash-object --stdin)" >> .latest
+endef
 
 # canned recipe to create checkpoint after a run
 define save_checkpoint
-@start_ref=$$(cut -d= -f2 .latest); [ "$(GIT_REF)" = "$$start_ref" ] || echo "WARNING: Git state has changed from $$start_ref to $(GIT_REF) during the run."
+@echo "asrun.GIT_HASH=$$($(GIT_HASH))" >> .latest
 @echo "asrun.GIT_REF=$(GIT_REF)" >> .latest
+@start_hash=$$(head -1 .latest | cut -d= -f2); [ "$$($(GIT_HASH))" = "$$start_hash" ] || echo "WARNING: Git state has changed from $$start_hash to $$($(GIT_HASH)) during the run."
+@start_diff=$$(head -2 .latest | tail -1 | cut -d= -f2);\
+end_diff=$$(git diff HEAD | git hash-object --stdin);\
+echo "asrun.DIFF=$$end_diff" >> .latest;\
+[ "$$end_diff" = "$$start_diff" ] || echo "WARNING: File state has changed during the run."
 @echo "asrun.VERSION=$(VERSION)" >> .latest
 @echo "asrun.DATE=$$(date -Iseconds)" >> .latest
 endef
 
 # canned recipe to test compatibility with checkpoint pre retag
 define test_checkpoint
-if [ "$(asrun.GIT_REF)" != "$(asrun.START_GIT_REF)" ]; then echo "ERROR: The results changed git-state whilst being generated, so can't be retagged"; exit 1; fi
-if [ "$(asrun.GIT_REF)" != "$(GIT_REF)" ]; then \
+@if [ "$(asrun.GIT_HASH)" != "$(asrun.START_GIT_HASH)" ]; then echo "ERROR: Git state changed whilst results being generated, so can't be retagged"; exit 1; fi
+@if [ "$(asrun.DIFF)" != "$(asrun.START_DIFF)" ]; then echo "ERROR: Files changed whilst results being generated, so can't be retagged"; exit 1; fi
+@if [ "$(asrun.GIT_HASH)" != "$$($(GIT_HASH))" ]; then \
   if [ -z "$(force-retag)" ]; then \
     echo "------------------------------------------------------------"; \
-    echo "ERROR: Working tree has drifted from checkpoint '$(asrun.GIT_REF)'"; \
+    echo "ERROR: Working tree has drifted from checkpoint '$(asrun.GIT_HASH)'"; \
     echo "Review changes, and use 'force-retag=1' to override if you insist:"; \
     echo "------------------------------------------------------------"; \
     exit 1; \
@@ -123,6 +134,7 @@ if [ "$(asrun.GIT_REF)" != "$(GIT_REF)" ]; then \
   fi \
 fi
 endef
+
 
 ################################################################
 ## Publishing (moving) generated results and providing shortcuts
