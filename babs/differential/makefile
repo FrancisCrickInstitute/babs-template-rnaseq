@@ -286,6 +286,9 @@ retag: ## If you've changed the git tag for the source code but sourcecode is th
 #### Bootstrap all relevant data from outside
 ################################################################
 
+# Prevent non-specific upstream stuff invoking the generic container response
+$(docs_dir)/% $(ingress_dir)/% $(nfcore_dir)/%:
+
 #' Get external spec files
 $(specfiles_dep): extdata/% : $(docs_dir)/% | extdata
 	cp $< $@

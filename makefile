@@ -51,12 +51,11 @@ export: ## Create an 'export' branch that can be squash-merged into projects, to
 .PHONY: infrastructure
 
 infrastructure: ## Transfer differential code from template
-infrastructure: $(template_dir)/environment.tar.gz
-	tar -xzf $< -C babs/differential/
+infrastructure: rnaseq.patch
+	tar -xzf $(template_dir)/environment.tar.gz -C babs/differential/
 	patch -p1 -d babs/differential < rnaseq.patch
-	for i in docs ingress nfcore; do cp babs/differential/resources/make/shared.mk babs/$$i/; done
 
-rnaseq.patch: $(template_dir)/environment.tar.gz
+rnaseq.patch: $(template_dir)/environment.tar.gz babs/differential/makefile $(wildcard babs/differential/resource/make/*.mk)
 	rm -rf infra-tmp && mkdir infra-tmp
 	tar -xzf $< -C infra-tmp
 	diff -ur infra-tmp babs/differential | grep -v "^Only in " | sed -E 's/^([+-]{3} [^\t]+)\t[0-9]{4}.*/\1/'> $@ || true
@@ -86,7 +85,7 @@ test: airway/fastq ## Generate a test folder setup for the airway data
 	if [ -n "$(aligner)" ]; then echo "aligner=$(aligner)" >> docs/GRCh38.config; fi && \
 	git commit --allow-empty -m "Restart git repo for testing" && \
 	git tag v9.9.9 )
-	#cd $@/babs/ingress && make run
+	cd $@/babs/ingress && make run
 
 .PHONY: test-ff-nfcore test-differential
 test-ff-nfcore: test/babs/nfcore/results ## Fast-forward to before the differential analysis, by using a cached run of nfcore

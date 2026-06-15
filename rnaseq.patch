@@ -222,12 +222,15 @@ diff -ur infra-tmp/makefile babs/differential/makefile
  	ln -sfn $(VERSION) $(pubdir)/latest
  	[ "$(location)" = "outputs" ] || cp --no-preserve=mode -r .htaccess $(pubdir)/ || echo "Warning: no .htaccess files, so unauthorised people may be able to view these results"
  	ln -sfn $$(realpath $(pubdir)/$(VERSION)) $(RESULTS_DIR)/published_$(location)
-@@ -216,12 +285,67 @@
+@@ -216,12 +285,70 @@
  ################################################################
  #### Bootstrap all relevant data from outside
  ################################################################
 -.PHONY: build
 -build: 
++
++# Prevent non-specific upstream stuff invoking the generic container response
++$(docs_dir)/% $(ingress_dir)/% $(nfcore_dir)/%:
 +
 +#' Get external spec files
 +$(specfiles_dep): extdata/% : $(docs_dir)/% | extdata
@@ -292,7 +295,7 @@ diff -ur infra-tmp/makefile babs/differential/makefile
  
  $(log_dir) $(dir $(my_metadata)) data $(RESULTS_DIR)/$(VERSION) $(RESULTS_DIR) $(staging_dir)/$(RESULTS_DIR)/$(VERSION) $(staging_dir) extdata:
  	mkdir -p $@
-@@ -231,5 +355,9 @@
+@@ -231,5 +358,9 @@
  maintainer-clean: clean ## Remove the results and data directories, in addition to staging and logs. The former contain end-results, so only do this if you really want to discard them (e.g. the analysis had a bug in it, and you want to do some housekeeping)
  	rm -rf $(RESULTS_DIR) data 
  
