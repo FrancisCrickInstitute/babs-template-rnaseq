@@ -434,11 +434,10 @@ build_dds_list <- function(dds, spec) {
     spec$sample_sets[[dataset_i]]$influential_samples <- obj$.influential
     spec$sample_sets[[dataset_i]]$object <- obj
   }
-  colour_toml <- "extdata/colours.toml"
-  if (!file.exists(colour_toml)) save_palettes(ddsList, fname="extdata/colours.toml")
+  spec <- read_palettes(spec, fname="extdata/colours.json")
+  save_palettes(spec, fname="staging/colours.json")
   spec
 }
-
 
 
 #' Fit the models of expression

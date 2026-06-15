@@ -44,6 +44,12 @@ write_assay <- function(obj, aname="vst", p) {
   out
 }
 
+write_proj <- function(proj, p, prefix="PC") {
+  fname <- p2filename(p, prefix=prefix, "csv")
+  write.csv(as.data.frame(proj), file=fname)
+  fname
+}
+
 #' @export
 write_clusters <- function(clust, mcols, p, prefix="clusters") {
   wb <- openxlsx::createWorkbook(title="Differential Analysis",
@@ -243,11 +249,12 @@ write_results <- function(dmc, params, assays=NULL) {
 
 
 #' @export
-to_letter <- function(i, so_far="") {
-  if (i<27)
-    paste0(LETTERS[i], so_far)
+to_letter <- function(i, alphabet = LETTERS, so_far = "") {
+  base <- length(alphabet)
+  if (i < base + 1)
+    paste0(alphabet[i], so_far)
   else
-    to_letter((i %/% 26), LETTERS[((i-1) %% 26) + 1])
+    to_letter((i - 1) %/% base, alphabet, paste0(alphabet[((i - 1) %% base) + 1], so_far))
 }
 
 
@@ -454,6 +461,7 @@ sample_X_dataset_table <- function(dds, obj) {
   # Generate tab_spanner parameters for each datasets extra columns
   ts_extra <- lapply(names(extra_meta),
                     function(x) list(name=x,
+                              id=paste0("ID",match(x,names(extra_meta))),
                               cols=1:ncol(extra_meta[[x]]))
                     )
   # Cummulatively offset the columns to be spanned
@@ -464,13 +472,10 @@ sample_X_dataset_table <- function(dds, obj) {
     accumulate=TRUE)
 
   df <- cbind(samp, do.call(cbind, unname(extra_meta)))
-  clabel <- setNames(as.list(names(df)), 1:ncol(df))
-  names(df) <- names(clabel)
   gt(data=df) %>%
-    cols_label(.list=clabel) %>%
     tab_spanner(label="Metadata",
                 columns=seq_along(samp)) %>%
-    Reduce(f=function(gti, x) tab_spanner(gti, label=x$name,columns=x$cols + ncol(samp)), x=ts_extra, init=.) %>%
+    Reduce(f=function(gti, x) tab_spanner(gti, label=x$name,id=x$id,columns=x$cols + ncol(samp)), x=ts_extra, init=.) %>%
     opt_interactive(page_size_default=25)
 }
 

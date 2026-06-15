@@ -381,9 +381,11 @@ multi-dimensionality as possible.
 first <- TRUE
 links <- list(
   clusters=list(),
+  pcs <- list(),
   expecteds=character()
 )
 cluster_ind <- counter(post_fn=to_letter)
+pc_ind <-  counter(post_fn=to_letter)
 girafe_ind <- counter()
 
 for (dataset_id in names(ddsList$sample_sets)) {
@@ -572,6 +574,10 @@ for (dataset_id in names(ddsList$sample_sets)) {
         center = do_recentre,
         scale = FALSE)
       proj <- predict(my_pc, newdata = t(assay(plot_se)))
+      this_pc <- pc_ind()
+      links$pcs[[this_pc]] <- modifyList(section_hierarchy, list(
+        link=write_proj(proj, p=params, prefix=paste0("PC-",this_pc))
+        ))
       my_percent <- round(100 * my_pc$sdev^2/sum(my_pc$sdev^2))
       pc.df <- cbind(colDF(plot_se),
                     data.frame(
@@ -579,7 +585,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
                       PC2 = proj[, plot_config$extra$pc_y], 
                       sample = rownames(colDF(plot_se))))
       
-      aes_list <- substitute_x_aes(mapping)
+      aes_list <- substitute_x_aes(mapping, colour_as_fill=!"fill" %in% names(eval(plot_fml[[2]])))
       for (this_aes in aes_list) {
         pl <- ggplot(transform(pc.df[vis_sample,],.derived="", .derived.value=""),
                     modifyList(this_aes, aes(x=PC1, y=PC2))) + 
@@ -673,9 +679,19 @@ fname <- write_clusters(links$clusters,
                         p=params,
                         prefix="exploratory-clusters")
 
+
 cat('\n\n<a class="download-excel btn btn-primary" href="',
     attr(fname,"link"),
     '">', RowNoun,'-Cluster mappings</a>', sep="")
+
+cat("\n\n## PC Files\n\n")
+pc_metaframe <- do.call(rbind, lapply(links$pcs, data.frame))
+fname <- p2filename(params, prefix="PC_metaframe", suffix=".csv")
+write.csv(pc_metaframe, file=fname)
+cat('\n\n<a class="download-excel btn btn-primary" href="',
+    attr(fname, "link"),
+    '">Details of PC</a>', sep="")
+
 plot_df <- bind_rows(do_plot())
 saveRDS(plot_df, file = file.path("data", "exploratory_plots.rds"))
 ojs_define(plot_df = plot_df)

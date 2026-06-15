@@ -580,7 +580,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
                           PC1 = proj[, plot_config$extra$pc_x],
                           PC2 = proj[, plot_config$extra[[if (nrow(this_assay) != 1) "pc_y" else "pc_x"]]], 
                           sample = rownames(colDF(plot_se))))
-        aes_list <- substitute_x_aes(mapping)
+        aes_list <- substitute_x_aes(mapping, colour_as_fill=!"fill" %in% names(eval(plot_fml[[2]])))
         for (this_aes in aes_list) {
           pl <- ggplot(transform(pc.df[vis_sample,],.derived="", .derived.value=""),
                       modifyList(this_aes, aes(x=PC1, y=PC2))) + 

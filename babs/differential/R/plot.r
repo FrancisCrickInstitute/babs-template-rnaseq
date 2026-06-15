@@ -183,7 +183,7 @@ separate_legend <- function(dds, vars) {
 }
 
 #' @export
-substitute_x_aes <- function(mapping) {
+substitute_x_aes <- function(mapping, colour_as_fill) {
   # x aesthetic about to be used to represent e.g. PC1 so may need to
   # remap what was being represented by x to another
   # aesthetic. Supplement with x swapped to colour if necessary
@@ -195,6 +195,7 @@ substitute_x_aes <- function(mapping) {
   out <- list(orig=mapping)
   if (need_alt_x) {
     mapping$colour <- mapping$x
+    if (colour_as_fill) mapping$fill <- mapping$x
     out$x2colour <- mapping
   }
   out
@@ -569,7 +570,7 @@ make_clusterer <- function(dds, fml) {
 
 save_palettes <- function(ddsList, fname) {
   con <- file(fname, "w")
-  palettes <- lapply(ddsList, function(dds) metadata(colData(dds))$palette$ggplot)
+  palettes <- lapply(ddsList$sample_sets, function(dds) metadata(colData(dds$object))$palette$ggplot)
   field_instances <- table(unlist(lapply(palettes, names)))
   in_all <- names(field_instances)[field_instances==length(palettes)]
   in_common <- sapply(
@@ -579,31 +580,73 @@ save_palettes <- function(ddsList, fname) {
         all(p[[f]] == palettes[[1]][[f]])
       }))
     })
-  name2key <- function(s) {ind <- grepl("[^A-Za-z0-9_-]", s); s[ind] <- paste0("'",s[ind],"'"); s}
 
-  palette2toml <- function(j, prefix="") {
-    writeLines(paste0("[", prefix, name2key(j), "]"), con=con)
+  palette2toml <- function(j, close="}") {
+    writeLines(paste0('    "',  j, '": {'), con=con)
     if (is.null(names(palettes[[1]][[j]]))) {
-      writeLines(c(paste0("'low to high' = [", paste0('"', palettes[[1]][[j]], '"', collapse=", "), "]"),""), con=con)
+      writeLines(
+        paste0(
+          '        "low to high" : [',
+          paste0('"', palettes[[1]][[j]], '"', collapse=", "),
+          "]"),
+      con=con)
     } else {
-      writeLines(c(paste0(name2key(names(palettes[[1]][[j]])), ' = "', palettes[[1]][[j]], '"'), ""), con=con)
+      writeLines(
+        paste(
+          sprintf('        "%s" : "%s"', names(palettes[[1]][[j]]), palettes[[1]][[j]]),
+          collapse=",\n"),
+        con=con
+      )
     }
+    writeLines(paste0("    ", close), con=con)
   }
   
+  writeLines('{ "all" : {', con=con)
   for (j in in_all[in_common]) {
-    palette2toml(j)
+    palette2toml(j, close=ifelse(j==rev(in_all[in_common])[1], "}", "},"))
   }
+  writeLines(c('},', '"variations": {'), con=con)
 
   distinct <- setdiff(names(field_instances), in_all[in_common])
   palettes <- lapply(palettes, "[", distinct)
   palettes <- palettes[lengths(palettes)>0]
   for (i in names(palettes)) {
+    writeLines(sprintf('"%s%": {', i), con=con)
     for (j in names(palettes[[i]])) {
-      palette2toml(j, prefix=paste0(i, '.'))
+      palette2toml(j, close=ifelse(j==rev(names(palettes))[1], "}", "},"))
     }
+    writeLines(ifelse(i == rev(names(palettes))[1], "}", "},"), con=con)
   }
+  writeLines(c("}", "}"), con=con)
   close(con)
 }
+
+read_palettes <- function(ddsList, fname) {
+  if (!file.exists(fname)) return(ddsList)
+  user_pal <- rjson::fromJSON(file=fname)
+  for (dset in names(ddsList$sample_sets)) {
+    pal <- metadata(colData(ddsList$sample_sets[[dset]]$object))$palette$ggplot
+    for (field in names(pal)) {
+      for (lev in names(pal[[field]])) {
+        ind <- which(names(user_pal$all[[field]])==lev)
+        val <- user_pal$all[[field]][[ind]]
+        if (dset %in% names(user_pal$variations) && field %in% names(user_pal$variations[[dset]] )) {
+          ind <- which(names(user_pal$variations[[dset]][[field]])==lev)
+          val <- user_pal$variations[[dset]][[field]][[ind]]
+        }
+        metadata(colData(ddsList$sample_sets[[dset]]$object))$palette$ggplot[[field]][[ind]] <- val
+        if (lev == "low to high") {
+          attr(metadata(colData(ddsList$sample_sets[[dset]]$object))$palette$Heatmap[[field]][[ind]], "colors") <- val
+        } else {
+          metadata(colData(ddsList$sample_sets[[dset]]$object))$palette$Heatmap[[field]][[ind]] <- val
+        }
+      }
+    }
+  }
+  ddsList
+}
+  
+  
 
 #' Heatmap colour-scheme generator
 #'
