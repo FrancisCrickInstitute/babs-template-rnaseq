@@ -1,16 +1,6 @@
 diff -ur infra-tmp/makefile babs/differential/makefile
 --- infra-tmp/makefile
 +++ babs/differential/makefile
-@@ -1,7 +1,7 @@
- .PHONY: makefile resources/make/module.mk resources/make/shared.mk resources/make/project.mk
--.PHONY: build clean maintainer-clean geo R-local
-+.PHONY: clean maintainer-clean geo R-local
- .DEFAULT_GOAL=help
--
-+diff_dir=.
- include resources/make/shared.mk
- include resources/make/module.mk   ## Anything we need to over-ride from shared
- include resources/make/project.mk  ## Describe analysis structure of the qmds etc
 @@ -16,41 +16,66 @@
  
  
@@ -43,8 +33,8 @@ diff -ur infra-tmp/makefile babs/differential/makefile
 -	 echo '' >> $@ ;\
 -	)
 -	echo '$*_pages=$(subsections)' >> $@
-+## variables to inform subsequent targets of the alignment, spec-file,
-+## and section for each alignment:spec combo. It will also set up the
++## variables to inform subsequent targets of the data_source, spec-file,
++## and section for each data_source:spec combo. It will also set up the
 +## global variables 'section'_(pages|qmds|htmls) which
 +## enumerate the individual combos.  Because these makefiles are
 +## 'included' they will automatically get remade as necessary, and if
@@ -52,24 +42,24 @@ diff -ur infra-tmp/makefile babs/differential/makefile
 +
 +mk0 = $(patsubst %,$(staging_dir)/.make-%,$(filter 00_%,$(sections)))
 +mk = $(patsubst %,$(staging_dir)/.make-%,$(filter-out 00_%,$(sections)))
-+qmd_path=$(staging_dir)/$*_$(ispec)_$(ialign).qmd
-+qmd0_path=$(staging_dir)/$*_$(ialign).qmd
++qmd_path=$(staging_dir)/$*_$(ispec)_$(idata).qmd
++qmd0_path=$(staging_dir)/$*_$(idata).qmd
 +
-+spec_of_align=$(filter-out $($(1).nospec),$(if $($(1).spec),$(filter $($(1).spec),$(specfiles)),$(specfiles)))
-+$(mk): $(staging_dir)/.make-% : $(file.spec) $(samplesheets) | $(staging_dir)
-+	printf "%s\n" $(foreach ispec,$(specfiles),\
-+	   $(foreach ialign,$(alignments),\
-+	   '$(qmd_path): alignment=$(ialign)'\
++spec_of_data_source=$(filter-out $($(1).nospec),$(if $($(1).spec),$(filter $($(1).spec),$(specs)),$(specs)))
++$(mk): $(staging_dir)/.make-% : $(specfiles) $(covariate_files) | $(staging_dir)
++	printf "%s\n" $(foreach ispec,$(specs),\
++	   $(foreach idata,$(datasets),\
++	   '$(qmd_path): data_source=$(idata)'\
 +	   '$(qmd_path): spec=$(ispec)'\
-+	   '$(qmd_path): script=$*_$(ispec)_$(ialign)'\
++	   '$(qmd_path): script=$*_$(ispec)_$(idata)'\
 +	   '$(qmd_path): section=$*'\
 +	   '$(qmd_path): cat1=$(or $(shell sed -n "s/^#$(squote)[[:space:]]*@categories[[:space:]]\+\(.*\)/\1/p" extdata/$(ispec).spec | head -n1),$(ispec))'\
-+	   '$(qmd_path): cat2=$(or $($(ialign).categories), $(ialign))'\
++	   '$(qmd_path): cat2=$(or $($(idata).categories), $(idata))'\
 +	   '$(qmd_path): specname=$(or $(shell sed -n "s/^#$(squote)[[:space:]]*@specname[[:space:]]\+\(.*\)/\1/p" extdata/$(ispec).spec | head -n1),$(ispec))'\
 +	   '$(qmd_path): $(source_dir)/$*.qmd'\
-+	   '$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$*_$(ispec)_$(ialign).html: $(my_counts_dir)/$(ialign) $(ispec).spec $(my_metadata)_$(ialign).csv $(qmd_path) $(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$($*_parent).html'\
++	   '$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$*_$(ispec)_$(idata).html: $(my_counts_dir)/$(idata) $(ispec).spec $(my_metadata)_$(idata).csv $(qmd_path) $(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$($*_parent).html'\
 +	)) > $@
-+	echo '$*_pages=$(foreach ialign,$(alignments),$(foreach ispec,$(call spec_of_align,$(ialign)),$*_$(ispec)_$(ialign)))' >> $@
++	echo '$*_pages=$(foreach idata,$(datasets),$(foreach ispec,$(call spec_of_data_source,$(idata)),$*_$(ispec)_$(idata)))' >> $@
  	echo '$*_qmds = $$(patsubst %,$(staging_dir)/%.qmd,$$($*_pages))'>> $@
  	echo '$*_htmls = $$(patsubst %,$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/%.html,$$($*_pages))'>> $@
  	echo '$*_htmls: $$($*_htmls)'>> $@
@@ -83,28 +73,28 @@ diff -ur infra-tmp/makefile babs/differential/makefile
 +# yet-to-be-run nfcore results.  Here, we ensure that the
 +# genes_results are made before the makefile that describes the dependencies
 +# of the 00_init.qmd's:
-+$(mk0): $(staging_dir)/.make-% : $(samplesheets) $(genes_results) | $(staging_dir)
-+	printf "%s\n" $(foreach ialign,$(alignments),\
-+	 '$(qmd0_path): alignment=$(ialign)'\
-+	 '$(qmd0_path): script=$*_$(ialign)'\
++$(mk0): $(staging_dir)/.make-% : $(covariate_files) $(genes_results) | $(staging_dir)
++	printf "%s\n" $(foreach idata,$(datasets),\
++	 '$(qmd0_path): data_source=$(idata)'\
++	 '$(qmd0_path): script=$*_$(idata)'\
 +	 '$(qmd0_path): section=$*'\
-+	 '$(qmd0_path): cat1=$($(ialign).categories)'\
++	 '$(qmd0_path): cat1=$($(idata).categories)'\
 +	 '$(qmd_path): specname=$(or $(shell sed -n "s/^#$(squote)[[:space:]]*@specname[[:space:]]\+\(.*\)/\1/p" extdata/$(ispec).spec | head -n1),$(ispec))'\
-+	 '$(qmd0_path): $(source_dir)/$*.qmd $(my_counts_dir)/$(ialign)'\
-+	 '$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$*_$(ialign).html: $(my_metadata)_$(ialign).csv $(qmd0_path)'\
++	 '$(qmd0_path): $(source_dir)/$*.qmd $(my_counts_dir)/$(idata)'\
++	 '$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$*_$(idata).html: $(my_metadata)_$(idata).csv $(qmd0_path)'\
 +	) > $@
-+	echo '$*_pages=$(foreach ialign,$(alignments),$*_$(ialign))' >> $@
++	echo '$*_pages=$(foreach idata,$(datasets),$*_$(idata))' >> $@
 +	echo '$*_qmds = $$(patsubst %,$(staging_dir)/%.qmd,$$($*_pages))'>> $@
 +	echo '$*_htmls = $$(patsubst %,$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/%.html,$$($*_pages))'>> $@
 +	echo '$*_htmls: $$($*_htmls)'>> $@
 +
 +ifneq (,$(filter-out $(or $(excluded-targets),$(MAKECMDGOALS)),$(MAKECMDGOALS)))
-+$(foreach c,$(conf), \
++$(foreach c,$(datasets), \
 +$(eval include extdata/$(c).config) \
-+$(eval $(c).org.db=$org.db) \
-+$(eval $(c).categories=$categories) \
-+$(eval $(c).spec=$spec) \
-+$(eval $(c).nospec=$nospec))
++$(eval $(c).org.db=$(org.db)) \
++$(eval $(c).categories=$(categories)) \
++$(eval $(c).spec=$(spec)) \
++$(eval $(c).nospec=$(nospec)))
 +endif
  
  qmds=$(strip $(foreach section,$(sections),$($(section)_qmds)))
@@ -114,39 +104,30 @@ diff -ur infra-tmp/makefile babs/differential/makefile
  
  ## Render the qmds to html in one quarto call
 -run: $(qmds) $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd | $(log_dir) data $(RESULTS_DIR)/$(VERSION)  ## Create objects in `data` that store the results of applying each spec file, along with a versioned html report in `results`.
-+run: $(qmds) $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(samplesheets)| $(log_dir) data $(RESULTS_DIR)/$(VERSION)  $(genes_results)  ## Create objects in `data` that store the results of applying each spec file, along with a versioned html report in `results`.
++run: $(qmds) $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(covariate_files)| $(log_dir) data $(RESULTS_DIR)/$(VERSION)  $(genes_results)  ## Create objects in `data` that store the results of applying each spec file, along with a versioned html report in `results`.
 +	$(GIT) commit -m "Adding files generated by a differential run" || echo "No additional differential files needed adding"
+ 	$(init_checkpoint)
  	sed  -i 's#^  contents: .*#  contents: [$(subst $(space),$(comma),$(patsubst $(staging_dir)/%,%,$(qmds)))]#' $(staging_dir)/index.qmd
  	rm -rf $(staging_dir)/$(RESULTS_DIR)/$(VERSION)
- 	rm -rf $(RESULTS_DIR)/$(VERSION).previous
-@@ -93,7 +119,7 @@
+@@ -94,7 +120,7 @@
  	ln -sfn  $(VERSION) $(RESULTS_DIR)/latest
  
  ## Render an individual page
 -$(html_reports) : $(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%.html : $(staging_dir)/%.qmd $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd | $(log_dir) $(RESULTS_DIR)/$(VERSION) $(staging_dir)/$(RESULTS_DIR)/$(VERSION)
-+$(html_reports) : $(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%.html : $(staging_dir)/%.qmd $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(samplesheets)| $(log_dir) $(RESULTS_DIR)/$(VERSION) $(staging_dir)/$(RESULTS_DIR)/$(VERSION)
++$(html_reports) : $(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%.html : $(staging_dir)/%.qmd $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(covariate_files)| $(log_dir) $(RESULTS_DIR)/$(VERSION) $(staging_dir)/$(RESULTS_DIR)/$(VERSION)
  	$(QUARTO) render '$<' $(quarto_opts) $(call log,html-$*)
  
  html-%: $(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%.html ## Create a single html file to be placed in the staging directory, '%' is a simplified filename e.g. `make html-01_exploratory_per-plan_GRCh38`.
-@@ -107,7 +133,7 @@
- notesfile=$(firstword $(wildcard NOTES.org NOTES.md))
- $(staging_dir)/notes.md: $(notesfile) CHANGELOG.md
- 	:> $@
--	[ -z "$(notesfile)" ] || [ "$(suffix $(notesfile))" = md ] || pandoc -s -o $@ $<  
-+	[ -z "$(notesfile)" ] || [ "$(suffix $(notesfile))" = md ] || pandoc --lua-filter=resources/_extensions/notes.lua -s -o $@ $<  
- 	[ "$(notesfile)" = CHANGELOG.md ] || cat CHANGELOG.md >> $@
- 
- CHANGELOG.md:
 @@ -123,14 +149,27 @@
  	 --generated=$(staging_dir)/$(VERSION).params.yml > $@
  	sed -i -e 's#choose_staging("$(section)")#"$(staging_dir)/$*"#' $@
  
 +$(qmds:qmd=yml):
-+	echo "title: $(alignment) $(or $(specname),$(spec))" > $@
-+	echo "description: $(alignment)-aligned data$(if $(spec), according to plan '$(spec)')" >> $@
++	echo "title: $(data_source) $(or $(specname),$(spec))" > $@
++	echo "description: $(data_source)-aligned data$(if $(spec), according to plan '$(spec)')" >> $@
 +	echo "categories: [$(if $(cat1),$(if $(cat2),$(cat1)$(comma)$(cat2),$(cat1)),$(cat2))]" >> $@
 +	echo "params:" >> $@
-+	echo "  alignment: $(alignment)" >> $@
++	echo "  data_source: $(data_source)" >> $@
 +	echo "  spec: $(or $(spec),'')" >> $@
 +	echo "  specname: $(or $(specname),'')" >> $@
 +	echo "  script: $(@:yml=qmd)" >> $@
@@ -155,8 +136,8 @@ diff -ur infra-tmp/makefile babs/differential/makefile
  $(staging_dir)/_quarto.yml: $(source_dir)/_quarto.yml $(qmds) $(css) $(includes)
 -	echo 'section: [$(subst $(space),$(comma)$(space),$(sections))]' > ${staging_dir}/_sidebar.yml
 -	echo 'subsection: [$(subst $(space),$(comma)$(space),$(all_subs))]' >> ${staging_dir}/_sidebar.yml
-+	echo 'alignment: [$(subst $(space),$(comma)$(space),$(alignments))]' > ${staging_dir}/_sidebar.yml
-+	echo 'spec: [null,$(subst $(space),$(comma)$(space),$(specfiles))]' >> ${staging_dir}/_sidebar.yml
++	echo 'data_source: [$(subst $(space),$(comma)$(space),$(datasets))]' > ${staging_dir}/_sidebar.yml
++	echo 'spec: [null,$(subst $(space),$(comma)$(space),$(specs))]' >> ${staging_dir}/_sidebar.yml
 +	echo 'section: [$(subst $(space),$(comma)$(space),$(sections))]' >> ${staging_dir}/_sidebar.yml
  	$(QUARTO) run $(source_dir)/typescript/sidebar.ts\
  	 --template=$< \
@@ -167,18 +148,43 @@ diff -ur infra-tmp/makefile babs/differential/makefile
  	cp $(source_dir)/_quarto-*.yml $(staging_dir)/
  	rm -f ${staging_dir}/_sidebar.yml
  	mkdir -p ${staging_dir}/_extensions
-@@ -150,7 +189,10 @@
+@@ -141,28 +180,43 @@
+ 	echo 'author: [{name: "$(or $(FULLNAME),$(shell whoami))", id: $(shell whoami), roles: Analyst, affiliation: $(or $(MY_AFFILIATION),{ref: [fci]})}]' > $@
+ 	echo 'params: {$(foreach p,$(param_names),$p: "$($p)"$(comma))}' >> $@
+ 
+-$(staging_dir)/index.qmd : $(source_dir)/index.qmd $(qmds) $(staging_dir)/notes.md
++$(staging_dir)/index.qmd : $(source_dir)/index.qmd $(qmds) $(staging_dir)/notes.md $(log_dir)/check_spec.log
+ 	sed  's#^  contents: .*#  contents: [$(subst $(space),$(comma),$(patsubst $(staging_dir)/%,%,$(qmds)))]#' $< > $@
+ 
++$(log_dir)/check_spec.log : $(specfiles)
++	$(R) --vanilla -e "files <- strsplit('$(specfiles)', ' +')[[1]]; \
++	  ok <- TRUE; \
++	  for (f in files) { \
++	    message('Checking ', f); \
++	    tryCatch(parse(file = f), error = function(e) { \
++	      message('ERROR in ', f, ': ', e$$message); \
++	      ok <<- FALSE \
++	    }) \
++	  }; \
++	  if (!ok) quit(status = 1)"  2>$@
++
+ $(staging_dir)/R.bib: extdata/R.bib
+ 	cp $< $@
+ 
  extdata/R.bib: | renv
  	$(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")' $(call log,bib)
  
-+renv: orgs=$(strip $(foreach align,$(alignments),$($(align).org.db)))
++renv: orgs=$(strip $(foreach data_source,$(datasets),$($(data_source).org.db)))
  renv: | $(log_dir)
 +	sed -i '/\#DO NOT EDIT AFTER THIS LINE/q' resources/_dependencies.R
 +	for i in "$(orgs)"; do echo "library($$i)" >> resources/_dependencies.R; done
  	if [ -f renv.lock ] ; then \
  	  $(R) -e 'library(renv); activate()' ;\
- 	  $(R) -e 'library(renv); restore(); install(lock=TRUE)' ;\
-@@ -160,9 +202,9 @@
+-	  $(R) -e 'library(renv); restore(); install(lock=TRUE)' ;\
++	  $(R) -e 'library(renv); restore(); install(strsplit("$(orgs)", " +")[[1]], lock=TRUE)' ;\
+ 	else \
+ 	  $(GIT) stash push -m "Pipeline stashed. Use 'git stash pop' to retrieve it" -- $@ $(call log,renv) ;\
+ 	  $(R) -e 'library(renv); init(bioconductor=TRUE)' ;\
  	  $(R) -e 'library(renv); snapshot(type="all")' ;\
  	fi
  	$(GIT) add renv.lock renv .Rprofile $(source_dir)
@@ -191,21 +197,21 @@ diff -ur infra-tmp/makefile babs/differential/makefile
  
  endif
  
-@@ -180,9 +222,24 @@
+@@ -180,9 +234,24 @@
  
  
  
 +# .PHONY: geo
-+# geo: geo/md5.txt  ## Gather everything into the 'geo' folder. Specify `version=`, `alignment=` and `spec=` to customise. Remember to `make clean-geo` when the files have been upload.
++# geo: geo/md5.txt  ## Gather everything into the 'geo' folder. Specify `VERSION=`, `data_source=` and `spec=` to customise. Remember to `make clean-geo` when the files have been upload.
 +# geo/md5.txt:
 +# 	mkdir -p $(SCRATCH_DIR)geo
 +# 	mkdir -p shortcuts
 +# 	ln -s $(SCRATCH_DIR)geo shortcuts/geo
-+# 	ln -fn $(my_counts_dir)/$(alignment)/*.genes.results shortcuts/geo/
-+# 	ln -fn $(RESULTS_DIR)/$(VERSION)/$(alignment)/$(spec)/*.xlsx shortcuts/geo/
-+# 	$(SQLITE) extdata/$(samples_db) 'select fastq_1 from fastqs  where config_file="$(alignment)";' | \
++# 	ln -fn $(my_counts_dir)/$(data_source)/*.genes.results shortcuts/geo/
++# 	ln -fn $(RESULTS_DIR)/$(VERSION)/$(data_source)/$(spec)/*.xlsx shortcuts/geo/
++# 	$(SQLITE) extdata/$(samples_db) 'select fastq_1 from fastqs  where config_file="$(data_source)";' | \
 +# 	while read -r fq ; do cp $${fq} shortcuts/geo/ ; done
-+# 	$(SQLITE) extdata/$(samples_db) 'select fastq_2 from fastqs  where config_file="$(alignment)";' | \
++# 	$(SQLITE) extdata/$(samples_db) 'select fastq_2 from fastqs  where config_file="$(data_source)";' | \
 +# 	while read -r fq ; do cp $${fq} shortcuts/geo/ ; done
 +# 	pushd shortcuts/geo; md5sum *.* > geo.md5.txt; popd
 +
@@ -216,45 +222,37 @@ diff -ur infra-tmp/makefile babs/differential/makefile
  	ln -sfn $(VERSION) $(pubdir)/latest
  	[ "$(location)" = "outputs" ] || cp --no-preserve=mode -r .htaccess $(pubdir)/ || echo "Warning: no .htaccess files, so unauthorised people may be able to view these results"
  	ln -sfn $$(realpath $(pubdir)/$(VERSION)) $(RESULTS_DIR)/published_$(location)
-@@ -215,12 +272,73 @@
+@@ -216,12 +285,67 @@
  ################################################################
  #### Bootstrap all relevant data from outside
  ################################################################
 -.PHONY: build
 -build: 
 +
-+ifneq ($(docs_dir),)
-+$(docs_dir)/%:
-+	$(MAKE) --no-print-directory -C $(docs_dir) $*
-+$(file.spec): extdata/% : $(docs_dir)/% | extdata
++#' Get external spec files
++$(specfiles_dep): extdata/% : $(docs_dir)/% | extdata
 +	cp $< $@
 +	$(GIT) add $@ $<
-+$(my_metadata).csv: $(docs_dir)/$(experiment_table).csv | $(dir $(my_metadata))
++
++#' Get external experiment table
++$(my_metadata).csv: $(wildcard $(docs_dir)/$(experiment_table).csv) | $(dir $(my_metadata))
++ifeq ($(wildcard $(docs_dir)/$(experiment_table).csv),)
++	@echo "You must create $@, which assigns covariates' values to your samples"
++	@exit 1
++else
 +	$(MAKE) --no-print-directory -C $(ingress_dir) $(experiment_table).csv
 +	cp $(ingress_dir)/$(experiment_table).csv $@
 +	$(GIT) add $@ $<
-+$(configs): extdata/%.config: $(docs_dir)/%.config | extdata
++endif
++
++#' Get external configs
++$(patsubst %,extdata/%.config,$(datasets_dep)): extdata/%.config: $(docs_dir)/%.config | extdata
 +	$(MAKE) --no-print-directory -C $(ingress_dir) $*.config
 +	cp $(ingress_dir)/$*.config $@
 +	$(GIT) add $@ $<
-+else
-+$(my_metadata).csv $(configs):
-+	touch $@
-+endif
 +
-+
-+ifneq ($(nfcore_dir),)
-+$(nfcore_dir)/%:
-+	$(MAKE) --no-print-directory -C $(nfcore_dir) $*
-+
-+# All the nfcore dependencies on docs - if docs samplesheet changes, recalculate everything.  If a config changes, just recalc that.
-+
-+$(nfcore_dir)/samplesheet_%.csv: $(docs_dir)/%.config $(docs_dir)/%.csv
-+$(nfcore_dir)/results/%/merged.gene_counts.tsv : $(docs_dir)/%.config $(docs_dir)/%.csv
-+
-+
-+## Recipes for copying & generating files from nfcore results
-+$(samplesheets) : $(my_metadata)_%.csv : $(nfcore_dir)/samplesheet_%.csv $(my_metadata).csv
++#' Get subtables of experiment table for external samplesheets
++$(covariate_files_dep) : $(my_metadata)_%.csv : $(nfcore_dir)/samplesheet_%.csv $(my_metadata).csv extdata/%.config
 +	rm -f '$*.db'
 +	$(SQLITE) '$*.db' '.import --csv  $< $*'  ;\
 +	$(SQLITE) '$*.db' '.import --csv  $(my_metadata).csv metadata'  ;\
@@ -262,6 +260,11 @@ diff -ur infra-tmp/makefile babs/differential/makefile
 +	rm -f '$*.db'
 +	$(GIT) add $@
 +
++$(nfcore_dir)/samplesheet_%.csv: $(docs_dir)/%.config $(docs_dir)/%.csv
++	$(MAKE) --no-print-directory -C $(nfcore_dir) $*
++
++
++#' nfcore-specific genes-results folder
 +$(genes_results): $(my_counts_dir)/%: $(nfcore_dir)/results/%/merged.gene_counts.tsv 
 +	dir=$(if $($*.group-as),$($*.group-as),$*);\
 +	mkdir -p $(my_counts_dir)/$${dir} ;\
@@ -273,12 +276,9 @@ diff -ur infra-tmp/makefile babs/differential/makefile
 +	fi
 +	mkdir -p $(RESULTS_DIR)/multiqc-$*
 +	cp -lr $(nfcore_dir)/results/$*/multi-qc/. $(RESULTS_DIR)/multiqc-$* || cp -r $(nfcore_dir)/results/$*/multi-qc/. $(RESULTS_DIR)/multiqc-$*
-+else
-+$(samplesheets):
-+	touch $@
-+$(genes_results):
-+	mkdir -p $@
-+endif
++
++$(nfcore_dir)/results/%/merged.gene_counts.tsv : $(docs_dir)/%.config $(docs_dir)/%.csv
++	$(MAKE) --no-print-directory -C $(nfcore_dir) $*
 +
  
  ################################################################
@@ -292,21 +292,20 @@ diff -ur infra-tmp/makefile babs/differential/makefile
  
  $(log_dir) $(dir $(my_metadata)) data $(RESULTS_DIR)/$(VERSION) $(RESULTS_DIR) $(staging_dir)/$(RESULTS_DIR)/$(VERSION) $(staging_dir) extdata:
  	mkdir -p $@
-@@ -230,5 +348,10 @@
+@@ -231,5 +355,9 @@
  maintainer-clean: clean ## Remove the results and data directories, in addition to staging and logs. The former contain end-results, so only do this if you really want to discard them (e.g. the analysis had a bug in it, and you want to do some housekeeping)
  	rm -rf $(RESULTS_DIR) data 
  
 +clean-geo:  ## Remove the GEO files from scratch
 +	rm -f shortcuts/geo
 +	rm -rf $(SCRATCH_DIR)geo
-+
+ 
  
 +MAKEFLAGS += --no-builtin-rules
- 
 diff -ur infra-tmp/resources/_dependencies.R babs/differential/resources/_dependencies.R
 --- infra-tmp/resources/_dependencies.R
 +++ babs/differential/resources/_dependencies.R
-@@ -1,17 +1,16 @@
+@@ -1,20 +1,20 @@
 -library(BiocParallel)
 -library(BiocManager)
 -library(BiocVersion)
@@ -329,10 +328,14 @@ diff -ur infra-tmp/resources/_dependencies.R babs/differential/resources/_depend
  library(mgcv)
  library(nnet)
  library(rpart)
+ library(spatial)
+ library(survival)
+ #DO NOT EDIT AFTER THIS LINE
++library(org.Hs.eg.db)
 diff -ur infra-tmp/resources/make/module.mk babs/differential/resources/make/module.mk
 --- infra-tmp/resources/make/module.mk
 +++ babs/differential/resources/make/module.mk
-@@ -4,3 +4,51 @@
+@@ -4,3 +4,42 @@
  ## Most things will already have been set in shared.mk -
  ## if you want to over-ride them, it is best to do so here
  ################################################################
@@ -361,27 +364,18 @@ diff -ur infra-tmp/resources/make/module.mk babs/differential/resources/make/mod
 +SQLITE_MODULE=SQLite/3.42.0-GCCcore-12.3.0
 +SQLITE = $(call ml,$(SQLITE_MODULE)); sqlite3
 +
-+################################################################
-+## Propagation of docs files
-+## 'Earliest' presence of a propagated file is taken as definitive.
-+################################################################
-+early_spec_dir=$(firstword $(wildcard $(docs_dir) $(diff_dir)/extdata))
-+specfiles=$(patsubst $(early_spec_dir)/%.spec,%,$(wildcard $(early_spec_dir)/*.spec))
++datasets_dep=$(patsubst $(docs_dir)/%.config,%,$(wildcard $(docs_dir)/*.config))
++datasets=$(datasets_dep) $(filter-out $(datasets_dep),$(patsubst extdata/%.config,%,$(wildcard extdata/*.config)))
 +
-+samplesheets = $(patsubst %,$(my_metadata)_%.csv,$(alignments))
-+configs = $(patsubst %,extdata/%.config,$(alignments))
-+genes_results = $(patsubst %,$(my_counts_dir)/%,$(alignments))
-+file.spec = $(patsubst %,extdata/%.spec,$(specfiles))
++specfiles_dep=$(patsubst $(docs_dir)/%.spec,extdata/%.spec,$(wildcard $(docs_dir)/*.spec))
++specfiles=$(specfiles_dep) $(filter-out $(specfiles_dep),$(wildcard extdata/*.spec))
++specs=$(patsubst extdata/%.spec,%,$(specfiles))
 +
-+################################################################
-+## GEO settings
-+################################################################
-+## For submission to GEO, we need to know the version, spec and
-+## aligment settings that are to be submitted.
-+################################################################
-+geo: version=latest
-+geo: alignment=$(firstword $(alignments))
-+geo: spec=$(firstword $(specfiles))
++covariate_files_dep = $(patsubst %,$(my_metadata)_%.csv,$(datasets_dep))
++covariate_files = $(patsubst %,$(my_metadata)_%.csv,$(datasets))
++
++configs = $(patsubst %,extdata/%.config,$(datasets))
++genes_results = $(patsubst %,$(my_counts_dir)/%,$(datasets_dep))
 +
 +excluded-targets += check-isolated
 diff -ur infra-tmp/resources/make/project.mk babs/differential/resources/make/project.mk
@@ -392,13 +386,13 @@ diff -ur infra-tmp/resources/make/project.mk babs/differential/resources/make/pr
  
  res_dir = $(RESULTS_DIR)/$(VERSION)
 +file_col = $(metadata_id_column)
-+metadata = $(my_metadata)_$(alignment).csv
-+counts =  $(my_counts_dir)/$(alignment)/
++metadata = $(my_metadata)_$(data_source).csv
++counts =  $(my_counts_dir)/$(data_source)/
  
  ## Let later processes know which of those to include in every section -
  ## variable _names_ need to be stored in the `param_names` variable:
--param_names = res_dir VERSION TAG staging_dir 
-+param_names = res_dir VERSION TAG staging_dir file_col name_col metadata counts
+-param_names = res_dir VERSION GIT_REF staging_dir 
++param_names = res_dir VERSION GIT_REF staging_dir file_col name_col metadata counts
  
  
  ################################################################
@@ -420,38 +414,34 @@ diff -ur infra-tmp/resources/make/project.mk babs/differential/resources/make/pr
 -# html-outdir=$(staging_dir)/$(RESULTS_DIR)/$(VERSION)
 -# 02_publish_htmls : $(html-outdir)/02_publish_%.html $(html-outdir)/01_analyse_%.html 
 -
-+01_exploratory_parent = 00_init_$(ialign)
-+02_differential_parent = 01_exploratory_$(ispec)_$(ialign)
-+03_enrichment_parent = 02_differential_$(ispec)_$(ialign)
++01_exploratory_parent = 00_init_$(idata)
++02_differential_parent = 01_exploratory_$(ispec)_$(idata)
++03_enrichment_parent = 02_differential_$(ispec)_$(idata)
 diff -ur infra-tmp/resources/make/shared.mk babs/differential/resources/make/shared.mk
 --- infra-tmp/resources/make/shared.mk
 +++ babs/differential/resources/make/shared.mk
-@@ -1,3 +1,25 @@
-+docs_dir?=$(wildcard ../docs)
-+ingress_dir?=$(wildcard ../ingress)
-+nfcore_dir?=$(wildcard ../nfcore)
-+diff_dir?=$(wildcard ../differential)
+@@ -1,3 +1,13 @@
++docs_dir?=../docs
++ingress_dir?=../ingress
++nfcore_dir?=../nfcore
++diff_dir?=../differential
 +
 +experiment_table = experiment_table
 +samplesheet_id_column = sample
 +metadata_id_column = ID
 +name_col = sample_name
 +
-+ifneq ($(diff_dir),)
-+alignments=$(patsubst $(diff_dir)/extdata/%.config,%,$(wildcard $(diff_dir)/extdata/*.config))
-+endif
-+ifneq ($(nfcore_dir),)
-+alignments=$(patsubst $(nfcore_dir)/results/%,%,$(wildcard $(nfcore_dir)/results/*))
-+endif
-+ifneq ($(ingress_dir),)
-+alignments=$(patsubst $(ingress_dir)/%.config,%,$(wildcard $(ingress_dir)/*.config))
-+endif
-+ifneq ($(docs_dir),)
-+alignments=$(patsubst $(docs_dir)/%.config,%,$(wildcard $(docs_dir)/*.config))
-+endif
  ################################################################
  ## Things here are typically shared across all phases of the
  ## analysis. There's originally one gold-reference copy of this file
+@@ -125,6 +135,7 @@
+ fi
+ endef
+ 
++
+ ################################################################
+ ## Publishing (moving) generated results and providing shortcuts
+ ################################################################
 diff -ur infra-tmp/resources/params.yml babs/differential/resources/params.yml
 --- infra-tmp/resources/params.yml
 +++ babs/differential/resources/params.yml
@@ -478,4 +468,243 @@ diff -ur infra-tmp/resources/_quarto.yml babs/differential/resources/_quarto.yml
  concise: false
 +_prefixes:
 +  spec: ⚙
-+  alignment: 📁
++  data_source: 📁
+diff -ur infra-tmp/resources/typescript/sidebar.ts babs/differential/resources/typescript/sidebar.ts
+--- infra-tmp/resources/typescript/sidebar.ts
++++ babs/differential/resources/typescript/sidebar.ts
+@@ -39,7 +39,7 @@
+  * Recursively expand axes into a nested nav tree,
+  * passing params from qmd2nav and collecting a flat list of hrefs.
+  *
+- * axes: object with arrays for each axis (e.g., { align, spec, script })
++ * axes: object with arrays for each axis (e.g., { data_source, spec, script })
+  * args: arguments including `staging` path
+  *
+  * Returns: { navTree, flatList }
+@@ -47,114 +47,120 @@
+ function expandAxesForNav(axes, staging) {
+     const flatList = [];
+ 
+-    function recurse(keys, prefix={}) {
+-	if (keys.length === 0) {
+-	    const fname =
+-		  Object.keys(prefix).reverse().map(k => prefix[k]).filter(v => v != null && v !== "").join("_") + ".qmd";
+-	    
+-	    const nav = qmd2nav(fname, staging, Object.keys(prefix));
+-	    if (nav) {
+-		flatList.push(nav.href);
+-		return [nav];
+-	    }
+-	    return [];
+-	}
+-
+-	const [currentKey, ...restKeys] = keys;
+-	const values = axes[currentKey];
+-	var results = [];
+-
+-	for (const val of values) {
+-	    const nodePrefix = { ...prefix, [currentKey]: val };
+-	    const children = recurse(restKeys, nodePrefix);
+-
+-	    if (children.length > 0) {
+-		if (val === null) {
+-		    // Flatten null branch
+-		    results.push(...children);
+-		} else {
+-		    // Use params from first child for section label
+-		    const nameVal = children.reduce((found, child) =>
+-			found || child.params?.[currentKey + "name"] || null, null
+-		    );
+-		    // capture specname (non-empty) before params are deleted
+-		    const nonEmptyNameVal = nameVal || null;
+-		    
+-		    let label = capitalizeFirstLetter(
+-			nonEmptyNameVal ||
+-			    children[0].params?.[currentKey] ||
+-			    val
+-		    );
+-		    
+-		    const filteredParams = Object.fromEntries(
+-			[currentKey, ...Object.keys(prefix)]
+-			    .flatMap(k => {
+-				const sourceForK     = children.find(c => k in (c.params || {}) && c.params[k] !== '');
+-				const sourceForKName = children.find(c => (k+"name") in (c.params || {}) && c.params[k+"name"] !== '');
+-				const entries = [];
+-				if (sourceForK)     entries.push([k, sourceForK.params[k]]);
+-				if (sourceForKName) entries.push([k+"name", sourceForKName.params[k+"name"]]);
+-				return entries;
+-			    })
+-		    );
+-		    
+-		    // only delete params AFTER filteredParams is built
+-		    children.forEach(child => {
+-    delete child.params;
+-		    });
+-		    if (
+-		        children.length === 1 &&
+-			    children[0] &&
+-			    typeof children[0].href === "string" &&
+-			    typeof children[0].text === "string" &&
+-			    !("section" in children[0])
+-		    ) {
+-			results.push({
+-			    ...children[0],
+-			    params: filteredParams
+-			});
+-		    } else {
+-			
+-			results.push({
+-			    section: (quarto?._prefixes?.[currentKey] ?? "") + label + ":",
+-			    contents: children,
+-			    params: filteredParams
+-			});
+-		    }
+-		}
+-	    }
+-	}
+-	const sectionNodes = results.filter(item => "section" in item);
+-	// Only collapse structural wrapper if it is a pure passthrough
+-	if (sectionNodes.length === 1 && results.length === 1) {
+-	    const only = sectionNodes[0];
+-	    
+-	    // Collapse only if the section adds no real grouping value
+-	    if (Array.isArray(only.contents)) {
+-		results = only.contents;
+-	    }
+-	}
+-	// If this axis has only one non-null value,
+-	// promote its section contents upward
+-	if (
+-	    values.filter(v => v !== null).length === 1
+-	) {
+-	    const promoted = [];
+-	    for (const item of results) {
+-		if (item.section && Array.isArray(item.contents)) {
+-		    promoted.push(...item.contents);
+-		} else {
+-		    promoted.push(item);
+-		}
+-	    }
+-	    results = promoted;
+-	}
+-	// results.forEach(child => {
+-	//     delete child.params;
+-	// });
+-	return results;
++function recurse(keys, prefix = {}) {
++    if (keys.length === 0) {
++        const fname =
++            Object.keys(prefix)
++                .reverse()
++                .map((k) => prefix[k])
++                .filter((v) => v != null && v !== "")
++                .join("_") + ".qmd";
++
++        const nav = qmd2nav(fname, staging, Object.keys(prefix));
++        if (nav) {
++            flatList.push(nav.href);
++            return [nav];
++        }
++        return [];
++    }
++
++    const [currentKey, ...restKeys] = keys;
++    const values = axes[currentKey];
++    let results = [];
++
++    for (const val of values) {
++        const nodePrefix = { ...prefix, [currentKey]: val };
++        const children = recurse(restKeys, nodePrefix);
++
++        if (children.length > 0) {
++            if (val === null) {
++                // Flatten null branch
++                results.push(...children);
++            } else {
++                const nameVal = children.reduce(
++                    (found, child) =>
++                        found || child.params?.[currentKey + "name"] || null,
++                    null
++                );
++
++                let label = capitalizeFirstLetter(
++                    nameVal ||
++                        children[0].params?.[currentKey] ||
++                        val
++                );
++
++                const filteredParams = Object.fromEntries(
++                    [currentKey, ...Object.keys(prefix)]
++                        .flatMap((k) => {
++                            const sourceForK = children.find(
++                                (c) =>
++                                    k in (c.params || {}) &&
++                                    c.params[k] !== ""
++                            );
++                            const sourceForKName = children.find(
++                                (c) =>
++                                    k + "name" in (c.params || {}) &&
++                                    c.params[k + "name"] !== ""
++                            );
++                            const entries = [];
++                            if (sourceForK)
++                                entries.push([k, sourceForK.params[k]]);
++                            if (sourceForKName)
++                                entries.push([
++                                    k + "name",
++                                    sourceForKName.params[k + "name"],
++                                ]);
++                            return entries;
++                        })
++                );
++
++                // only delete params AFTER filteredParams is built
++                children.forEach((child) => {
++                    delete child.params;
++                });
++
++                if (
++                    children.length === 1 &&
++                    children[0] &&
++                    typeof children[0].href === "string" &&
++                    typeof children[0].text === "string" &&
++                    !("section" in children[0])
++                ) {
++                    results.push({
++                        ...children[0],
++                        params: filteredParams,
++                    });
++                } else {
++                    results.push({
++                        section:
++                            (quarto?._prefixes?.[currentKey] ?? "") +
++                            label +
++                            ":",
++                        contents: children,
++                        params: filteredParams,
++                    });
++                }
++            }
++        }
+     }
+ 
++    // Collapse condition: If an axis has only one non-null unique value, promote children
++    const nonNullValues = values.filter((v) => v !== null);
++    if (nonNullValues.length === 1) {
++        const promoted = [];
++        for (const item of results) {
++            if (item.section && Array.isArray(item.contents)) {
++                promoted.push(...item.contents);
++            } else {
++                promoted.push(item);
++            }
++        }
++        results = promoted;
++    }
++
++    return results;
++}
++
+     const navTree = recurse(Object.keys(axes).filter(k => k !=="_prefixes"));
+     return { navTree, flatList };
+ 
