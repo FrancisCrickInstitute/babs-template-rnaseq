@@ -478,7 +478,19 @@ hmap_fn <- function(dds, mat, cluster_transform, gene_clust, model_vars, plot_co
     } else {
       cluster_columns <- FALSE
     }
-    rheight <- eval(plot_config$extra$row_height) %||% unit(1, "mm")
+    rheight <- unit(1, "mm")
+    if ("row_height" %in% names(plot_config$extra)) {
+      step_units <- function(n, size, unit="mm") {function(x) unit(stepfun(x=n, y=size)(x), unit=unit)}
+      rheight <- eval(plot_config$extra$row_height)
+      if (is.function(rheight)) rheight <- rheight(nrow(mat))
+    }
+    annotation_height <- NULL
+    if ("annotation_row_height" %in% names(plot_config$extra)) {
+      step_units <- function(n, size, unit="mm") {function(x) unit(stepfun(x=n, y=size)(x), unit=unit)}
+      annotation_height <- eval(plot_config$extra$annotation_row_height)
+      if (is.function(annotation_height)) annotation_height <- annotation_height(length(model_vars))
+    }
+    
     defaults <- list(
       matrix=masked[,ind,drop=FALSE],
       column_title = column_title,
@@ -492,6 +504,7 @@ hmap_fn <- function(dds, mat, cluster_transform, gene_clust, model_vars, plot_co
       top_annotation = ComplexHeatmap::HeatmapAnnotation(
         df = as.data.frame(colData(dds))[ind, model_vars, drop=FALSE], 
         col = metadata(colData(dds))$palette$Heatmap[model_vars],
+        annotation_height=annotation_height,
         show_legend=FALSE,
         show_annotation_name=last
       ), 
