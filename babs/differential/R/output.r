@@ -46,6 +46,7 @@ write_assay <- function(obj, aname="vst", p) {
 
 write_proj <- function(proj, p, prefix="PC") {
   fname <- p2filename(p, prefix=prefix, "csv")
+  dir.create(dirname(fname), recursive=TRUE)
   write.csv(as.data.frame(proj), file=fname)
   fname
 }

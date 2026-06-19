@@ -149,29 +149,37 @@ assemble_partialised <- function(obj, reduced, resids = TRUE) {
   t(mat)
 }
 
-partial_reconstruct <- function(obj, plot_fml, resids=TRUE,  assay=NULL, ...) {
+
+default_assay_name <- function(plot_aes, obj,assay=NULL) {
   if (is.null(assay)) {
-    if ("y" %in% names(plot_fml[[2]])) {
-      assay <- as.character(plot_fml[[2]]$y)
+    if ("y" %in% names(plot_aes)) {
+      assay <- all.vars(plot_aes$y)
     } else {
       assay <- ifelse(inherits(obj, "DESeqDataSet"), "vst", assayNames(obj)[1])
     }
   }
+  assay
+}
+
+partial_reconstruct <- function(obj, reduced, resids=TRUE,  assay=NULL, ...) {
+  if (is.null(assay)) {
+      assay <- ifelse(inherits(obj, "DESeqDataSet"), "vst", assayNames(obj)[1])
+  }
   influential_in_assay <- (obj$.influential %||% TRUE) & (obj$.influential_in_assay[[assay]] %||% TRUE)
-  if (formula_equal(design(obj), plot_fml) && resids) {
+  if (formula_equal(design(obj), reduced) && resids) {
     assays(obj) <- assays(obj)[assay]
   } else {
     deconstructed <- partialise(obj, assay=assay, influence=influential_in_assay)
-    if (formula_equal(design(obj), plot_fml)) {
+    if (formula_equal(design(obj), reduced)) {
       removed <- " having removed noise"
     } else {
-      txt <- dropped_terms(deconstructed, update(plot_fml, NULL ~ .))
+      txt <- dropped_terms(deconstructed, reduced)
       removed <- paste0(" having removed effect of ",
                        if (resids) "" else "noise and ",
                        paste(txt, collapse=", ")
                        )
     }
-    assays(obj) <- setNames(list(assemble_partialised(deconstructed, reduced=update(plot_fml, NULL ~ .),  resids=resids)), assay)
+    assays(obj) <- setNames(list(assemble_partialised(deconstructed, reduced=reduced,  resids=resids)), assay)
   }
   metadata(obj)$removed <- ""
   metadata(obj)$ind <- !duplicated(model.matrix(design(obj), colDF(obj)))

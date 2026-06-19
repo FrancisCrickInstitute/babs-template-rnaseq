@@ -67,7 +67,7 @@ knitr::opts_chunk$set(
   results='asis'
 )
 
-
+theme_set(cowplot::theme_half_open(12) + cowplot::panel_border())
 
 ```
 
@@ -350,15 +350,14 @@ for (dataset_id in names(ddsList$sample_sets)) {
         dataset$object$.involved <- FALSE
         dataset$object$.involved[dataset$object$.influential] <- involved
       }
-      plot_formulae <- get_in_section(model$profile_plots, c("all", "differential"))
+
       ## MA Plot
-      cat('\n\n::: {.panel-tabset .unnumbered group="diffplot"}\n\n')
       res <- as.data.frame(comparison$results)
       pal <- RColorBrewer::brewer.pal(9, "Set1")
       res$class <- ifelse(is_significant, "Sig", "Not")
       if (is_external) {
         cat("\n\n", strrep("#", length(section_hierarchy)+1), " MA\n\n", sep="")
-        cat("For MA plots, external gene-lists are represented in specific comparisons, rather than getting there own plot.\n\n")
+        cat("For MA plots, external gene-lists are represented in specific comparisons, rather than getting there own plot.{.unnumbered}\n\n")
       } else {        
         if (is_formula(comparison$comparison)) {
           yax <- "Largest fold change"
@@ -399,7 +398,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
         pl <- pl +
           scale_colour_identity(labels=colour_scale$labels, breaks=colour_scale$breaks, guide = "legend") +
           labs(colour="Class")
-        cat("\n\n", strrep("#", length(section_hierarchy)+1), " MA\n\n", sep="")
+        cat("\n\n", strrep("#", length(section_hierarchy)+1), " MA{.unnumbered}\n\n", sep="")
         do_plot(pl,
                 label="MA",
                 caption=paste0("MA plot of ", tooltip(model, comparison_id), "-differential ", rowNoun,"s for ",mtag(model_id), " in ", dtag(dataset_id)),
@@ -411,6 +410,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
         cat("\n\n---\n\n")
       }
       ## Heatmap
+      plot_formulae <- get_in_section(model$profile_plots, c("all", "differential"))      
       model_vars <- sort_vars(
         unique(c(all.vars(model$design),
                  unique(unlist(lapply(plot_formulae, function(x) c(
@@ -419,16 +419,6 @@ for (dataset_id in names(ddsList$sample_sets)) {
                  )))))),
         model$variables)
       model_vars <- setdiff(intersect(model_vars, names(colData(model$object))), ".involved")
-      nice_legends <- separate_legend(dataset$object, model_vars)
-      pl <- do.call(gridExtra::arrangeGrob,c(
-        nice_legends,
-        ncol=ceiling(sqrt(length(nice_legends)))))
-      cat("\n\n", strrep("#", length(section_hierarchy)+1), " Heatmap\n\n", sep="")
-      do_plot(pl,
-              label= "legend-a",
-              caption=paste("Metadata colour-codings for",dtag(dataset_id)),
-              plot_meta=section_hierarchy
-              )
       cat("\n\n---\n\n")
       if (!is.null(model$mat)) {
         mmat <- model$mat
@@ -445,40 +435,55 @@ for (dataset_id in names(ddsList$sample_sets)) {
         baseline_str <- paste("average", noun_to_readout(rowNoun))
       }
       centroid_df <- list()
-      # Because heatmaps aren't really affected by anything other than y-aesthetic and partials:
-      unique_heatmaps <- !duplicated(sapply(plot_formulae, function(pl) {fml <- pl[[1]]; y <- eval(fml[[2]])$y; fml[[2]] <- y; deparse1(fml)}))
+      # TODO: This is probably too severe:
+      # Because heatmaps aren't really affected by anything other than y-aesthetic:
+      unique_heatmaps <- !duplicated(sapply(plot_formulae, function(pl) {pl[[1]]$y %||% ""}))
       for (plot_id in names(plot_formulae)[unique_heatmaps]) {
         plot_config <- plot_formulae[[plot_id]]
-        plot_fml <- plot_config[[1]]
+        plot_aes <- plot_config[[1]]
         section_hierarchy <- list(dataset=dataset_id, model=model_id, comparison=comparison_id, plot_config=plot_id)
-        dmc_heading(ddsList, section_hierarchy, depth=strrep("#", length(section_hierarchy)+1), numbered=FALSE)
-        prepare_plot_data <- expr({
-          plot_fml <- plot_formulae[[plot_id]][[1]]
-          y_hint <- plot_fml[[2]]$y
-          if ("y" %in% names(plot_fml[[2]])) {
-            which_assay <- as.character(as.character(y_hint))
-            y_hint <- model$extra_assays[[which_assay]]$hint %||% which_assay
-            do_weight <- (!dataset$extra_assays[[which_assay]]$method %in% "normalise") %||% TRUE
-            tidied_se <- tidy_significant_se(dataset$object, is_significant, weights=if (do_weight) weights else NULL, assay=which_assay)
-            do_recentre <- model$extra_assays[[which_assay]]$recentre %||% FALSE
-            do_rescale <- model$extra_assays[[which_assay]]$rescale %||% FALSE
-          } else {
-            tidied_se <- tidy_significant_se(dataset$object, is_significant, weights=weights)
-            do_recentre <- do_rescale <- FALSE
-          }
-          design(tidied_se) <- model$design
-          mcols(tidied_se)$results <- comparison$results[row.names(tidied_se),]
-          plot_se <- partial_reconstruct(tidied_se, plot_fml, assay=assayNames(tidied_se)[1])
-          sample_order <- reorder_samples(plot_se, model_vars)
-          if ("visible" %in% names(plot_config$extras)) {
-            vis_sample <- eval(plot_config$extras$visible, colData(tidied_se))
-          } else {
-            vis_sample <- TRUE
-          }
-          if (do_recentre) assay(plot_se) <- assay(plot_se) - rowMeans(assay(plot_se)[,plot_se$.influential_in_assay, drop=FALSE])
-          if (do_rescale) assay(plot_se) <- assay(plot_se) / rowSds(assay(plot_se)[,plot_se$.influential_in_assay, drop=FALSE])
-        })
-        eval(prepare_plot_data)
+        dmc_heading(ddsList, section_hierarchy, depth=strrep("#", length(section_hierarchy)+1), numbered=FALSE, describe=NA)
+        cat('\n\n::: {.panel-tabset .unnumbered group="diffplot"}\n\n')
+        cat("\n\n", strrep("#", length(section_hierarchy)+1), " Details\n\n", sep="")
+        dmc_heading(ddsList, section_hierarchy, depth=strrep("#", length(section_hierarchy)+2), numbered=FALSE)
+        cat("\n\n", strrep("#", length(section_hierarchy)+1), " Legend\n\n", sep="")
+        if  (plot_id == names(plot_formulae)[unique_heatmaps][1]) {
+          nice_legends <- separate_legend(dataset$object, model_vars)
+          pl <- do.call(gridExtra::arrangeGrob,c(
+            nice_legends,
+            ncol=ceiling(sqrt(length(nice_legends)))))
+          do_plot(pl,
+                  label= "legend-a",
+                  caption=paste("Metadata colour-codings for",dtag(dataset_id)),
+                  plot_meta=section_hierarchy
+                  )
+          legend_url <- do_plot()
+          legend_url <- legend_url[[length(legend_url)]]$png
+        } else {
+           cat("\n![](", legend_url, ")\n", sep="")
+        }
+        y_hint <- plot_aes$y
+        which_assay <- default_assay_name(plot_aes, dataset$object)
+        if ("y" %in% names(plot_aes)) {
+          y_hint <- model$extra_assays[[which_assay]]$hint %||% which_assay
+          do_weight <- (!dataset$extra_assays[[which_assay]]$method %in% c("normalise", "partial")) %||% TRUE
+          tidied_se <- tidy_significant_se(dataset$object, is_significant, weights=if (do_weight) weights else NULL, assay=which_assay)
+          do_recentre <- model$extra_assays[[which_assay]]$recentre %||% FALSE
+          do_rescale <- model$extra_assays[[which_assay]]$rescale %||% FALSE
+        } else {
+          tidied_se <- tidy_significant_se(dataset$object, is_significant, weights=weights)
+          do_recentre <- do_rescale <- FALSE
+        }
+        design(tidied_se) <- model$design
+        mcols(tidied_se)$results <- comparison$results[row.names(tidied_se),]
+        
+        plot_se <- tidied_se
+        plot_se$.influential_in_assay <- (plot_se$.influential %||% TRUE) & (plot_se$.influential_in_assay[[which_assay]] %||% TRUE)
+        
+        sample_order <- reorder_samples(plot_se, model_vars)
+        vis_sample <- eval(plot_config$extra$visible, colData(tidied_se))
+        if (do_recentre) assay(plot_se) <- assay(plot_se) - rowMeans(assay(plot_se)[,plot_se$.influential_in_assay, drop=FALSE])
+        if (do_rescale) assay(plot_se) <- assay(plot_se) / rowSds(assay(plot_se)[,plot_se$.influential_in_assay, drop=FALSE])
         mat_height <- height_scaler(n=nrow(plot_se), small=10, big=20, N=1000)
         hc <- plot_config$extra$gene_clust
         keep_names <- FALSE
@@ -503,9 +508,10 @@ for (dataset_id in names(ddsList$sample_sets)) {
         capt <- paste0(tooltip(model, comparison_id), comp_type, rowNoun,"s  of ", mtag(model_id), " in ", dtag(dataset_id), metadata(plot_se)$removed)
         cc <- cluster_calc(assay(plot_se), clusterID=gene_clust$clusters)
         hmap_data <- assay(plot_se)
+        cat("\n\n", strrep("#", length(section_hierarchy)+1), " Heatmap\n\n", sep="")
         pls <- hmap_fn(
           dds=plot_se[,sample_order, drop=FALSE], mat=hmap_data[,sample_order, drop=FALSE],
-          cluster_transform=identity, gene_clust = gene_clust, row_title = paste0(RowNoun, "s"),
+          gene_clust = gene_clust, row_title = paste0(RowNoun, "s"),
           model_vars = model_vars,
           plot_config =plot_config,
           row_split = if ("cut.params" %in% slotNames(hc) && "k" %in% names(slot(hc, "cut.params"))) slot(hc, "cut.params")$k  else NULL,
@@ -524,7 +530,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
         cat("\n\n---\n\n")
         pls <- hmap_fn(
           dds=plot_se[,sample_order, drop=FALSE], mat=hmap_data[,sample_order, drop=FALSE],
-          cluster_transform=identity, gene_clust = gene_clust, row_title = paste0(RowNoun, "s"),
+          gene_clust = gene_clust, row_title = paste0(RowNoun, "s"),
           model_vars = model_vars,
           row_split = if ("cut.params" %in% slotNames(hc) && "k" %in% names(slot(hc, "cut.params"))) slot(hc, "cut.params")$k  else NULL,
           plot_config =plot_config, 
@@ -551,23 +557,13 @@ for (dataset_id in names(ddsList$sample_sets)) {
           )
         }
         cat('\n\n---\n\n')
-      }
-      ## if (is_null(plot_formulae)) {
-      ##   cat(':::\n\n')
-      ##   next
-      ## }
-      ##
-      ## PC2
-      section_hierarchy$plot_config <- NULL
-      cat("\n\n", strrep("#", length(section_hierarchy)+1), " 2PC\n\n", sep="")
-      for (plot_id in names(plot_formulae)) {
-        plot_config <- plot_formulae[[plot_id]]
-        plot_fml <- plot_config[[1]]
-        section_hierarchy <- list(dataset=dataset_id, model=model_id, comparison=comparison_id, plot_config=plot_id)
-        dmc_heading(ddsList, section_hierarchy, depth=strrep("#", length(section_hierarchy)+1), numbered=FALSE)
-        eval(prepare_plot_data)
+        ## PC2
+        cat("\n\n", strrep("#", length(section_hierarchy)+1), " 2PC\n\n", sep="")
+#        section_hierarchy <- list(dataset=dataset_id, model=model_id, comparison=comparison_id, plot_config=plot_id)
+#        dmc_heading(ddsList, section_hierarchy, depth=strrep("#", length(section_hierarchy)+1), numbered=FALSE)
+#        eval(prepare_plot_data)
         this_assay <- assay(plot_se)
-        orig_caption <- aes_caption(eval(plot_fml[[2]]))
+        orig_caption <- aes_caption(plot_aes)
         mapping <- modify_mapping(plot_config, aes(y=.derived.value))
         my_pc <- prcomp(
           t(this_assay[,plot_se$.influential_in_assay, drop=FALSE]),
@@ -576,11 +572,11 @@ for (dataset_id in names(ddsList$sample_sets)) {
         proj <- predict(my_pc, newdata = t(this_assay))
         my_percent <- round(100 * my_pc$sdev^2/sum(my_pc$sdev^2))
         pc.df <- cbind(colDF(plot_se),
-                        data.frame(
-                          PC1 = proj[, plot_config$extra$pc_x],
-                          PC2 = proj[, plot_config$extra[[if (nrow(this_assay) != 1) "pc_y" else "pc_x"]]], 
-                          sample = rownames(colDF(plot_se))))
-        aes_list <- substitute_x_aes(mapping, colour_as_fill=!"fill" %in% names(eval(plot_fml[[2]])))
+                      data.frame(
+                        PC1 = proj[, plot_config$extra$pc_x],
+                        PC2 = proj[, plot_config$extra[[if (nrow(this_assay) != 1) "pc_y" else "pc_x"]]], 
+                        sample = rownames(colDF(plot_se))))
+        aes_list <- substitute_x_aes(mapping, colour_as_fill=!"fill" %in% names(plot_aes))
         for (this_aes in aes_list) {
           pl <- ggplot(transform(pc.df[vis_sample,],.derived="", .derived.value=""),
                       modifyList(this_aes, aes(x=PC1, y=PC2))) + 
@@ -592,12 +588,12 @@ for (dataset_id in names(ddsList$sample_sets)) {
           if (do_labels) {
             pl <- pl + geom_text_repel(aes(label = sample))
           }
-          pl <- pl + get_colour_scales(dataset$object, this_aes, all.vars(plot_config$extras$flag))
+          pl <- pl + get_colour_scales(dataset$object, this_aes, all.vars(plot_config$extra$flag))
           cat("\n\n")
           if (identical(this_aes,aes_list[[1]])) {
             this_caption <- orig_caption
           } else {
-            tmp <- eval(plot_fml[[2]])
+            tmp <- plot_aes
             tmp$colour <- tmp$x
             this_caption <- aes_caption(tmp)
           }
@@ -607,22 +603,15 @@ for (dataset_id in names(ddsList$sample_sets)) {
                   plot_meta=section_hierarchy)
           cat("\n\n")
         } # Repeat if need to annotate by an overwritten 'x'
-      }
-      ##
       ##
       ## Profile plots
-      section_hierarchy$plot_config <- NULL
-      cat("\n\n", strrep("#", length(section_hierarchy)+1), " Profile\n\n", sep="")
-      for (plot_id in names(plot_formulae)) {
-        plot_config <- plot_formulae[[plot_id]]
-        plot_fml <- plot_config[[1]]
-        section_hierarchy <- list(dataset=dataset_id, model=model_id, comparison=comparison_id, plot_config=plot_id)
-        y_hint <- plot_fml[[2]]$y
+        cat("\n\n", strrep("#", length(section_hierarchy)+1), " Profile\n\n", sep="")
+        y_hint <- plot_aes$y
         if (!is.null(y_hint)) {
           which_assay <- as.character(as.character(y_hint))
           y_hint <- model$extra_assays[[which_assay]]$hint %||% which_assay
         }
-        dmc_heading(ddsList, section_hierarchy, depth=strrep("#", length(section_hierarchy)+1), numbered=FALSE)
+#        dmc_heading(ddsList, section_hierarchy, depth=strrep("#", length(section_hierarchy)+1), numbered=FALSE)
         mapping <- modify_mapping(plot_config, aes(y=.derived.value))
         colour_aes <- transform_colour_min(mapping)
         pl <- ggplot(centroid_df[[plot_id]], mapping) +
@@ -630,22 +619,22 @@ for (dataset_id in names(ddsList$sample_sets)) {
           theme_bw() +
           geom_point_interactive(aes(y= .derived.value), size = 3, shape = 21) +
           labs(y=paste(c(noun_to_readout(RowNoun), y_hint), collapse=" "))
-        pl <- pl + my_alpha_scale(pl)
+        pls <- pl + my_alpha_scale(pl)
         if ("group" %in% names(mapping)) {
           pl <- pl+geom_line(colour_aes, stat="summary", fun=mean)
         }
         if ("ScaleDiscrete" %in% class(layer_scales(pl)$x)) {
           pl <- pl + scale_x_discrete(guide=guide_axis(n.dodge=2))
         }
-        pl <- pl + get_colour_scales(dataset$object, mapping, all.vars(plot_config$extras$flag))
+        pl <- pl + get_colour_scales(dataset$object, mapping, all.vars(plot_config$extra$flag))
         do_plot(pl,
                 label= "diffClustProfile",
                 caption=paste0("Cluster profile for ", attr(centroid_df[[plot_id]], "caption")),
                 plot_meta=section_hierarchy
                 )
         cat('\n\n---\n\n')
+        cat(':::\n\n')
       }
-      cat(':::\n\n')
     }
   }
 }

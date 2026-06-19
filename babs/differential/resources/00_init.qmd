@@ -133,6 +133,7 @@ if (grepl("\\.csv$", params$metadata)) {
 } else {
   sample_sheet <- readxl::read_excel(params$metadata, sheet=1)
 }
+sample_sheet <- cbind(ID=paste(sample_sheet$ROI, sample_sheet$level_2, sep="__"), sample_sheet)
 potential_label <- sapply(sample_sheet, function(x) length(unique(x))==nrow(sample_sheet) & !is.numeric(x))
 file_col <- c(params$file_col[params$file_col %in% names(sample_sheet)], names(sample_sheet)[potential_label])[1]
 if (is.na(file_col %||% NA)) {
@@ -197,7 +198,7 @@ if (missing) {
 if (file.exists(csv)) {
   cat("\n\n## Using a CSV text file of assay data\n\n")
   cat("We will create a SummarizedExperiment object and analyse it with limma, rather than DESeq2.\n\n")
-  df <- read.csv(csv, check.names=FALSE)
+  df <- read.csv(csv, check.names=FALSE, row.names=1)
   mat <- as.matrix(df[,as.character(sample_sheet[[file_col]])])
   if (missing) {
     mat[] <- ifelse(is.na(mat),1,0)
@@ -207,9 +208,11 @@ if (file.exists(csv)) {
     'Data-source Type'=paste0("Text data", ifelse(missing," binarised", "")),
     'Source file'=csv,
     data_source_params))))
-  dds <- SummarizedExperiment(assays=SimpleList(raw=mat),
-                             colData=sample_sheet[as.character(sample_sheet[[file_col]]) %in% colnames(mat),]
-                             )
+  dds <- DESeqDataSetFromMatrix(
+    floor(mat),
+    colData=sample_sheet[as.character(sample_sheet[[file_col]]) %in% colnames(mat),],
+    design=~1
+  )
   assay(dds)[is.nan(assay(dds))] <- NA
   if (any(is.na(assay(dds)))) dds$'.percentNA' <- 100 *apply(is.na(assay(dds)), 2, mean)
   if (length(setdiff(names(df), colnames(mat)))>0) {

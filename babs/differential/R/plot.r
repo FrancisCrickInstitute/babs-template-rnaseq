@@ -172,11 +172,14 @@ separate_legend <- function(dds, vars) {
     intersect(vars, names(metadata(colData(dds))$palette$Heatmap)),
     function(md_name) {
       md <- metadata(colData(dds))$palette$Heatmap[[md_name]]
+      title <- metadata(colData(dds))$varlabels[[md_name]]
       if (is.function(md)) {
-        Legend(col_fun=md, title=md_name)@grob
+        Legend(col_fun=md, title= title)@grob
       } else{
-        Legend(legend_gp=gpar(fill=md),labels=names(md),
-               title=md_name, nrow=ifelse(length(md)>8, ceiling(sqrt(length(md))), length(md)))@grob
+        labels <- metadata(colData(dds))$labels[[md_name]]
+        labels <- labels[match(names(md), names(labels))]
+        Legend(legend_gp=gpar(fill=md),labels=labels,
+               title=title, nrow=ifelse(length(md)>8, ceiling(sqrt(length(md))), length(md)))@grob
       }
     }
   )
@@ -275,12 +278,12 @@ modify_mapping <- function(plot_config, add_aes=NULL) {
 
 
 handle_flag_aes <- function(plot_config) {
-  aes_obj <- eval(plot_config[[1]][[2]])
+  aes_obj <- plot_config[[1]]
   if ("fill" %in% names(aes_obj) || !"colour" %in% names(aes_obj)) return(aes_obj)
   aes_obj <- as.list(aes_obj)  # make editable
   colour_expr <- aes_obj$colour
   aes_obj$fill <- colour_expr
-  if ("flag" %in% names(plot_config$extra)) {
+  if (!is.null(plot_config$extra$flag)) {
     flag_expr <- plot_config$extra$flag
     flag_true <- paste(all.vars(plot_config$extra$flag), collapse=",")
     aes_obj$colour <- expr(factor(ifelse(!!flag_expr, !!flag_true, as.character(!!colour_expr)), levels=c(levels(!!colour_expr), !!flag_true)))
@@ -413,8 +416,9 @@ adapt_hclust_param <- function(param, zero_by=NULL) {
   return(param)
 }
 
+step_units <- function(n, size, unit="mm") {function(x) unit(stepfun(x=n, y=size)(x), unit=unit)}
 
-hmap_fn <- function(dds, mat, cluster_transform, gene_clust, model_vars, plot_config, measure_name, colour_saturates,  ...) {
+hmap_fn <- function(dds, mat, gene_clust, model_vars, plot_config, measure_name, colour_saturates,  ...) {
   if ("visible" %in% names(plot_config$extra)) {
     vis_sample <- eval(plot_config$extra$visible, colDF(dds))
   } else {
@@ -426,43 +430,50 @@ hmap_fn <- function(dds, mat, cluster_transform, gene_clust, model_vars, plot_co
     model_vars <- c(model_vars, ".influential")
   }
   size_fit <- NULL
+  masked <- mat
+  mask <- all.vars(plot_config$extra$mask)[1]
+  if (!is.na(mask) && mask %in% assayNames(dds)) {
+    masked[assay(dds, mask)[row.names(masked), colnames(masked)]] <- NA
+  }
+  col_fn <- sym_colour(masked[,colData(dds)$.influential], mx=colour_saturates)
+  rheight <- unit(1, "mm")
+  rheight <- eval(plot_config$extra$row_height)
+  if (is.function(rheight)) rheight <- rheight(nrow(masked))
+  annotation_height <- NULL
+  annotation_height <- eval(plot_config$extra$annotation_row_height)
+  if (is.function(annotation_height)) annotation_height <- annotation_height(length(model_vars))
   panel_hmap <- function(ind=TRUE, first, last, column_title, args) {
-    masked <- mat
-    mask <- all.vars(plot_config$extra$mask)[1]
-    if (!is.na(mask) && mask %in% assayNames(dds)) {
-      masked[assay(dds, mask)[row.names(masked), colnames(masked)]] <- NA
-    }
-    col_fn <- sym_colour(masked[,colData(dds)$.influential], mx=colour_saturates)
     left_annotation <- NULL
     if (plot_config$extra$cluster_unused_samples == "ignore") {
       ind <- ind[dds$.influential_in_assay]
     }
-    mat_subset <- mat[, ind, drop=FALSE]
     dds_subset <- dds[, ind]
+    # The sample-dendrogram should be calculated on the underlying more-raw data, not e.g. the row-scaled 
+    cluster_assay <- assay(dds_subset, plot_config$extra[["sample_clustering_assay"]])
     if (plot_config$extra$cluster_unused_samples == "include") {
       infl_ind_subset <- TRUE
     } else {
       infl_ind_subset <- dds_subset$.influential_in_assay %||% TRUE
     }
-    N_infl <- length(mat_subset[1,][infl_ind_subset])
+    N_infl <- length(cluster_assay[1,][infl_ind_subset])
     if (N_infl<=1) { #Flip so as not to leave one or fewer samples in the tree
       infl_ind_subset <- !infl_ind_subset 
-      N_infl <- length(mat_subset[1,][infl_ind_subset])#update
+      N_infl <- length(cluster_assay[1,][infl_ind_subset])#update
       if (N_infl <=1) infl_ind_subset <- TRUE #Still one or fewer, so bundle them together
-      N_infl <- length(mat_subset[1,][infl_ind_subset])#update
+      N_infl <- length(cluster_assay[1,][infl_ind_subset])#update
     }
     if (N_infl >1 && "sample_clust" %in% names(plot_config$extra)) {
       # Get the subset of data we're actually plotting
-      # cluster influential samples WITHIN this subset
+      # cluster influential samples WITHIN this subset      
       infl_cluster <- bluster::clusterRows(
-        t(cluster_transform(mat_subset[, infl_ind_subset, drop=FALSE])),
+        t(cluster_assay[, infl_ind_subset, drop=FALSE]),
         adapt_hclust_param(plot_config$extra$sample_clust), full=TRUE
       )$objects$hclust
       if (all(infl_ind_subset)) {
         cluster_columns <- infl_cluster
       } else {
         dfun <- adapt_hclust_param(plot_config$extra$sample_clust)@dist.fun %||% dist
-        D <- as.matrix(dfun(t(cluster_transform(mat_subset)), method = infl_cluster$dist.method))
+        D <- as.matrix(dfun(t(cluster_assay), method = infl_cluster$dist.method))
         # Extract distances: new samples (rows) to base samples (columns)
         D_new <- D[!infl_ind_subset, infl_ind_subset, drop=FALSE]
         D_among_new <- D[!infl_ind_subset, !infl_ind_subset, drop=FALSE]
@@ -472,27 +483,15 @@ hmap_fn <- function(dds, mat, cluster_transform, gene_clust, model_vars, plot_co
           D_new,
           D_among_new,
           infl_cluster$method,
-          column_names = colnames(mat_subset)
+          column_names = colnames(cluster_assay)
         )
       }
     } else {
       cluster_columns <- FALSE
     }
-    rheight <- unit(1, "mm")
-    if ("row_height" %in% names(plot_config$extra)) {
-      step_units <- function(n, size, unit="mm") {function(x) unit(stepfun(x=n, y=size)(x), unit=unit)}
-      rheight <- eval(plot_config$extra$row_height)
-      if (is.function(rheight)) rheight <- rheight(nrow(mat))
-    }
-    annotation_height <- NULL
-    if ("annotation_row_height" %in% names(plot_config$extra)) {
-      step_units <- function(n, size, unit="mm") {function(x) unit(stepfun(x=n, y=size)(x), unit=unit)}
-      annotation_height <- eval(plot_config$extra$annotation_row_height)
-      if (is.function(annotation_height)) annotation_height <- annotation_height(length(model_vars))
-    }
     
     defaults <- list(
-      matrix=masked[,ind,drop=FALSE],
+      matrix=masked[, ind, drop=FALSE],
       column_title = column_title,
       col = col_fn,
       cluster_rows = if ("objects" %in% names(gene_clust)) gene_clust$objects$hclust else FALSE,
@@ -551,8 +550,8 @@ hmap_fn <- function(dds, mat, cluster_transform, gene_clust, model_vars, plot_co
       predicted_height= predict(size_fit,data.frame(mat_row=nrow(defaults$matrix), anno_row=length(model_vars)))
     )
   }
-  if ("cols" %in% names(plot_config$extra)) {
-    col_split <- rlang::eval_tidy(eval(plot_config$extra)$cols, colDF(dds))
+  if ("cols" %in% names(plot_aes)) {
+    col_split <- rlang::eval_tidy(plot_aes$cols, colDF(dds))
     splits <- split(seq_along(col_split), col_split)
   } else {
     splits <- list("Samples"=seq(length=ncol(dds)))
@@ -568,22 +567,12 @@ hmap_fn <- function(dds, mat, cluster_transform, gene_clust, model_vars, plot_co
 }
 
 
-#To change what the clustering operates on
-make_clusterer <- function(dds, fml) {
-  cluster <- all.vars(fml[[2]]$cluster)[1]
-  if (!is.na(cluster) && cluster %in% assayNames(dds)) {
-    function(mat) {
-      mat[] <- assay(dds, cluster)[row.names(mat), colnames(mat)]
-      mat
-    }
-  } else {
-    identity
-  }
-}
 
 save_palettes <- function(ddsList, fname) {
   con <- file(fname, "w")
   palettes <- lapply(ddsList$sample_sets, function(dds) metadata(colData(dds$object))$palette$ggplot)
+  labels <- lapply(ddsList$sample_sets, function(dds) metadata(colData(dds$object))$labels)
+  varlabels <- lapply(ddsList$sample_sets, function(dds) metadata(colData(dds$object))$varlabels)
   field_instances <- table(unlist(lapply(palettes, names)))
   in_all <- names(field_instances)[field_instances==length(palettes)]
   in_common <- sapply(
@@ -594,29 +583,39 @@ save_palettes <- function(ddsList, fname) {
       }))
     })
 
-  palette2toml <- function(j, close="}") {
+  palette2json <- function(i, j, close="}") {
     writeLines(paste0('    "',  j, '": {'), con=con)
-    if (is.null(names(palettes[[1]][[j]]))) {
+    if (is.null(names(palettes[[i]][[j]]))) {
+      cat(sprintf('      "Label" : "%s",\n      "Range" : ', j), file=con)
       writeLines(
         paste0(
-          '        "low to high" : [',
-          paste0('"', palettes[[1]][[j]], '"', collapse=", "),
+          '[',
+          paste0('"', palettes[[i]][[j]], '"', collapse=", "),
           "]"),
       con=con)
     } else {
+      lbl <- varlabels[[i]][[j]] %||% j
+      writeLines(sprintf('      "Label" : "%s",\n      "Values" : {', lbl), con=con)
+      lbls <- setNames(names(palettes[[i]][[j]]), names(palettes[[i]][[j]]))
+      ind <- match(names(labels[[i]][[j]]), names(lbls))
+      lbls[ind] <- labels[[i]][[j]][ind]
       writeLines(
         paste(
-          sprintf('        "%s" : "%s"', names(palettes[[1]][[j]]), palettes[[1]][[j]]),
+          sprintf('          "%s" : {"colour": "%s", "label": "%s"}',
+                  names(palettes[[i]][[j]]),
+                  palettes[[i]][[j]],
+                  lbls),
           collapse=",\n"),
         con=con
       )
+      writeLines("      }", con=con)
     }
     writeLines(paste0("    ", close), con=con)
   }
   
   writeLines('{ "all" : {', con=con)
   for (j in in_all[in_common]) {
-    palette2toml(j, close=ifelse(j==rev(in_all[in_common])[1], "}", "},"))
+    palette2json(i=1, j, close=ifelse(j==rev(in_all[in_common])[1], "}", "},"))
   }
   writeLines(c('},', '"variations": {'), con=con)
 
@@ -624,11 +623,11 @@ save_palettes <- function(ddsList, fname) {
   palettes <- lapply(palettes, "[", distinct)
   palettes <- palettes[lengths(palettes)>0]
   for (i in names(palettes)) {
-    writeLines(sprintf('"%s%": {', i), con=con)
+    writeLines(sprintf('"%s": {', i), con=con)
     for (j in names(palettes[[i]])) {
-      palette2toml(j, close=ifelse(j==rev(names(palettes))[1], "}", "},"))
+      palette2json(i, j, close=ifelse(j==rev(names(palettes[[i]])), "}", "},"))
     }
-    writeLines(ifelse(i == rev(names(palettes))[1], "}", "},"), con=con)
+    writeLines(ifelse(i == rev(names(palettes))[1], "  }", "  },"), con=con)
   }
   writeLines(c("}", "}"), con=con)
   close(con)
@@ -640,19 +639,36 @@ read_palettes <- function(ddsList, fname) {
   for (dset in names(ddsList$sample_sets)) {
     pal <- metadata(colData(ddsList$sample_sets[[dset]]$object))$palette$ggplot
     for (field in names(pal)) {
+      if (dset %in% names(user_pal$variations) && field %in% names(user_pal$variations[[dset]] )) {
+        metadata(colData(ddsList$sample_sets[[dset]]$object))$varlabels[[field]] <- user_pal$variations[[dset]][[field]]$Label
+      } else {
+        metadata(colData(ddsList$sample_sets[[dset]]$object))$varlabels[[field]] <- user_pal$all[[field]]$Label
+      }
       for (lev in names(pal[[field]])) {
-        ind <- which(names(user_pal$all[[field]])==lev)
-        val <- user_pal$all[[field]][[ind]]
+        ind <- which(names(user_pal$all[[field]]$Values)==lev)
+        if (length(ind)==0) next
+        val <- user_pal$all[[field]]$Values[[ind]]$colour
+        lbl <- user_pal$all[[field]]$Values[[ind]]$label
         if (dset %in% names(user_pal$variations) && field %in% names(user_pal$variations[[dset]] )) {
-          ind <- which(names(user_pal$variations[[dset]][[field]])==lev)
-          val <- user_pal$variations[[dset]][[field]][[ind]]
+          ind <- which(names(user_pal$variations[[dset]]$Values[[field]])==lev)
+          if (length(ind)!=0) {
+            val <- user_pal$variations[[dset]][[field]]$Values[[ind]]$colour
+            lbl <- user_pal$variations[[dset]][[field]]$Values[[ind]]$label
+          }
         }
+        ind <- which(names(metadata(colData(ddsList$sample_sets[[dset]]$object))$palette$ggplot[[field]])==lev)
         metadata(colData(ddsList$sample_sets[[dset]]$object))$palette$ggplot[[field]][[ind]] <- val
-        if (lev == "low to high") {
-          attr(metadata(colData(ddsList$sample_sets[[dset]]$object))$palette$Heatmap[[field]][[ind]], "colors") <- val
-        } else {
-          metadata(colData(ddsList$sample_sets[[dset]]$object))$palette$Heatmap[[field]][[ind]] <- val
+        metadata(colData(ddsList$sample_sets[[dset]]$object))$palette$Heatmap[[field]][[ind]] <- val
+        ind <- which(names(metadata(colData(ddsList$sample_sets[[dset]]$object))$labels[[field]])==lev)
+        metadata(colData(ddsList$sample_sets[[dset]]$object))$labels[[field]][[ind]] <- lbl
+      }
+      if (is.null(names(pal[[field]]))) {
+        val <- user_pal$all[[field]]$Range
+        if (dset %in% names(user_pal$variations) && field %in% names(user_pal$variations[[dset]] )) {
+          val <- user_pal$variations[[dset]][[field]]$Range
         }
+        metadata(colData(ddsList$sample_sets[[dset]]$object))$palette$ggplot[[field]] <- val
+        attr(metadata(colData(ddsList$sample_sets[[dset]]$object))$palette$Heatmap[[field]], "colors") <- val
       }
     }
   }

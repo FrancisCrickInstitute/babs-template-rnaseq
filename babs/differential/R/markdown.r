@@ -42,15 +42,20 @@ dmc_heading <- function(obj, hierarchy,  depth="##", numbered=TRUE, describe=TRU
     if (!is.null(met$name) && met$name != met$id) {
       heading <- c(heading, ":", met$name)
     }
-    fml <- profile_to_string(obj$sample_sets[[dataset]]$models[[model]]$profile_plots[[plot]])
+    if (is.na(describe)) {
+      describe <- TRUE
+      fml <- desc <- ""
+    } else {
+      fml <- profile_to_string(obj$sample_sets[[dataset]]$models[[model]]$profile_plots[[plot]])
+      desc <- describe_for_dmc(obj$sample_sets[[dataset]]$models[[model]]$profile_plots[[plot]]$extra)
+    }
     if (!is.null(met$description)) {
       text <- paste0(met$description, "\n\n",
-                    fml, "\n\n")
+                    fml, "\n")
     } else {
-      text <- paste0(fml, "\n\n")
+      text <- paste0(fml, "\n")
     }
-    text <- paste(text,
-                 describe_for_dmc(obj$sample_sets[[dataset]]$models[[model]]$profile_plots[[plot]]$extra), sep="\n\n")
+    text <- paste0(text, desc)
     text
   } else if (!is.null(comparison)) {
     ## Doing a comparison
@@ -125,8 +130,7 @@ dmc_factory <- function(obj, type, report=report_span) {
 
 
 profile_to_string <- function(plot_config) {
-  fml <- plot_config[[1]]
-  mapping <- eval(fml[[2]])
+  mapping <- plot_config[[1]]
   
   parts <- lapply(names(mapping), function(nm) {
     paste0(toupper(substr(nm, 1, 1)), substr(nm, 2, nchar(nm)), " = ", rlang::as_label(mapping[[nm]]))
@@ -134,32 +138,28 @@ profile_to_string <- function(plot_config) {
   out <- paste0("Aesthetics:\n\n", paste0("- ", parts, collapse="\n"), "\n\n")
 
   extras <- list(
-    "sort_by" = "Sort samples by ",
-    "visible" = "Visibility criterion ",
-    "flag" =  "Highlight samples by ",
-    "mask" = "Mask assay on ",
-    "cluster" = "Base clusters on assay ",
-    "extra" = "Extra variables added to annotation: ",
-    "expand_rows" = "Expand top variable genes to include rows match on ",
-    "tooltip" = "Hover over dotplots using ",
-    "data_id" = "Hover grouping by ",
-    "sort" = "Sort dendrogram rows by ",
-    "cols" = "Facet columns on ",
-    "rows" = "Facet rows on ",
-    "facets" = "Facet on "
+    "sort_by" = structure("Sort samples by ", hide=is.null),
+    "visible" = structure("Visibility criterion ", hide=all),
+    "flag" =  structure("Highlight samples by ", hide=is.null),
+    "mask" = structure("Mask assay on ", hide=is.null),
+    "sample_clustering_assay" = structure("Base clusters on assay ", hide=function(x) x==1),
+    "extra" = structure("Extra variables added to annotation: ", hide=is.null),
+    "expand_rows" = structure("Expand top variable genes to include rows match on ", hide=is.null),
+    "tooltip" = structure("Hover over dotplots using ", hide=is.null),
+    "data_id" = structure("Hover grouping by ", hide=is.null),
+    "sort" = structure("Sort dendrogram rows by ", hide=is.null),
+    "cols" = structure("Facet columns on ", hide=is.null),
+    "rows" = structure("Facet rows on ", hide=is.null),
+    "facets" = structure("Facet on ", hide=is.null)
   )
+  hide <- sapply(names(extras), function(e) attr(extras[[e]], "hide")(plot_config$extra[[e]]))
   parts <- lapply(
-    intersect(names(plot_config$extra), names(extras)),
-    function(v) paste0(extras[[v]],  ifelse(is_formula(plot_config$extra[[v]]), rlang::as_label(plot_config$extra[[v]]), paste(plot_config$qextra[[v]], collape=",")))
+    intersect(names(plot_config$extra), names(extras)[!hide]),
+    function(v) paste0(extras[[v]],  ifelse(is.name(plot_config$extra[[v]]), rlang::as_label(plot_config$extra[[v]]), paste(plot_config$qextra[[v]], collape=",")))
   )
                 
-  out <- paste0(out, "\n\nOptions:\n\n", paste0("- ", parts, collapse="\n"))
-  recon <- paste(deparse(as.formula(attr(fml, "src"))[[3]]), collapse="")
-  if (recon==".") {
-    out
-    } else {
-      paste(out, "\n\nReconstruction:\n\n", recon, "\n\n")
-    }
+  paste0(out, "\n\nOptions:\n\n", paste0("- ", parts, collapse="\n"))
+
 }
 
   

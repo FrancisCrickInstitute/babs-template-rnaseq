@@ -204,7 +204,7 @@ build_dds_list <- function(dds, spec) {
     )
     obj
   }
-  
+  merge_default <- function(x, y) modifyList(y,x)
   # Share any top-level models down to each sample-set
   spec <- trickle_down(field="models", to="sample_sets", merge_fn=c)
   spec <- trickle_down(field="profile_plots", to="models")
@@ -234,7 +234,7 @@ build_dds_list <- function(dds, spec) {
   spec <- trickle_down(field="filterFun", to="comparisons", default=spec$settings$filterFun)
   
   ## Cascade down any plot-specific stuff
-  spec <- trickle_down(field="extra", to="profile_plots", levels=c("spec", "sample_sets", "models", "profile_plots"), merge_fn=modifyList, default=default_plot_extra())
+  spec <- trickle_down(field="extra", to="profile_plots", levels=c("spec", "sample_sets", "models", "profile_plots"), merge_fn=merge_default, default=default_plot_extra())
   
   modelled_terms <- lapply(
     spec$sample_sets,
@@ -348,18 +348,7 @@ build_dds_list <- function(dds, spec) {
         # default to the set of models removing any terms that will preserve marginality
         pp <- find_simpler_models(spec$sample_sets[[dataset_i]]$models[[i]]$design, do_aes=TRUE, type="design")
         spec$sample_sets[[dataset_i]]$models[[i]]$profile_plots <- structure(pp, src="Auto-generated")
-      } else {
-        spec$sample_sets[[dataset_i]]$models[[i]]$profile_plots <- lapply(
-          spec$sample_sets[[dataset_i]]$models[[i]]$profile_plots,
-          function(p) {
-            fml <- p[[1]]
-            o <- update(spec$sample_sets[[dataset_i]]$models[[i]]$design, fml)
-            attributes(o) <- attributes(fml)
-            attr(o, "src") <- paste0(deparse(fml), collapse="")
-            p[[1]] <- o
-            p
-          })
-      }
+      } 
     }
 # TODO: metadata(obj)$models no longer exists, swap all references to spec$sample_sets[[dataset_i]]$models instead
     if ("sample_swap" %in% names(spec$sample_sets[[dataset_i]])) {
@@ -423,6 +412,14 @@ build_dds_list <- function(dds, spec) {
         metadata(colData(obj))$palette$ggplot[new_cols] <- new_meta$ggplot[new_cols]
       }
     }
+    gg <- metadata(colData(obj))$palette$ggplot
+    metadata(colData(obj))$varlabels <- setNames(as.list(names(gg)), names(gg))
+    needs_labels <- !sapply(gg, is_function)
+    needs_labels <- setNames(names(gg)[needs_labels], names(gg)[needs_labels])
+    metadata(colData(obj))$labels <- lapply(needs_labels, function(x) setNames(
+      names(gg[[x]]),
+      names(gg[[x]]))
+      )
     if ("collapse" %in% names(spec$sample_sets[[dataset_i]])) {
       mf <- model.frame(spec$sample_sets[[dataset_i]]$collapse, data.frame(colData(obj)))
       ind <- match(do.call(paste, c(mf, sep="\r")),
@@ -1552,7 +1549,12 @@ generate_assay <- function(args, dds) {
     out <- assay(
       partial_reconstruct(clear_infl, args$design, resids=FALSE, assay=args$from),
       args$from)
-  } else if(args$method == "identity") {
+  } else if (args$method=="partial") {
+    design(dds) <- args$design
+    out <- assay(
+      partial_reconstruct(dds, args$reduced, resids=args$resids %||% TRUE, assay=args$from),
+      args$from)
+  } else if (args$method == "identity") {
     out <- curAssay
   }
   out
@@ -1693,21 +1695,32 @@ wrap_exposed <- function(x, me, parent = paste0(me, "s"), parent_name = NULL) {
   x
 }
 
-
 clean_formula <- function(formula, data) {
+  # Identify factors with one level
+  single_level_factors <- names(which(sapply(data, function(x) is.factor(x) && length(unique(x)) <= 1)))
+
+  # Remove single-level factors from the formula
+  formula_terms <- all.vars(formula)
+  formula_terms <- formula_terms[!(formula_terms %in% single_level_factors)]
+
+  if (length(formula_terms) == 0) {
+    return(as.formula("~ 1"))  # No predictors, only intercept
+  }
+
+  # Rebuild formula without the single-level factors
+  formula <- as.formula(paste("~", paste(formula_terms, collapse = " + ")))
+
+  # Now simplify the formula as before
   mm <- model.matrix(formula, data)
   keep_cols <- colSums(abs(mm)) > 0
-  keep_cols[which(colSums(mm==1)==nrow(mm))[-1]] <- FALSE
+  keep_cols[which(colSums(mm == 1) == nrow(mm))[-1]] <- FALSE
   terms_obj <- terms(formula)
   term_labels <- attr(terms_obj, "term.labels")
-  # Map columns back to terms
   assign <- attr(mm, "assign")
-  # Keep terms that contribute at least one nonzero column
   keep_terms <- unique(assign[keep_cols])
-  if (length(setdiff(assign, keep_terms))==0) return(formula)
-  keep_terms <- keep_terms[keep_terms != 0]  # remove intercept
+  if (length(setdiff(assign, keep_terms)) == 0) return(formula)
+  keep_terms <- keep_terms[keep_terms != 0]
   new_terms <- term_labels[keep_terms]
-  # Rebuild formula
   if (length(new_terms) == 0) {
     as.formula("~ 1")
   } else {

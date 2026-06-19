@@ -218,11 +218,21 @@ default_plot_extra <- function() {
     sample_clust   = bluster::HclustParam(metric="pearson"),
     pc_weight = "equal weight", ## equal_weight/eigen (latter favours early PCs)
     reduce_heuristic="drop1",
+    sort_by=NULL,
+    visible=TRUE,
+    flag=NULL,
+    expand_rows=NULL,
     pc_x = 1,
-    pc_y=2,
+    pc_y = 2,
+    sample_clustering_assay=1,
+    row_height=step_units(n = c(20, 50, 500), size = c(4, 2, 0.5, 0.1), unit = "mm"),
+    annotation_row_height = NULL,
     cluster_unused_samples="inject" ## or include or ignore
   )
-  lapply(attach_src(lapply(ex, eval), lapply(ex, function(x) paste(deparse(x), collapse=""))), structure, default=TRUE)
+  out <- attach_src(lapply(ex, eval), lapply(ex, function(x) paste(deparse(x), collapse="")))
+  ind <- !sapply(out, is.null)
+  out[ind] <- lapply(out[ind], structure, default=TRUE)
+  out
 }
 
 describe_for_dmc <- function(lst) {
@@ -255,7 +265,7 @@ describe_for_dmc <- function(lst) {
         paste("-", gsub("\\{\\}", attr(lst[[a]], "src"), descriptions[[a]]))
       }
     }),
-    collapse="\n\n")
+    collapse="\n")
 }
   
       
