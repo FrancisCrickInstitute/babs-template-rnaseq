@@ -180,20 +180,8 @@ $(staging_dir)/$(VERSION).params.yml:  resources/make/project.mk $(staging_dir)/
 	echo 'author: [{name: "$(or $(FULLNAME),$(shell whoami))", id: $(shell whoami), roles: Analyst, affiliation: $(or $(MY_AFFILIATION),{ref: [fci]})}]' > $@
 	echo 'params: {$(foreach p,$(param_names),$p: "$($p)"$(comma))}' >> $@
 
-$(staging_dir)/index.qmd : $(source_dir)/index.qmd $(qmds) $(staging_dir)/notes.md $(log_dir)/check_spec.log
+$(staging_dir)/index.qmd : $(source_dir)/index.qmd $(qmds) $(staging_dir)/notes.md
 	sed  's#^  contents: .*#  contents: [$(subst $(space),$(comma),$(patsubst $(staging_dir)/%,%,$(qmds)))]#' $< > $@
-
-$(log_dir)/check_spec.log : $(specfiles)
-	$(R) --vanilla -e "files <- strsplit('$(specfiles)', ' +')[[1]]; \
-	  ok <- TRUE; \
-	  for (f in files) { \
-	    message('Checking ', f); \
-	    tryCatch(parse(file = f), error = function(e) { \
-	      message('ERROR in ', f, ': ', e$$message); \
-	      ok <<- FALSE \
-	    }) \
-	  }; \
-	  if (!ok) quit(status = 1)"  2>$@
 
 $(staging_dir)/R.bib: extdata/R.bib
 	cp $< $@
@@ -201,7 +189,6 @@ $(staging_dir)/R.bib: extdata/R.bib
 extdata/R.bib: | renv
 	$(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")' $(call log,bib)
 
-renv: orgs=$(strip $(foreach data_source,$(datasets),$($(data_source).org.db)))
 renv: | $(log_dir)
 	sed -i '/\#DO NOT EDIT AFTER THIS LINE/q' resources/_dependencies.R
 	for i in "$(orgs)"; do echo "library($$i)" >> resources/_dependencies.R; done
@@ -215,7 +202,7 @@ renv: | $(log_dir)
 	fi
 	$(GIT) add renv.lock renv .Rprofile $(source_dir)
 	$(GIT) add $(wildcard ../makefile ../.gitignore ../readme.md ../.gitignore .pipeline-version)
-	$(GIT) add $(wildcard makefile R .Rbuildignore .gitignore) resources/_dependencies.R
+	$(GIT) add $(wildcard makefile R .Rbuildignore .gitignore resources/_dependencies.R)
 	$(GIT) commit -m 'Renv initialised by pipeline' || echo "No initialisation files need commiting" $(call log,renv,-a) 
 
 endif
@@ -233,20 +220,6 @@ ifeq ($(WRAP),sbatch)
 endif
 
 
-
-# .PHONY: geo
-# geo: geo/md5.txt  ## Gather everything into the 'geo' folder. Specify `VERSION=`, `data_source=` and `spec=` to customise. Remember to `make clean-geo` when the files have been upload.
-# geo/md5.txt:
-# 	mkdir -p $(SCRATCH_DIR)geo
-# 	mkdir -p shortcuts
-# 	ln -s $(SCRATCH_DIR)geo shortcuts/geo
-# 	ln -fn $(my_counts_dir)/$(data_source)/*.genes.results shortcuts/geo/
-# 	ln -fn $(RESULTS_DIR)/$(VERSION)/$(data_source)/$(spec)/*.xlsx shortcuts/geo/
-# 	$(SQLITE) extdata/$(samples_db) 'select fastq_1 from fastqs  where config_file="$(data_source)";' | \
-# 	while read -r fq ; do cp $${fq} shortcuts/geo/ ; done
-# 	$(SQLITE) extdata/$(samples_db) 'select fastq_2 from fastqs  where config_file="$(data_source)";' | \
-# 	while read -r fq ; do cp $${fq} shortcuts/geo/ ; done
-# 	pushd shortcuts/geo; md5sum *.* > geo.md5.txt; popd
 
 .PHONY: publish
 publish: $(pubdir)/$(VERSION) ## Copy results to final location. Either 'outputs' folder (default), intranet (`make publish location=intranet`) or internet
@@ -344,11 +317,6 @@ $(nfcore_dir)/results/%/merged.gene_counts.tsv : $(docs_dir)/%.config $(docs_dir
 ################################################################
 #### Helper goals
 ################################################################
-check-isolated: confs=$(or $(LABEL),$(patsubst extdata/%.config,%,$(configs)),example)
-check-isolated:
-	@echo "Checking general setup"
-	@. resources/shell/isolated.sh
-	@for conf in $(confs); do echo "Checking setup for config '$${conf}'"; . resources/shell/isolated.sh $${conf}; done
 
 $(log_dir) $(dir $(my_metadata)) data $(RESULTS_DIR)/$(VERSION) $(RESULTS_DIR) $(staging_dir)/$(RESULTS_DIR)/$(VERSION) $(staging_dir) extdata:
 	mkdir -p $@
@@ -358,9 +326,6 @@ clean: ## Remove the staging folder and the log directory - these should never c
 maintainer-clean: clean ## Remove the results and data directories, in addition to staging and logs. The former contain end-results, so only do this if you really want to discard them (e.g. the analysis had a bug in it, and you want to do some housekeeping)
 	rm -rf $(RESULTS_DIR) data 
 
-clean-geo:  ## Remove the GEO files from scratch
-	rm -f shortcuts/geo
-	rm -rf $(SCRATCH_DIR)geo
 
 
 MAKEFLAGS += --no-builtin-rules
