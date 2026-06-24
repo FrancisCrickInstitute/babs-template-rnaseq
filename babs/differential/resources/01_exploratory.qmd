@@ -136,7 +136,7 @@ ddsList <- build_dds_list(dds, specs)
 gt(summarise_filters(ddsList))
 ddsList <- leaf_modify(ddsList,
                       function(leaf, layers) {
-                        leaf$object <- leaf$object[mcols(leaf$object)$filter$univeral %||% TRUE, , drop=FALSE]
+                        leaf$object <- leaf$object[mcols(leaf$object)$filter$universal %||% TRUE, , drop=FALSE]
                         leaf},
                       layers="sample_sets")
 ddsList <- leaf_modify(ddsList,
@@ -406,7 +406,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
     model_vars <- sort_vars(
       unique(c(all.vars(model$design),
                unique(unlist(lapply(plot_formulae, function(x) c(
-                 all.vars(x[[1]]),
+                 unique(unlist(lapply(x[[1]], all.vars))),
                  unique(unlist(lapply(x$extra, all.vars)))
                 )))))),
       model$variables)
@@ -470,23 +470,6 @@ for (dataset_id in names(ddsList$sample_sets)) {
       hmap_data <- assay(plot_se)[top, ]
       colnames(hmap_data) <- rownames(colDF(plot_se))
       do_labels <- nrow(colDF(plot_se)) < 10
-      do_z <- TRUE
-      do_rescale <- dataset$extra_assays[[which_assay]]$rescale %||% do_z
-      do_recentre <- dataset$extra_assays[[which_assay]]$recentre %||% do_z
-      colour_saturates <- dataset$extra_assays[[which_assay]]$colour_saturates
-      if (plot_config$extra$sample_clust@metric %in% c("binary")) {
-        measure_name <- paste("Binary", noun_to_readout(RowNoun))
-      } else {
-        measure_name <- paste0(
-          ifelse(do_recentre, "Centred ", ""),
-          ifelse(do_rescale, "Scaled ", ""),
-          noun_to_readout(RowNoun)
-        )
-        if (do_recentre) hmap_data <- hmap_data - rowMeans(hmap_data[,plot_se$.influential_in_assay, drop=FALSE])
-        if (do_rescale) hmap_data <- hmap_data / rowSds(hmap_data[,plot_se$.influential_in_assay, drop=FALSE])
-      }
-      measure_name <- paste(measure_name, y_hint)
-      my_caption <- paste0(measure_name, " in ",  dtag(dataset_id), metadata(plot_se)$removed)
       gene_clust <- bluster::clusterRows(
         hmap_data[,plot_se$.influential_in_assay],
         adapt_hclust_param(plot_config$extra$gene_clust, zero_by=if (length(expander)==1) mcols(plot_se)[[expander]][top] else  NULL),
@@ -495,6 +478,45 @@ for (dataset_id in names(ddsList$sample_sets)) {
       gene_clust$clusters <- cluster_cardinality(gene_clust$clusters, this_clust)
       cc <- cluster_calc(hmap_data, clusterID=gene_clust$clusters)
       vis_sample <- eval( plot_config$extra$visible, colDF(plot_se))
+      do_scale <- eval(plot_config$extra$scale,colDF(plot_se))
+      do_centre <- eval(plot_config$extra$centre, colDF(plot_se))
+      if (is.logical(do_centre) && length(do_centre)==1 && do_centre) {
+        centre_txt <- "Centred "
+        hmap_data <- hmap_data - rowMeans(hmap_data[,plot_se$.influential_in_assay, drop=FALSE])
+      } else if (is.logical(do_centre) && any(do_centre)) {
+        centre_txt <- "Shifted "
+        hmap_data <- hmap_data - rowMeans(hmap_data[,plot_se$.influential_in_assay & do_centre, drop=FALSE])
+      }  else if (is_formula(do_centre)) {
+        grp <- as.integer(interaction(model.frame(do_scale, colData(plot_se)), drop=TRUE))
+        m <- do.call(cbind, tapply(seq_along(grp), grp, function(ic) rowMeans(hmap_data[,ic, drop=FALSE])))
+        hmap_data <- hmap_data - (m[,grp, drop=FALSE])
+        centre_txt <- "Group-centred "
+      } else {
+        centre_txt <- ""
+      }
+      if (is.logical(do_scale) && length(do_scale)==1 && do_scale) {
+        scale_txt <- "Scaled "
+        hmap_data <- hmap_data / sqrt(rowVars(hmap_data[,plot_se$.influential_in_assay, drop=FALSE]))
+      } else if (is.logical(do_scale) && any(do_scale)) {
+        scale_txt <- "Reference-group-scaled "
+        hmap_data <- hmap_data / sqrt(rowVars(hmap_data[,plot_se$.influential_in_assay & do_scale, drop=FALSE]))
+      }  else if (is_formula(do_scale)) {
+        grp <- as.integer(interaction(model.frame(do_scale, colData(plot_se)), drop=TRUE))
+        v <- do.call(cbind, tapply(seq_along(grp), grp, function(ic) rowVars(hmap_data[,ic,drop=FALSE])))
+        hmap_data <- hmap_data / sqrt(v[,grp, drop=FALSE])
+        scale_txt <- "Group-scaled "
+      } else {
+        scale_txt <- ""
+      }
+      if (plot_config$extra$sample_clust@metric %in% c("binary")) {
+        measure_name <- paste("Binary", noun_to_readout(RowNoun))
+      } else {
+        measure_name <- paste0(centre_txt, scale_txt, noun_to_readout(RowNoun))
+      }
+      measure_name <- paste(measure_name, y_hint)
+      colour_saturates <- dataset$extra_assays[[which_assay]]$colour_saturates
+      my_caption <- paste0(measure_name, " in ",  dtag(dataset_id), metadata(plot_se)$removed)
+
       #
       ## Empirically column-ordered heatmap
       pls <- hmap_fn(
@@ -577,7 +599,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
       cat("\n\n", strrep("#", length(section_hierarchy)+1), " 2PC\n\n", sep="")
       my_pc <- prcomp(
         t(assay(plot_se)[,plot_se$.influential_in_assay]),
-        center = do_recentre,
+        center = TRUE,
         scale = FALSE)
       proj <- predict(my_pc, newdata = t(assay(plot_se)))
       this_pc <- pc_ind()

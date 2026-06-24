@@ -245,7 +245,9 @@ build_dds_list <- function(dds, spec) {
         if (is_formula(y$design))
           d <- all.vars(update(y$design, NULL ~ .))
         if ("profile_plots" %in% names(y))
-            d <- c(d, unlist(lapply(y$profile_plots, function(x) c(all.vars(x[[1]]), unlist(lapply(x$extra, all.vars))) )))
+          d <- c(d, unlist(lapply(y$profile_plots, function(x) c(
+            unlist(lapply(x[[1]], all.vars)),
+            unlist(lapply(x$extra, all.vars))) )))
         d
       })
     })
@@ -1529,7 +1531,7 @@ generate_assay <- function(args, dds) {
   curAssay <- assay(dds, args$from)
   if (args$method=="normalise") {
     curFrame <- as.data.frame(colData(dds))
-    margs <- modifyList(args, list(from=NULL, method=NULL, design=NULL, recentre=NULL, rescale=NULL, hint=NULL, influential_samples=NULL, colour_saturates=NULL))
+    margs <- modifyList(args, list(from=NULL, method=NULL, design=NULL, hint=NULL, influential_samples=NULL, colour_saturates=NULL))
     baseFrame <-do.call(
       transform,
       modifyList(margs, list(`_data`=curFrame))

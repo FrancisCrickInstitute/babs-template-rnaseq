@@ -414,7 +414,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
       model_vars <- sort_vars(
         unique(c(all.vars(model$design),
                  unique(unlist(lapply(plot_formulae, function(x) c(
-                   all.vars(x[[1]]),
+                   unique(unlist(lapply(x[[1]], all.vars))),
                    unique(unlist(lapply(x$extra, all.vars)))
                  )))))),
         model$variables)
@@ -468,11 +468,8 @@ for (dataset_id in names(ddsList$sample_sets)) {
           y_hint <- model$extra_assays[[which_assay]]$hint %||% which_assay
           do_weight <- (!dataset$extra_assays[[which_assay]]$method %in% c("normalise", "partial")) %||% TRUE
           tidied_se <- tidy_significant_se(dataset$object, is_significant, weights=if (do_weight) weights else NULL, assay=which_assay)
-          do_recentre <- model$extra_assays[[which_assay]]$recentre %||% FALSE
-          do_rescale <- model$extra_assays[[which_assay]]$rescale %||% FALSE
         } else {
           tidied_se <- tidy_significant_se(dataset$object, is_significant, weights=weights)
-          do_recentre <- do_rescale <- FALSE
         }
         design(tidied_se) <- model$design
         mcols(tidied_se)$results <- comparison$results[row.names(tidied_se),]
@@ -482,8 +479,6 @@ for (dataset_id in names(ddsList$sample_sets)) {
         
         sample_order <- reorder_samples(plot_se, model_vars)
         vis_sample <- eval(plot_config$extra$visible, colData(tidied_se))
-        if (do_recentre) assay(plot_se) <- assay(plot_se) - rowMeans(assay(plot_se)[,plot_se$.influential_in_assay, drop=FALSE])
-        if (do_rescale) assay(plot_se) <- assay(plot_se) / rowSds(assay(plot_se)[,plot_se$.influential_in_assay, drop=FALSE])
         mat_height <- height_scaler(n=nrow(plot_se), small=10, big=20, N=1000)
         hc <- plot_config$extra$gene_clust
         keep_names <- FALSE
@@ -508,6 +503,36 @@ for (dataset_id in names(ddsList$sample_sets)) {
         capt <- paste0(tooltip(model, comparison_id), comp_type, rowNoun,"s  of ", mtag(model_id), " in ", dtag(dataset_id), metadata(plot_se)$removed)
         cc <- cluster_calc(assay(plot_se), clusterID=gene_clust$clusters)
         hmap_data <- assay(plot_se)
+        do_scale <- eval(plot_config$extra$scale,colDF(plot_se))
+        do_centre <- eval(plot_config$extra$centre, colDF(plot_se))
+        if (is.logical(do_centre) && length(do_centre)==1 && do_centre) {
+          centre_txt <- "Centred "
+          hmap_data <- hmap_data - rowMeans(hmap_data[,plot_se$.influential_in_assay, drop=FALSE])
+        } else if (is.logical(do_centre) && any(do_centre)) {
+          centre_txt <- "Shifted "
+          hmap_data <- hmap_data - rowMeans(hmap_data[,plot_se$.influential_in_assay & do_centre, drop=FALSE])
+        }  else if (is_formula(do_centre)) {
+          grp <- as.integer(interaction(model.frame(do_scale, colData(plot_se)), drop=TRUE))
+          m <- do.call(cbind, tapply(seq_along(grp), grp, function(ic) rowMeans(hmap_data[,ic, drop=FALSE])))
+          hmap_data <- hmap_data - (m[,grp, drop=FALSE])
+          centre_txt <- "Group-centred "
+        } else {
+          centre_txt <- ""
+        }
+        if (is.logical(do_scale) && length(do_scale)==1 && do_scale) {
+          scale_txt <- "Scaled "
+          hmap_data <- hmap_data / sqrt(rowVars(hmap_data[,plot_se$.influential_in_assay, drop=FALSE]))
+        } else if (is.logical(do_scale) && any(do_scale)) {
+          scale_txt <- "Reference-group-scaled "
+          hmap_data <- hmap_data / sqrt(rowVars(hmap_data[,plot_se$.influential_in_assay & do_scale, drop=FALSE]))
+        }  else if (is_formula(do_scale)) {
+          grp <- as.integer(interaction(model.frame(do_scale, colData(plot_se)), drop=TRUE))
+          v <- do.call(cbind, tapply(seq_along(grp), grp, function(ic) rowVars(hmap_data[,ic,drop=FALSE])))
+          hmap_data <- hmap_data / sqrt(v[,grp, drop=FALSE])
+          scale_txt <- "Group-scaled "
+        } else {
+          scale_txt <- ""
+        }
         cat("\n\n", strrep("#", length(section_hierarchy)+1), " Heatmap\n\n", sep="")
         pls <- hmap_fn(
           dds=plot_se[,sample_order, drop=FALSE], mat=hmap_data[,sample_order, drop=FALSE],
@@ -515,7 +540,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
           model_vars = model_vars,
           plot_config =plot_config,
           row_split = if ("cut.params" %in% slotNames(hc) && "k" %in% names(slot(hc, "cut.params"))) slot(hc, "cut.params")$k  else NULL,
-          measure_name=paste(c(noun_to_readout(RowNoun), y_hint), collapse=" "),
+          measure_name=paste(c(centre_txt, scale_txt, noun_to_readout(RowNoun), y_hint), collapse=" "),
           colour_saturates=NULL,
           show_column_names=TRUE)
         do_plot(Reduce(`+`, pls),
@@ -535,7 +560,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
           row_split = if ("cut.params" %in% slotNames(hc) && "k" %in% names(slot(hc, "cut.params"))) slot(hc, "cut.params")$k  else NULL,
           plot_config =plot_config, 
           colour_saturates=NULL,
-          measure_name=paste(c(noun_to_readout(RowNoun), y_hint), collapse=" "),
+          measure_name=paste(c(centre_txt, scale_txt, noun_to_readout(RowNoun), y_hint), collapse=" "),
           show_column_names=TRUE, cluster_columns = FALSE)
         do_plot(Reduce(`+`, pls),
                 label="Heatmap",
@@ -567,7 +592,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
         mapping <- modify_mapping(plot_config, aes(y=.derived.value))
         my_pc <- prcomp(
           t(this_assay[,plot_se$.influential_in_assay, drop=FALSE]),
-          center = do_recentre,
+          center = TRUE,
           scale = FALSE)
         proj <- predict(my_pc, newdata = t(this_assay))
         my_percent <- round(100 * my_pc$sdev^2/sum(my_pc$sdev^2))

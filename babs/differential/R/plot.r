@@ -530,6 +530,8 @@ hmap_fn <- function(dds, mat, gene_clust, model_vars, plot_config, measure_name,
         tmp_args$matrix <- tmp_args$matrix[rep(1, pre_size$mat_row[i]),]
         tmp_args$height <- rheight * nrow(tmp_args$matrix)
         tmp_args$row_split <- NULL
+        tmp_args$row_order <- NULL
+        tmp_args$row_dend_reorder <- NULL
         tmp_args$cluster_rows <- FALSE
         tmp_args$top_annotation <- ComplexHeatmap::HeatmapAnnotation(
           df = as.data.frame(colData(dds))[ind, model_vars, drop=FALSE][,rep(1, pre_size$anno_row[i]),drop=FALSE], 
@@ -550,8 +552,8 @@ hmap_fn <- function(dds, mat, gene_clust, model_vars, plot_config, measure_name,
       predicted_height= predict(size_fit,data.frame(mat_row=nrow(defaults$matrix), anno_row=length(model_vars)))
     )
   }
-  if ("cols" %in% names(plot_aes)) {
-    col_split <- rlang::eval_tidy(plot_aes$cols, colDF(dds))
+  if ("cols" %in% names(plot_config$extra)) {
+    col_split <- rlang::eval_tidy(plot_config$extra$cols, colDF(dds))
     splits <- split(seq_along(col_split), col_split)
   } else {
     splits <- list("Samples"=seq(length=ncol(dds)))

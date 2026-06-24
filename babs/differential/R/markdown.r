@@ -46,8 +46,10 @@ dmc_heading <- function(obj, hierarchy,  depth="##", numbered=TRUE, describe=TRU
       describe <- TRUE
       fml <- desc <- ""
     } else {
-      fml <- profile_to_string(obj$sample_sets[[dataset]]$models[[model]]$profile_plots[[plot]])
-      desc <- describe_for_dmc(obj$sample_sets[[dataset]]$models[[model]]$profile_plots[[plot]]$extra)
+      pp <- obj$sample_sets[[dataset]]$models[[model]]$profile_plots[[plot]]
+      #pp$extra <- lapply(pp$extra, function(ex) eval(ex, colDF(obj$sample_sets[[dataset]]$object)))
+      fml <- profile_to_string(pp)
+      desc <- describe_for_dmc(pp$extra)
     }
     if (!is.null(met$description)) {
       text <- paste0(met$description, "\n\n",
@@ -148,11 +150,13 @@ profile_to_string <- function(plot_config) {
     "tooltip" = structure("Hover over dotplots using ", hide=is.null),
     "data_id" = structure("Hover grouping by ", hide=is.null),
     "sort" = structure("Sort dendrogram rows by ", hide=is.null),
+    "scale" = structure("Scale heatmap rows ", hide=is.null),
+    "centre" = structure("Scale heatmap rows ", hide=is.null),
     "cols" = structure("Facet columns on ", hide=is.null),
     "rows" = structure("Facet rows on ", hide=is.null),
     "facets" = structure("Facet on ", hide=is.null)
   )
-  hide <- sapply(names(extras), function(e) attr(extras[[e]], "hide")(plot_config$extra[[e]]))
+  hide <- sapply(names(extras), function(e) is.call(plot_config$extra[[e]]) || attr(extras[[e]], "hide")(plot_config$extra[[e]]))
   parts <- lapply(
     intersect(names(plot_config$extra), names(extras)[!hide]),
     function(v) paste0(extras[[v]],  ifelse(is.name(plot_config$extra[[v]]), rlang::as_label(plot_config$extra[[v]]), paste(plot_config$qextra[[v]], collape=",")))

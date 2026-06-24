@@ -25,6 +25,7 @@ ${launcher_dir}/${USER}/rstudio:$HOME/.config/rstudio"
     exec /usr/lib/rstudio-server/bin/rserver \
     --server-daemonize=0 \
     --auth-stay-signed-in-days=30 \
+    --database-config-file=/dev/null \
     --auth-timeout-minutes=0 \
     --www-port '$PORT
 

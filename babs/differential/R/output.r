@@ -471,9 +471,11 @@ sample_X_dataset_table <- function(dds, obj) {
     x},
     ts_extra,
     accumulate=TRUE)
-
   df <- cbind(samp, do.call(cbind, unname(extra_meta)))
+  cl <- names(df)
+  names(df) <- paste0("X", seq_along(cl))
   gt(data=df) %>%
+    cols_label(.list=setNames(as.list(cl), names(df))) %>%
     tab_spanner(label="Metadata",
                 columns=seq_along(samp)) %>%
     Reduce(f=function(gti, x) tab_spanner(gti, label=x$name,id=x$id,columns=x$cols + ncol(samp)), x=ts_extra, init=.) %>%
