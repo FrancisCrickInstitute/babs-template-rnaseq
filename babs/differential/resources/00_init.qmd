@@ -116,7 +116,10 @@ if (file.exists(preprocessed)) {
   }
   if (any(is.na(assay(dds)))) dds$'.percentNA' <- 100 *apply(is.na(assay(dds)), 2, mean)
   if (!"symbol" %in% names(mcols(dds))) {
-    mcols(dds)$symbol <- mcols(dds)[[data_source_params$symbolColumn %||% 1]]
+    if (ncol(mcols(dds))!=0)
+      mcols(dds)$symbol <- mcols(dds)[[data_source_params$symbolColumn %||% 1]]
+    else
+      mcols(dds)$symbol <- row.names(dds)
   }
   save(dds, file=file.path("data",paste0("counts_", params$data_source, ".rda")))
   saveRDS(dds, file=file.path("data",paste0("counts_", params$data_source, ".rds")))
@@ -133,7 +136,6 @@ if (grepl("\\.csv$", params$metadata)) {
 } else {
   sample_sheet <- readxl::read_excel(params$metadata, sheet=1)
 }
-sample_sheet <- cbind(ID=paste(sample_sheet$ROI, sample_sheet$level_2, sep="__"), sample_sheet)
 potential_label <- sapply(sample_sheet, function(x) length(unique(x))==nrow(sample_sheet) & !is.numeric(x))
 file_col <- c(params$file_col[params$file_col %in% names(sample_sheet)], names(sample_sheet)[potential_label])[1]
 if (is.na(file_col %||% NA)) {
