@@ -1,7 +1,7 @@
 diff -ur infra-tmp/makefile babs/differential/makefile
 --- infra-tmp/makefile
 +++ babs/differential/makefile
-@@ -16,41 +16,66 @@
+@@ -16,41 +16,67 @@
  
  
  ## Create a makefile per section. It will set up target-specific
@@ -54,8 +54,9 @@ diff -ur infra-tmp/makefile babs/differential/makefile
 +	   '$(qmd_path): script=$*_$(ispec)_$(idata)'\
 +	   '$(qmd_path): section=$*'\
 +	   '$(qmd_path): cat1=$(or $(shell sed -n "s/^#$(squote)[[:space:]]*@categories[[:space:]]\+\(.*\)/\1/p" extdata/$(ispec).spec | head -n1),$(ispec))'\
-+	   '$(qmd_path): cat2=$(or $($(idata).categories), $(idata))'\
-+	   '$(qmd_path): specname=$(or $(shell sed -n "s/^#$(squote)[[:space:]]*@specname[[:space:]]\+\(.*\)/\1/p" extdata/$(ispec).spec | head -n1),$(ispec))'\
++	   '$(qmd_path): cat2=$(or $(shell sed -n "s/^categories[[:space:]]*=[[:space:]]*\(.*\)/\1/p" extdata/$(idata).config | head -n1),$(shell sed -n "s/^name[[:space:]]*=[[:space:]]*\(.*\)/\1/p" extdata/$(idata).config | head -n1),$(idata))'\
++	   '$(qmd_path): specname=$(or $(shell sed -n "s/^#$(squote)[[:space:]]*@specname[[:space:]]*\(.*\)/\1/p" extdata/$(ispec).spec | head -n1),$(ispec))'\
++	   '$(qmd_path): sourcename=$(or $(shell sed -n "s/^name[[:space:]]*=[[:space:]]*\(.*\)/\1/p" extdata/$(idata).config | head -n1),$(idata))'\
 +	   '$(qmd_path): $(source_dir)/$*.qmd'\
 +	   '$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$*_$(ispec)_$(idata).html: $(my_counts_dir)/$(idata) $(ispec).spec $(my_metadata)_$(idata).csv $(qmd_path) $(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$($*_parent).html'\
 +	)) > $@
@@ -99,7 +100,7 @@ diff -ur infra-tmp/makefile babs/differential/makefile
  
  qmds=$(strip $(foreach section,$(sections),$($(section)_qmds)))
  
-@@ -72,7 +97,8 @@
+@@ -72,7 +98,8 @@
  quarto_opts=--output-dir $(RESULTS_DIR)/$(VERSION) --execute-dir $(CURDIR) -M repo:$(repo)
  
  ## Render the qmds to html in one quarto call
@@ -109,7 +110,7 @@ diff -ur infra-tmp/makefile babs/differential/makefile
  	$(init_checkpoint)
  	sed  -i 's#^  contents: .*#  contents: [$(subst $(space),$(comma),$(patsubst $(staging_dir)/%,%,$(qmds)))]#' $(staging_dir)/index.qmd
  	rm -rf $(staging_dir)/$(RESULTS_DIR)/$(VERSION)
-@@ -94,7 +120,7 @@
+@@ -94,7 +121,7 @@
  	ln -sfn  $(VERSION) $(RESULTS_DIR)/latest
  
  ## Render an individual page
@@ -118,18 +119,19 @@ diff -ur infra-tmp/makefile babs/differential/makefile
  	$(QUARTO) render '$<' $(quarto_opts) $(call log,html-$*)
  
  html-%: $(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%.html ## Create a single html file to be placed in the staging directory, '%' is a simplified filename e.g. `make html-01_exploratory_per-plan_GRCh38`.
-@@ -123,14 +149,27 @@
+@@ -123,14 +150,28 @@
  	 --generated=$(staging_dir)/$(VERSION).params.yml > $@
  	sed -i -e 's#choose_staging("$(section)")#"$(staging_dir)/$*"#' $@
  
 +$(qmds:qmd=yml):
-+	echo "title: $(data_source) $(or $(specname),$(spec))" > $@
-+	echo "description: $(data_source)-aligned data$(if $(spec), according to plan '$(spec)')" >> $@
++	echo "title: $(or $(sourcename),$(data_source)) $(or $(specname),$(spec))" > $@
++	echo "description: $(or $(sourcename),$(data_source)) data$(if $(spec), according to plan '$(or $(specname),$(spec))')" >> $@
 +	echo "categories: [$(if $(cat1),$(if $(cat2),$(cat1)$(comma)$(cat2),$(cat1)),$(cat2))]" >> $@
 +	echo "params:" >> $@
 +	echo "  data_source: $(data_source)" >> $@
 +	echo "  spec: $(or $(spec),'')" >> $@
 +	echo "  specname: $(or $(specname),'')" >> $@
++	echo "  data_sourcename: $(or $(sourcename),'')" >> $@
 +	echo "  script: $(@:yml=qmd)" >> $@
 +
  
@@ -148,7 +150,7 @@ diff -ur infra-tmp/makefile babs/differential/makefile
  	cp $(source_dir)/_quarto-*.yml $(staging_dir)/
  	rm -f ${staging_dir}/_sidebar.yml
  	mkdir -p ${staging_dir}/_extensions
-@@ -151,16 +190,18 @@
+@@ -151,16 +192,18 @@
  	$(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")' $(call log,bib)
  
  renv: | $(log_dir)
@@ -169,7 +171,7 @@ diff -ur infra-tmp/makefile babs/differential/makefile
  	$(GIT) add $(wildcard makefile R .Rbuildignore .gitignore resources/_dependencies.R)
  	$(GIT) commit -m 'Renv initialised by pipeline' || echo "No initialisation files need commiting" $(call log,renv,-a) 
  
-@@ -183,6 +224,7 @@
+@@ -183,6 +226,7 @@
  .PHONY: publish
  publish: $(pubdir)/$(VERSION) ## Copy results to final location. Either 'outputs' folder (default), intranet (`make publish location=intranet`) or internet
  	cp --no-preserve=mode -r $(RESULTS_DIR)/$(VERSION)/. $(extra_files) $(pubdir)/$(VERSION)
@@ -177,7 +179,7 @@ diff -ur infra-tmp/makefile babs/differential/makefile
  	ln -sfn $(VERSION) $(pubdir)/latest
  	[ "$(location)" = "outputs" ] || cp --no-preserve=mode -r .htaccess $(pubdir)/ || echo "Warning: no .htaccess files, so unauthorised people may be able to view these results"
  	ln -sfn $$(realpath $(pubdir)/$(VERSION)) $(RESULTS_DIR)/published_$(location)
-@@ -216,8 +258,61 @@
+@@ -216,8 +260,61 @@
  ################################################################
  #### Bootstrap all relevant data from outside
  ################################################################
@@ -274,7 +276,7 @@ diff -ur infra-tmp/resources/_dependencies.R babs/differential/resources/_depend
 diff -ur infra-tmp/resources/make/module.mk babs/differential/resources/make/module.mk
 --- infra-tmp/resources/make/module.mk
 +++ babs/differential/resources/make/module.mk
-@@ -4,3 +4,83 @@
+@@ -4,3 +4,80 @@
  ## Most things will already have been set in shared.mk -
  ## if you want to over-ride them, it is best to do so here
  ################################################################
@@ -284,12 +286,7 @@ diff -ur infra-tmp/resources/make/module.mk babs/differential/resources/make/mod
 +## Directories
 +################################################################
 +
-+## Location of qmds and multi-yaml files
-+source_dir=resources
-+## Place where qmds will be generated
-+staging_dir=staging
-+## place within the staging directory where renders will be placed
-+RESULTS_DIR = results
++
 +staged_results=$(staging_dir)/$(RESULTS_DIR)/$(VERSION)
 +## Where to store key information transferred from nfcore run
 +my_counts_dir=extdata/genes.results
@@ -303,11 +300,11 @@ diff -ur infra-tmp/resources/make/module.mk babs/differential/resources/make/mod
 +SQLITE_MODULE=SQLite/3.42.0-GCCcore-12.3.0
 +SQLITE = $(call ml,$(SQLITE_MODULE)); sqlite3
 +
-+datasets_dep=$(patsubst $(docs_dir)/%.config,%,$(wildcard $(docs_dir)/*.config))
-+datasets=$(datasets_dep) $(filter-out $(datasets_dep),$(patsubst extdata/%.config,%,$(wildcard extdata/*.config)))
++datasets_dep=$(patsubst $(docs_dir)/%.config,%,$(or $(wildcard $(docs_dir)/$(ANALYSIS_)*.config),$(wildcard $(docs_dir)/*.config)))
++datasets=$(datasets_dep) $(filter-out $(datasets_dep),$(patsubst extdata/%.config,%,$(or $(wildcard extdata/$(ANALYSIS_)*.config),$(wildcard extdata/*.config))))
 +
-+specfiles_dep=$(patsubst $(docs_dir)/%.spec,extdata/%.spec,$(wildcard $(docs_dir)/*.spec))
-+specfiles=$(specfiles_dep) $(filter-out $(specfiles_dep),$(wildcard extdata/*.spec))
++specfiles_dep=$(patsubst $(docs_dir)/%.spec,extdata/%.spec,$(or $(wildcard $(docs_dir)/$(ANALYSIS_)*.spec),$(wildcard $(docs_dir)/*.spec)))
++specfiles=$(specfiles_dep) $(filter-out $(specfiles_dep),$(or $(wildcard extdata/$(ANALYSIS_)*.spec), $(wildcard extdata/*.spec)))
 +specs=$(patsubst extdata/%.spec,%,$(specfiles))
 +
 +covariate_files_dep = $(patsubst %,$(my_metadata)_%.csv,$(datasets_dep))
@@ -335,6 +332,17 @@ diff -ur infra-tmp/resources/make/module.mk babs/differential/resources/make/mod
 +
 +renv: orgs=$(strip $(foreach data_source,$(datasets),$($(data_source).org.db)))
 +
++check-isolated: confs=$(or $(LABEL),$(patsubst extdata/%.config,%,$(configs)),example)
++check-isolated:
++	@echo "Checking general setup"
++	@. resources/shell/isolated.sh
++	@for conf in $(confs); do echo "Checking setup for config '$${conf}'"; . resources/shell/isolated.sh $${conf}; done
++
++clean-geo:  ## Remove the GEO files from scratch
++	rm -f shortcuts/geo
++	rm -rf $(SCRATCH_DIR)geo
++
++
 +# .PHONY: geo
 +# geo: geo/md5.txt  ## Gather everything into the 'geo' folder. Specify `VERSION=`, `data_source=` and `spec=` to customise. Remember to `make clean-geo` when the files have been upload.
 +# geo/md5.txt:
@@ -349,19 +357,10 @@ diff -ur infra-tmp/resources/make/module.mk babs/differential/resources/make/mod
 +# 	while read -r fq ; do cp $${fq} shortcuts/geo/ ; done
 +# 	pushd shortcuts/geo; md5sum *.* > geo.md5.txt; popd
 +
-+check-isolated: confs=$(or $(LABEL),$(patsubst extdata/%.config,%,$(configs)),example)
-+check-isolated:
-+	@echo "Checking general setup"
-+	@. resources/shell/isolated.sh
-+	@for conf in $(confs); do echo "Checking setup for config '$${conf}'"; . resources/shell/isolated.sh $${conf}; done
-+
-+clean-geo:  ## Remove the GEO files from scratch
-+	rm -f shortcuts/geo
-+	rm -rf $(SCRATCH_DIR)geo
 diff -ur infra-tmp/resources/make/project.mk babs/differential/resources/make/project.mk
 --- infra-tmp/resources/make/project.mk
 +++ babs/differential/resources/make/project.mk
-@@ -7,10 +7,13 @@
+@@ -7,11 +7,13 @@
  ################################################################
  
  res_dir = $(RESULTS_DIR)/$(VERSION)
@@ -372,11 +371,12 @@ diff -ur infra-tmp/resources/make/project.mk babs/differential/resources/make/pr
  ## Let later processes know which of those to include in every section -
  ## variable _names_ need to be stored in the `param_names` variable:
 -param_names = res_dir VERSION GIT_REF staging_dir 
+-
 +param_names = res_dir VERSION GIT_REF staging_dir file_col name_col metadata counts
  
- 
  ################################################################
-@@ -20,7 +23,8 @@
+ ## SECTIONS AND THEIR PARAMETERS
+@@ -20,7 +22,8 @@
  ## name everything in the source dirrectory (`./resources` by default)
  ## after one one of these.
  
@@ -386,7 +386,7 @@ diff -ur infra-tmp/resources/make/project.mk babs/differential/resources/make/pr
  
  ################################################################
  ## Section-to-section dependencies
-@@ -30,7 +34,6 @@
+@@ -30,7 +33,6 @@
  ## for 'make pages' we can specify a `section`_parent variable
  ################################################################
  
@@ -414,7 +414,15 @@ diff -ur infra-tmp/resources/make/shared.mk babs/differential/resources/make/sha
  ################################################################
  ## Things here are typically shared across all phases of the
  ## analysis. There's originally one gold-reference copy of this file
-@@ -125,6 +135,7 @@
+@@ -31,6 +41,7 @@
+ ## place within the staging directory where renders will be placed
+ RESULTS_DIR = results$(_ANALYSIS)
+ 
++
+ # csv file names (excluding ext)
+ log_dir=logs
+ 
+@@ -132,6 +143,7 @@
  fi
  endef
  
@@ -449,242 +457,3 @@ diff -ur infra-tmp/resources/_quarto.yml babs/differential/resources/_quarto.yml
 +_prefixes:
 +  spec: ⚙
 +  data_source: 📁
-diff -ur infra-tmp/resources/typescript/sidebar.ts babs/differential/resources/typescript/sidebar.ts
---- infra-tmp/resources/typescript/sidebar.ts
-+++ babs/differential/resources/typescript/sidebar.ts
-@@ -39,7 +39,7 @@
-  * Recursively expand axes into a nested nav tree,
-  * passing params from qmd2nav and collecting a flat list of hrefs.
-  *
-- * axes: object with arrays for each axis (e.g., { align, spec, script })
-+ * axes: object with arrays for each axis (e.g., { data_source, spec, script })
-  * args: arguments including `staging` path
-  *
-  * Returns: { navTree, flatList }
-@@ -47,114 +47,120 @@
- function expandAxesForNav(axes, staging) {
-     const flatList = [];
- 
--    function recurse(keys, prefix={}) {
--	if (keys.length === 0) {
--	    const fname =
--		  Object.keys(prefix).reverse().map(k => prefix[k]).filter(v => v != null && v !== "").join("_") + ".qmd";
--	    
--	    const nav = qmd2nav(fname, staging, Object.keys(prefix));
--	    if (nav) {
--		flatList.push(nav.href);
--		return [nav];
--	    }
--	    return [];
--	}
--
--	const [currentKey, ...restKeys] = keys;
--	const values = axes[currentKey];
--	var results = [];
--
--	for (const val of values) {
--	    const nodePrefix = { ...prefix, [currentKey]: val };
--	    const children = recurse(restKeys, nodePrefix);
--
--	    if (children.length > 0) {
--		if (val === null) {
--		    // Flatten null branch
--		    results.push(...children);
--		} else {
--		    // Use params from first child for section label
--		    const nameVal = children.reduce((found, child) =>
--			found || child.params?.[currentKey + "name"] || null, null
--		    );
--		    // capture specname (non-empty) before params are deleted
--		    const nonEmptyNameVal = nameVal || null;
--		    
--		    let label = capitalizeFirstLetter(
--			nonEmptyNameVal ||
--			    children[0].params?.[currentKey] ||
--			    val
--		    );
--		    
--		    const filteredParams = Object.fromEntries(
--			[currentKey, ...Object.keys(prefix)]
--			    .flatMap(k => {
--				const sourceForK     = children.find(c => k in (c.params || {}) && c.params[k] !== '');
--				const sourceForKName = children.find(c => (k+"name") in (c.params || {}) && c.params[k+"name"] !== '');
--				const entries = [];
--				if (sourceForK)     entries.push([k, sourceForK.params[k]]);
--				if (sourceForKName) entries.push([k+"name", sourceForKName.params[k+"name"]]);
--				return entries;
--			    })
--		    );
--		    
--		    // only delete params AFTER filteredParams is built
--		    children.forEach(child => {
--    delete child.params;
--		    });
--		    if (
--		        children.length === 1 &&
--			    children[0] &&
--			    typeof children[0].href === "string" &&
--			    typeof children[0].text === "string" &&
--			    !("section" in children[0])
--		    ) {
--			results.push({
--			    ...children[0],
--			    params: filteredParams
--			});
--		    } else {
--			
--			results.push({
--			    section: (quarto?._prefixes?.[currentKey] ?? "") + label + ":",
--			    contents: children,
--			    params: filteredParams
--			});
--		    }
--		}
--	    }
--	}
--	const sectionNodes = results.filter(item => "section" in item);
--	// Only collapse structural wrapper if it is a pure passthrough
--	if (sectionNodes.length === 1 && results.length === 1) {
--	    const only = sectionNodes[0];
--	    
--	    // Collapse only if the section adds no real grouping value
--	    if (Array.isArray(only.contents)) {
--		results = only.contents;
--	    }
--	}
--	// If this axis has only one non-null value,
--	// promote its section contents upward
--	if (
--	    values.filter(v => v !== null).length === 1
--	) {
--	    const promoted = [];
--	    for (const item of results) {
--		if (item.section && Array.isArray(item.contents)) {
--		    promoted.push(...item.contents);
--		} else {
--		    promoted.push(item);
--		}
--	    }
--	    results = promoted;
--	}
--	// results.forEach(child => {
--	//     delete child.params;
--	// });
--	return results;
-+function recurse(keys, prefix = {}) {
-+    if (keys.length === 0) {
-+        const fname =
-+            Object.keys(prefix)
-+                .reverse()
-+                .map((k) => prefix[k])
-+                .filter((v) => v != null && v !== "")
-+                .join("_") + ".qmd";
-+
-+        const nav = qmd2nav(fname, staging, Object.keys(prefix));
-+        if (nav) {
-+            flatList.push(nav.href);
-+            return [nav];
-+        }
-+        return [];
-+    }
-+
-+    const [currentKey, ...restKeys] = keys;
-+    const values = axes[currentKey];
-+    let results = [];
-+
-+    for (const val of values) {
-+        const nodePrefix = { ...prefix, [currentKey]: val };
-+        const children = recurse(restKeys, nodePrefix);
-+
-+        if (children.length > 0) {
-+            if (val === null) {
-+                // Flatten null branch
-+                results.push(...children);
-+            } else {
-+                const nameVal = children.reduce(
-+                    (found, child) =>
-+                        found || child.params?.[currentKey + "name"] || null,
-+                    null
-+                );
-+
-+                let label = capitalizeFirstLetter(
-+                    nameVal ||
-+                        children[0].params?.[currentKey] ||
-+                        val
-+                );
-+
-+                const filteredParams = Object.fromEntries(
-+                    [currentKey, ...Object.keys(prefix)]
-+                        .flatMap((k) => {
-+                            const sourceForK = children.find(
-+                                (c) =>
-+                                    k in (c.params || {}) &&
-+                                    c.params[k] !== ""
-+                            );
-+                            const sourceForKName = children.find(
-+                                (c) =>
-+                                    k + "name" in (c.params || {}) &&
-+                                    c.params[k + "name"] !== ""
-+                            );
-+                            const entries = [];
-+                            if (sourceForK)
-+                                entries.push([k, sourceForK.params[k]]);
-+                            if (sourceForKName)
-+                                entries.push([
-+                                    k + "name",
-+                                    sourceForKName.params[k + "name"],
-+                                ]);
-+                            return entries;
-+                        })
-+                );
-+
-+                // only delete params AFTER filteredParams is built
-+                children.forEach((child) => {
-+                    delete child.params;
-+                });
-+
-+                if (
-+                    children.length === 1 &&
-+                    children[0] &&
-+                    typeof children[0].href === "string" &&
-+                    typeof children[0].text === "string" &&
-+                    !("section" in children[0])
-+                ) {
-+                    results.push({
-+                        ...children[0],
-+                        params: filteredParams,
-+                    });
-+                } else {
-+                    results.push({
-+                        section:
-+                            (quarto?._prefixes?.[currentKey] ?? "") +
-+                            label +
-+                            ":",
-+                        contents: children,
-+                        params: filteredParams,
-+                    });
-+                }
-+            }
-+        }
-     }
- 
-+    // Collapse condition: If an axis has only one non-null unique value, promote children
-+    const nonNullValues = values.filter((v) => v !== null);
-+    if (nonNullValues.length === 1) {
-+        const promoted = [];
-+        for (const item of results) {
-+            if (item.section && Array.isArray(item.contents)) {
-+                promoted.push(...item.contents);
-+            } else {
-+                promoted.push(item);
-+            }
-+        }
-+        results = promoted;
-+    }
-+
-+    return results;
-+}
-+
-     const navTree = recurse(Object.keys(axes).filter(k => k !=="_prefixes"));
-     return { navTree, flatList };
- 

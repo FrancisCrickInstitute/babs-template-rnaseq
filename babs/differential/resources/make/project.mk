@@ -15,7 +15,6 @@ counts =  $(my_counts_dir)/$(data_source)/
 ## variable _names_ need to be stored in the `param_names` variable:
 param_names = res_dir VERSION GIT_REF staging_dir file_col name_col metadata counts
 
-
 ################################################################
 ## SECTIONS AND THEIR PARAMETERS
 ################################################################

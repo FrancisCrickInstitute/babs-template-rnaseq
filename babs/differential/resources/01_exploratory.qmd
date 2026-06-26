@@ -90,7 +90,7 @@ if (!is.null(metadata(dds)$organism$org)) {
   library(metadata(dds)$organism$org, character.only=TRUE)
 }
 
-specs   <- load_specs(file=paste0(params$spec, ".spec"), context=dds)
+specs   <- load_specs(params, context=dds)
 data_source_params <- get_data_source_params(params$data_source)
 rowNoun <- data_source_params$rowNoun %||% "gene"
 RowNoun <- stringr::str_to_title(rowNoun)
@@ -474,6 +474,11 @@ for (dataset_id in names(ddsList$sample_sets)) {
         hmap_data[,plot_se$.influential_in_assay],
         adapt_hclust_param(plot_config$extra$gene_clust, zero_by=if (length(expander)==1) mcols(plot_se)[[expander]][top] else  NULL),
         full=TRUE)
+      singletons <- which(table(gene_clust$clusters)==1)
+      ind <- match(singletons, gene_clust$clusters)
+      if (!any(names(gene_clust$clusters)[ind] %in% levels(gene_clust$clusters))) {
+        levels(gene_clust$clusters)[singletons] <- names(gene_clust$clusters)[ind]
+      }
       this_clust <- cluster_ind()
       gene_clust$clusters <- cluster_cardinality(gene_clust$clusters, this_clust)
       cc <- cluster_calc(hmap_data, clusterID=gene_clust$clusters)

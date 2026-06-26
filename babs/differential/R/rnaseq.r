@@ -1,5 +1,6 @@
 #' @export
-load_specs <- function(file="", context) {
+load_specs <- function(params, context) {
+  file <- paste0(params$spec, ".spec")
   if (file.exists(file.path("extdata",file))) {
     df <- as.data.frame(colData(context))
     e <- as.environment(df)
@@ -110,6 +111,7 @@ load_specs <- function(file="", context) {
       }
     )
   }
+  specs$params <- params
   specs
 }
 
@@ -208,6 +210,7 @@ build_dds_list <- function(dds, spec) {
   # Share any top-level models down to each sample-set
   spec <- trickle_down(field="models", to="sample_sets", merge_fn=c)
   spec <- trickle_down(field="profile_plots", to="models")
+  spec <- trickle_down(field="comparisons", to="models", merge_fn=c)
   # Conjunct or cascade any top-level subsetting - if missing, use all samples
   spec <- trickle_down(field="subset", to="sample_sets", default=rep(TRUE, ncol(dds)), merge_fn=`&`)
   spec <- trickle_down(field="influential_samples", to="sample_sets", default=rep(TRUE, ncol(dds)), merge_fn=`&`)
@@ -434,7 +437,7 @@ build_dds_list <- function(dds, spec) {
     spec$sample_sets[[dataset_i]]$object <- obj
   }
   spec <- read_palettes(spec, fname="extdata/colours.json")
-  save_palettes(spec, fname="staging/colours.json")
+  save_palettes(spec)
   spec
 }
 
@@ -1339,7 +1342,9 @@ extract_hits <- function(covar_x_pc, pc, coldat) {
     max_col <- this_covar$column[which.max(this_covar$Assoc)][1]
     pc_hits[covar, "strongest"] <- as.character(max_col)
   }
-  hits <- paste0("PC", sort(unique(as.integer(c(pc_hits$strongest, pc_hits$first)))))
+  hits <- sort(unique(as.integer(c(pc_hits$strongest, pc_hits$first))))
+  if (length(hits)==0) hits <- 1
+  hits <- paste0("PC", hits)
   wide_dat <- cbind(coldat, pc[,hits,drop=FALSE])
   long_dat <- pivot_longer(wide_dat, cols=all_of(hits), names_to="PC")
   long_dat

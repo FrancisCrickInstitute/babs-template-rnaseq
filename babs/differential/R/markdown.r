@@ -150,8 +150,6 @@ profile_to_string <- function(plot_config) {
     "tooltip" = structure("Hover over dotplots using ", hide=is.null),
     "data_id" = structure("Hover grouping by ", hide=is.null),
     "sort" = structure("Sort dendrogram rows by ", hide=is.null),
-    "scale" = structure("Scale heatmap rows ", hide=is.null),
-    "centre" = structure("Scale heatmap rows ", hide=is.null),
     "cols" = structure("Facet columns on ", hide=is.null),
     "rows" = structure("Facet rows on ", hide=is.null),
     "facets" = structure("Facet on ", hide=is.null)

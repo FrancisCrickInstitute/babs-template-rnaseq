@@ -99,15 +99,23 @@ counter <- function(post_fn=identity) {
 
 
 #' @export
-choose_staging <- function(resource, staging="staging") {
-  files <- dir(staging, pattern=paste0("^", resource, ".*\\.qmd"))
+choose_staging <- function(resource) {
+  dirs <- dir(pattern="^staging")
+  files <- lapply(setNames(dirs, dirs),  dir, pattern=paste0("^", resource, ".*\\.qmd"))
+  if (length(dirs)==1) {
+    files <- files[[1]]
+    filepaths <- file.path(dirs, sub("\\.qmd", "", files))
+  } else {
+    files <- unlist(lapply(dirs, function(d) file.path(d, files[[d]])))
+    filepaths <- sub("\\.qmd", "", files)
+  }
   if (length(files)==1) {
     print(paste("Using parameters from", files))
-    file.path(staging, sub(".qmd$", "", files))
+    filepaths
   } else if (length(files)==0) {
     warning("No staging files from which to take parameters.")
   } else {    
-    file.path(staging, sub(".qmd$", "", files[menu(files, title="Select which staging file to use for parameters")]))
+    filepaths[menu(files, title="Select which staging file to use for parameters")]
   }
 }
 
@@ -266,7 +274,7 @@ describe_for_dmc <- function(lst) {
       if (is.null(lst[[a]])) {
         paste("-", gsub("\\{([^}]*)\\}", "\\1", descriptions[[a]]))
       } else {
-        paste("-", gsub("\\{\\}", attr(lst[[a]], "src"), descriptions[[a]]))
+        paste("-", gsub("\\{\\}", if (is.call(lst[[a]])) deparse1(lst[[a]]) else  attr(lst[[a]], "src"), descriptions[[a]]))
       }
     }),
     collapse="\n")

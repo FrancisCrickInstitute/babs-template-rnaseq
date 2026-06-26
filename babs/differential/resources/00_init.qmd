@@ -223,7 +223,7 @@ if (file.exists(csv)) {
   } else {
     mcols(dds)$symbol <- row.names(dds)
   }
-  #dds <- add_org_annotation(dds, organism$org, keytype=data_source_params$keytype, count_source=params$count_source)
+  dds <- add_org_annotation(dds, organism$org, keytype=data_source_params$keytype, count_source=params$count_source)
   colnames(dds) <- as.character(dds[[name_col]])
   row.names(dds) <- rowData(dds)[[1]]
   save(dds, file=file.path("data",paste0("counts_", params$data_source, ".rda")))

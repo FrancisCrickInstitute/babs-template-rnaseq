@@ -481,24 +481,28 @@ for (dataset_id in names(ddsList$sample_sets)) {
         vis_sample <- eval(plot_config$extra$visible, colData(tidied_se))
         mat_height <- height_scaler(n=nrow(plot_se), small=10, big=20, N=1000)
         hc <- plot_config$extra$gene_clust
-        keep_names <- FALSE
         if ("cut.params" %in% slotNames(hc) && "k" %in% names(slot(hc, "cut.params")) && slot(hc, "cut.params")$k >= nrow(plot_se)) {
           slot(hc, "cut.params") <- modifyList(slot(hc, "cut.params"), list(k=nrow(plot_se)))
-          keep_names <- TRUE
         }
         if (nrow(plot_se)>1) {
           gene_clust <- bluster::clusterRows(assay(plot_se)[,dataset$object$.involved,drop=FALSE], adapt_hclust_param(hc), full=TRUE)
           if (is_external) {
             gene_clust$clusters <- match(names(gene_clust$clusters), external_list$ID)
+          } else {
+            singletons <- which(table(gene_clust$clusters)==1)
+            ind <- match(singletons, gene_clust$clusters)
+            if (!any(names(gene_clust$clusters)[ind] %in% levels(gene_clust$clusters))) {
+              levels(gene_clust$clusters)[singletons] <- names(gene_clust$clusters)[ind]
+            }
           }
         } else {
           gene_clust <- list(
-            clusters=setNames(factor(1), row.names(plot_se)),
+            clusters=setNames(row.names(plot_se), row.names(plot_se)),
             objects=list(hclust=FALSE))
         }
         if (!is_external) {
           this_clust <- cluster_ind()
-          gene_clust$clusters <- if (keep_names) row.names(plot_se) else cluster_cardinality(gene_clust$clusters, this_clust)
+          gene_clust$clusters <-cluster_cardinality(gene_clust$clusters, this_clust)
         }
         capt <- paste0(tooltip(model, comparison_id), comp_type, rowNoun,"s  of ", mtag(model_id), " in ", dtag(dataset_id), metadata(plot_se)$removed)
         cc <- cluster_calc(assay(plot_se), clusterID=gene_clust$clusters)

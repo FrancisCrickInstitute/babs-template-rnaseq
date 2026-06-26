@@ -230,6 +230,8 @@ cluster_cardinality <- function(clusterID, prefix="") {
   tbl <- table(clusterID)
   ordered_clusters <- names(sort(tbl, decreasing = TRUE))
   new_labels <- paste0("|", prefix, seq_along(ordered_clusters), "| = ", tbl[ordered_clusters])
+  singleton <- tbl[ordered_clusters]==1
+  new_labels[singleton] <- names(tbl[ordered_clusters])[singleton]
   factor(clusterID, levels = ordered_clusters, labels = new_labels)
 }
 
@@ -369,7 +371,8 @@ distinct_formulae <- function(flist) {
 }
 
 
-adapt_hclust_param <- function(param, zero_by=NULL) {
+adapt_hclust_param <- function(param, zero_by=NULL, singleton=FALSE) {
+  if (singleton) param@metric <- "euclidean"
   metric <- param@metric %||% "default"
   if (metric %in% c("pearson", "kendall", "spearman")) {
     # Replace metric with a custom distfun
@@ -467,12 +470,12 @@ hmap_fn <- function(dds, mat, gene_clust, model_vars, plot_config, measure_name,
       # cluster influential samples WITHIN this subset      
       infl_cluster <- bluster::clusterRows(
         t(cluster_assay[, infl_ind_subset, drop=FALSE]),
-        adapt_hclust_param(plot_config$extra$sample_clust), full=TRUE
+        adapt_hclust_param(plot_config$extra$sample_clust, singleton=nrow(cluster_assay)==1), full=TRUE
       )$objects$hclust
       if (all(infl_ind_subset)) {
         cluster_columns <- infl_cluster
       } else {
-        dfun <- adapt_hclust_param(plot_config$extra$sample_clust)@dist.fun %||% dist
+        dfun <- adapt_hclust_param(plot_config$extra$sample_clust, singleton=nrow(cluster_assay)==1)@dist.fun %||% dist
         D <- as.matrix(dfun(t(cluster_assay), method = infl_cluster$dist.method))
         # Extract distances: new samples (rows) to base samples (columns)
         D_new <- D[!infl_ind_subset, infl_ind_subset, drop=FALSE]
@@ -570,7 +573,8 @@ hmap_fn <- function(dds, mat, gene_clust, model_vars, plot_config, measure_name,
 
 
 
-save_palettes <- function(ddsList, fname) {
+save_palettes <- function(ddsList) {
+  fname <- file.path(ddsList$params$staging, "colours.json")
   con <- file(fname, "w")
   palettes <- lapply(ddsList$sample_sets, function(dds) metadata(colData(dds$object))$palette$ggplot)
   labels <- lapply(ddsList$sample_sets, function(dds) metadata(colData(dds$object))$labels)

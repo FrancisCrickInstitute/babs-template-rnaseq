@@ -10,12 +10,7 @@
 ## Directories
 ################################################################
 
-## Location of qmds and multi-yaml files
-source_dir=resources
-## Place where qmds will be generated
-staging_dir=staging
-## place within the staging directory where renders will be placed
-RESULTS_DIR = results
+
 staged_results=$(staging_dir)/$(RESULTS_DIR)/$(VERSION)
 ## Where to store key information transferred from nfcore run
 my_counts_dir=extdata/genes.results
@@ -29,11 +24,11 @@ EXECUTOR = singularity
 SQLITE_MODULE=SQLite/3.42.0-GCCcore-12.3.0
 SQLITE = $(call ml,$(SQLITE_MODULE)); sqlite3
 
-datasets_dep=$(patsubst $(docs_dir)/%.config,%,$(wildcard $(docs_dir)/*.config))
-datasets=$(datasets_dep) $(filter-out $(datasets_dep),$(patsubst extdata/%.config,%,$(wildcard extdata/*.config)))
+datasets_dep=$(patsubst $(docs_dir)/%.config,%,$(or $(wildcard $(docs_dir)/$(ANALYSIS_)*.config),$(wildcard $(docs_dir)/*.config)))
+datasets=$(datasets_dep) $(filter-out $(datasets_dep),$(patsubst extdata/%.config,%,$(or $(wildcard extdata/$(ANALYSIS_)*.config),$(wildcard extdata/*.config))))
 
-specfiles_dep=$(patsubst $(docs_dir)/%.spec,extdata/%.spec,$(wildcard $(docs_dir)/*.spec))
-specfiles=$(specfiles_dep) $(filter-out $(specfiles_dep),$(wildcard extdata/*.spec))
+specfiles_dep=$(patsubst $(docs_dir)/%.spec,extdata/%.spec,$(or $(wildcard $(docs_dir)/$(ANALYSIS_)*.spec),$(wildcard $(docs_dir)/*.spec)))
+specfiles=$(specfiles_dep) $(filter-out $(specfiles_dep),$(or $(wildcard extdata/$(ANALYSIS_)*.spec), $(wildcard extdata/*.spec)))
 specs=$(patsubst extdata/%.spec,%,$(specfiles))
 
 covariate_files_dep = $(patsubst %,$(my_metadata)_%.csv,$(datasets_dep))

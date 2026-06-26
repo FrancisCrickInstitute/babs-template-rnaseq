@@ -447,7 +447,7 @@ sample_X_dataset_table <- function(dds, obj) {
   extra_meta <- lapply(
     setNames(names(ddsList), names(ddsList)),
     function(x) {
-      newcols <- as.data.frame(colData(ddsList[[x]])[, setdiff(names(colData(ddsList[[x]])),  c(names(samp), ".influential", ".involved")),drop=FALSE])
+      newcols <- as.data.frame(colData(ddsList[[x]])[, setdiff(names(colData(ddsList[[x]])),  c(names(samp), ".influential", ".involved", ".influential_in_assay")),drop=FALSE])
       newcols[[paste0(x, "+")]] <- ifelse(ddsList[[x]]$.influential, "✓", "")
       m <- merge(
         setNames(data.frame(ifelse(colnames(dds) %in% colnames(ddsList[[x]]), "✓", ""), row.names=row.names(samp)), x),

@@ -37,8 +37,9 @@ $(mk): $(staging_dir)/.make-% : $(specfiles) $(covariate_files) | $(staging_dir)
 	   '$(qmd_path): script=$*_$(ispec)_$(idata)'\
 	   '$(qmd_path): section=$*'\
 	   '$(qmd_path): cat1=$(or $(shell sed -n "s/^#$(squote)[[:space:]]*@categories[[:space:]]\+\(.*\)/\1/p" extdata/$(ispec).spec | head -n1),$(ispec))'\
-	   '$(qmd_path): cat2=$(or $($(idata).categories), $(idata))'\
-	   '$(qmd_path): specname=$(or $(shell sed -n "s/^#$(squote)[[:space:]]*@specname[[:space:]]\+\(.*\)/\1/p" extdata/$(ispec).spec | head -n1),$(ispec))'\
+	   '$(qmd_path): cat2=$(or $(shell sed -n "s/^categories[[:space:]]*=[[:space:]]*\(.*\)/\1/p" extdata/$(idata).config | head -n1),$(shell sed -n "s/^name[[:space:]]*=[[:space:]]*\(.*\)/\1/p" extdata/$(idata).config | head -n1),$(idata))'\
+	   '$(qmd_path): specname=$(or $(shell sed -n "s/^#$(squote)[[:space:]]*@specname[[:space:]]*\(.*\)/\1/p" extdata/$(ispec).spec | head -n1),$(ispec))'\
+	   '$(qmd_path): sourcename=$(or $(shell sed -n "s/^name[[:space:]]*=[[:space:]]*\(.*\)/\1/p" extdata/$(idata).config | head -n1),$(idata))'\
 	   '$(qmd_path): $(source_dir)/$*.qmd'\
 	   '$(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$*_$(ispec)_$(idata).html: $(my_counts_dir)/$(idata) $(ispec).spec $(my_metadata)_$(idata).csv $(qmd_path) $(staging_dir)/$(RESULTS_DIR)/$$(VERSION)/$($*_parent).html'\
 	)) > $@
@@ -150,13 +151,14 @@ $(qmds) : $(staging_dir)/%.qmd : $(staging_dir)/%.yml $(staging_dir)/$(VERSION).
 	sed -i -e 's#choose_staging("$(section)")#"$(staging_dir)/$*"#' $@
 
 $(qmds:qmd=yml):
-	echo "title: $(data_source) $(or $(specname),$(spec))" > $@
-	echo "description: $(data_source)-aligned data$(if $(spec), according to plan '$(spec)')" >> $@
+	echo "title: $(or $(sourcename),$(data_source)) $(or $(specname),$(spec))" > $@
+	echo "description: $(or $(sourcename),$(data_source)) data$(if $(spec), according to plan '$(or $(specname),$(spec))')" >> $@
 	echo "categories: [$(if $(cat1),$(if $(cat2),$(cat1)$(comma)$(cat2),$(cat1)),$(cat2))]" >> $@
 	echo "params:" >> $@
 	echo "  data_source: $(data_source)" >> $@
 	echo "  spec: $(or $(spec),'')" >> $@
 	echo "  specname: $(or $(specname),'')" >> $@
+	echo "  data_sourcename: $(or $(sourcename),'')" >> $@
 	echo "  script: $(@:yml=qmd)" >> $@
 
 

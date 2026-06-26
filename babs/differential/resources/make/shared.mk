@@ -27,12 +27,20 @@ EXECUTOR = singularity
 # Conventional directory-, file- and field- names
 ################################################################
 
+ifneq ($(ANALYSIS),)
+ANALYSIS_ = $(ANALYSIS)-
+_ANALYSIS = -$(ANALYSIS)
+__ANALYSIS = /$(ANALYSIS)
+shortTitle=$(ANALYSIS)
+endif
+
 ## Location of qmds and multi-yaml files
 source_dir=resources
 ## Place where qmds will be generated
-staging_dir=staging
+staging_dir=staging$(_ANALYSIS)
 ## place within the staging directory where renders will be placed
-RESULTS_DIR = results
+RESULTS_DIR = results$(_ANALYSIS)
+
 
 # csv file names (excluding ext)
 log_dir=logs
@@ -146,7 +154,7 @@ publish_outputs=outputs
 location=outputs
 
 shortcut=$(if redirect_$(location),shortcuts/,)
-pubdir = $(shortcut)$(or $(publish_$(location)),published_$(location))
+pubdir = $(shortcut)$(or $(publish_$(location)),published_$(location))$(__ANALYSIS)
 
 $(pubdir)/$(VERSION):
 ifdef redirect_$(location)
