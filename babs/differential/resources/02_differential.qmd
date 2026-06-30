@@ -545,7 +545,6 @@ for (dataset_id in names(ddsList$sample_sets)) {
           plot_config =plot_config,
           row_split = if ("cut.params" %in% slotNames(hc) && "k" %in% names(slot(hc, "cut.params"))) slot(hc, "cut.params")$k  else NULL,
           measure_name=paste(c(centre_txt, scale_txt, noun_to_readout(RowNoun), y_hint), collapse=" "),
-          colour_saturates=NULL,
           show_column_names=TRUE)
         do_plot(Reduce(`+`, pls),
                 label="Heatmap",
@@ -562,8 +561,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
           gene_clust = gene_clust, row_title = paste0(RowNoun, "s"),
           model_vars = model_vars,
           row_split = if ("cut.params" %in% slotNames(hc) && "k" %in% names(slot(hc, "cut.params"))) slot(hc, "cut.params")$k  else NULL,
-          plot_config =plot_config, 
-          colour_saturates=NULL,
+          plot_config =plot_config,
           measure_name=paste(c(centre_txt, scale_txt, noun_to_readout(RowNoun), y_hint), collapse=" "),
           show_column_names=TRUE, cluster_columns = FALSE)
         do_plot(Reduce(`+`, pls),

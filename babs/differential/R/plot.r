@@ -421,7 +421,7 @@ adapt_hclust_param <- function(param, zero_by=NULL, singleton=FALSE) {
 
 step_units <- function(n, size, unit="mm") {function(x) unit(stepfun(x=n, y=size)(x), unit=unit)}
 
-hmap_fn <- function(dds, mat, gene_clust, model_vars, plot_config, measure_name, colour_saturates,  ...) {
+hmap_fn <- function(dds, mat, gene_clust, model_vars, plot_config, measure_name,  ...) {
   if ("visible" %in% names(plot_config$extra)) {
     vis_sample <- eval(plot_config$extra$visible, colDF(dds))
   } else {
@@ -438,7 +438,7 @@ hmap_fn <- function(dds, mat, gene_clust, model_vars, plot_config, measure_name,
   if (!is.na(mask) && mask %in% assayNames(dds)) {
     masked[assay(dds, mask)[row.names(masked), colnames(masked)]] <- NA
   }
-  col_fn <- sym_colour(masked[,colData(dds)$.influential], mx=colour_saturates)
+  col_fn <- sym_colour(masked[,colData(dds)$.influential], mx=plot_config$extra$colour_saturates)
   rheight <- unit(1, "mm")
   rheight <- eval(plot_config$extra$row_height)
   if (is.function(rheight)) rheight <- rheight(nrow(masked))

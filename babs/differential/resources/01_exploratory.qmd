@@ -519,7 +519,6 @@ for (dataset_id in names(ddsList$sample_sets)) {
         measure_name <- paste0(centre_txt, scale_txt, noun_to_readout(RowNoun))
       }
       measure_name <- paste(measure_name, y_hint)
-      colour_saturates <- dataset$extra_assays[[which_assay]]$colour_saturates
       my_caption <- paste0(measure_name, " in ",  dtag(dataset_id), metadata(plot_se)$removed)
 
       #
@@ -529,7 +528,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
         row_split = if ("cut.params" %in% slotNames(plot_config$extra$gene_clust) && "k" %in% names(slot(plot_config$extra$gene_clust, "cut.params"))) slot(plot_config$extra$gene_clust, "cut.params")$k  else NULL,
         gene_clust = gene_clust,
         row_title = paste0(RowNoun, "s"),
-        model_vars = model_vars, plot_config =plot_config, measure_name =measure_name, colour_saturates=colour_saturates)
+        model_vars = model_vars, plot_config =plot_config, measure_name =measure_name)
       do_plot(Reduce(`+`, pls),
               label= "Heatmap",
               caption=my_caption,
@@ -545,7 +544,11 @@ for (dataset_id in names(ddsList$sample_sets)) {
       cat("\n\n---\n\n")
       pls <- hmap_fn(dds=plot_se[,sample_order, drop=FALSE], mat=hmap_data[,sample_order, drop=FALSE], row_title = paste0(RowNoun, "s"),
                     row_split = if ("cut.params" %in% slotNames(plot_config$extra$gene_clust) && "k" %in% names(slot(plot_config$extra$gene_clust, "cut.params"))) slot(plot_config$extra$gene_clust, "cut.params")$k  else NULL,
-                    gene_clust = gene_clust,   model_vars = model_vars,   plot_config =plot_config,   measure_name = measure_name, cluster_columns = FALSE, colour_saturates=colour_saturates)
+                    gene_clust = gene_clust,
+                    model_vars = model_vars,
+                    plot_config = plot_config,
+                    measure_name = measure_name,
+                    cluster_columns = FALSE)
       do_plot(Reduce(`+`, pls),
               label= "HeatmapOrd",
               caption=paste("Sorted", my_caption),
@@ -555,7 +558,6 @@ for (dataset_id in names(ddsList$sample_sets)) {
               preview=first,
               plot_meta=section_hierarchy
               )
-      
       cat("\n\n---\n\n")
       #
       ## Feature-cluster aggregate profile plots

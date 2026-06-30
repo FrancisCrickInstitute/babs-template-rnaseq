@@ -1536,7 +1536,7 @@ generate_assay <- function(args, dds) {
   curAssay <- assay(dds, args$from)
   if (args$method=="normalise") {
     curFrame <- as.data.frame(colData(dds))
-    margs <- modifyList(args, list(from=NULL, method=NULL, design=NULL, hint=NULL, influential_samples=NULL, colour_saturates=NULL))
+    margs <- modifyList(args, list(from=NULL, method=NULL, design=NULL, hint=NULL, influential_samples=NULL))
     baseFrame <-do.call(
       transform,
       modifyList(margs, list(`_data`=curFrame))
