@@ -222,18 +222,24 @@ calls:
   ...
 ```
 
-Currently there are only two methods implemented: `normalise` and
-`identity`. `normalise` takes:
+Currently there are only a few methods implemented. They all take a
+`from` argument that takes the name of the assay from which they are
+to be derived: if omitted it will be from the default assay. They also
+all take a `influential_samples` argument so that samples that no
+longer play a role (e.g. if they've been normalised away to 0) can be
+de-influenced.
+
+##### `normalise`
+
+`normalise` takes:
 
  - a `design` argument that identifies the groups within which to
 normalise
  - an assay `from` to use as the base assay
- - options to `recentre` and `rescale` the data (these default to `TRUE`
-   for our visualisations)
  - other arguments set the baseline value against which everything in
    a group (defined by the `design`) will be normalised to
 
-This clearly leaves, in this case, the _nuclear_ samples normalised to
+This clearly leaves, in the case above, the _nuclear_ samples normalised to
 themselves (so identically zero across all genes). To avoid this
 disrupting the visual picture, we have a third dataset-specific
 predicate `visualise` (alongside `subset` and `influential_samples`)
@@ -241,8 +247,24 @@ that will remove these samples from plots (this is optional, but if
 you dislike seeing a primarily white set of columns in your heatmaps,
 this is the way to eradicate them.)
 
+##### `identity`
+
 The `method="identity"` allows us to create assays identical to the
-`from` assay, but allow us to switch off the centring and/or scaling.
+`from` assay, but allow us to have different sets of emphasis.
+
+##### `denoise`
+
+Takes a `design` formula argument: this defines experimental groups,
+and all samples within an experimental group will be set to the
+average expression profile in that group.
+
+##### `partial`
+
+Takes `design` and `reduced` formulae as arguments and produces
+partial residuals (ie regresses out the effects/terms that are
+mentioned in the `design` but omitted from the `reduced`. Also takes
+an optional `resids` argument to determine whether the residuals are
+added back in (default is `TRUE`).
 
 We'll see how to use the extra assays in the [plotting
 section](#profile-formulae). But a reminder: these extra assays are
@@ -692,48 +714,81 @@ necessary to add descriptions of the profiles to be plotted explicitly:
       models = list(
         nested = model(
           design = ~treatment * time + batch,
-          profile_plots = list(
-            aes(x=time, colour=batch, shape=treatment)  ~ treatment + time + timepoint * time + batch,
-            aes(x=time, colour=treatment)  ~ treatment + time + timepoint * time,
-            aes(y=vs_t0, x=time, colour=treatment) ~ . - batch
+          profile_plots = profile_plots(
+            profile_plot(aes(x=time, colour=batch, shape=treatment)),
+            profile_plot(aes(y=denuisance, x=time, colour=treatment)),
+            profile_plot(aes(y=vs_t0, x=time, colour=treatment))
           )
         )
       )
     )
 ```
 
-Everything on the LHS is used as an aesthetic mapping for any given
-plot, and the model on the right says which covariates's effects are
-kept in the 'normalised' data: anything that is omitted is effectively
-normalised/regressed-out .
+Everything in the first (in the above - only) element of the
+`profile_plot` is an aesthetic mapping for any given plot. If `y` is
+omitted, it is assumed that data will be taken from the default assay,
+but if `y` is given, data will be taken from an assay defined by
+`extra_assays` (defined [here](#extra-assays))
 
-In the first element of the `profile_plots` list, the RHS of the
-formula is algebraically identical to the `design`, so no effects will
-be regressed out. But plots will be drawn so that time is on the
-horizontal axis, expression will be on the vertical axes - and samples
-will be coloured by batch, and shaped according to which treatment
-group they were in.
+It is possible to customise plots by adding an `extra` argument to the
+`profile_plot` (this `extra` can also be defined at the model or
+dataset level, and apply to apply all plots below it in the dataset >
+model hierarchy).
 
-The second element will produce a different set of plots, this time
-we've regressed out (corrected-for) batch, so the PCA and heatmaps
-will be different from those on raw vst data. Note, for the
-two-dimensional PC plots, we need both the `x` and `y` aesthetics to
-represent the projection, so the `time` aspect of this data would not
-be represented in the visualisation: to get round this, we
-automatically generate a plot where we use the `colour` aesthetic to
-represent the overwritten `x`.
+#### `extra` plot configuration
 
-The third example illustrates the standard use of the `.` placeholder
-in R formulae to represent the 'existing' model.  Here, the `.`
-represents the design, and the `-` is the standard Wilkinson notation
-to _remove_ an effect, so the third example is a different way of
-phrasing the second instance: regress out the effect of batch.
+We have a number of ways of tweaking the plots. Some of these apply to
+heatmaps, some to PCAs etc, but we list them below: they'll only get
+used in the relevant plot-type (e.g. the top variable genes count is
+irrelevant to a PCA). Here they are with their defaults, and a brief
+description:
 
-The third example also illustrates how to access `extra_assay` as
-defined [here](#extra-assays) - simply setting the `y` aesthetic to
-map to the name of the extra assay will replace the default assay
-(vst-transformed normalised counts) in the plots.
-
+- `section = "all"`: which sections (exploratory/differential/all)
+should this plot be produced for 
+- `top_n_variable = 500`: top N features for generating the heatmap
+  (`Inf` gives you everything, but is intense!)
+- `gene_clust = bluster::HclustParam(cut.params = list(k = 12))`: The
+  gene clustering expression (look at the HclustParam docs)
+- `sample_clust= bluster::HclustParam(metric="pearson")`:
+  Sample-clustering (we extend the `metric` with the various flavours
+  of correlation as well)
+- `pc_weight = "equal weight"`: equal_weight/eigen (latter favours
+  early PCs) when working out which are the 'interesting' PCs
+  associated with experimental terms
+- `reduce_heuristic="drop1"`: again for PC assocation, the
+  model-selection method for seeing if a term is interesting
+- `sort_by=NULL`: an expression (so use `quote` or `~`) who's terms will determine the
+  design-driven sorting of columns of the heatmaps. This defaults to
+  the order that the terms in appear in the `model$variables`.
+- `visible=TRUE`: an expression that will be evaluated in the context
+  of the column-data of the dataset. If it evaluates to FALSE the
+  sample will not be plotted
+- `flag=NULL`: An extra 'aesthetic' used to draw attention to certain
+  samples. Where it evaluates to `TRUE`, the sample will be
+  highlighted (circle drawn around the PC projection, or an
+  black/white distinction on heatmaps) 
+- `expand_rows=NULL`: a name of an mcols column that will group
+  together naturally grouped features (e.g. guides/exons belonging to
+  the same gene)
+- `centre=TRUE`: Should the colour-scale in heatmaps be centred to
+  mean-per-row being white
+- `scale=TRUE`: Similarly should the dynamic colour range of each row
+  be constant
+- `colour_saturates=NULL`: A fixed radius for saturation of colour in
+  the heatmaps
+- `pc_x = 1`: Which component to treat as the horizontal PC
+- `pc_y = 2`: and which the vertical
+- `sample_clustering_assay=1`: Which assay to base the clustering on -
+  can be different from the one that is used to colour the dendrogram.
+- `row_height=step_units(n = c(20, 50, 500), size = c(4, 2, 0.5, 0.1),
+  unit = "mm")`: For the dendrogram, a way of handling differing
+  numbers of rows consistently. See the step_fun function in R.
+- `annotation_row_height = NULL`: Same as above but for annotation rows
+- `cluster_unused_samples="inject": inject/include/ignore - for
+  samples that are not tagged as influential, how do we put them in
+  the sampple-dendrogram (best place in the dendrogram of influential
+  samples; build the dendrogram with them, but don't use them to
+  determine variable features; don't show them at all in the heatmap).
 
 #### Clustering
 
