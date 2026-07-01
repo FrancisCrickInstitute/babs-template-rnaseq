@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RNASeq Template</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.12.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.23.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -65,7 +65,7 @@
 Kelly</h4>
             
       
-      <small class="dont-index">Source: <a href="https://github.com/FrancisCrickInstitute/babs-template-rnaseq/blob/master/babs/differential/vignettes/spec.rmd" class="external-link"><code>vignettes/spec.rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/FrancisCrickInstitute/babs-template-rnaseq/blob/main/babs/differential/vignettes/spec.rmd" class="external-link"><code>vignettes/spec.rmd</code></a></small>
       <div class="d-none name"><code>spec.rmd</code></div>
     </div>
 
@@ -265,19 +265,25 @@ setting <code>extra_assays</code> in a dataset as a list of
   ),
   visualise = compartment != "nuclear",
   ...</code></pre>
-<p>Currently there are only two methods implemented:
-<code>normalise</code> and <code>identity</code>. <code>normalise</code>
-takes:</p>
+<p>Currently there are only a few methods implemented. They all take a
+<code>from</code> argument that takes the name of the assay from which
+they are to be derived: if omitted it will be from the default assay.
+They also all take a <code>influential_samples</code> argument so that
+samples that no longer play a role (e.g. if they’ve been normalised away
+to 0) can be de-influenced.</p>
+<div class="section level5">
+<h5 id="normalise">
+<code>normalise</code><a class="anchor" aria-label="anchor" href="#normalise"></a>
+</h5>
+<p><code>normalise</code> takes:</p>
 <ul>
 <li>a <code>design</code> argument that identifies the groups within
 which to normalise</li>
 <li>an assay <code>from</code> to use as the base assay</li>
-<li>options to <code>recentre</code> and <code>rescale</code> the data
-(these default to <code>TRUE</code> for our visualisations)</li>
 <li>other arguments set the baseline value against which everything in a
 group (defined by the <code>design</code>) will be normalised to</li>
 </ul>
-<p>This clearly leaves, in this case, the <em>nuclear</em> samples
+<p>This clearly leaves, in the case above, the <em>nuclear</em> samples
 normalised to themselves (so identically zero across all genes). To
 avoid this disrupting the visual picture, we have a third
 dataset-specific predicate <code>visualise</code> (alongside
@@ -285,9 +291,33 @@ dataset-specific predicate <code>visualise</code> (alongside
 remove these samples from plots (this is optional, but if you dislike
 seeing a primarily white set of columns in your heatmaps, this is the
 way to eradicate them.)</p>
+</div>
+<div class="section level5">
+<h5 id="identity">
+<code>identity</code><a class="anchor" aria-label="anchor" href="#identity"></a>
+</h5>
 <p>The <code>method="identity"</code> allows us to create assays
-identical to the <code>from</code> assay, but allow us to switch off the
-centring and/or scaling.</p>
+identical to the <code>from</code> assay, but allow us to have different
+sets of emphasis.</p>
+</div>
+<div class="section level5">
+<h5 id="denoise">
+<code>denoise</code><a class="anchor" aria-label="anchor" href="#denoise"></a>
+</h5>
+<p>Takes a <code>design</code> formula argument: this defines
+experimental groups, and all samples within an experimental group will
+be set to the average expression profile in that group.</p>
+</div>
+<div class="section level5">
+<h5 id="partial">
+<code>partial</code><a class="anchor" aria-label="anchor" href="#partial"></a>
+</h5>
+<p>Takes <code>design</code> and <code>reduced</code> formulae as
+arguments and produces partial residuals (ie regresses out the
+effects/terms that are mentioned in the <code>design</code> but omitted
+from the <code>reduced</code>. Also takes an optional
+<code>resids</code> argument to determine whether the residuals are
+added back in (default is <code>TRUE</code>).</p>
 <p>We’ll see how to use the extra assays in the <a href="#profile-formulae">plotting section</a>. But a reminder: these
 extra assays are ignored in the differential testing, as the inferences
 and estimations are always done on the primary assay. You’ll need to
@@ -295,6 +325,7 @@ model the pairing explicitly.</p>
 <p>The extra assays accumulate, so you can have a later
 <code>to_T0</code> that could be generated
 <code>from="to_nulcear"</code>, for instance.</p>
+</div>
 </div>
 </div>
 <div class="section level3">
@@ -671,16 +702,18 @@ entirely faithful record of what is done).</p>
 <h3 id="other-functionality">Other functionality<a class="anchor" aria-label="anchor" href="#other-functionality"></a>
 </h3>
 <div class="section level4">
-<h4 id="profile-formulae">Profile formulae<a class="anchor" aria-label="anchor" href="#profile-formulae"></a>
+<h4 id="plot-profiles">Plot profiles<a class="anchor" aria-label="anchor" href="#plot-profiles"></a>
 </h4>
-<p>In the exploratory plots, we present PC and dendodrograms. Primarily
-these are of the normalised counts without any further processing, but
-there is a mechanism for removing the effect of known covariates prior
-to the calculation of variable genes (for heatmaps) and rotations (for
-PCs). This is useful in cases where the dominant transcriptional
-variation might be driven by “nuisance” covariates, such as batch or
-patient, and so the simply normalised plots focus on experimentally
-uninteresting features.</p>
+<p>In the exploratory plots, we present heatmaps with dendodrograms, PCA
+plots (both one and two dimensional), and average-expression plots
+(averaging rows grouped by heatmap similarity). Primarily these are of
+the normalised counts without any further processing, but there is a
+mechanism for removing the effect of known covariates prior to the
+calculation of variable genes (for heatmaps) and rotations (for PCs).
+This is useful in cases where the dominant transcriptional variation
+might be driven by “nuisance” covariates, such as batch or patient, and
+so the simply normalised plots focus on experimentally uninteresting
+features.</p>
 <p>This is <strong>not</strong> the same as looking at an unadjusted PCA
 plot, noticing that the main clusters appear to relate to batch, and the
 then noticing that, say, timepoint rather than treatment is determining
@@ -701,43 +734,103 @@ explicitly:</p>
 <span>      models <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
 <span>        nested <span class="op">=</span> <span class="fu">model</span><span class="op">(</span></span>
 <span>          design <span class="op">=</span> <span class="op">~</span><span class="va">treatment</span> <span class="op">*</span> <span class="va">time</span> <span class="op">+</span> <span class="va">batch</span>,</span>
-<span>          profile_plots <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>            <span class="fu">aes</span><span class="op">(</span>x<span class="op">=</span><span class="va">time</span>, colour<span class="op">=</span><span class="va">batch</span>, shape<span class="op">=</span><span class="va">treatment</span><span class="op">)</span>  <span class="op">~</span> <span class="va">treatment</span> <span class="op">+</span> <span class="va">time</span> <span class="op">+</span> <span class="va">timepoint</span> <span class="op">*</span> <span class="va">time</span> <span class="op">+</span> <span class="va">batch</span>,</span>
-<span>            <span class="fu">aes</span><span class="op">(</span>x<span class="op">=</span><span class="va">time</span>, colour<span class="op">=</span><span class="va">treatment</span><span class="op">)</span>  <span class="op">~</span> <span class="va">treatment</span> <span class="op">+</span> <span class="va">time</span> <span class="op">+</span> <span class="va">timepoint</span> <span class="op">*</span> <span class="va">time</span>,</span>
-<span>            <span class="fu">aes</span><span class="op">(</span>y<span class="op">=</span><span class="va">vs_t0</span>, x<span class="op">=</span><span class="va">time</span>, colour<span class="op">=</span><span class="va">treatment</span><span class="op">)</span> <span class="op">~</span> <span class="va">.</span> <span class="op">-</span> <span class="va">batch</span></span>
+<span>          profile_plots <span class="op">=</span> <span class="fu">profile_plots</span><span class="op">(</span></span>
+<span>            <span class="fu">profile_plot</span><span class="op">(</span><span class="fu">aes</span><span class="op">(</span>x<span class="op">=</span><span class="va">time</span>, colour<span class="op">=</span><span class="va">batch</span>, shape<span class="op">=</span><span class="va">treatment</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>            <span class="fu">profile_plot</span><span class="op">(</span><span class="fu">aes</span><span class="op">(</span>y<span class="op">=</span><span class="va">denuisance</span>, x<span class="op">=</span><span class="va">time</span>, colour<span class="op">=</span><span class="va">treatment</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>            <span class="fu">profile_plot</span><span class="op">(</span><span class="fu">aes</span><span class="op">(</span>y<span class="op">=</span><span class="va">vs_t0</span>, x<span class="op">=</span><span class="va">time</span>, colour<span class="op">=</span><span class="va">treatment</span><span class="op">)</span><span class="op">)</span></span>
 <span>          <span class="op">)</span></span>
 <span>        <span class="op">)</span></span>
 <span>      <span class="op">)</span></span>
 <span>    <span class="op">)</span></span></code></pre></div>
-<p>Everything on the LHS is used as an aesthetic mapping for any given
-plot, and the model on the right says which covariates’s effects are
-kept in the ‘normalised’ data: anything that is omitted is effectively
-normalised/regressed-out .</p>
-<p>In the first element of the <code>profile_plots</code> list, the RHS
-of the formula is algebraically identical to the <code>design</code>, so
-no effects will be regressed out. But plots will be drawn so that time
-is on the horizontal axis, expression will be on the vertical axes - and
-samples will be coloured by batch, and shaped according to which
-treatment group they were in.</p>
-<p>The second element will produce a different set of plots, this time
-we’ve regressed out (corrected-for) batch, so the PCA and heatmaps will
-be different from those on raw vst data. Note, for the two-dimensional
-PC plots, we need both the <code>x</code> and <code>y</code> aesthetics
-to represent the projection, so the <code>time</code> aspect of this
-data would not be represented in the visualisation: to get round this,
-we automatically generate a plot where we use the <code>colour</code>
-aesthetic to represent the overwritten <code>x</code>.</p>
-<p>The third example illustrates the standard use of the <code>.</code>
-placeholder in R formulae to represent the ‘existing’ model. Here, the
-<code>.</code> represents the design, and the <code>-</code> is the
-standard Wilkinson notation to <em>remove</em> an effect, so the third
-example is a different way of phrasing the second instance: regress out
-the effect of batch.</p>
-<p>The third example also illustrates how to access
-<code>extra_assay</code> as defined <a href="#extra-assays">here</a> -
-simply setting the <code>y</code> aesthetic to map to the name of the
-extra assay will replace the default assay (vst-transformed normalised
-counts) in the plots.</p>
+<p>Everything in the first (in the above - only) element of the
+<code>profile_plot</code> is an aesthetic mapping for any given plot. If
+<code>y</code> is omitted, it is assumed that data will be taken from
+the default assay, but if <code>y</code> is given, data will be taken
+from an assay defined by <code>extra_assays</code> (defined <a href="#extra-assays">here</a>)</p>
+<p>It is possible to customise plots by adding an <code>extra</code>
+argument to the <code>profile_plot</code> (this <code>extra</code> can
+also be defined at the model or dataset level, and apply to apply all
+plots below it in the dataset &gt; model hierarchy).</p>
+</div>
+<div class="section level4">
+<h4 id="extra-plot-configuration">
+<code>extra</code> plot configuration<a class="anchor" aria-label="anchor" href="#extra-plot-configuration"></a>
+</h4>
+<p>We have a number of ways of tweaking the plots. Some of these apply
+to heatmaps, some to PCAs etc, but we list them below: they’ll only get
+used in the relevant plot-type (e.g. the top variable genes count is
+irrelevant to a PCA). Here they are with their defaults, and a brief
+description:</p>
+<ul>
+<li>
+<code>section = "all"</code>: which sections
+(exploratory/differential/all) should this plot be produced for</li>
+<li>
+<code>top_n_variable = 500</code>: top N features for generating the
+heatmap (<code>Inf</code> gives you everything, but is intense!)</li>
+<li>
+<code>gene_clust = bluster::HclustParam(cut.params = list(k = 12))</code>:
+The gene clustering expression (look at the HclustParam docs)</li>
+<li>
+<code>sample_clust= bluster::HclustParam(metric="pearson")</code>:
+Sample-clustering (we extend the <code>metric</code> with the various
+flavours of correlation as well)</li>
+<li>
+<code>pc_weight = "equal weight"</code>: equal_weight/eigen (latter
+favours early PCs) when working out which are the ‘interesting’ PCs
+associated with experimental terms</li>
+<li>
+<code>reduce_heuristic="drop1"</code>: again for PC assocation, the
+model-selection method for seeing if a term is interesting</li>
+<li>
+<code>sort_by=NULL</code>: an expression (so use <code>quote</code>
+or <code>~</code>) who’s terms will determine the design-driven sorting
+of columns of the heatmaps. This defaults to the order that the terms in
+appear in the <code>model$variables</code>.</li>
+<li>
+<code>visible=TRUE</code>: an expression that will be evaluated in
+the context of the column-data of the dataset. If it evaluates to FALSE
+the sample will not be plotted</li>
+<li>
+<code>flag=NULL</code>: An extra ‘aesthetic’ used to draw attention
+to certain samples. Where it evaluates to <code>TRUE</code>, the sample
+will be highlighted (circle drawn around the PC projection, or an
+black/white distinction on heatmaps)</li>
+<li>
+<code>expand_rows=NULL</code>: a name of an mcols column that will
+group together naturally grouped features (e.g. guides/exons belonging
+to the same gene)</li>
+<li>
+<code>centre=TRUE</code>: Should the colour-scale in heatmaps be
+centred to mean-per-row being white</li>
+<li>
+<code>scale=TRUE</code>: Similarly should the dynamic colour range
+of each row be constant</li>
+<li>
+<code>colour_saturates=NULL</code>: A fixed radius for saturation of
+colour in the heatmaps</li>
+<li>
+<code>pc_x = 1</code>: Which component to treat as the horizontal
+PC</li>
+<li>
+<code>pc_y = 2</code>: and which the vertical</li>
+<li>
+<code>sample_clustering_assay=1</code>: Which assay to base the
+clustering on - can be different from the one that is used to colour the
+dendrogram.</li>
+<li>
+<code>row_height=step_units(n = c(20, 50, 500), size = c(4, 2, 0.5, 0.1), unit = "mm")</code>:
+For the dendrogram, a way of handling differing numbers of rows
+consistently. See the step_fun function in R.</li>
+<li>
+<code>annotation_row_height = NULL</code>: Same as above but for
+annotation rows</li>
+<li>`cluster_unused_samples=“inject”: inject/include/ignore - for
+samples that are not tagged as influential, how do we put them in the
+sampple-dendrogram (best place in the dendrogram of influential samples;
+build the dendrogram with them, but don’t use them to determine variable
+features; don’t show them at all in the heatmap).</li>
+</ul>
 </div>
 <div class="section level4">
 <h4 id="clustering">Clustering<a class="anchor" aria-label="anchor" href="#clustering"></a>

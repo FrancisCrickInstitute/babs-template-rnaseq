@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RNASeq Template</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.12.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.23.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -37,14 +37,84 @@
   <main id="main" class="col-md-9"><div class="page-header">
 
       <h1>Changelog</h1>
-      <small>Source: <a href="https://github.com/FrancisCrickInstitute/babs-template-rnaseq/blob/master/babs/differential/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
+      <small>Source: <a href="https://github.com/FrancisCrickInstitute/babs-template-rnaseq/blob/main/babs/differential/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
     <div class="section level2">
-<h2 class="pkg-version" data-toc-text="1.12.0" id="version-1120">Version 1.12.0<a class="anchor" aria-label="anchor" href="#version-1120"></a></h2>
+<h2 class="pkg-version" data-toc-text="1.23.0" id="version-1230">Version 1.23.0<a class="anchor" aria-label="anchor" href="#version-1230"></a></h2>
 <div class="section level3">
-<h3 id="minor-changes-1-12-0">Minor Changes<a class="anchor" aria-label="anchor" href="#minor-changes-1-12-0"></a></h3>
-<ul><li>infra: Use patching to build on infrastructure template</li>
+<h3 id="major-changes-1-23-0">Major Changes<a class="anchor" aria-label="anchor" href="#major-changes-1-23-0"></a></h3>
+</div>
+<div class="section level3">
+<h3 id="minor-changes-1-23-0">Minor Changes<a class="anchor" aria-label="anchor" href="#minor-changes-1-23-0"></a></h3>
+<ul><li>feat: Handle very small differential clusters</li>
+<li>chore: Restyle code according to jarl linter</li>
+<li>feat: Add diverging colour scales for numerics with zeros</li>
+<li>infra: refactor partialisation for maintainability</li>
+<li>test: Add extra_assay to test suite</li>
+<li>infra: First attempt at copier</li>
+<li>feat: Dynamic config file</li>
+<li>fix: Correct the –data-file format</li>
+<li>feat: Make config-specific samplesheets</li>
+<li>infra: Move crick nfcore settings to jinja</li>
+<li>fix: Add answers file</li>
+<li>feat: Make .env.local templated</li>
+<li>chore: Fix typo</li>
+<li>infra: Fine-tuning the copier</li>
+<li>infra: Remove copier templates</li>
+<li>fix: bring nfcore up to speed on the docs-multi-samplesheet idea</li>
+<li>infra: More refactoring to allow multiple csvs</li>
+<li>infra: Add a github release mechanism</li>
+<li>docs: Add a readme for non-Crick users</li>
+<li>chore: Remove some things from the archive</li>
+<li>fix: Workaround for picking up fastq files dynamically</li>
+<li>infra: Remove prefixes from config files</li>
+<li>Infra: Update to R 4.6</li>
+<li>fix: renv work-around</li>
+<li>feat: Allow proper isolation of dendrogram from non-influential samples</li>
+<li>fix: Handle influential_in_assay more uniformly in differential</li>
+<li>infra: better default-names mechanism</li>
+<li>infra: more refactoring</li>
+<li>feat: Improve dendrogram injection</li>
+<li>feat: Improve sub-influential handling</li>
+<li>infra: further refactoring based on proteomics tests</li>
+<li>infra: Move all ‘extra’ plot aesthetics to their own alist</li>
+<li>feat: Allow sample_set ‘split’ to generate datasets via formula</li>
+<li>fix: Syntax errors</li>
+<li>fix: Various robustness improvements</li>
+<li>infra: Move param functionality into the specs</li>
+<li>fix: Store size of heatmap in multi-facet setting</li>
+<li>infra: Relabel ‘alignment’ as the more generic ‘data_source’</li>
+<li>infra: Switch to soft-linking the shared.mk</li>
+<li>infra: Refactor so that ‘builds’ are isolated from non-upstream stuff</li>
+<li>infra: Improve the checkpoint/retagging functionality</li>
+<li>infra: Improve the git/retag functionality</li>
+<li>feat: Ability to load colour palettes</li>
+<li>chore: Update patch to reflect alignment -&gt; data_source</li>
+<li>infra: Improve patching robustness</li>
+<li>feat: Add heatmap stepfun height</li>
+<li>style: Move legend and description into tabset</li>
+<li>feat: Improve handling of z-transforming the heatmap data colours</li>
+<li>infra: Move some of the rnaseq-specific make into the module file</li>
+<li>fix: Revert over-written file</li>
+<li>feat: Allow multiple websites with an “ANALYSIS=” cli option</li>
+<li>feat: Update shiny explorer</li>
+<li>fix: move colour-saturation to its more natural plot-config home</li>
+<li>docs: Document the <code>extra</code> profile_plot argument</li>
+<li>docs: Improve docs # Version 1.15.0 ## Major Changes ## Minor Changes</li>
+<li>chore: version bump</li>
+<li>fix: Isolate heatmap sample-reordering</li>
+<li>chore: update the rnaseq.patch for the refactored spec/config</li>
+<li>infra: Add notes preprocessor</li>
+<li>fix: syntax error in docs makefile</li>
+<li>feat: Retrieve template updates via the export branch</li>
+<li>infra: move renv.lock from resources</li>
+<li>fix: regression in the sample ordering of heatmaps # Version 1.13.0 ## Major Changes ## Minor Changes</li>
+<li>fix: Typo in pc weight functionality</li>
+<li>fix: make ‘involved’ samples work in rank-deficient designs</li>
+<li>fix: Conversion of .babs file to docs settings</li>
+<li>feat: Allow assay-specific influential-samples # Version 1.12.0 ## Minor Changes</li>
+<li>infra: Use patching to build on infrastructure template</li>
 <li>feat: Put spec and alignment icons in the quarto sidebar</li>
 <li>feat: Add differential PC plots</li>
 </ul></div>
