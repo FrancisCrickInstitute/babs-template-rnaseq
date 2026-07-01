@@ -9,8 +9,15 @@ specification(
 		    method="normalise", from="vst",
 		    treatment="Untreated",
 		    hint="normalised to untreated",
-		    design = ~  cellLine,
-		    recentre=FALSE, rescale=FALSE)
+		    design = ~  cellLine),
+		no_line=extra_assay(
+		    method="partial", from="vst",
+		    design=~treatment + cellLine,
+		    reduced=~treatment),
+		no_treat=extra_assay(
+		    method="partial", from="vst",
+		    design=~treatment + cellLine,
+		    reduced=~cellLine)
 	    ),
             models = list(
                 M1 = model(
@@ -22,10 +29,10 @@ this behaviour will tend not to be selected.  There is no replication (ie no lin
 so we have to restrict our model to at most this complexity.",
                     design = ~ treatment + cellLine,
 		    profile_plots=list(
-			aes(x=cellLine, colour=treatment, group=treatment) ~ .,
-			aes(x=cellLine, colour=treatment, group=treatment) ~ . - treatment,
-			aes(x=cellLine, colour=treatment, group=treatment) ~ . - cellLine,
-			aes(y=to_untreated, x=cellLine, colour=treatment) ~ .
+			aes(x=cellLine, colour=treatment, group=treatment),
+			aes(y=no_treat, x=cellLine, colour=treatment, group=treatment),
+			aes(y=no_line, x=cellLine, colour=treatment, group=treatment),
+			aes(y=to_untreated, x=cellLine, colour=treatment)
 		    ),
                     comparisons = list(
                         mult_comp( revpairwise ~ treatment ),

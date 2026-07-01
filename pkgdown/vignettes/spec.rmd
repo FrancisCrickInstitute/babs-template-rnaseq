@@ -682,9 +682,11 @@ faithful record of what is done).
 
 ### Other functionality
 
-#### Profile formulae
+#### Plot profiles
 
-In the exploratory plots, we present PC and dendodrograms. Primarily
+In the exploratory plots, we present heatmaps with  dendodrograms, PCA
+plots (both one and two dimensional), and average-expression plots
+(averaging rows grouped by heatmap similarity). Primarily
 these are of the normalised counts without any further processing, but
 there is a mechanism for removing the effect of known covariates prior
 to the calculation of variable genes (for heatmaps) and rotations (for

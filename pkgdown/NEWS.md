@@ -1,3 +1,61 @@
+# Version 1.23.0
+## Major Changes
+## Minor Changes
+ - feat: Handle very small differential clusters
+ - chore: Restyle code according to jarl linter
+ - feat: Add diverging colour scales for numerics with zeros
+ - infra: refactor partialisation for maintainability
+ - test: Add extra_assay to test suite
+ - infra: First attempt at copier
+ - feat: Dynamic config file
+ - fix: Correct the --data-file format
+ - feat: Make config-specific samplesheets
+ - infra: Move crick nfcore settings to jinja
+ - fix: Add answers file
+ - feat: Make .env.local templated
+ - chore: Fix typo
+ - infra: Fine-tuning the copier
+ - infra: Remove copier templates
+ - fix: bring nfcore up to speed on the docs-multi-samplesheet idea
+ - infra: More refactoring to allow multiple csvs
+ - infra:  Add a github release mechanism
+ - docs: Add a readme for non-Crick users
+ - chore: Remove some things from the archive
+ - fix: Workaround for picking up fastq files dynamically
+ - infra: Remove prefixes from config files
+ - Infra: Update to R 4.6
+ - fix: renv work-around
+ - feat: Allow proper isolation of dendrogram from non-influential samples
+ - fix: Handle influential_in_assay more uniformly in differential
+ - infra: better default-names mechanism
+ - infra: more refactoring
+ - feat: Improve dendrogram injection
+ - feat: Improve sub-influential handling
+ - infra: further refactoring based on proteomics tests
+ - infra: Move all 'extra' plot aesthetics to their own alist
+ - feat: Allow sample_set 'split' to generate datasets via formula
+ - fix: Syntax errors
+ - fix: Various robustness improvements
+ - infra: Move param functionality into the specs
+ - fix: Store size of heatmap in multi-facet setting
+ - infra: Relabel 'alignment' as the more generic 'data_source'
+ - infra: Switch to soft-linking the shared.mk
+ - infra: Refactor so that 'builds' are isolated from non-upstream stuff
+ - infra: Improve the checkpoint/retagging functionality
+ - infra: Improve the git/retag functionality
+ - feat: Ability to load colour palettes
+ - chore: Update patch to reflect alignment -> data_source
+ - infra: Improve patching robustness
+ - feat: Add heatmap stepfun height
+ - style: Move legend and description into tabset
+ - feat: Improve handling of z-transforming the heatmap data colours
+ - infra: Move some of the rnaseq-specific make into the module file
+ - fix: Revert over-written file
+ - feat: Allow multiple websites with an "ANALYSIS=" cli option
+ - feat: Update shiny explorer
+ - fix: move colour-saturation to its more natural plot-config home
+ - docs: Document the `extra` profile_plot argument
+ - docs: Improve docs
 # Version 1.15.0
 ## Major Changes
 ## Minor Changes

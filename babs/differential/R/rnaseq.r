@@ -27,7 +27,7 @@ load_specs <- function(params, context) {
     list_obj("model", envir=e)
     list_obj("specification", envir=e)
     list_obj("extra_assay", envir=e)
-    list_obj("profile_plot", envir=e, post=function(x) {if (is.list(x)) x else list(x)} )
+    list_obj("profile_plot", envir=e, post=function(x) {if (!inherits(x, "gg")) x else list(x)} )
     list_obj("comparison", envir=e, post=function(x) {if (is_formula(x[[1]]) && length(x[[1]])==3) do.call(mult_comp, x) else x})
 
     # List wrappers - either evaluating or not
