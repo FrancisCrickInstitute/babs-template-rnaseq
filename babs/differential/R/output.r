@@ -20,23 +20,30 @@ p2filename <- function(p, prefix, suffix) {
 #' @return A list of file paths to the excel files
 #' @author Gavin Kelly
 #' @export
-write_assay <- function(obj, aname="vst", p) {
-  ddsList <- flatten_nest(obj, function(leaf) leaf$object, layers="sample_sets")
+write_assay <- function(ddsList, aname="vst", params) {
   out <- list()
-  for (i in names(ddsList)) {
-    x <- assayPlus(ddsList[[i]], aname)
+  for (i in names(ddsList$sample_sets)) {
+    obj <- ddsList$sample_sets[[i]]$object
+    x <- assayPlus(obj, aname)
     if (is.null(x)) {
       next
     }
-    content_frame <- cbind(mcols(ddsList[[i]]),x)
-    head_frame <- as.data.frame(colData(ddsList[[i]]))
+    content_frame <- cbind(mcols(obj),x)
+    head_frame <- as.data.frame(colData(obj))
     head_frame[] <- sapply(head_frame, as.character)
-    spacer_frame <- as.data.frame(mcols(ddsList[[i]]))[rep(1, ncol(head_frame)),]
+    spacer_frame <- as.data.frame(mcols(obj))[rep(1, ncol(head_frame)),]
     spacer_frame[] <- ""
     row.names(spacer_frame) <- colnames(head_frame)
-    fname <- p2filename(p, paste0(aname, "_", i), "tsv")
+    fname <- p2filename(params, paste0(aname, "_", i), "tsv")
+    out <- c(out,
+            list(list(
+              link=paste0("<a class=\"download-excel btn btn-primary\" href=\"", attr(fname, "link"), "\">Assay ", aname, " of ", i, "</a>"),
+              fname=fname,
+              params=params,
+              hierarchy=list(dataset=i, assay=aname)
+            )
+            ))
     dir.create(dirname(fname), recursive=TRUE)
-    out[[i]] <- fname
     write.table(cbind(spacer_frame, t(head_frame)), file=fname, quote=FALSE, sep="\t", col.names=FALSE)
     write.table(content_frame, file=fname,
                 quote=FALSE, sep="\t", append=TRUE, col.names=NA)
@@ -44,48 +51,41 @@ write_assay <- function(obj, aname="vst", p) {
   out
 }
 
-write_proj <- function(proj, p, prefix="PC") {
-  fname <- p2filename(p, prefix=prefix, "csv")
+write_proj <- function(proj, params, hierarchy, prefix="PC") {
+  fname <- p2filename(params,
+                     paste(
+                       prefix,
+                       hierarchy$dataset, hierarchy$model, hierarchy$plot_config,
+                       sep="_"),
+                     "tsv")
   dir.create(dirname(fname), recursive=TRUE)
-  write.csv(as.data.frame(proj), file=fname)
-  fname
+  write.table(as.data.frame(proj), file=fname, quote=FALSE, sep="\t", col.names=NA)
+  list(
+    link=paste0("<a class=\"download-excel btn btn-primary\" href=\"", attr(fname, "link"), "\">PC ", hierarchy$plot_config, " modeled as ", hierarchy$model, " in ", hierarchy$dataset, "</a>", sep=""),
+    fname=fname,
+    params=params,
+    hierarchy=hierarchy)
 }
 
 #' @export
-write_clusters <- function(clust, mcols, p, prefix="clusters") {
-  wb <- openxlsx::createWorkbook(title="Differential Analysis",
-                                creator="BABS")
-  descrip <- data.frame(
-    grouping=names(clust),
-    description=sapply(clust, "[[", "description")
-  )
-  sn <- "Description"
-  addWorksheet(wb, sn)
-  writeData(wb, sn, descrip, rowNames=FALSE, colNames=TRUE)
-
-  frames <- lapply(
-    names(clust),
-    function(x) setNames(
-      data.frame(as.character(clust[[x]]$id), names(clust[[x]]$id)),
-      c(x, "ID")
-    ))
-  if (length(frames)==1) {
-    df <- frames[[1]]
-  } else {
-    df <- Reduce(function(x,y) merge(x, y, by="ID", all=TRUE), frames)
-  }
-  saveRDS(df, file=file.path("data", paste0(prefix, "_", p$spec, "_", p$data_source, ".rds")))
+write_clusters <- function(clusters, description, mcols, params, hierarchy, prefix="clusters") {
+  df <- data.frame(Cluster=as.character(clusters), Feature=names(clusters))
   meta <- as.data.frame(mcols)
-  df <- merge(meta, df,  by.x=0, by.y="ID")
-  names(df)[names(df)=="Row.names"] <- "ID"
-  sn <- "Clusterings"
-  addWorksheet(wb, sn)
-  writeData(wb, sn, df, rowNames=FALSE, colNames=TRUE)
-
-  fname <- p2filename(p, prefix=prefix,"xlsx")
+  df <- merge(meta, df,  by.x=0, by.y="Feature")
+  df$Row.names <- NULL
+  fname <- p2filename(params,
+                     paste(
+                       prefix,
+                       hierarchy$dataset, hierarchy$model, hierarchy$plot_config,
+                       sep="_"),
+                     "tsv")
   dir.create(dirname(fname), recursive=TRUE)
-  (saveWorkbook(wb, fname, overwrite=TRUE))
-  fname
+  write.table(df, file=fname, quote=FALSE, sep="\t", col.names=NA)
+  list(
+    link=paste0("<a class=\"download-excel btn btn-primary\" href=\"", attr(fname, "link"), "\">Clusters ", hierarchy$plot_config, " modeled as ", hierarchy$model, " in ", hierarchy$dataset, "</a>", description, sep=""),
+    fname=fname,
+    params=params,
+    hierarchy=hierarchy)
 }
 
 summarise_results <- function(obj, inds) {
@@ -141,7 +141,7 @@ write_results <- function(dmc, params, assays=NULL) {
   summaries <- nested_modify(dmc, summarise_results)
   summaries <- Reduce(rbind, flatten_nest(summaries, function(x) x$summary))
   
-  out <- lapply(dmc$sample_sets, function(x) "")
+  out <- lapply(dmc$sample_sets, function(x) list())
   for (dataset_id in names(dmc$sample_sets)) {
     dataset <- dmc$sample_sets[[dataset_id]]
     wb <- openxlsx::createWorkbook(title="Differential Analysis",
@@ -241,9 +241,15 @@ write_results <- function(dmc, params, assays=NULL) {
                                  value = unlist(si$platform),
                                  stringsAsFactors = FALSE),
               headerStyle=hs2)
-    out[[dataset_id]] <- p2filename(params, prefix=paste0("differential_", dataset_id), suffix="xlsx")
-    dir.create(dirname(out[[dataset_id]]), recursive=TRUE)
-    (saveWorkbook(wb, out[[dataset_id]], overwrite=TRUE))
+    fname <- p2filename(params, prefix=paste0("differential_", dataset_id), suffix="xlsx")
+    out[[dataset_id]] <- list(
+      fname=fname,
+      link=paste0("<a class=\"download-excel btn btn-primary\" href=\"", attr(fname, "link"), "\">Differential results for ", dataset_id, "</a>"),
+      params=params,
+      hierarchy=list()
+    )
+    dir.create(dirname(fname), recursive=TRUE)
+    (saveWorkbook(wb, fname, overwrite=TRUE))
   }
   out
 }
@@ -549,5 +555,9 @@ save_expected <- function(se, params, hierarchy){
   write.table(t(head_frame), file=fname, quote=FALSE, sep="\t", col.names=FALSE)
   write.table(assay(se)[,ind], file=fname,
               quote=FALSE, sep="\t", append=TRUE, col.names=FALSE)
-  paste0("<a class=\"download-excel btn btn-primary\" href=\"", attr(fname, "link"), "\">Expected ", which_assay, " modeled as ", hierarchy$model, " in ", hierarchy$dataset, "</a>", sep="")
+  list(
+    link=paste0("<a class=\"download-excel btn btn-primary\" href=\"", attr(fname, "link"), "\">Expected ", which_assay, " modeled as ", hierarchy$model, " in ", hierarchy$dataset, "</a>", sep=""),
+    fname=fname,
+    params=params,
+    hierarchy=hierarchy)
 }

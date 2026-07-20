@@ -68,6 +68,10 @@ knitr::opts_chunk$set(
 )
 
 theme_set(cowplot::theme_half_open(12) + cowplot::panel_border())
+links <- list(
+  results=list(),
+  clusters=list()
+)
 
 ```
 
@@ -105,7 +109,7 @@ ddsList <- leaf_modify(ddsList,
                         leaf
                       },
                       layers="sample_sets")
-  
+
 if (!is.null(metadata(dds)$organism$org)) {
   library(metadata(dds)$organism$org, character.only=TRUE)
 }
@@ -120,7 +124,7 @@ if ("missing" %in% names(data_source_params)) {
   attr(rowNoun, "readout") <- "missingness"
   attr(RowNoun, "readout") <- "Missingness"
 }
-cluster_ind <- counter(post_fn=to_letter)      
+cluster_ind <- counter(post_fn=to_letter)
 
 
 dtag <- dmc_factory(ddsList, type="dataset")
@@ -170,9 +174,7 @@ saveRDS(ddsList, file=rds_name)
 save(ddsList, file=sub("rds$", "rda", rds_name))
 
 
-xl_files <- write_results(ddsList,
-                         params
-                         )
+links$results <- write_results(ddsList,params)
 
 if (FALSE) {
 leaf_apply(ddsList,
@@ -186,7 +188,7 @@ leaf_apply(ddsList,
 ```
 
 
-## Summary Tables 
+## Summary Tables
 
 Here we summarise the results of the differential testing. Each
 sample-set gets its own table (flick between tabs to choose which),
@@ -268,7 +270,7 @@ for (dataset_id in seq_along(unique(summaries$dataset))) {
       ""
     ), envir = environment(), quiet = TRUE)
   if (!interactive()) cat(res, sep = '\n\n')
-  
+
   if (any(unclassed$dataset==dataset_name)) {
     res <- knitr::knit_child(
       text = c(
@@ -285,7 +287,7 @@ for (dataset_id in seq_along(unique(summaries$dataset))) {
       ), envir = environment(), quiet = TRUE)
   if (!interactive()) cat(res, sep = '\n\n')
   }
-  
+
   for (model_name in unique(subset(pval_frame, dataset==dataset_name)$model)) {
     pl <- ggplot(subset(pval_frame, dataset==dataset_name & model==model_name), aes(x=pvalue, fill=baseMean<1)) +
       geom_density(alpha=0.5) +
@@ -358,7 +360,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
       if (is_external) {
         cat("\n\n", strrep("#", length(section_hierarchy)+1), " MA\n\n", sep="")
         cat("For MA plots, external gene-lists are represented in specific comparisons, rather than getting there own plot.{.unnumbered}\n\n")
-      } else {        
+      } else {
         if (is_formula(comparison$comparison)) {
           yax <- "Largest fold change"
         } else {
@@ -380,7 +382,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
                             breaks = c("#aaaaaa", "#000000"))
         ind <- top_true(is_significant, res$shrunkLFC, n=5)
         if (!is.null(external_list)) {
-          ## add external IDs 
+          ## add external IDs
           dat <- res[external_list$ID,]
           if (length(unique(external_list$Comparison)) <= length(pal)) {
             col <- pal[match(external_list$Comparison, unique(external_list$Comparison))]
@@ -394,7 +396,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
             geom_point(aes(colour=col), data=res[external_list$ID,])
           ind <- ind[!row.names(res)[ind] %in% external_list$ID]
         }
-        pl <- pl+ggrepel::geom_text_repel(size=3, data=res[ind,], show.legend = FALSE) 
+        pl <- pl+ggrepel::geom_text_repel(size=3, data=res[ind,], show.legend = FALSE)
         pl <- pl +
           scale_colour_identity(labels=colour_scale$labels, breaks=colour_scale$breaks, guide = "legend") +
           labs(colour="Class")
@@ -410,7 +412,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
         cat("\n\n---\n\n")
       }
       ## Heatmap
-      plot_formulae <- get_in_section(model$profile_plots, c("all", "differential"))      
+      plot_formulae <- get_in_section(model$profile_plots, c("all", "differential"))
       model_vars <- sort_vars(
         unique(c(all.vars(model$design),
                  unique(unlist(lapply(plot_formulae, function(x) c(
@@ -473,10 +475,8 @@ for (dataset_id in names(ddsList$sample_sets)) {
         }
         design(tidied_se) <- model$design
         mcols(tidied_se)$results <- comparison$results[row.names(tidied_se),]
-        
         plot_se <- tidied_se
         plot_se$.influential_in_assay <- (plot_se$.influential %||% TRUE) & (plot_se$.influential_in_assay[[which_assay]] %||% TRUE)
-        
         sample_order <- reorder_samples(plot_se, model_vars)
         vis_sample <- eval(plot_config$extra$visible, colData(tidied_se))
         mat_height <- height_scaler(n=nrow(plot_se), small=10, big=20, N=1000)
@@ -572,15 +572,18 @@ for (dataset_id in names(ddsList$sample_sets)) {
                   paste0("#| fig-height: [", 1.5*attr(pls[[1]], "predicted_height"), ",", attr(pls[[1]], "predicted_height") ,"]"),
                   "#| out-height: 800px"),
                 )
-        
         centroid_df[[plot_id]] <- cbind(cc, colDF(plot_se))[vis_sample,,drop=FALSE] %>%
           pivot_longer(cols=any_of(names(cc)), names_to=".derived", values_to=".derived.value") %>%
           mutate(.derived=factor(.derived, levels=names(cc)))
         attr(centroid_df[[plot_id]], "caption") <- capt
         if (!is_external) {
-          all_clusters[[this_clust]] <- list(
-            id=gene_clust$clusters,
-            description=capt
+          links$clusters[[this_clust]] <- write_clusters(
+            clusters=gene_clust$clusters,
+            description=capt,
+            mcols=mcols(plot_se),
+            params=params,
+            hierarchy=section_hierarchy,
+            prefix="differential-clusters"
           )
         }
         cat('\n\n---\n\n')
@@ -601,14 +604,14 @@ for (dataset_id in names(ddsList$sample_sets)) {
         pc.df <- cbind(colDF(plot_se),
                       data.frame(
                         PC1 = proj[, plot_config$extra$pc_x],
-                        PC2 = proj[, plot_config$extra[[if (nrow(this_assay) != 1) "pc_y" else "pc_x"]]], 
+                        PC2 = proj[, plot_config$extra[[if (nrow(this_assay) != 1) "pc_y" else "pc_x"]]],
                         sample = rownames(colDF(plot_se))))
         aes_list <- substitute_x_aes(mapping, colour_as_fill=!"fill" %in% names(plot_aes))
         for (this_aes in aes_list) {
           pl <- ggplot(transform(pc.df[vis_sample,],.derived="", .derived.value=""),
-                      modifyList(this_aes, aes(x=PC1, y=PC2))) + 
+                      modifyList(this_aes, aes(x=PC1, y=PC2))) +
             geom_point_interactive(size = 5, shape = 21) +
-            facet_wrapper(mapping, this_aes) + 
+            facet_wrapper(mapping, this_aes) +
             xlab(paste0("PC ", plot_config$extra$pc_x, ": ", my_percent[plot_config$extra$pc_x], "% variance")) +
             ylab(paste0("PC ", plot_config$extra$pc_y, ": ", my_percent[plot_config$extra$pc_y], "% variance"))
           do_labels <- nrow(colDF(dataset$object)) < 10
@@ -642,7 +645,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
         mapping <- modify_mapping(plot_config, aes(y=.derived.value))
         colour_aes <- transform_colour_min(mapping)
         pl <- ggplot(centroid_df[[plot_id]], mapping) +
-          facet_wrapper(mapping, default=aes(facets = .derived), scales="free_y") + 
+          facet_wrapper(mapping, default=aes(facets = .derived), scales="free_y") +
           theme_bw() +
           geom_point_interactive(aes(y= .derived.value), size = 3, shape = 21) +
           labs(y=paste(c(noun_to_readout(RowNoun), y_hint), collapse=" "))
@@ -666,7 +669,6 @@ for (dataset_id in names(ddsList$sample_sets)) {
   }
 }
 
-      
 
 ```
 
@@ -677,20 +679,34 @@ for (dataset_id in names(ddsList$sample_sets)) {
 ```{r}
 #| label: downloads
 
-iwalk(xl_files,
-     ~cat("\n\n<a class=\"download-excel btn btn-primary\" href=\"", attr(.x, "link"), "\"> Differential ",rowNoun," for '", .y,"'</a>", sep="")
-     )
+link2sub <- list(
+  results="Differential results",
+  clusters="Cluster assignments"
+)
 
-if (length(all_clusters)>0) {
-  fname <- write_clusters(all_clusters,
-                         mcols(ddsList$sample_sets[[1]]$object),
-                         p=params,
-                         prefix="differential-clusters")
-  
-  cat('\n\n<a class="download-excel btn btn-primary" href="',
-      attr(fname,"link"),
-      '">',RowNoun,'-Cluster mappings</a>', sep="")
+dfs <- data.frame()
+for (i in names(link2sub)) {
+  cat("\n\n##", link2sub[[i]], "\n")
+  for (j in links[[i]]) {
+    cat("\n", j$link, "\n", sep="")
+    dfs <- dplyr::bind_rows(dfs, as.data.frame(
+      modifyList(
+        list(
+          file=j$fname,
+          section=params$section,
+          data_source=params$data_source,
+          plan=params$spec,
+          type=i
+          ),
+        modifyList(list(dataset=NA, model=NA, plot_config=NA, assay=NA), j$hierarchy))
+    ))
+  }
 }
+
+fname <- p2filename(params, prefix="manifest", suffix="txt")
+write.table(dfs, file=fname, row.names=FALSE, quote=FALSE, sep="\t")
+cat("\n<a class=\"download-excel btn btn-primary\" href=\"", attr(fname, "link"), "\">Manifest of all downloadable files</a>\n", sep="")
+
 
 ```
 

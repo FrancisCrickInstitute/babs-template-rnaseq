@@ -178,17 +178,25 @@ table_tracker(params)(sample_X_dataset_table(dds, ddsList), label="inputs", capt
 ```{r}
 #| label: save-assay
 
-assay_files <- list()
+links <- list(
+  assays=list(),
+  clusters=list(),
+  pcs = list(),
+  expecteds=list()
+)
+
 anames <- unique(unlist(leaf_modify(
   ddsList,
   function(leaf, layers) {assayNames(leaf$object)}, layers="sample_sets")$sample_sets))
 if (is_des) anames <- c(anames, "norm")
 #anames <- intersect(anames, c("counts", "vst", "norm", "abundance", "imputed"))
 for (aname in anames) {
-  fname <- write_assay(ddsList,
-                       aname=aname,
-                       p=params)
-  assay_files[[aname]] <- lapply(fname, attr, "link")
+  links$assays <- c(
+    links$assays,
+    write_assay(ddsList,
+                aname=aname,
+                params=params)
+  )
 }
 
 
@@ -226,7 +234,7 @@ experiments there may only be one inferential approach, but as soon as
 we have a more complex structure different questions may demand a
 diversity of approaches, optionally: accounting for various
 covariates; stratifying the analysis by experimental factors; looking
-for the ways that one factor modifies the effect of another upon 
+for the ways that one factor modifies the effect of another upon
 `{r}  noun_to_readout(rowNoun)`;... We use mathematical formulae to
 specify these approaches:
 
@@ -263,14 +271,14 @@ divide into two choices:
    represents a sample. It might be obvious what these 'aesthetic'
    choices should be, but conversely we may produce multiple 'plot
    configurations' to illustrate different experimental factors.
-   
+
  - What to use as the 'outcome': typically we'll use the normalised
    readout in heatmaps, or to generate principal components, but there
    are situations where we might wish to 'normalise out' the effect
    of, say, batch so that the true biology can come into focus. Or we
    might wish to 'recentre' the data so that one particular
    experimental group is seen as a baseline.
-   
+
 At the beginning of each 'plot config' section we list the respective
 choice made for the plots in that section: the 'aesthetic' mapping
 describes how each aspect of the plot (colour, x-coordinate, shape,
@@ -314,7 +322,7 @@ perhaps the reverse, so for this 'supervised' clustering we chose the
 
 Based on the `{r} rowNoun`'s `{r} noun_to_readout(rowNoun)` in the
 influential samples, the dendrogram from the heatmap will be split
-into similarly behaving features. We can aggregate the `{r} noun_to_readout(rowNoun)` 
+into similarly behaving features. We can aggregate the `{r} noun_to_readout(rowNoun)`
 across those features and produce dot
 plots for each of the clusters. See, for example @fig-clustProfile-1
 
@@ -371,7 +379,7 @@ according to the chosen plot configuration. Whereas in the cluster
 dotplot we equally-weighted various subsets of similar `{r} rowNoun`s,
 in the PC dotplots we aggregate all the `{r} rowNoun`s
 but chose a weighting scheme that captures as much of the
-multi-dimensionality as possible. 
+multi-dimensionality as possible.
 
 :::
 
@@ -379,11 +387,6 @@ multi-dimensionality as possible.
 #| label: fig-qc-visualisation
 
 first <- TRUE
-links <- list(
-  clusters=list(),
-  pcs <- list(),
-  expecteds=character()
-)
 cluster_ind <- counter(post_fn=to_letter)
 pc_ind <-  counter(post_fn=to_letter)
 girafe_ind <- counter()
@@ -394,7 +397,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
   dmc_heading(ddsList, section_hierarchy, depth=strrep("#", length(section_hierarchy)))
   src2bullets(dataset, c("subset", "extra_assays", "influential_samples"))
   mdls <- Filter(function(m) {
-    !is.null(dataset$models[[m]]$profile_plots) && length(dataset$models[[m]]$profile_plots)>0 && 
+    !is.null(dataset$models[[m]]$profile_plots) && length(dataset$models[[m]]$profile_plots)>0 &&
       length(get_in_section(dataset$models[[m]]$profile_plots, c("all", "exploratory"))) > 0},
     names(dataset$models))
   for (model_id in mdls) {
@@ -416,7 +419,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
     #
     # Save the expected values across the designs reference-grid
     expected_assay <- partial_reconstruct(model_se, design(model_se), resids=FALSE)
-    links$expecteds <- c(links$expecteds, save_expected(expected_assay, params, section_hierarchy))
+    links$expecteds <- c(links$expecteds, list(save_expected(expected_assay, params, section_hierarchy)))
     ## Loop through plot configurations
     for (plot_id in names(plot_formulae)) {
       plot_config <- plot_formulae[[plot_id]]
@@ -438,7 +441,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
                 plot_meta=section_hierarchy
                 )
         legend_url <- do_plot()
-        legend_url <- legend_url[[length(legend_url)]]$png
+        legend_url <- if (length(legend_url)>0) legend_url[[length(legend_url)]]$png else ""
       } else {
         cat("\n![](", legend_url, ")\n", sep="")
       }
@@ -561,8 +564,8 @@ for (dataset_id in names(ddsList$sample_sets)) {
       cat("\n\n---\n\n")
       #
       ## Feature-cluster aggregate profile plots
-      
-      cat("\n\n", strrep("#", length(section_hierarchy)+1), " Profiles\n\n", sep="")     
+
+      cat("\n\n", strrep("#", length(section_hierarchy)+1), " Profiles\n\n", sep="")
       centroid_df <- cbind(cc, colDF(plot_se))[vis_sample,,drop=FALSE] %>%
         pivot_longer(cols=any_of(names(cc)), names_to=".derived", values_to=".derived.value") %>%
         mutate(.derived=factor(.derived, levels=names(cc)))
@@ -571,9 +574,9 @@ for (dataset_id in names(ddsList$sample_sets)) {
       colour_aes <- transform_colour_min(mapping)
       orig_caption <- aes_caption(plot_aes)
       pl <- ggplot(centroid_df, mapping) +
-        facet_wrapper(mapping, default=aes(facets = .derived), scales="free_y") + 
+        facet_wrapper(mapping, default=aes(facets = .derived), scales="free_y") +
         geom_point_interactive(size = 3, shape = 21) +
-        labs(y=paste(noun_to_readout(RowNoun),y_hint)) 
+        labs(y=paste(noun_to_readout(RowNoun),y_hint))
       if ("group" %in% names(mapping)) {
         group_df <- cbind(cc, colDF(plot_se))[vis_sample,,drop=FALSE]  %>%
           pivot_longer(cols=any_of(names(cc)), names_to=".derived", values_to=".derived.value") %>%
@@ -596,10 +599,15 @@ for (dataset_id in names(ddsList$sample_sets)) {
               label= "clustProfile",
               caption=capt,
               plot_meta=section_hierarchy)
-      links$clusters[[this_clust]] <- list(
-        id=gene_clust$clusters,
-        description=capt
+      links$clusters[[this_clust]] <- write_clusters(
+        clusters=gene_clust$clusters,
+        description=capt,
+        mcols=mcols(plot_se),
+        params=params,
+        hierarchy=section_hierarchy,
+        prefix="exploratory-clusters"
       )
+
       cat("\n\n---\n\n")
       #
       ## Two-dimensional PC plots
@@ -610,22 +618,20 @@ for (dataset_id in names(ddsList$sample_sets)) {
         scale = FALSE)
       proj <- predict(my_pc, newdata = t(assay(plot_se)))
       this_pc <- pc_ind()
-      links$pcs[[this_pc]] <- modifyList(section_hierarchy, list(
-        link=write_proj(proj, p=params, prefix=paste0("PC-",this_pc))
-        ))
+      links$pcs[[this_pc]] <- write_proj(cbind(colDF(plot_se), proj), params=params, section_hierarchy, prefix="PC")
       my_percent <- round(100 * my_pc$sdev^2/sum(my_pc$sdev^2))
       pc.df <- cbind(colDF(plot_se),
                     data.frame(
                       PC1 = proj[, plot_config$extra$pc_x],
-                      PC2 = proj[, plot_config$extra$pc_y], 
+                      PC2 = proj[, plot_config$extra$pc_y],
                       sample = rownames(colDF(plot_se))))
-      
+
       aes_list <- substitute_x_aes(mapping, colour_as_fill=!"fill" %in% names(plot_aes))
       for (this_aes in aes_list) {
         pl <- ggplot(transform(pc.df[vis_sample,],.derived="", .derived.value=""),
-                    modifyList(this_aes, aes(x=PC1, y=PC2))) + 
+                    modifyList(this_aes, aes(x=PC1, y=PC2))) +
           geom_point_interactive(size = 5, shape = 21) +
-          facet_wrapper(mapping, this_aes) + 
+          facet_wrapper(mapping, this_aes) +
           xlab(paste0("PC ", plot_config$extra$pc_x, ": ", my_percent[plot_config$extra$pc_x], "% variance")) +
           ylab(paste0("PC ", plot_config$extra$pc_y, ": ", my_percent[plot_config$extra$pc_y], "% variance"))
         if (do_labels) {
@@ -653,7 +659,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
       pc_weights <- if (plot_config$extra$pc_weight=="eigen") my_pc$sdev^2/sum(my_pc$sdev^2) else NULL
       maxpc <- min(40, ncol(proj))
       covar_x_pc <- mat_x_terms(proj[,1:maxpc], model$design, colDF(plot_se), weights=pc_weights[1:maxpc], type=plot_config$extra$reduce_heuristic)
-      pl <- ggplot(covar_x_pc, aes(x = column, y = Covariate, fill = Assoc)) + 
+      pl <- ggplot(covar_x_pc, aes(x = column, y = Covariate, fill = Assoc)) +
        geom_raster() +
        facet_wrap(~wrap, scales = "free_x",ncol = 1)  +
        scale_fill_gradient2(low = "#4575b4",mid = "grey90", high = "#d73027") +
@@ -667,7 +673,7 @@ for (dataset_id in names(ddsList$sample_sets)) {
       long_dat <- transform(extract_hits(covar_x_pc, proj[vis_sample,], colDF(plot_se)[vis_sample,, drop=FALSE]), .derived=PC, .derived.value=value)
       pl <- ggplot(long_dat, modifyList(mapping, aes(y=.derived.value))) +
         geom_point_interactive(size = 3, shape = 21) +
-        facet_wrapper(mapping, default=aes(facets = .derived), scales="free_y") 
+        facet_wrapper(mapping, default=aes(facets = .derived), scales="free_y")
       if ("group" %in% names(mapping)){
         pl <- pl+geom_line(colour_aes, stat="summary", alpha=0.2,
                           fun=mean)
@@ -696,38 +702,36 @@ for (dataset_id in names(ddsList$sample_sets)) {
 ```{r}
 #| label: downloads
 
-## Assay Data
-for (i in names(assay_files)) {
-  for (j in names(assay_files[[i]])) {
-    cat("\n\n<a class=\"download-excel btn btn-primary\" href=\"", assay_files[[i]][[j]], "\">", i, " matrix for ", j, "</a>", sep="")
+link2sub <- list(
+  assays="Complete assay values",
+  expecteds="Experimental-group averages",
+  clusters="Cluster assignments",
+  pcs="PC projections"
+)
+
+dfs <- data.frame()
+for (i in names(link2sub)) {
+  cat("\n\n##", link2sub[[i]], "\n")
+  for (j in links[[i]]) {
+    cat("\n", j$link, "\n", sep="")
+    dfs <- dplyr::bind_rows(dfs, as.data.frame(
+      modifyList(
+        list(
+          file=j$fname,
+          section=params$section,
+          data_source=params$data_source,
+          plan=params$spec,
+          type=i),
+        modifyList(list(dataset=NA, model=NA, plot_config=NA, assay=NA), j$hierarchy))
+    ))
   }
 }
 
-cat("\n\n## Experimental Group Averages\n\n")
+fname <- p2filename(params, prefix="manifest", suffix="txt")
+write.table(dfs, file=fname, row.names=FALSE, quote=FALSE, sep="\t")
+cat("\n<a class=\"download-excel btn btn-primary\" href=\"", attr(fname, "link"), "\">Manifest of all downloadable files</a>\n", sep="")
 
-cat(links$expecteds, sep="\n\n")
-
-cat("\n\n## Cluster Composition\n\n")
-
-fname <- write_clusters(links$clusters,
-                        mcols(ddsList$sample_sets[[1]]$object),
-                        p=params,
-                        prefix="exploratory-clusters")
-
-
-cat('\n\n<a class="download-excel btn btn-primary" href="',
-    attr(fname,"link"),
-    '">', RowNoun,'-Cluster mappings</a>', sep="")
-
-cat("\n\n## PC Files\n\n")
-pc_metaframe <- do.call(rbind, lapply(links$pcs, data.frame))
-fname <- p2filename(params, prefix="PC_metaframe", suffix=".csv")
-write.csv(pc_metaframe, file=fname)
-cat('\n\n<a class="download-excel btn btn-primary" href="',
-    attr(fname, "link"),
-    '">Details of PC</a>', sep="")
-
-plot_df <- bind_rows(do_plot())
+plot_df <- dplyr::bind_rows(do_plot())
 saveRDS(plot_df, file = file.path("data", "exploratory_plots.rds"))
 ojs_define(plot_df = plot_df)
 
