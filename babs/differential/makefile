@@ -175,8 +175,8 @@ $(staging_dir)/_quarto.yml: $(source_dir)/_quarto.yml $(qmds) $(css) $(includes)
 	 --repo="$(repo)" > $@
 	echo 'multiqc: "$(if $(wildcard $(RESULTS_DIR)/multiqc-*),MultiQC and ,)"' >> $@
 	[ -z "$(shortTitle)" ] || sed -i 's/title: Analysis results/title: $(shortTitle) analysis results/' $@
-	sed -i 's/<<GIT_REF>>/$(GIT_REF)/' $@
 	cp $(source_dir)/_quarto-*.yml $(staging_dir)/
+	sed -i 's/<<GIT_REF>>/$(GIT_REF)/' $(staging_dir)/_quarto-*.yml
 	rm -f ${staging_dir}/_sidebar.yml
 	mkdir -p ${staging_dir}/_extensions
 	cp -r  ${source_dir}/_extensions/. ${staging_dir}/_extensions/

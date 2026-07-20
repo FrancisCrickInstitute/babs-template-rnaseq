@@ -110,7 +110,17 @@ diff -ur infra-tmp/makefile babs/differential/makefile
  	$(init_checkpoint)
  	sed  -i 's#^  contents: .*#  contents: [$(subst $(space),$(comma),$(patsubst $(staging_dir)/%,%,$(qmds)))]#' $(staging_dir)/index.qmd
  	rm -rf $(staging_dir)/$(RESULTS_DIR)/$(VERSION)
-@@ -94,7 +121,7 @@
+@@ -82,7 +109,9 @@
+ 	rm -rf $(RESULTS_DIR)/$(VERSION).previous
+ 	cp -rT $(staging_dir)/$(RESULTS_DIR)/$(VERSION) $(RESULTS_DIR)/$(VERSION)
+ 	awk 'FNR==1 && NR!=1 { next } { print }' $(RESULTS_DIR)/$(VERSION)/*/manifest$(GIT_REF).txt > $(RESULTS_DIR)/$(VERSION)/manifest$(GIT_REF).txt
++	rm -f $(RESULTS_DIR)/$(VERSION)/*/manifest$(GIT_REF).txt
+ 	ln -sfn  $(VERSION) $(RESULTS_DIR)/latest
++	sed 's/<<GIT_REF>>/$(GIT_REF)/' $(source_dir)/html/downloads.php > $(RESULTS_DIR)/$(VERSION)/downloads.php
+ 	$(save_checkpoint)
+ 
+ 
+@@ -95,7 +124,7 @@
  	ln -sfn  $(VERSION) $(RESULTS_DIR)/latest
  
  ## Render an individual page
@@ -119,7 +129,7 @@ diff -ur infra-tmp/makefile babs/differential/makefile
  	$(QUARTO) render '$<' $(quarto_opts) $(call log,html-$*)
  
  html-%: $(staging_dir)/$(RESULTS_DIR)/$(VERSION)/%.html ## Create a single html file to be placed in the staging directory, '%' is a simplified filename e.g. `make html-01_exploratory_per-plan_GRCh38`.
-@@ -123,14 +150,28 @@
+@@ -124,14 +153,28 @@
  	 --generated=$(staging_dir)/$(VERSION).params.yml > $@
  	sed -i -e 's#choose_staging("$(section)")#"$(staging_dir)/$*"#' $@
  
@@ -148,9 +158,9 @@ diff -ur infra-tmp/makefile babs/differential/makefile
 +	echo 'multiqc: "$(if $(wildcard $(RESULTS_DIR)/multiqc-*),MultiQC and ,)"' >> $@
 +	[ -z "$(shortTitle)" ] || sed -i 's/title: Analysis results/title: $(shortTitle) analysis results/' $@
  	cp $(source_dir)/_quarto-*.yml $(staging_dir)/
+ 	sed -i 's/<<GIT_REF>>/$(GIT_REF)/' $(staging_dir)/_quarto-*.yml
  	rm -f ${staging_dir}/_sidebar.yml
- 	mkdir -p ${staging_dir}/_extensions
-@@ -151,16 +192,18 @@
+@@ -153,16 +196,18 @@
  	$(R) -e 'knitr::write_bib(names(renv:::lockfile("renv.lock")$$data()$$Packages), file="$@",prefix="pkg_")' $(call log,bib)
  
  renv: | $(log_dir)
@@ -171,15 +181,33 @@ diff -ur infra-tmp/makefile babs/differential/makefile
  	$(GIT) add $(wildcard makefile R .Rbuildignore .gitignore resources/_dependencies.R)
  	$(GIT) commit -m 'Renv initialised by pipeline' || echo "No initialisation files need commiting" $(call log,renv,-a) 
  
-@@ -183,6 +226,7 @@
- .PHONY: publish
+@@ -186,6 +231,7 @@
  publish: $(pubdir)/$(VERSION) ## Copy results to final location. Either 'outputs' folder (default), intranet (`make publish location=intranet`) or internet
+ 	[ -z "url_$(location)" ] || sed -i 's#$(RESULTS_DIR)/#$(url_$(location))$(__ANALYSIS)/#' $(RESULTS_DIR)/$(VERSION)/manifest$(GIT_REF).txt
  	cp --no-preserve=mode -r $(RESULTS_DIR)/$(VERSION)/. $(extra_files) $(pubdir)/$(VERSION)
 +	cp --no-preserve=mode --recursive --dereference --no-clobber $(RESULTS_DIR)/multiqc-* $(pubdir)/ 2> /dev/null || true
  	ln -sfn $(VERSION) $(pubdir)/latest
  	[ "$(location)" = "outputs" ] || cp --no-preserve=mode -r .htaccess $(pubdir)/ || echo "Warning: no .htaccess files, so unauthorised people may be able to view these results"
  	ln -sfn $$(realpath $(pubdir)/$(VERSION)) $(RESULTS_DIR)/published_$(location)
-@@ -216,8 +260,61 @@
+@@ -196,8 +242,6 @@
+ 	  [ -z "$$V" ] || [ -f "$(pubdir)/$$V/index.html" ] || line=$$(echo "$$line" | sed "s|<a href=\"\.\./$$V/index\.html\">$$V</a>|$$V|") ;\
+ 	  echo "$$line" >> $(pubdir)/$(VERSION)/notes.html ;\
+ 	done < $(RESULTS_DIR)/$(VERSION)/notes.html
+-	mv $(RESULTS_DIR)/latest/manifest$(asrun.GIT_REF).txt	$(RESULTS_DIR)/latest/manifest$(GIT_REF).txt
+-	sed -i "s|$(asrun.GIT_REF)|$(GIT_REF)|g" $(RESULTS_DIR)/$(VERSION)/downloads.php
+ 
+ include .latest
+ .latest:
+@@ -210,6 +254,8 @@
+ 	  newf=$$(echo "$$f" | sed "s|$(asrun.GIT_REF)|$(GIT_REF)|") ;\
+ 	  mv "$$f" "$$newf" ;\
+ 	done
++	mv $(RESULTS_DIR)/latest/manifest$(asrun.GIT_REF).txt	$(RESULTS_DIR)/latest/manifest$(GIT_REF).txt
++	sed -i "s|$(asrun.GIT_REF)|$(GIT_REF)|g" $(RESULTS_DIR)/$(VERSION)/downloads.php
+ 	find $(RESULTS_DIR)/latest/ -name '*.html' -exec sed -i "s|$(asrun.GIT_REF)|$(GIT_REF)|g" {} +
+ 	find $(RESULTS_DIR)/latest/ -name '*.html' -exec sed -i "s|>$$(readlink $(RESULTS_DIR)/latest)</td>|>$(VERSION)</td>|g" {} +
+ 	find $(RESULTS_DIR)/latest/ -name '*.html' -exec sed -i "s|>$(RESULTS_DIR)/$$(readlink $(RESULTS_DIR)/latest)</td>|>$(RESULTS_DIR)/$(VERSION)</td>|g" {} +
+@@ -221,8 +267,61 @@
  ################################################################
  #### Bootstrap all relevant data from outside
  ################################################################
@@ -243,6 +271,25 @@ diff -ur infra-tmp/makefile babs/differential/makefile
  
  ################################################################
  #### Helper goals
+@@ -230,17 +329,13 @@
+ $(RESULTS_DIR)/$(VERSION): $(RESULTS_DIR)
+ $(staging_dir)/$(RESULTS_DIR)/$(VERSION): $(staging_dir)
+ 
+-data extdata $(RESULTS_DIR)/$(VERSION) $(staging_dir)/$(RESULTS_DIR)/$(VERSION):
++data extdata $(dir $(my_metadata)) $(RESULTS_DIR)/$(VERSION) $(staging_dir)/$(RESULTS_DIR)/$(VERSION):
+ 	mkdir -p $@
+ 
+ $(log_dir) $(RESULTS_DIR) $(staging_dir):
+ 	mkdir -p $@
+ 	echo "*" > $@/.gitignore
+ 
+-
+-$(log_dir) data $(RESULTS_DIR)/$(VERSION) $(RESULTS_DIR) $(staging_dir)/$(RESULTS_DIR)/$(VERSION) $(staging_dir) extdata:
+-	mkdir -p $@
+-
+ clean: ## Remove the staging folder and the log directory - these should never contain anything of lasting interest that can't be recreated
+ 	rm -rf $(staging_dir) $(log_dir)
+ maintainer-clean: clean ## Remove the results and data directories, in addition to staging and logs. The former contain end-results, so only do this if you really want to discard them (e.g. the analysis had a bug in it, and you want to do some housekeeping)
 diff -ur infra-tmp/resources/_dependencies.R babs/differential/resources/_dependencies.R
 --- infra-tmp/resources/_dependencies.R
 +++ babs/differential/resources/_dependencies.R
@@ -450,7 +497,7 @@ diff -ur infra-tmp/resources/params.yml babs/differential/resources/params.yml
 diff -ur infra-tmp/resources/_quarto.yml babs/differential/resources/_quarto.yml
 --- infra-tmp/resources/_quarto.yml
 +++ babs/differential/resources/_quarto.yml
-@@ -35,3 +35,6 @@
+@@ -38,3 +38,6 @@
    error: true
  code-summary: "Show the code"
  concise: false
