@@ -10,6 +10,9 @@ website:
       - href: https://github.com/BABS-STP/
         text: Github repository
         icon: github
+      - href: ./manifest_<<GIT_REF>>.txt
+        text: Manifest
+        icon: file-earmark-arrow-down
   sidebar:
     contents: []
 bibliography: R.bib  

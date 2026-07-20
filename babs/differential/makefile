@@ -108,7 +108,10 @@ run: $(qmds) $(staging_dir)/_quarto.yml $(staging_dir)/index.qmd $(covariate_fil
 	$(QUARTO) render '$(staging_dir)' $(quarto_opts) $(call log,render)
 	rm -rf $(RESULTS_DIR)/$(VERSION).previous
 	cp -rT $(staging_dir)/$(RESULTS_DIR)/$(VERSION) $(RESULTS_DIR)/$(VERSION)
+	awk 'FNR==1 && NR!=1 { next } { print }' $(RESULTS_DIR)/$(VERSION)/*/manifest$(GIT_REF).txt > $(RESULTS_DIR)/$(VERSION)/manifest$(GIT_REF).txt
+	rm -f $(RESULTS_DIR)/$(VERSION)/*/manifest$(GIT_REF).txt
 	ln -sfn  $(VERSION) $(RESULTS_DIR)/latest
+	sed 's/<<GIT_REF>>/$(GIT_REF)/' $(source_dir)/html/downloads.php > $(RESULTS_DIR)/$(VERSION)/downloads.php
 	$(save_checkpoint)
 
 
@@ -172,6 +175,7 @@ $(staging_dir)/_quarto.yml: $(source_dir)/_quarto.yml $(qmds) $(css) $(includes)
 	 --repo="$(repo)" > $@
 	echo 'multiqc: "$(if $(wildcard $(RESULTS_DIR)/multiqc-*),MultiQC and ,)"' >> $@
 	[ -z "$(shortTitle)" ] || sed -i 's/title: Analysis results/title: $(shortTitle) analysis results/' $@
+	sed -i 's/<<GIT_REF>>/$(GIT_REF)/' $@
 	cp $(source_dir)/_quarto-*.yml $(staging_dir)/
 	rm -f ${staging_dir}/_sidebar.yml
 	mkdir -p ${staging_dir}/_extensions
@@ -225,6 +229,7 @@ endif
 
 .PHONY: publish
 publish: $(pubdir)/$(VERSION) ## Copy results to final location. Either 'outputs' folder (default), intranet (`make publish location=intranet`) or internet
+	[ -z "url_$(location)" ] || sed -i 's#$(RESULTS_DIR)/#$(url_$(location))$(__ANALYSIS)/#' $(RESULTS_DIR)/$(VERSION)/manifest$(GIT_REF).txt
 	cp --no-preserve=mode -r $(RESULTS_DIR)/$(VERSION)/. $(extra_files) $(pubdir)/$(VERSION)
 	cp --no-preserve=mode --recursive --dereference --no-clobber $(RESULTS_DIR)/multiqc-* $(pubdir)/ 2> /dev/null || true
 	ln -sfn $(VERSION) $(pubdir)/latest
@@ -249,6 +254,8 @@ retag: ## If you've changed the git tag for the source code but sourcecode is th
 	  newf=$$(echo "$$f" | sed "s|$(asrun.GIT_REF)|$(GIT_REF)|") ;\
 	  mv "$$f" "$$newf" ;\
 	done
+	mv $(RESULTS_DIR)/latest/manifest$(asrun.GIT_REF).txt	$(RESULTS_DIR)/latest/manifest$(GIT_REF).txt
+	sed -i "s|$(asrun.GIT_REF)|$(GIT_REF)|g" $(RESULTS_DIR)/$(VERSION)/downloads.php
 	find $(RESULTS_DIR)/latest/ -name '*.html' -exec sed -i "s|$(asrun.GIT_REF)|$(GIT_REF)|g" {} +
 	find $(RESULTS_DIR)/latest/ -name '*.html' -exec sed -i "s|>$$(readlink $(RESULTS_DIR)/latest)</td>|>$(VERSION)</td>|g" {} +
 	find $(RESULTS_DIR)/latest/ -name '*.html' -exec sed -i "s|>$(RESULTS_DIR)/$$(readlink $(RESULTS_DIR)/latest)</td>|>$(RESULTS_DIR)/$(VERSION)</td>|g" {} +
@@ -319,9 +326,15 @@ $(nfcore_dir)/results/%/merged.gene_counts.tsv : $(docs_dir)/%.config $(docs_dir
 ################################################################
 #### Helper goals
 ################################################################
+$(RESULTS_DIR)/$(VERSION): $(RESULTS_DIR)
+$(staging_dir)/$(RESULTS_DIR)/$(VERSION): $(staging_dir)
 
-$(log_dir) $(dir $(my_metadata)) data $(RESULTS_DIR)/$(VERSION) $(RESULTS_DIR) $(staging_dir)/$(RESULTS_DIR)/$(VERSION) $(staging_dir) extdata:
+data extdata $(dir $(my_metadata)) $(RESULTS_DIR)/$(VERSION) $(staging_dir)/$(RESULTS_DIR)/$(VERSION):
 	mkdir -p $@
+
+$(log_dir) $(RESULTS_DIR) $(staging_dir):
+	mkdir -p $@
+	echo "*" > $@/.gitignore
 
 clean: ## Remove the staging folder and the log directory - these should never contain anything of lasting interest that can't be recreated
 	rm -rf $(staging_dir) $(log_dir)
