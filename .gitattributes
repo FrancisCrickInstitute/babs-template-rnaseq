@@ -5,3 +5,9 @@
 /readme.md export-ignore
 /.gitattributes export-ignore
 .pipeline-version export-subst
+/babs-rnaseq.yml export-ignore
+/copier.yml export-ignore
+/full-copier.yml export-ignore
+/rnaseq.patch export-ignore
+/README-non-crick.md export-ignore
+/.github

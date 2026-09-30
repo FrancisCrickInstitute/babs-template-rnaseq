@@ -44,6 +44,7 @@ check-samplesheets: $(samplesheets)
 	done
 
 
+ifeq ($(wildcard samplesheet.csv),)
 $(samplesheets) : %.csv : %.config
 	if [ -z "$(wildcard $($*.fastq_wildcard))" ]; then  \
 	  echo "Couldn't find fastq files in $(fastq_wildcard). Perhaps try setting fastq_wildcard, or change your answers file" | tee -a tmp.err ;\
@@ -60,6 +61,10 @@ $(samplesheets) : %.csv : %.config
 	  fi ;\
 	done
 	$(GIT) add $@
+else
+$(samplesheets) : samplesheet.csv
+	cp $< $@
+endif
 
 
 ifeq ($(configs),)
