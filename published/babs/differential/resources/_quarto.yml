@@ -1,0 +1,40 @@
+project:
+  type: website
+website:
+  title: "Analysis results"
+  navbar:
+    right:
+      - href: notes.html
+        text: Release Notes
+        icon: clock-history
+      - href: https://github.com/BABS-STP/
+        text: Github repository
+        icon: github
+  sidebar:
+    contents: []
+bibliography: R.bib  
+number-sections: true
+filters:
+  - tooltips
+format:
+  html:
+    theme: cerulean
+    fontsize: 1.1em
+    linestretch: 1.7
+    lightbox: true
+    toc: true
+    css:
+      - styles.css
+    include-before-body: wide-toggle.html
+    template-partials:
+      - _title-meta-author.html
+code-fold: true
+execute:
+  output: asis
+  echo: false
+  error: true
+code-summary: "Show the code"
+concise: false
+_prefixes:
+  spec: ⚙
+  alignment: 📁

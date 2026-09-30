@@ -1,0 +1,174 @@
+---
+title: Gene-level plots
+description: Plots of expression profiles
+categories: [Differential]
+params:
+  section: Gene plots
+---
+
+
+# Preface
+
+We load in all the necessary additional R packages, and set up some initial parameters.
+
+
+```{r}
+#| label: load-diff1
+#| output: false
+#| warning: false
+#| error: false
+
+library(tidyverse)       # Language
+library(devtools)
+library(openxlsx)        # IO
+library(ggrepel)         # General Vis.
+library(RColorBrewer)
+library(ComplexHeatmap)
+library(gt)
+library(DESeq2)          # Assay-specific
+library(PoiClaClu)
+library(rtracklayer)
+library(tximport)
+library(clusterProfiler)
+library(ReactomePA)
+library(GO.db)
+library(IHW)
+
+source("R/plot.r", local = knitr::knit_global())
+source("R/markdown.r", local = knitr::knit_global())
+source("R/rnaseq.r", local = knitr::knit_global())
+source("R/partial.r", local = knitr::knit_global())
+source("R/output.r", local = knitr::knit_global())
+source("R/helpers.r", local = knitr::knit_global())
+
+set.seed(1)
+
+if (!isTRUE(getOption('knitr.in.progress'))) {
+  params <- load_params(choose_staging("04_gene_plots"))
+}
+
+do_plot <- plot_tracker(params)
+
+knitr::opts_chunk$set(
+  warning=FALSE, error=TRUE, message=FALSE,
+  dev=c("ragg_png","pdf"), out.width="100%",
+  dev.args=list(ragg_png=list(scaling=1.5)),
+  fig.width=14, fig.height=10, fig.process=rename_with_tag(params),
+  results='asis'
+)
+
+
+link2path <- function(lname) {  file.path(knitr::opts_knit$get("output.dir"),lname) }
+
+```
+
+
+
+
+```{r}
+#| label: read-diff
+data(list=paste0("counts_", params$alignment))
+data(list=paste0("ddsList_", params$alignment, "_", params$spec))
+
+if (!is.null(metadata(dds)$organism$org)) {
+  library(metadata(dds)$organism$org, character.only=TRUE)
+}
+
+
+specs <- load_specs(file=paste0(params$spec, ".spec"), context=dds)
+
+param <- ParamList$new(defaults=specs$settings)
+# Calling the setter without a value will pick up the default (from the spec), _and_ alert it in the markdown, and return the default
+set.seed(param$set("seed", postpone=TRUE))
+param$set("spec",  params$spec, "Using analysis plan '{}'.", postpone=TRUE)
+param$set("alignment", params$alignment, "Using alignment settings '{}'")
+
+```
+
+
+# Find differential genes
+
+ We use DESeq2 [@pkg_DESeq2] to find differential genes using the
+negative binomial distribution to model counts, with IHW [@IHW2016]
+for multiple-testing correction with greater power than
+Benjamini-Hochberg, and ashr [@pkg_ashr] for effect-size shrinkage
+to ensure reported fold-changes are more robust.
+
+
+```{r}
+#| label: differential
+
+param$set("alpha", postpone=TRUE)
+param$set("lfcThreshold", postpone=TRUE)
+param$set("filterFun", postpone=TRUE)
+param$set("baseline_heuristic", postpone=TRUE)
+param$set("LRT_effect")
+
+rds_name <- file.path("data", paste0(basename(params$spec),"_x_", params$alignment, ".rds"))
+
+
+dds_model_comp <- decompress_dmc(readRDS(rds_name))
+
+```
+
+
+
+```{r}
+#| label: fig-differential-MA
+first <- TRUE
+
+
+
+for (dataset in names(dds_model_comp)) {
+  dmc_heading(dds_model_comp, dataset=dataset, model=NULL, depth="##")
+  met <- metadata(dds_model_comp[[dataset]][[1]][[1]])$dmc
+  for (mdl in names(dds_model_comp[[dataset]])) {
+    met <- metadata(dds_model_comp[[dataset]][[mdl]][[1]])$dmc
+    dmc_heading(dds_model_comp, dataset=dataset, model=mdl, depth="###")
+    this_mdl <- dds_model_comp[[dataset]][[mdl]]
+    for (comp_name in names(this_mdl)) {
+      dds <- this_mdl[[comp_name]]
+      res <- as.data.frame(mcols(this_mdl[[comp_name]])$results)
+      md <- metadata(this_mdl[[comp_name]])
+      filt <- expression(grepl('.*\\*$', class))
+      genes <- row.names(res)[eval(filt,res)][1:5]
+      plotFrames <- lapply(genes, function(i) cbind(as.data.frame(colData(dds)), Y=assay(dds, "vst")[i,], .gene=i))
+      plotFrame <- do.call(rbind, plotFrames)
+      my_aes <- aes(x=days, col=eventual, group=interaction(eventual, Participant)) ~ 1
+      pl <- ggplot(plotFrame,
+                  eval(my_aes[[2]])) +
+        geom_point(aes(y=Y)) + facet_wrap(~.gene) +
+        theme_bw()
+      if ("group" %in% names(my_aes[[2]])) {
+        pl <- pl + geom_line(aes(y=Y))
+      }
+      do_plot(pl,
+              label="02-MA",
+              caption=paste0("MA plot of differential genes ", sub(".*\\t", "", comp_name)),
+              preview=first
+              )
+      first <- FALSE
+      cat("\n\n---\n\n")
+    } # next comparison
+  }   # next model
+}     # next dataset
+
+```
+
+
+# Terms Of Use
+
+The Crick has a [publication
+policy](https://intranet.crick.ac.uk/our-crick/library-information-services/pages/guidelines-publication)
+and we expect to be included on publications, regardless of funding
+arrangements. Any use of these results in publication must be
+discussed with BABS regarding authorship. If not authorship then
+the BABS analyst must receive a named acknowledgement. Please also
+cite the following sources which have enabled the analysis to be
+carried out.
+
+# References
+
+::: {#refs}
+:::
+

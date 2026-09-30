@@ -1,0 +1,204 @@
+#!/usr/bin/env bash
+#SBATCH --ntasks=1
+#SBATCH --output=slurm-%x.out
+
+# Allows the following over-rides
+# BABS_PROJECT_ROOT - the upper limit of the project, for binding purposes. Default in .env is to the git root, or the current path
+# BABS_CMD - What command to call in the container. Overrides inference from basename.
+# BABS_DEV - Redirect stdin/err right until immediately before the singularity/docker call
+# BABS_DOTENV - What the environment files are prefixed with (default .env - set to empty to prevent)
+# BABS_INTERACTIVE - whether to add a '-it' flag for docker, specifically
+# BABS_LOG - where to write a debug report if called with BABS_CMD=debug
+# BABS_LAUNCHER_DIR - override the $launcher_dir(=./babs-launchers) storage/cache location
+
+export BABS_DOTENV=${BABS_DOTENV-.env}
+## source any .env files
+if [[ -n "$BABS_DOTENV" ]]; then
+    for env_file in $BABS_DOTENV{,.local,.${USER},.local.${USER}}; do
+	[[ -f "${env_file}" ]] && source "${env_file}"
+    done
+fi
+
+launcher_dir=${BABS_LAUNCHER_DIR:-$launcher_dir}
+source launch-helper.sh
+
+if ! (mkdir -p "${launcher_dir}" 2>/dev/null && [ -w "${launcher_dir}" ]); then
+    launcher_dir=$(mktemp -d) || {
+    echo "Failed to create temp directory" >&2
+        exit 1
+    }
+fi
+
+# Only redirect if BABS_DEV has value
+if [ -n "$BABS_DEV" ]; then
+    # Save original stdout and stderr
+    exec 3>&1 4>&2
+    # Redirect stdout and stderr for the bulk of the script
+    exec >"$BABS_DEV" 2>"$BABS_DEV"
+    restore_fds() {
+        exec 1>&3 2>&4
+        exec 3>&- 4>&-
+    }
+fi
+
+## slurm-specific customisations
+basename=${SLURM_JOB_NAME:-$(basename "$0")}
+run_local=
+run_tmux=
+if [[ $BABS_CMD == ,* ]]; then
+    run_local=yes
+    BABS_CMD=${BABS_CMD#,}
+fi
+if [[ $BABS_CMD == *, ]]; then
+    BABS_CMD=${BABS_CMD%,}   # strip trailing comma
+    run_tmux="tmux new-window -n $BABS_CMD -d"
+fi
+cmd=${BABS_CMD:-${basename%-*}}
+
+## Set number of threads appropriately
+if [ -n "${SLURM_JOB_ID}" ]; then
+    NUM_THREADS=${SLURM_CPUS_PER_TASK:-${NUM_THREADS}}
+fi
+
+export SINGULARITYENV_BIOCPARALLEL_WORKER_NUMBER=${NUM_THREADS}
+export SINGULARITYENV_OMP_NUM_THREADS=${NUM_THREADS}
+export SINGULARITYENV_OPENBLAS_NUM_THREADS=${NUM_THREADS}
+export SINGULARITYENV_IN_BABS_CONTAINER=${docker_image}
+
+if [[ -z "$SINGULARITYENV_RENV_PATHS_ROOT" ]] ; then
+    export SINGULARITYENV_RENV_PATHS_ROOT="$(realpath ~/.cache/R/renv)"
+    mkdir -p ${SINGULARITYENV_RENV_PATHS_ROOT}
+fi
+
+export SINGULARITY_BIND
+SINGULARITY_BIND+="${SINGULARITY_BIND:+,}/tmp"
+
+bind_dirs="RENV_PATHS_ROOT SSH_AUTH_SOCK TINYTEX_DIR UV_CACHE_DIR"
+for v in ${bind_dirs}; do
+    svar=SINGULARITYENV_${v}
+    my_path="${!svar}"
+    [[ -n $my_path ]] && SINGULARITY_BIND+=",$my_path" && mkdir -p "$my_path"
+done
+
+[[ $run_local ]] || echo -e "\033[44;97m i \033[0m Extra directories being bound to the container. This might affect reproducibility: ,${SINGULARITY_BIND}"  | tr ',' '\n' 1>&2
+
+if [[ ! run_local ]] && compgen -v | grep SINGULARITYENV 1>&2 > /dev/null; then
+    echo -e "\033[44;97m i \033[0m The following environment variables are inherited in the container. Remove the corresponding SINGULARITYENV_* variable (unset) if you don't want the following values to be used:"
+    for var in $(compgen -v | grep SINGULARITYENV); do
+
+        if [[ "$var" =~ TOKEN|SECRET|KEY|PASSWORD|API|GITHUB_PAT ]]; then
+            echo "${var#SINGULARITYENV_}=****"  1>&2
+        else
+            echo "${var#SINGULARITYENV_}=${!var}" 1>&2
+        fi
+    done
+fi
+
+PASSWORD=$(openssl rand -hex 32)
+seed=0
+while :; do
+    PORT=$(shuf -n 1 -i 49152-65535 --random-source=<(echo "${PWD}${seed}" | openssl dgst -sha256 | cut -d ' ' -f2 ))
+    ss -atun sport ":$PORT" | grep -q ":$PORT" || break
+    ((seed++))
+done
+
+if [[ $run_local ]]; then
+    my_caller () { echo "⚠️⚠️ Running uncontained ⚠️⚠️" ; ${run_tmux} "$@"; }
+elif ! command -v docker >/dev/null 2>&1; then
+    image="${SINGULARITY_IMAGEDIR:-${SINGULARITY_CACHEDIR:-$HOME/.singularity/cache}/library}/${sif_file}"
+    if [ ! -f "${image}" ]; then
+        echo "✅ Creating ${image} from ${docker_image}..."
+	if [ -n "${SINGULARITY_MODULE}" ]; then 
+          module is-loaded ${SINGULARITY_MODULE} ||
+          module load ${SINGULARITY_MODULE} ||
+          echo "Couldn't load singularity module - assuming it's an executible"
+	fi
+        mkdir -p $(dirname "$image")
+        export DOCKER_USERNAME="${DOCKER_USERNAME:-${GITHUB_USERNAME:-$(git config --get github.user)}}" || { echo "No GitHub username found"; exit 1; }
+        export DOCKER_PASSWORD=${DOCKER_PASSWORD:-${GITHUB_PAT}}
+        singularity pull ${image} docker://${docker_image} || exit
+    fi
+    container=singularity
+    my_caller () {
+    if [ -n "${SINGULARITY_MODULE}" ]; then 
+        module is-loaded ${SINGULARITY_MODULE} ||
+        module load ${SINGULARITY_MODULE} ||
+        echo "Couldn't load singularity module - assuming it's an executible"
+    fi
+    local singularity_args=(
+            ${method:-exec}
+            --bind ${BABS_PROJECT_ROOT}
+            --pwd $(realpath .)
+            --containall
+            --scratch /run,/var/lib/rstudio-server
+            --cleanenv
+            ${image}
+    )
+    singularity_args+=("$@")
+    [ -n "${BABS_DEV}" ] && restore_fds
+    ${run_tmux} singularity "${singularity_args[@]}"
+    }
+else
+    container=docker
+    my_caller () {
+    local docker_args=(
+            --rm
+            -w /home/rstudio/project
+            -v "${BABS_PROJECT_ROOT}:/home/rstudio/project"
+    )
+    IFS=',' read -ra binds <<< "$SINGULARITY_BIND"
+    for bind in "${binds[@]}"; do
+            if [[ "$bind" == *:* ]]; then
+        docker_args+=("-v" "$bind")
+            else
+        docker_args+=("-v" "$bind:$bind")
+            fi
+    done
+    docker_args+=(
+            -e USERID=$(id -u)
+            -e GROUPID=$(id -g)
+    )
+    while IFS='=' read -r name value; do
+            if [[ "$name" == SINGULARITYENV_* ]]; then
+        varname="${name#SINGULARITYENV_}"
+        docker_args+=("-e" "${varname}=${value}")
+            fi
+    done < <(env | grep ^SINGULARITYENV_)
+    [[ "$interactive" == true ]] && docker_args+=(-it) || docker_args+=(-d)
+    docker_args+=(-p "$PORT:$PORT")
+    docker_args+=("$docker_image")
+    [[ "$method" == shell ]] && docker_args+=("bash")
+    docker_args+=("$@")
+    [ -n "${BABS_DEV}" ] && restore_fds
+    ${run_tmux} docker run "${docker_args[@]}"
+    }
+fi
+
+source server-info.sh
+source rstudio.sh
+source shiny.sh
+source jupyter.sh
+source http.sh
+
+case "$cmd" in
+    rstudio|shiny|jupyter|http)
+        ${cmd} "$@"
+        ;;
+    debug)
+        [ -e ${BABS_LOG:=.}/report.txt ] && {echo ${BABS_LOG)/report.txt already exists; exit 1;}
+        echo $PWD > ${BABS_LOG}/report.txt
+        echo "## SINGULARITY ENV" >> ${BABS_LOG}/report.txt
+        for var in $(compgen -v | grep SINGULARITYENV); do
+            echo "${var#SINGULARITYENV_}=${!var}"  >> ${BABS_LOG}/report.txt
+        done
+        echo "## SINGULARITY BIND" >> ${BABS_LOG}/report.txt
+        echo ${SINGULARITY_BIND} >>  ${BABS_LOG}/report.txt
+        echo "Please cite $(realpath "$BABS_LOG")/report.txt in any support messages."
+        ;;
+    shell)
+        interactive=${BABS_INTERACTIVE:-true} method=shell my_caller
+        ;;
+    *)
+        interactive=${BABS_INTERACTIVE:-true} my_caller $cmd "$@"
+        ;;
+esac

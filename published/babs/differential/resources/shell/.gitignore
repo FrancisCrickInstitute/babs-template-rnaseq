@@ -1,0 +1,13 @@
+/tmp/
+/var/
+/R/
+/run.
+/rstudio
+/database.conf
+/rsession.conf
+
+/jupyter-kernel.sentinel
+/jupyter-share/
+/pip-cache/
+/uv-cache/
+
