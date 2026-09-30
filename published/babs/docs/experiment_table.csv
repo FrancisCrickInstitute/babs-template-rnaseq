@@ -1,0 +1,10 @@
+ID,sample_name,mouse,cell_type,treatment
+TSA9559A1,1,A,BMDMs,naive
+TSA9559A2,2,A,BMDMs,hyphae
+TSA9559A3,3,A,BMDMs,hyphae_PDL1
+TSA9559A4,4,B,BMDMs,naive
+TSA9559A5,5,B,BMDMs,hyphae
+TSA9559A6,6,B,BMDMs,hyphae_PDL1
+TSA9559A7,7,C,BMDMs,naive
+TSA9559A8,8,C,BMDMs,hyphae
+TSA9559A9,9,C,BMDMs,hyphae_PDL1
