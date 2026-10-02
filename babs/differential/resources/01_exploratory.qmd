@@ -665,22 +665,9 @@ cat('\n\n<a class="download-excel btn btn-primary" href="',
     '">', param$get("RowNoun"),'-Cluster mappings</a>', sep="")
 plot_df <- bind_rows(do_plot())
 saveRDS(plot_df, file = file.path("data", "exploratory_plots.rds"))
-ojs_define(plot_df = plot_df)
 
 ```
 
-```{ojs}
-//| label: select-plot
-plot_rows=transpose(plot_df);
-viewof dataset=Inputs.select([...new Set(plot_rows.map(d => d.dataset))]);
-viewof model=Inputs.select([...new Set(plot_rows.map(d => d.model))]);
-viewof label=Inputs.select([...new Set(plot_rows.map(d => d.label))]);
-
-filtered = plot_rows.filter(function(row) {
-  return row.dataset==dataset && row.model==model && row.label==label;});
-
-html`<img src="${filtered[0].png}" style="max-width: 100%; height: auto;">`
-```
 
 # Terms Of Use
 
