@@ -1,8 +1,0 @@
-/data
-/logs
-/results
-/shortcuts
-/staging
-/extdata/genes.results/
-/samples.db
-secret.mk
