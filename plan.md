@@ -14,7 +14,8 @@ Hard constraints:
   or "simplified". The skills ship byte-identical copies of `babs/differential/R/*.r`
   and `babs/differential/resources/*.qmd`, and the agent runs that code.
 - Nothing in the existing code base is edited. All new material lives in a new,
-  self-contained plugin directory (or a separate repo; see open question 1).
+  self-contained plugin directory at the top of this repo, marked
+  `export-ignore` so it never reaches project tarballs (decision 1).
 - The user supplies `experiment_table.csv` and the `.spec` file(s). The skills
   validate them and run; they do not invent experimental designs.
 - Anything the current `makefile` does that affects the analysis (parameter
@@ -73,7 +74,7 @@ differential/
 
 `resources/make/project.mk` defines `sections = 00_init 01_exploratory 02_differential 03_enrichment`.
 (`04_gene_plots.qmd` exists but is **not** in `sections`, has hard-coded
-aesthetics, and is treated as work in progress; excluded, see open question 5.)
+aesthetics, and is treated as work in progress; excluded by decision 5.)
 
 Pages are instantiated per combination:
 
@@ -220,8 +221,11 @@ babs-rnaseq-skills/                          # new directory (or repo), nothing 
   `references/experiment-table.md`: the docs/readme rules.
 
 **`rnaseq-env-setup`**
-- `scripts/check-env.sh`: detect docker / singularity / bare R + quarto; report
-  versions; locate or pull the image named in `.env`; locate renv cache.
+- Target runtime is singularity on NEMO (decision 2). `scripts/check-env.sh`:
+  load the singularity module, report versions, locate or pull the `.sif` for
+  the image named in `.env` (`SINGULARITY_IMAGEDIR` then the cache), locate the
+  renv cache. The docker and shell branches of `shared.mk` are kept in the
+  wrapper for completeness but are untested and documented as such.
 - `scripts/restore-renv.sh`: replicate the makefile `renv` target (append
   `library(<org.db>)` to `_dependencies.R`, `renv::restore()`, install org.db,
   `knitr::write_bib` -> `extdata/R.bib`).
@@ -232,12 +236,16 @@ babs-rnaseq-skills/                          # new directory (or repo), nothing 
   of the statisticians' results) and what to do when the image cannot be pulled.
 
 **`rnaseq-ingest`**
-- `scripts/init-workdir.sh <analysis_dir>`: create the section 2.2 layout and
-  copy `shared/R`, `shared/resources` into it.
+- `scripts/init-workdir.sh <analysis_dir>`: create the section 2.2 layout,
+  copy `shared/R`, `shared/resources` into it, and `git init` with a bootstrap
+  tag exactly as `resources/shell/isolated.sh` does, so `VERSION`/`GIT_REF`
+  and therefore every output filename behave as under `make run` (decision 7).
 - `scripts/discover-nfcore.sh <nfcore_results_dir>`: find
-  `star_rsem/*.genes.results` or `star_salmon/*/quant.sf` + `salmon_tx2gene.tsv`,
-  the multiqc folder, the samplesheet; print what was found and which aligner it
-  implies. Handles both the 3.10.x and 3.26.x result layouts.
+  `star_rsem/*.genes.results`, the multiqc folder and the samplesheet of an
+  nf-core/rnaseq 3.10.x run (decision 4); print what was found. Salmon input
+  (`star_salmon/*/quant.sf` + `salmon_tx2gene.tsv`) is already understood by
+  `00_init.qmd`, so the script reports it if present but it is not a tested
+  path. Other release layouts are reported as unrecognised rather than guessed.
 - `scripts/stage-inputs.sh`: the gathering recipes from the differential
   makefile: CR-strip the experiment table to `extdata/metadata.csv`; inner-join
   with the samplesheet on `ID` = `sample` to make `extdata/metadata_<ds>.csv`
@@ -278,7 +286,8 @@ babs-rnaseq-skills/                          # new directory (or repo), nothing 
   Table Two fallacy).
 - SKILL.md tells the agent what warnings mean (rank deficiency, dropped models
   with no replication, dropped comparisons) and that fixes belong in the spec,
-  not in the code.
+  not in the code. The agent validates the user's spec and explains failures;
+  it edits a design only when the user asks (decision 6).
 
 **`rnaseq-enrichment`**
 - Runs `render-section.sh 03_enrichment <ds> <spec>`.
@@ -356,8 +365,9 @@ babs-rnaseq-skills/                          # new directory (or repo), nothing 
 
 ### Phase 8: end-to-end agent trials
 19. Using the skill-creator workflow, write 3 to 4 test prompts (airway with the
-    shipped spec; a two-factor spec from `example_docs/analyse.spec`; a salmon
-    run; a deliberately broken spec with an unknown covariate) and run them
+    shipped spec; a two-factor spec from `example_docs/analyse.spec`; a
+    deliberately broken spec with an unknown covariate; a request to add a
+    comparison to an existing spec) and run them
     through an agent with the plugin installed, saving outputs per iteration.
 20. Compare against the Phase 0 reference with a script
     (`scripts/compare-to-reference.sh`): same objects, same tables, same figure
@@ -367,8 +377,9 @@ babs-rnaseq-skills/                          # new directory (or repo), nothing 
 
 ### Phase 9: polish
 22. Tune the skill descriptions for triggering (skill-creator's description
-    optimiser), package, document installation, decide on export rules
-    (`.gitattributes`) if the plugin lives in this repo.
+    optimiser), package, document installation, and add the plugin directory
+    to `.gitattributes` as `export-ignore` (the one edit outside the plugin
+    directory, agreed in decision 1).
 
 ## 6. Verification standard
 
@@ -378,38 +389,34 @@ produces the same `data/*.rds` contents and the same tsv/csv/xlsx tables as
 timestamps. This is checkable because all randomness is seeded from
 `settings$seed` and the code is identical.
 
-## 7. Open questions and working assumptions
+## 7. Decisions (agreed 2026-11-16)
 
-1. **Where does the plugin live?** Assumed: a new top-level directory in this
-   repo, marked `export-ignore` so it never reaches project tarballs. A
-   separate repo is the alternative if the plugin should version independently
-   of the template.
-2. **Which executor will agents have?** Assumed: docker on workstations,
-   singularity on NEMO. If agents will only ever have a bare R, the env skill
-   needs a documented "shell" path with renv from the lockfile and a warning
-   that results are not container-reproducible.
-3. **Is the HTML report required, or are the objects and tables enough?**
-   Assumed: the report is rendered because that is how the code is intended to
-   run (`plot_tracker` and `table_tracker` only save figures and csvs inside
-   knitr). Dropping Quarto would mean changing how the R code is invoked.
-4. **nf-core version in the wild.** The repo references both 3.10.1 and 3.26.0.
-   Assumed: both layouts must be discovered; the skill reports which it found.
-5. **Scope of sections.** Assumed: `00_init` to `03_enrichment` only.
-   `04_gene_plots.qmd` (not in `sections`, hard-coded aesthetics) and the
-   `biologic` export are excluded unless requested.
-6. **Spec authoring.** Assumed: the user provides the spec; the skill validates
-   it and, if asked, helps edit it using the vignette grammar, but never
-   silently rewrites a design.
-7. **Git versioning of results.** `VERSION`/`GIT_REF` come from `git describe`.
-   Assumed: the analysis directory is initialised as a git repo (as
-   `isolated.sh` does) so output naming stays identical; otherwise the driver
-   falls back to `unreleased`/`uncontrolled` exactly as `shared.mk` does.
-8. **Multiple specs and configs.** Supported by looping the drivers over
-   spec x data_source, honouring `<ds>.spec` / `<ds>.nospec` restrictions from
-   the config, as the makefile does.
-9. **Crick-specific text** (Terms of Use, affiliations in `params.yml`) is kept
-   as is, since the qmds are vendored verbatim; confirm this is wanted for
-   non-Crick users.
+1. **Location.** The plugin lives in this repo as a top-level directory, marked
+   `export-ignore` in `.gitattributes`, so project tarballs never include it
+   and the vendored R code sits next to its source for the sync check.
+2. **Executor.** Singularity on NEMO with the pinned BABS bioconductor image
+   and the renv cache on fast disk. Docker and bare-R paths are retained from
+   `shared.mk` but untested and flagged as such in the env skill.
+3. **Report.** The full Quarto HTML report is rendered, because the figure and
+   table helpers only write their outputs inside knitr and this is the only
+   way to run the qmd code unchanged.
+4. **nf-core layout.** The ingest skill targets nf-core/rnaseq 3.10.x
+   `star_rsem` output (`star_rsem/<sample>.genes.results` plus multiqc). Other
+   releases and Salmon are reported, not assumed.
+5. **Sections.** `00_init`, `01_exploratory`, `02_differential`,
+   `03_enrichment`. `04_gene_plots.qmd` and the `biologic` export are out of
+   scope.
+6. **Spec role.** The user supplies the spec. The skills parse-check it, check
+   its covariates against the experiment table and explain failures. They
+   edit a design only when the user asks, using the vignette grammar, and
+   never draft a spec unprompted.
+7. **Git versioning.** The analysis directory is `git init`ed with a bootstrap
+   tag as `isolated.sh` does, so `VERSION`/`GIT_REF` and the output filenames
+   match a make run.
+8. **Multiple specs and configs.** The drivers loop over spec x data_source,
+   honouring `<ds>.spec` / `<ds>.nospec` from the config, as the makefile does.
+9. **Crick-specific text.** Terms of Use and the BABS affiliations in
+   `params.yml` stay verbatim, consistent with vendoring the qmds byte for byte.
 
 ## 8. Explicitly out of scope
 
