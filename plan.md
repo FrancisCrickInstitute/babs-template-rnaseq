@@ -41,7 +41,7 @@ prerequisites from the stage upstream of it via make dependencies.
 |---|---|---|
 | `docs` | Checks `*.spec`, `*.config`, `experiment_table.csv`, `samplesheet.csv` exist and are well formed (`ID` first column, `sample_label` second column recommended). | Yes, the validation rules carry over. |
 | `ingress` | Copies docs files, strips CR, fills config defaults (`universal=yes`, `strandedness=auto`, `aligner=star_rsem`), md5s fasta/gtf. | Only the CR stripping and the `aligner` default matter downstream. |
-| `nfcore` | Builds per-config samplesheet (sqlite join), runs `nf-core/rnaseq` (`-r 3.26.0` in `module.mk`, 3.10.1 in docs), symlinks `results/<config>/merged.gene_counts.tsv` and `results/<config>/multi-qc`. | No. The agent starts from an existing nf-core output. The skills must *discover* the same files `differential` would have pulled. |
+| `nfcore` | Builds per-config samplesheet (sqlite join), runs `nf-core/rnaseq` (`-r 3.26.0` in `module.mk`, the version targeted here; the docs example configs still show 3.10.1), symlinks `results/<config>/merged.gene_counts.tsv` and `results/<config>/multi-qc`. | No. The agent starts from an existing nf-core output. The skills must *discover* the same files `differential` would have pulled. |
 | `differential` | The downstream R/Quarto analysis. | Yes, entirely. |
 
 ### 2.2 What `differential/make run` gathers (the input contract)
@@ -193,8 +193,10 @@ babs-rnaseq-skills/                          # new directory (or repo), nothing 
 ├── README.md                                # how to install, prerequisites, quick start
 ├── shared/                                  # single vendored copy used by every skill
 │   ├── R/                                   # byte-identical to babs/differential/R
-│   ├── resources/                           # byte-identical subset of babs/differential/resources (see 3.1)
-│   ├── renv.lock  .env  _dependencies.R
+│   ├── resources/                           # byte-identical subset of babs/differential/resources (see section 3, decision 1), including _dependencies.R at its original path
+│   ├── renv.lock  .env
+│   ├── scripts/
+│   │   └── render-section.sh                # generic per-page driver used by ingest and the three analysis skills
 │   └── sync-check.sh                        # diff -r against babs/differential; fails on any difference
 └── skills/
     ├── babs-rnaseq-downstream/              # orchestrator: the whole workflow, order, decision points
@@ -227,7 +229,7 @@ babs-rnaseq-skills/                          # new directory (or repo), nothing 
   renv cache. The docker and shell branches of `shared.mk` are kept in the
   wrapper for completeness but are untested and documented as such.
 - `scripts/restore-renv.sh`: replicate the makefile `renv` target (append
-  `library(<org.db>)` to `_dependencies.R`, `renv::restore()`, install org.db,
+  `library(<org.db>)` to `resources/_dependencies.R`, `renv::restore()`, install org.db,
   `knitr::write_bib` -> `extdata/R.bib`).
 - `scripts/run-in-container.sh <cmd>`: the `CONTAINER_OPTIONS` / bind logic from
   `shared.mk`, so every later driver runs through one wrapper regardless of
@@ -242,7 +244,7 @@ babs-rnaseq-skills/                          # new directory (or repo), nothing 
   and therefore every output filename behave as under `make run` (decision 7).
 - `scripts/discover-nfcore.sh <nfcore_results_dir>`: find
   `star_rsem/*.genes.results`, the multiqc folder and the samplesheet of an
-  nf-core/rnaseq 3.10.x run (decision 4); print what was found. Salmon input
+  nf-core/rnaseq 3.26.0 run (decision 4); print what was found. Salmon input
   (`star_salmon/*/quant.sf` + `salmon_tx2gene.tsv`) is already understood by
   `00_init.qmd`, so the script reports it if present but it is not a tested
   path. Other release layouts are reported as unrecognised rather than guessed.
@@ -257,10 +259,10 @@ babs-rnaseq-skills/                          # new directory (or repo), nothing 
   `sample_label` advice, non-empty files), plus the `check_spec` recipe
   (`parse()` every spec in R) and a covariate check (every variable named in
   spec designs/transforms exists in the experiment table).
-- `scripts/render-section.sh <section> <ds> [<spec>]`: the generic driver used
+- `shared/scripts/render-section.sh <section> <ds> [<spec>]`: the generic driver used
   by this and the three analysis skills (per-page yml, `merge_yml.ts`,
   `sidebar.ts` -> `_quarto.yml`, `<VERSION>.params.yml`, `quarto render
-  --execute-dir`, log to `logs/`). Lives in `shared/`, referenced from each skill.
+  --execute-dir`, log to `logs/`). Lives in `shared/scripts/`, referenced from each skill.
 - SKILL.md: run `00_init` and then read `data/counts_<ds>.rds` with a read-only
   helper (`scripts/summarise-counts.R`: dims, samples kept/dropped, annotation
   coverage, organism) so the agent can report the ingest outcome.
@@ -400,7 +402,7 @@ timestamps. This is checkable because all randomness is seeded from
 3. **Report.** The full Quarto HTML report is rendered, because the figure and
    table helpers only write their outputs inside knitr and this is the only
    way to run the qmd code unchanged.
-4. **nf-core layout.** The ingest skill targets nf-core/rnaseq 3.10.x
+4. **nf-core layout.** The ingest skill targets nf-core/rnaseq 3.26.0 (the `-r` pinned in `babs/nfcore/module.mk`)
    `star_rsem` output (`star_rsem/<sample>.genes.results` plus multiqc). Other
    releases and Salmon are reported, not assumed.
 5. **Sections.** `00_init`, `01_exploratory`, `02_differential`,
