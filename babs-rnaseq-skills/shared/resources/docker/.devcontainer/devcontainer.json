@@ -1,0 +1,19 @@
+{
+    "name": "BABS Container",
+    "build": {
+        "dockerfile": "../Dockerfile"
+    },
+    "features": {
+        "ghcr.io/devcontainers/features/common-utils:2": {
+            "installZsh": false,
+            "installOhMyZsh": false,
+            "installOhMyZshConfig": false,
+            "upgradePackages": false
+        },
+        "ghcr.io/rocker-org/devcontainer-features/r-packages:1": {
+            "packages": "curl,renv,sf,terra,tinytex",
+            "installSystemRequirements": true
+        },
+        "ghcr.io/jsburckhardt/devcontainer-features/uv:1": {}
+    }
+}

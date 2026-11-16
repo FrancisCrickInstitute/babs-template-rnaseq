@@ -1,0 +1,9 @@
+{
+  "name": "babs-rnaseq-skills",
+  "version": "0.1.0",
+  "description": "Run the BABS bulk RNA-seq downstream analysis (init, exploratory, differential, enrichment) on an existing nf-core/rnaseq output, using the unmodified BABS R and Quarto code.",
+  "author": {
+    "name": "BABS, Francis Crick Institute"
+  },
+  "keywords": ["rnaseq", "deseq2", "nf-core", "bioinformatics", "babs"]
+}

@@ -1,0 +1,729 @@
+---
+title: Differential analysis ${title}
+description: Differential analysis of ${description}
+categories: [Differential]
+params:
+  section: Differential analysis
+---
+
+
+# Preface
+
+We load in all the necessary additional R packages, and set up some initial parameters.
+
+
+```{r}
+#| label: load-diff1
+#| output: false
+#| warning: false
+#| error: false
+
+library(tidyverse)       # Language
+library(devtools)
+library(openxlsx)        # IO
+library(ggrepel)         # General Vis.
+library(RColorBrewer)
+library(ComplexHeatmap)
+library(gt)
+library(emmeans)
+library(DESeq2)          # Assay-specific
+library(PoiClaClu)
+library(rtracklayer)
+library(tximport)
+library(clusterProfiler)
+library(ReactomePA)
+library(GO.db)
+library(IHW)
+library(ggiraph)
+library(ggrastr)
+
+source("R/plot.r", local = knitr::knit_global())
+source("R/dendrogram_insert.r", local = knitr::knit_global())
+source("R/markdown.r", local = knitr::knit_global())
+source("R/rnaseq.r", local = knitr::knit_global())
+source("R/partial.r", local = knitr::knit_global())
+source("R/output.r", local = knitr::knit_global())
+source("R/helpers.r", local = knitr::knit_global())
+if (file.exists("R/my-functions.r")) source("R/my-functions.r",  local = knitr::knit_global())
+
+for (i in sub("\\.emmc$", "", ls("package:emmeans", pattern="*.emmc")))
+  assign(paste0("my_", i,".emmc"), negate_emmc(paste0(i, ".emmc")))
+
+set.seed(1)
+
+if (!isTRUE(getOption('knitr.in.progress'))) {
+  params <- load_params(choose_staging("02_differential"))
+}
+
+
+
+do_plot <- plot_tracker(params)
+
+knitr::opts_chunk$set(
+  warning=FALSE, error=TRUE, message=FALSE,
+  dev=c("ragg_png","pdf"), out.width="100%",
+  dev.args=list(ragg_png=list(scaling=1.5)),
+  fig.width=14, fig.height=10, fig.process=rename_with_tag(params),
+  results='asis'
+)
+
+theme_set(cowplot::theme_half_open(12) + cowplot::panel_border())
+links <- list(
+  results=list(),
+  clusters=list()
+)
+
+```
+
+
+
+```{r}
+#| label: tbl-load-diff2
+#| tbl-cap: Context
+if (isTRUE(getOption('knitr.in.progress'))) {
+  gt(data.frame(Setting=names(params),
+                Value=unlist(params)))
+}
+
+
+```
+
+```{r}
+#| label: read-diff
+
+base_dir <- getwd()
+data(list=paste0("counts_", params$data_source))
+data(list=paste0("ddsList_", params$data_source, "_", params$spec))
+ddsList <- leaf_modify(ddsList,
+                      function(leaf, layers) {
+                        leaf$object <- leaf$object[mcols(leaf$object)$filter$differential %||% TRUE, , drop=FALSE]
+                        leaf},
+                      layers="sample_sets")
+ddsList <- leaf_modify(ddsList,
+                      function(leaf, layers) {
+                        if (!is.null(leaf$impute$differential) && !leaf$impte$differential) {
+                          assays(leaf$object) <- setFirstAssay(
+                            leaf$object,
+                            setdiff(assayNames(leaf$object), "imputed")[1])
+                        }
+                        leaf
+                      },
+                      layers="sample_sets")
+
+if (!is.null(metadata(dds)$organism$org)) {
+  library(metadata(dds)$organism$org, character.only=TRUE)
+}
+
+
+# Calling the setter without a value will pick up the default (from the spec), _and_ alert it in the markdown, and return the default
+set.seed(ddsList$settings$seed)
+data_source_params <- get_data_source_params(params$data_source)
+rowNoun <- data_source_params$rowNoun %||% "gene"
+RowNoun <- stringr::str_to_title(rowNoun)
+if ("missing" %in% names(data_source_params)) {
+  attr(rowNoun, "readout") <- "missingness"
+  attr(RowNoun, "readout") <- "Missingness"
+}
+cluster_ind <- counter(post_fn=to_letter)
+
+
+dtag <- dmc_factory(ddsList, type="dataset")
+mtag <- dmc_factory(ddsList, type="model")
+
+```
+
+# Find differential `{r} rowNoun`s
+
+ We use DESeq2 [@pkg_DESeq2] to find differential `{r} rowNoun`s using the
+negative binomial distribution to model counts, with IHW [@IHW2016]
+for multiple-testing correction with greater power than
+Benjamini-Hochberg, and ashr [@pkg_ashr] for effect-size shrinkage
+to ensure reported fold-changes are more robust.
+
+
+```{r}
+#| label: differential
+
+
+rds_name <- file.path("data", paste0(basename(params$spec),"_x_", params$data_source, ".rds"))
+
+if (interactive() && file.exists(rds_name)) {
+  ddsList <- readRDS(rds_name)
+  # In an interactive session, you may want to skip the rest of this code chunk if you are
+  # sure that the saved rds object represents the latest analysis.
+}
+
+
+## For each dataset, fit all its models
+ddsList <- nested_modify(
+  ddsList,
+  fit_models,
+  layers="sample_sets",
+  minReplicatesForReplace = Inf
+)
+
+
+## Now put results in each comparison object
+ddsList <- nested_modify(
+  ddsList,
+  get_result
+)
+
+
+saveRDS(ddsList, file=rds_name)
+save(ddsList, file=sub("rds$", "rda", rds_name))
+
+
+links$results <- write_results(ddsList,params)
+
+if (FALSE) {
+leaf_apply(ddsList,
+           function(leaf, layers) {
+             readr::write_excel_csv(
+               path=file.path(params$res_dir, sprintf("allgenes_%s_%s_%s.csv", layers[1], layers[2], layers[3])),
+               x=as.data.frame(leaf$results) %>% dplyr::select(log2FoldChange, stat, symbol, class))
+           })
+}
+
+```
+
+
+## Summary Tables
+
+Here we summarise the results of the differential testing. Each
+sample-set gets its own table (flick between tabs to choose which),
+within which the different models, and their null hypotheses, are
+enumerated.
+
+In the 'Significant' column we tally the number of significant
+`{r} rowNoun`s (for pairwise comparisons, separated into up or down, where
+A-B being labelled up means `{r} noun_to_readout(rowNoun)` is higher in A; for omnibus
+comparisons, a broad categorisation of the most extreme groups, as
+described above.) We also tally the total number of `{r} rowNoun`s
+exhibiting that behaviour (ie not necessarily statistically
+signficant) - these might not always add up to the same value, as
+there is an independent filter of low-signal `{r} rowNoun`s whose effect
+varies from comparison to comparison.
+
+Our naming convention for a comparison often looks like `A-B|M` -
+again, because this is an semi-automated report, this mightn't be
+optimal, but the rationale is `A-B` refers to the two experimental
+conditions being compared (a 'upward' fold change will be reported
+if the `{r} noun_to_readout(rowNoun)` is higher in `A` than it is in `B`). The `|M` part
+refers to the fact that we may have looked at that `A-B` comparison
+conditional upon some other variable (which in this example takes the
+value `M`):  anything before the `|` symbol identifies the
+experimental conditions that are being contrasted, and the part after
+the `|` identifies any stratification/conditioning of the data.
+
+In @fig-summaryp-1 we present some diagnostic plots of the observed
+p-values. Theoretically we want the pink part of the plot to have a
+solid peak on the left, and then make a reasonable plateau across
+higher p-values: gross deviations from this can indicate an absence of
+differential behaviour (lack of left-peak) or a model
+mis-specification that might need investigating. The blue tracks
+indicate p-values corresponding to `{r} rowNoun`s with very low `{r} noun_to_readout(rowNoun)`, which
+would typically struggle to provide evidence of differential
+behaviour, and so show an example of what a 'bad' pink trace might
+look like.
+
+```{r}
+#| label: summary
+
+summaries <- nested_modify(ddsList, summarise_results)
+summaries <- Reduce(rbind, flatten_nest(summaries, function(x) x$summary))
+
+if (is.null(summaries)) {
+  cat("\n\nNo datasets had models that were successful\n\n")
+} else {
+  unclassed <- summaries %>%
+    subset(Group %in% c('Zero Count', 'Low Count', 'Outlier')) %>%
+    group_by(dataset, model, Group) %>%
+    summarise(N=paste(unique(Total), collapse=";")) %>%
+    ungroup() %>%
+    pivot_wider(id_cols=c(model, dataset), names_from=Group, values_from=N)
+}
+
+pval_frame <- nested_modify(ddsList, pval_df)
+pval_frame <- Reduce(rbind, flatten_nest(pval_frame, function(x) x))
+
+cat("\n\n")
+
+for (dataset_id in seq_along(unique(summaries$dataset))) {
+  dataset_name <- unique(summaries$dataset)[dataset_id]
+  res <- knitr::knit_child(
+    text = c(
+      "```{r}",
+      "#| echo: false",
+      paste0("#| label: tbl-summary-",dataset_id),
+      paste0("#| tbl-cap: ", dataset_name),
+      "summaries %>%",
+      "subset(dataset==dataset_name & !Group %in% c('Zero Count', 'Low Count', 'Outlier'), select=-dataset) %>% ",
+      "gt(groupname_col=\"model\") %>%",
+      "tab_style(",
+      "  style = cell_fill(color = '#bee2e9'),",
+      "  locations = cells_row_groups()",
+      ") %>% ",
+      paste0("tab_header(title=\"",RowNoun,"List summary\", subtitle=dataset_name)"),
+      "```",
+      "",
+      ""
+    ), envir = environment(), quiet = TRUE)
+  if (!interactive()) cat(res, sep = '\n\n')
+
+  if (any(unclassed$dataset==dataset_name)) {
+    res <- knitr::knit_child(
+      text = c(
+        "```{r}",
+        "#| echo: false",
+        paste0("#| label: tbl-summaryfit-",dataset_id),
+        paste0("#| tbl-cap: ",dataset_name, " model-fit stats"),
+        "subset(unclassed, dataset==dataset_name) %>%",
+        "gt() %>%",
+        "tab_header(title=\"Model-fit summary\", subtitle=dataset_name)",
+        "```",
+        "",
+        ""
+      ), envir = environment(), quiet = TRUE)
+  if (!interactive()) cat(res, sep = '\n\n')
+  }
+
+  for (model_name in unique(subset(pval_frame, dataset==dataset_name)$model)) {
+    pl <- ggplot(subset(pval_frame, dataset==dataset_name & model==model_name), aes(x=pvalue, fill=baseMean<1)) +
+      geom_density(alpha=0.5) +
+      facet_wrap(~comparison) +
+      theme_bw()
+    do_plot(pl,
+            label="summaryp",
+            caption=paste("p-Diagnostic for", dataset_name, model_name),
+            plot_meta=list(dataset=dataset_id, model=model_name)
+            )
+    cat("\n\n---\n\n")
+  }
+}
+
+```
+
+```{r}
+#| label: results
+all_clusters <- list()
+for (dataset_id in names(ddsList$sample_sets)) {
+  section_hierarchy <- list(dataset=dataset_id)
+  dataset <- ddsList$sample_sets[[dataset_id]]
+  dmc_heading(ddsList, list(dataset=dataset_id), depth=strrep("#", length(section_hierarchy)))
+  has_comparisons <- sapply(dataset$models, function(m) "comparisons" %in% names(m) && length(m$comparisons) > 0)
+  src2bullets(dataset, c("subset", "extra_assays", "influential_samples"))
+  for (model_id in names(dataset$models)) {
+    section_hierarchy <- list(dataset=dataset_id, model=model_id)
+    #this_model <- ddsList$sample_sets[[dataset_id]][[model_id]]
+    model <- dataset$models[[model_id]]
+    dmc_heading(ddsList, list(dataset=dataset_id, model=model_id), depth=strrep("#", length(section_hierarchy)))
+    src2bullets(model, c("subset", "extra_assays", "influential_samples"))
+    cat("`",
+        Reduce(paste, sub("~", paste0(noun_to_readout(RowNoun)," ~ "), deparse(model$design))),
+        "`\n\n"
+        )
+    first <- TRUE
+    external_list <- model$external_list
+    if (!is.null(external_list)) {
+      external_list <- read.csv(file.path(base_dir, external_list))
+      external_list <- subset(external_list, ID %in% row.names(model$object[[1]]))
+      external_list$Cluster[is.na(external_list$Cluster)] <- external_list$ID[is.na(external_list$Cluster)]
+    }
+    for (comparison_id in c(names(model$comparisons), unique(external_list$Comparison))) {
+      comparison <- model$comparisons[[comparison_id]]
+      section_hierarchy <- list(dataset=dataset_id, model=model_id, comparison=comparison_id)
+      dmc_heading(ddsList, section_hierarchy, depth=strrep("#", length(section_hierarchy)))
+      is_external <- is.null(comparison)
+      if (is_external) {
+        is_significant <- row.names(model$object) %in% external_list$ID[external_list$Comparison==comparison_id]
+        comp_type <- " "
+      } else {
+        is_significant <- grepl("\\*$", comparison$results$class)
+        comp_type <- "-differential "
+        if (!any(is_significant)) {
+          next
+        }
+      }
+      involved <- comparison$involved
+      if (is.null(involved)) { # Fall back for contrasts that don't (yet) memorise which samples they're affected by
+        dataset$object$.involved <- dataset$object$.influential
+      } else {
+        dataset$object$.involved <- FALSE
+        dataset$object$.involved[dataset$object$.influential] <- involved
+      }
+
+      ## MA Plot
+      res <- as.data.frame(comparison$results)
+      pal <- RColorBrewer::brewer.pal(9, "Set1")
+      res$class <- ifelse(is_significant, "Sig", "Not")
+      if (is_external) {
+        cat("\n\n", strrep("#", length(section_hierarchy)+1), " MA\n\n", sep="")
+        cat("For MA plots, external gene-lists are represented in specific comparisons, rather than getting there own plot.{.unnumbered}\n\n")
+      } else {
+        if (is_formula(comparison$comparison)) {
+          yax <- "Largest fold change"
+        } else {
+          yax <- "Log fold change (shrunk)"
+        }
+        pl <- ggplot(res,
+                    aes(x=baseMean,
+                        y=shrunkLFC,
+                        colour=ifelse(class == "Not", "#aaaaaa","#000000"),
+                        size=ifelse(class == "Not", 0.5 , 2),
+                        label=symbol
+                        )
+                    ) +
+          geom_point() +
+          geom_point_interactive(aes(tooltip=symbol), data=res[top_true(is_significant, res$shrunkLFC, n=100),]) +
+          scale_x_log10()  + scale_size_identity() +
+          labs(x="Mean of normalised counts", y=yax)+ theme_bw()
+        colour_scale <- list(labels = c("Not", "Significant"),
+                            breaks = c("#aaaaaa", "#000000"))
+        ind <- top_true(is_significant, res$shrunkLFC, n=5)
+        if (!is.null(external_list)) {
+          ## add external IDs
+          dat <- res[external_list$ID,]
+          if (length(unique(external_list$Comparison)) <= length(pal)) {
+            col <- pal[match(external_list$Comparison, unique(external_list$Comparison))]
+          } else {
+            col <- rep(pal[1], nrow(dat))
+          }
+          colour_scale$labels <- c(colour_scale$labels, unique(external_list$Comparison))
+          colour_scale$breaks <- c(colour_scale$breaks, pal[seq_along(unique(external_list$Comparison))])
+          pl <- pl +
+            ggrepel::geom_text_repel(aes(colour=col), size=3, data=res[external_list$ID,], max.overlaps=Inf, show.legend = FALSE) +
+            geom_point(aes(colour=col), data=res[external_list$ID,])
+          ind <- ind[!row.names(res)[ind] %in% external_list$ID]
+        }
+        pl <- pl+ggrepel::geom_text_repel(size=3, data=res[ind,], show.legend = FALSE)
+        pl <- pl +
+          scale_colour_identity(labels=colour_scale$labels, breaks=colour_scale$breaks, guide = "legend") +
+          labs(colour="Class")
+        cat("\n\n", strrep("#", length(section_hierarchy)+1), " MA{.unnumbered}\n\n", sep="")
+        do_plot(pl,
+                label="MA",
+                caption=paste0("MA plot of ", tooltip(model, comparison_id), "-differential ", rowNoun,"s for ",mtag(model_id), " in ", dtag(dataset_id)),
+                preview=first,
+                plot_meta=section_hierarchy,
+                dpi=150, interactive=FALSE
+                )
+        first <- FALSE
+        cat("\n\n---\n\n")
+      }
+      ## Heatmap
+      plot_formulae <- get_in_section(model$profile_plots, c("all", "differential"))
+      model_vars <- sort_vars(
+        unique(c(all.vars(model$design),
+                 unique(unlist(lapply(plot_formulae, function(x) c(
+                   unique(unlist(lapply(x[[1]], all.vars))),
+                   unique(unlist(lapply(x$extra, all.vars)))
+                 )))))),
+        model$variables)
+      model_vars <- setdiff(intersect(model_vars, names(colData(model$object))), ".involved")
+      cat("\n\n---\n\n")
+      if (!is.null(model$mat)) {
+        mmat <- model$mat
+      } else {
+        mmat <- model.matrix(model$design, colData(model$object))
+      }
+      weights <- setNames(rep(0, ncol(dataset$object)), colnames(dataset$object))
+      #TODO check why baseline not appearing
+      if (!is_external && "baseline_contrast" %in% names(comparison)) {
+        weights[colnames(model$object)] <- t(as.vector(comparison$baseline_contrast) %*% MASS::ginv(mmat))
+        baseline_str <- paste("baseline", noun_to_readout(rowNoun))
+      } else {
+        weights[colnames(model$object)] <- rep(1/nrow(mmat), times=nrow(mmat))
+        baseline_str <- paste("average", noun_to_readout(rowNoun))
+      }
+      centroid_df <- list()
+      # TODO: This is probably too severe:
+      # Because heatmaps aren't really affected by anything other than y-aesthetic:
+      unique_heatmaps <- !duplicated(sapply(plot_formulae, function(pl) {pl[[1]]$y %||% ""}))
+      for (plot_id in names(plot_formulae)[unique_heatmaps]) {
+        plot_config <- plot_formulae[[plot_id]]
+        plot_aes <- plot_config[[1]]
+        section_hierarchy <- list(dataset=dataset_id, model=model_id, comparison=comparison_id, plot_config=plot_id)
+        dmc_heading(ddsList, section_hierarchy, depth=strrep("#", length(section_hierarchy)+1), numbered=FALSE, describe=NA)
+        cat('\n\n::: {.panel-tabset .unnumbered group="diffplot"}\n\n')
+        cat("\n\n", strrep("#", length(section_hierarchy)+1), " Details\n\n", sep="")
+        dmc_heading(ddsList, section_hierarchy, depth=strrep("#", length(section_hierarchy)+2), numbered=FALSE)
+        cat("\n\n", strrep("#", length(section_hierarchy)+1), " Legend\n\n", sep="")
+        if  (plot_id == names(plot_formulae)[unique_heatmaps][1]) {
+          nice_legends <- separate_legend(dataset$object, model_vars)
+          pl <- do.call(gridExtra::arrangeGrob,c(
+            nice_legends,
+            ncol=ceiling(sqrt(length(nice_legends)))))
+          do_plot(pl,
+                  label= "legend-a",
+                  caption=paste("Metadata colour-codings for",dtag(dataset_id)),
+                  plot_meta=section_hierarchy
+                  )
+          legend_url <- do_plot()
+          legend_url <- legend_url[[length(legend_url)]]$png
+        } else {
+           cat("\n![](", legend_url, ")\n", sep="")
+        }
+        y_hint <- plot_aes$y
+        which_assay <- default_assay_name(plot_aes, dataset$object)
+        if ("y" %in% names(plot_aes)) {
+          y_hint <- model$extra_assays[[which_assay]]$hint %||% which_assay
+          do_weight <- (!dataset$extra_assays[[which_assay]]$method %in% c("normalise", "partial")) %||% TRUE
+          tidied_se <- tidy_significant_se(dataset$object, is_significant, weights=if (do_weight) weights else NULL, assay=which_assay)
+        } else {
+          tidied_se <- tidy_significant_se(dataset$object, is_significant, weights=weights)
+        }
+        design(tidied_se) <- model$design
+        mcols(tidied_se)$results <- comparison$results[row.names(tidied_se),]
+        plot_se <- tidied_se
+        plot_se$.influential_in_assay <- (plot_se$.influential %||% TRUE) & (plot_se$.influential_in_assay[[which_assay]] %||% TRUE)
+        sample_order <- reorder_samples(plot_se, model_vars)
+        vis_sample <- eval(plot_config$extra$visible, colData(tidied_se))
+        mat_height <- height_scaler(n=nrow(plot_se), small=10, big=20, N=1000)
+        hc <- plot_config$extra$gene_clust
+        if ("cut.params" %in% slotNames(hc) && "k" %in% names(slot(hc, "cut.params")) && slot(hc, "cut.params")$k >= nrow(plot_se)) {
+          slot(hc, "cut.params") <- modifyList(slot(hc, "cut.params"), list(k=nrow(plot_se)))
+        }
+        if (nrow(plot_se)>1) {
+          gene_clust <- bluster::clusterRows(assay(plot_se)[,dataset$object$.involved,drop=FALSE], adapt_hclust_param(hc), full=TRUE)
+          if (is_external) {
+            gene_clust$clusters <- match(names(gene_clust$clusters), external_list$ID)
+          } else {
+            singletons <- which(table(gene_clust$clusters)==1)
+            ind <- match(singletons, gene_clust$clusters)
+            if (!any(names(gene_clust$clusters)[ind] %in% levels(gene_clust$clusters))) {
+              levels(gene_clust$clusters)[singletons] <- names(gene_clust$clusters)[ind]
+            }
+          }
+        } else {
+          gene_clust <- list(
+            clusters=setNames(row.names(plot_se), row.names(plot_se)),
+            objects=list(hclust=FALSE))
+        }
+        if (!is_external) {
+          this_clust <- cluster_ind()
+          gene_clust$clusters <-cluster_cardinality(gene_clust$clusters, this_clust)
+        }
+        capt <- paste0(tooltip(model, comparison_id), comp_type, rowNoun,"s  of ", mtag(model_id), " in ", dtag(dataset_id), metadata(plot_se)$removed)
+        cc <- cluster_calc(assay(plot_se), clusterID=gene_clust$clusters)
+        hmap_data <- assay(plot_se)
+        do_scale <- eval(plot_config$extra$scale,colDF(plot_se))
+        do_centre <- eval(plot_config$extra$centre, colDF(plot_se))
+        if (is.logical(do_centre) && length(do_centre)==1 && do_centre) {
+          centre_txt <- "Centred "
+          hmap_data <- hmap_data - rowMeans(hmap_data[,plot_se$.influential_in_assay, drop=FALSE])
+        } else if (is.logical(do_centre) && any(do_centre)) {
+          centre_txt <- "Shifted "
+          hmap_data <- hmap_data - rowMeans(hmap_data[,plot_se$.influential_in_assay & do_centre, drop=FALSE])
+        }  else if (is_formula(do_centre)) {
+          grp <- as.integer(interaction(model.frame(do_scale, colData(plot_se)), drop=TRUE))
+          m <- do.call(cbind, tapply(seq_along(grp), grp, function(ic) rowMeans(hmap_data[,ic, drop=FALSE])))
+          hmap_data <- hmap_data - (m[,grp, drop=FALSE])
+          centre_txt <- "Group-centred "
+        } else {
+          centre_txt <- ""
+        }
+        if (is.logical(do_scale) && length(do_scale)==1 && do_scale) {
+          scale_txt <- "Scaled "
+          hmap_data <- hmap_data / sqrt(rowVars(hmap_data[,plot_se$.influential_in_assay, drop=FALSE]))
+        } else if (is.logical(do_scale) && any(do_scale)) {
+          scale_txt <- "Reference-group-scaled "
+          hmap_data <- hmap_data / sqrt(rowVars(hmap_data[,plot_se$.influential_in_assay & do_scale, drop=FALSE]))
+        }  else if (is_formula(do_scale)) {
+          grp <- as.integer(interaction(model.frame(do_scale, colData(plot_se)), drop=TRUE))
+          v <- do.call(cbind, tapply(seq_along(grp), grp, function(ic) rowVars(hmap_data[,ic,drop=FALSE])))
+          hmap_data <- hmap_data / sqrt(v[,grp, drop=FALSE])
+          scale_txt <- "Group-scaled "
+        } else {
+          scale_txt <- ""
+        }
+        cat("\n\n", strrep("#", length(section_hierarchy)+1), " Heatmap\n\n", sep="")
+        pls <- hmap_fn(
+          dds=plot_se[,sample_order, drop=FALSE], mat=hmap_data[,sample_order, drop=FALSE],
+          gene_clust = gene_clust, row_title = paste0(RowNoun, "s"),
+          model_vars = model_vars,
+          plot_config =plot_config,
+          row_split = if ("cut.params" %in% slotNames(hc) && "k" %in% names(slot(hc, "cut.params"))) slot(hc, "cut.params")$k  else NULL,
+          measure_name=paste(c(centre_txt, scale_txt, noun_to_readout(RowNoun), y_hint), collapse=" "),
+          show_column_names=TRUE)
+        do_plot(Reduce(`+`, pls),
+                label="Heatmap",
+                caption=paste0("Heatmap on ", capt,  ". White for ", baseline_str),
+                height_opt=c(
+                  paste0("#| fig-height: [", 1.5*attr(pls[[1]], "predicted_height"), ",", attr(pls[[1]], "predicted_height") ,"]"),
+                  "#| out-height: 800px"),
+                plot_meta=section_hierarchy,
+                )
+        ### Design-based column ordering of  heatmap
+        cat("\n\n---\n\n")
+        pls <- hmap_fn(
+          dds=plot_se[,sample_order, drop=FALSE], mat=hmap_data[,sample_order, drop=FALSE],
+          gene_clust = gene_clust, row_title = paste0(RowNoun, "s"),
+          model_vars = model_vars,
+          row_split = if ("cut.params" %in% slotNames(hc) && "k" %in% names(slot(hc, "cut.params"))) slot(hc, "cut.params")$k  else NULL,
+          plot_config =plot_config,
+          measure_name=paste(c(centre_txt, scale_txt, noun_to_readout(RowNoun), y_hint), collapse=" "),
+          show_column_names=TRUE, cluster_columns = FALSE)
+        do_plot(Reduce(`+`, pls),
+                label="Heatmap",
+                caption=paste0("Sorted heatmap on ", capt,  ". White for ", baseline_str),
+                plot_meta=section_hierarchy,
+                height_opt=c(
+                  paste0("#| fig-height: [", 1.5*attr(pls[[1]], "predicted_height"), ",", attr(pls[[1]], "predicted_height") ,"]"),
+                  "#| out-height: 800px"),
+                )
+        centroid_df[[plot_id]] <- cbind(cc, colDF(plot_se))[vis_sample,,drop=FALSE] %>%
+          pivot_longer(cols=any_of(names(cc)), names_to=".derived", values_to=".derived.value") %>%
+          mutate(.derived=factor(.derived, levels=names(cc)))
+        attr(centroid_df[[plot_id]], "caption") <- capt
+        if (!is_external) {
+          links$clusters[[this_clust]] <- write_clusters(
+            clusters=gene_clust$clusters,
+            description=capt,
+            mcols=mcols(plot_se),
+            params=params,
+            hierarchy=section_hierarchy,
+            prefix="differential-clusters"
+          )
+        }
+        cat('\n\n---\n\n')
+        ## PC2
+        cat("\n\n", strrep("#", length(section_hierarchy)+1), " 2PC\n\n", sep="")
+#        section_hierarchy <- list(dataset=dataset_id, model=model_id, comparison=comparison_id, plot_config=plot_id)
+#        dmc_heading(ddsList, section_hierarchy, depth=strrep("#", length(section_hierarchy)+1), numbered=FALSE)
+#        eval(prepare_plot_data)
+        this_assay <- assay(plot_se)
+        orig_caption <- aes_caption(plot_aes)
+        mapping <- modify_mapping(plot_config, aes(y=.derived.value))
+        my_pc <- prcomp(
+          t(this_assay[,plot_se$.influential_in_assay, drop=FALSE]),
+          center = TRUE,
+          scale = FALSE)
+        proj <- predict(my_pc, newdata = t(this_assay))
+        my_percent <- round(100 * my_pc$sdev^2/sum(my_pc$sdev^2))
+        pc.df <- cbind(colDF(plot_se),
+                      data.frame(
+                        PC1 = proj[, plot_config$extra$pc_x],
+                        PC2 = proj[, plot_config$extra[[if (nrow(this_assay) != 1) "pc_y" else "pc_x"]]],
+                        sample = rownames(colDF(plot_se))))
+        aes_list <- substitute_x_aes(mapping, colour_as_fill=!"fill" %in% names(plot_aes))
+        for (this_aes in aes_list) {
+          pl <- ggplot(transform(pc.df[vis_sample,],.derived="", .derived.value=""),
+                      modifyList(this_aes, aes(x=PC1, y=PC2))) +
+            geom_point_interactive(size = 5, shape = 21) +
+            facet_wrapper(mapping, this_aes) +
+            xlab(paste0("PC ", plot_config$extra$pc_x, ": ", my_percent[plot_config$extra$pc_x], "% variance")) +
+            ylab(paste0("PC ", plot_config$extra$pc_y, ": ", my_percent[plot_config$extra$pc_y], "% variance"))
+          do_labels <- nrow(colDF(dataset$object)) < 10
+          if (do_labels) {
+            pl <- pl + geom_text_repel(aes(label = sample))
+          }
+          pl <- pl + get_colour_scales(dataset$object, this_aes, all.vars(plot_config$extra$flag))
+          cat("\n\n")
+          if (identical(this_aes,aes_list[[1]])) {
+            this_caption <- orig_caption
+          } else {
+            tmp <- plot_aes
+            tmp$colour <- tmp$x
+            this_caption <- aes_caption(tmp)
+          }
+          do_plot(pl,
+                  label= "twopc",
+                  caption=paste("Annotated by", this_caption, "in", dtag(dataset_id), metadata(plot_se)$removed),
+                  plot_meta=section_hierarchy)
+          cat("\n\n")
+        } # Repeat if need to annotate by an overwritten 'x'
+      ##
+      ## Profile plots
+        cat("\n\n", strrep("#", length(section_hierarchy)+1), " Profile\n\n", sep="")
+        y_hint <- plot_aes$y
+        if (!is.null(y_hint)) {
+          which_assay <- as.character(as.character(y_hint))
+          y_hint <- model$extra_assays[[which_assay]]$hint %||% which_assay
+        }
+#        dmc_heading(ddsList, section_hierarchy, depth=strrep("#", length(section_hierarchy)+1), numbered=FALSE)
+        mapping <- modify_mapping(plot_config, aes(y=.derived.value))
+        colour_aes <- transform_colour_min(mapping)
+        pl <- ggplot(centroid_df[[plot_id]], mapping) +
+          facet_wrapper(mapping, default=aes(facets = .derived), scales="free_y") +
+          theme_bw() +
+          geom_point_interactive(aes(y= .derived.value), size = 3, shape = 21) +
+          labs(y=paste(c(noun_to_readout(RowNoun), y_hint), collapse=" "))
+        pls <- pl + my_alpha_scale(pl)
+        if ("group" %in% names(mapping)) {
+          pl <- pl+geom_line(colour_aes, stat="summary", fun=mean)
+        }
+        if ("ScaleDiscrete" %in% class(layer_scales(pl)$x)) {
+          pl <- pl + scale_x_discrete(guide=guide_axis(n.dodge=2))
+        }
+        pl <- pl + get_colour_scales(dataset$object, mapping, all.vars(plot_config$extra$flag))
+        do_plot(pl,
+                label= "diffClustProfile",
+                caption=paste0("Cluster profile for ", attr(centroid_df[[plot_id]], "caption")),
+                plot_meta=section_hierarchy
+                )
+        cat('\n\n---\n\n')
+        cat(':::\n\n')
+      }
+    }
+  }
+}
+
+
+```
+
+
+# Downloads
+
+
+```{r}
+#| label: downloads
+
+link2sub <- list(
+  results="Differential results",
+  clusters="Cluster assignments"
+)
+
+dfs <- data.frame()
+for (i in names(link2sub)) {
+  cat("\n\n##", link2sub[[i]], "\n")
+  for (j in links[[i]]) {
+    cat("\n", j$link, "\n", sep="")
+    dfs <- dplyr::bind_rows(dfs, as.data.frame(
+      modifyList(
+        list(
+          file=j$fname,
+          section=params$section,
+          data_source=params$data_source,
+          plan=params$spec,
+          type=i
+          ),
+        modifyList(list(dataset=NA, model=NA, plot_config=NA, assay=NA), j$hierarchy))
+    ))
+  }
+}
+
+fname <- p2filename(params, prefix="manifest", suffix="txt")
+write.table(dfs, file=fname, row.names=FALSE, quote=FALSE, sep="\t")
+cat("\n<a class=\"download-excel btn btn-primary\" href=\"", attr(fname, "link"), "\">Manifest of all downloadable files</a>\n", sep="")
+
+
+```
+
+
+# Terms Of Use
+
+The Crick has a [publication
+policy](https://intranet.crick.ac.uk/our-crick/library-information-services/pages/guidelines-publication)
+and we expect to be included on publications, regardless of funding
+arrangements. Any use of these results in publication must be
+discussed with BABS regarding authorship. If not authorship then
+the BABS analyst must receive a named acknowledgement. Please also
+cite the following sources which have enabled the analysis to be
+carried out.
+
+# References
+
+::: {#refs}
+:::
+

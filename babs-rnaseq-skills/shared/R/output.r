@@ -1,0 +1,563 @@
+#' @export
+p2filename <- function(p, prefix, suffix) {
+  prefix <- gsub(" ", "-", prefix)
+  section <- basename(file.path(tools::file_path_sans_ext(p$script)))
+  fname <- file.path(p$res_dir, section,  sprintf("%s%s.%s", prefix, p$GIT_REF, suffix))
+  attr(fname, "link") <- file.path(section, sprintf("%s%s.%s", prefix, p$GIT_REF, suffix))
+  fname
+}
+
+#' Text file of assay data
+#'
+#' Write all sample data, with the colData as a header
+#' @title Text file of assay data
+#' @param ddsList A list of [DESeq2::DESeqDataSet-class()] objects 
+#' @param assay The assay to be output (or 'norm' for normalised counts)
+#' @param path Where to put the text files
+#' @param suffix Additional identifier information for the filename
+#' @param formula The model that will be used to estimate the normalisation offsets
+#' @param terms_to_remove The 'Terms' estimated from the above model that will be removed (subtracted) from values of the assay.
+#' @return A list of file paths to the excel files
+#' @author Gavin Kelly
+#' @export
+write_assay <- function(ddsList, aname="vst", params) {
+  out <- list()
+  for (i in names(ddsList$sample_sets)) {
+    obj <- ddsList$sample_sets[[i]]$object
+    x <- assayPlus(obj, aname)
+    if (is.null(x)) {
+      next
+    }
+    content_frame <- cbind(mcols(obj),x)
+    head_frame <- as.data.frame(colData(obj))
+    head_frame[] <- sapply(head_frame, as.character)
+    spacer_frame <- as.data.frame(mcols(obj))[rep(1, ncol(head_frame)),]
+    spacer_frame[] <- ""
+    row.names(spacer_frame) <- colnames(head_frame)
+    fname <- p2filename(params, paste0(aname, "_", i), "tsv")
+    out <- c(out,
+            list(list(
+              link=paste0("<a class=\"download-excel btn btn-primary\" href=\"", attr(fname, "link"), "\">Assay ", aname, " of ", i, "</a>"),
+              fname=fname,
+              params=params,
+              hierarchy=list(dataset=i, assay=aname)
+            )
+            ))
+    dir.create(dirname(fname), recursive=TRUE)
+    write.table(cbind(spacer_frame, t(head_frame)), file=fname, quote=FALSE, sep="\t", col.names=FALSE)
+    write.table(content_frame, file=fname,
+                quote=FALSE, sep="\t", append=TRUE, col.names=NA)
+  }
+  out
+}
+
+write_proj <- function(proj, params, hierarchy, prefix="PC") {
+  fname <- p2filename(params,
+                     paste(
+                       prefix,
+                       hierarchy$dataset, hierarchy$model, hierarchy$plot_config,
+                       sep="_"),
+                     "tsv")
+  dir.create(dirname(fname), recursive=TRUE)
+  write.table(as.data.frame(proj), file=fname, quote=FALSE, sep="\t", col.names=NA)
+  list(
+    link=paste0("<a class=\"download-excel btn btn-primary\" href=\"", attr(fname, "link"), "\">PC ", hierarchy$plot_config, " modeled as ", hierarchy$model, " in ", hierarchy$dataset, "</a>", sep=""),
+    fname=fname,
+    params=params,
+    hierarchy=hierarchy)
+}
+
+#' @export
+write_clusters <- function(clusters, description, mcols, params, hierarchy, prefix="clusters") {
+  df <- data.frame(Cluster=as.character(clusters), Feature=names(clusters))
+  meta <- as.data.frame(mcols)
+  df <- merge(meta, df,  by.x=0, by.y="Feature")
+  df$Row.names <- NULL
+  fname <- p2filename(params,
+                     paste(
+                       prefix,
+                       hierarchy$dataset, hierarchy$model, hierarchy$plot_config,
+                       sep="_"),
+                     "tsv")
+  dir.create(dirname(fname), recursive=TRUE)
+  write.table(df, file=fname, quote=FALSE, sep="\t", col.names=NA)
+  list(
+    link=paste0("<a class=\"download-excel btn btn-primary\" href=\"", attr(fname, "link"), "\">Clusters ", hierarchy$plot_config, " modeled as ", hierarchy$model, " in ", hierarchy$dataset, "</a>", description, sep=""),
+    fname=fname,
+    params=params,
+    hierarchy=hierarchy)
+}
+
+summarise_results <- function(obj, inds) {
+  res <- get_nest(obj, inds)$results
+  out <- as.data.frame(table(
+    Group=sub("\\*$","",res$class),
+    Significant=factor(ifelse(grepl("\\*$",res$class), "Significant", "not"), levels=c("Significant","not"))
+  )) %>%
+    tidyr::spread(Significant, Freq) %>%
+    dplyr::mutate(Total=not+Significant) %>%
+    dplyr::select(-not) %>%
+    dplyr::arrange(desc(Significant/Total))
+  meta <- list(
+    dataset = obj$sample_sets[[inds[[1]]]]$name,
+    model = obj$sample_sets[[inds[[1]]]]$models[[inds[[2]]]]$name,
+    comparison = obj$sample_sets[[inds[[1]]]]$models[[inds[[2]]]]$comparisons[[inds[[3]]]]$name
+  )
+  obj$sample_sets[[inds[[1]]]]$models[[inds[[2]]]]$comparisons[[inds[[3]]]]$summary <- modifyList(out, meta)
+  obj
+}    
+
+pval_df <- function(obj, inds) {
+  res <- get_nest(obj, inds)$results
+  res$dataset <- obj$sample_sets[[inds[[1]]]]$name
+  res$model <- obj$sample_sets[[inds[[1]]]]$models[[inds[[2]]]]$name
+  res$comparison <- obj$sample_sets[[inds[[1]]]]$models[[inds[[2]]]]$comparisons[[inds[[3]]]]$name
+  obj$sample_sets[[inds[[1]]]]$models[[inds[[2]]]]$comparisons[[inds[[3]]]] <- res
+  obj
+}    
+
+#' Xlsx reporting of results
+#'
+#' Store all the differential gene-lists and supporting materials
+#' in a multi-worksheet spreadsheet
+#' @title XLSX report of results
+#' @param ddsList A depth-3 list of [DESeq2::DESeqDataSet-class()] objects containing results in the mcols slot
+#' @param param The parameter object used to generate the results
+#' @param dir Directory to store the results in
+#' @return A list of file paths to the excel files
+#' @author Gavin Kelly
+#' @export
+write_results <- function(dmc, params, assays=NULL) {
+  si <- session_info()
+  crick_colours <-list(
+    primary=list(red="#e3001a",yellow="#ffe608",blue="#4066aa",green="#7ab51d",purple="#bb90bd"),
+    secondary=list(pink="#fadbd9", yellow="#fff6a7", green="#adcf82", orange="#ffe7ab", blue="#bee2e6"),
+    spare=list(blue="#95ceed"))
+  hs1 <- createStyle(fgFill = crick_colours$secondary$orange, textDecoration = "italic",
+                    border = "Bottom")
+  hs2 <- createStyle(fgFill = crick_colours$secondary$blue, textDecoration = "italic",
+                    border = "Bottom")
+
+  summaries <- nested_modify(dmc, summarise_results)
+  summaries <- Reduce(rbind, flatten_nest(summaries, function(x) x$summary))
+  
+  out <- lapply(dmc$sample_sets, function(x) list())
+  for (dataset_id in names(dmc$sample_sets)) {
+    dataset <- dmc$sample_sets[[dataset_id]]
+    wb <- openxlsx::createWorkbook(title="Differential Analysis",
+                                  creator="BABS")
+    sn <- "Parameters"
+    addWorksheet(wb, sn)
+    writeData(wb, sn,
+              data.frame(
+                id=names(ddsList$settings),
+                description=sapply(ddsList$settings, function(x) if (is.null(x)) "Null" else attr(x, "src")), rowNames=FALSE, colNames=TRUE)
+              )
+    ## Design
+    sn <- "Design"
+    addWorksheet(wb, sn)
+    writeData(wb, sn, as.data.frame(colData(dataset$object)), headerStyle=hs2)
+    sn <- "Class Sizes"
+    addWorksheet(wb, sn)
+    writeData(wb, sn, subset(summaries, dataset==dataset_id), headerStyle=hs2)
+    ## Differential gene-lists
+    comparison_name_lookup <- list()
+    addWorksheet(wb, "Comparison Key")
+    models <- dataset$models
+    for (model_id in names(models)) {
+      model <- models[[model_id]]
+      model_name <- model$name %||% model_id
+      comparisons <- model$comparisons
+      for (comparison_id in names(comparisons)) {
+        comparison <- comparisons[[comparison_id]]
+        comparison_name <- comparison$name %||% comparison_id
+        mc <- mcols(get_nest(dmc, list(dataset_id, 1))$object)
+        ind <- sapply(mc, function(x) is.null(dim(x)))
+        dframe <- as.data.frame(comparison$results)
+        for (assay_name in assays) {
+          this_assay <- assayPlus(get_nest(dmc, list(dataset_id, model_id, comparison_id)), assay_name)
+          if (is.null(this_assay)) {
+            warning(assay_name, " not an assay, so not added to output")
+            next
+          }
+          if (length(assays)>1) {
+            names(this_assay) <- paste(this_assay, names(this_assay), sep="_")
+          }
+          dframe <- cbind(dframe, this_assay)
+        }
+        dframe <- dframe %>%
+          tibble::rownames_to_column("id") %>%
+          dplyr::arrange(desc(abs(shrunkLFC))) %>%
+          dplyr::select(-padj)
+        if (length(dataset$models)==1) {
+          sn <- comparison_name
+          if (nchar(sn) > 31) {sn <- comparison_id; comparison_name_lookup[[sn]] <- comparison_name}
+        } else {
+          o <- sn <- paste0(comparison_name, ",", model_name)
+          if (nchar(sn) > 31) {
+            sn <- paste0(comparison_name, ",", model_id);
+            if (nchar(sn) > 31) sn <- paste0(comparison_id, ",", model_id)
+            comparison_name_lookup[[sn]] <- o
+          }
+        }
+        if (nchar(sn)>31) {
+          comparison_name_lookup[[sn]] <- NULL
+          alpha_key <- to_letter(length(comparison_name_lookup)+1)
+          comparison_name_lookup[[alpha_key]] <- sn
+          sn <- alpha_key
+        }
+        col_ind <- ((match(model_id, names(models)) - 1) %% length(crick_colours$secondary)) + 1
+        addWorksheet(wb, sn, tabColour=crick_colours$secondary[[col_ind]])
+        writeData(wb, sn, dframe, headerStyle=hs1, withFilter=TRUE)
+        groupRows(wb, sn, rows=which(!grepl("\\*$", dframe$class))+1, hidden=TRUE)
+        filtCol <- match("class", names(dframe))
+        if (!is.na(filtCol)) {
+          filt_string <- sprintf(
+            '><filterColumn colId="%s"><customFilters><customFilter val="*~*"/></customFilters></filterColumn></autoFilter>',
+            filtCol-1
+          )
+          sheet_n <- match(sn, names(wb))
+          wb$worksheets[[sheet_n]]$autoFilter <- sub("/>$", filt_string, wb$worksheets[[sheet_n]]$autoFilter)
+        }
+      }
+    }
+    if (length(comparison_name_lookup)==0) {
+      removeWorksheet(wb, "Comparison Key")
+    } else {
+      writeData(wb, "Comparison Key", data.frame(Key=names(comparison_name_lookup),
+                                                 Comparison=unlist(comparison_name_lookup)
+                                                 )
+                )
+    }
+    ## sn <- "GO terms"
+    ## addWorksheet(wb, sn)
+    ## writeData(wb, sn, go_df, headerStyle=hs1)
+    sn <- "R Packages"
+    addWorksheet(wb, sn)
+    writeData(wb, sn, as.data.frame(si$packages), headerStyle=hs2)
+    sn <- "R Details"
+    addWorksheet(wb, sn)
+    writeData(wb, sn, data.frame(setting = names(si$platform),
+                                 value = unlist(si$platform),
+                                 stringsAsFactors = FALSE),
+              headerStyle=hs2)
+    fname <- p2filename(params, prefix=paste0("differential_", dataset_id), suffix="xlsx")
+    out[[dataset_id]] <- list(
+      fname=fname,
+      link=paste0("<a class=\"download-excel btn btn-primary\" href=\"", attr(fname, "link"), "\">Differential results for ", dataset_id, "</a>"),
+      params=params,
+      hierarchy=list()
+    )
+    dir.create(dirname(fname), recursive=TRUE)
+    (saveWorkbook(wb, fname, overwrite=TRUE))
+  }
+  out
+}
+
+
+#' @export
+to_letter <- function(i, alphabet = LETTERS, so_far = "") {
+  base <- length(alphabet)
+  if (i < base + 1)
+    paste0(alphabet[i], so_far)
+  else
+    to_letter((i - 1) %/% base, alphabet, paste0(alphabet[((i - 1) %% base) + 1], so_far))
+}
+
+
+
+#' Generate text files require for Biologic
+#'
+#' The visualisation part of 'Biologic' requires a set of text files
+#' which represent the differential results and the models and
+#' contrasts that were used to derive the results.  This function
+#' generates them from a previous run of the pipeline.
+#' 
+#' @title Export Biologic files
+#' @param result_object Path to the rds of the  result object
+#' @param path Where to write the files for Biologic to read
+#' @return nothing
+#' @author Gavin Kelly
+#' @export
+export_biologic <- function(result_object, path) {
+  obj <- readRDS(result_object)
+  comparison_table <- list()
+  definition_table <- list()
+  models_list <- list()
+  coldata_list <- list()
+  rsem_raw <- NULL
+  rsem_norm <- NULL
+  for (subset_name in names(obj)) {
+    this_subset <- obj[[subset_name]]
+    first_dds <- this_subset[[1]][[1]]
+    coldata_list <- c(coldata_list, list(as.data.frame(colData(first_dds))))
+    this_raw_counts <- counts(first_dds, norm=FALSE)
+    this_norm_counts <- counts(first_dds, norm=TRUE)
+    novel_samples <- setdiff(colnames(this_raw_counts), colnames(rsem_raw))
+    if (length(novel_samples)!=0) {
+      rsem_raw <- cbind(rsem_raw, this_raw_counts[, novel_samples])
+      rsem_norm <- cbind(rsem_norm, this_norm_counts[, novel_samples])
+    }
+    for (model_name in names(this_subset)) {
+      this_model <- this_subset[[model_name]]
+      for (comparison_name in names(obj[[subset_name]][[model_name]])) {
+        dds <- this_model[[comparison_name]]
+        ## Results file
+        results_frame <- as.data.frame(mcols(dds)$results)
+        write.table(results_frame,
+#                    file=file.path(path, paste0(name_sanitizer(paste(subset_name, model_name, comparison_name, sep="_")), ".txt")),
+                    file=file.path(path, paste0(name_sanitizer(paste(comparison_name, sep="_")), ".txt")),
+                    sep="\t", col.names=NA
+                    )
+        ## Model file
+        is_lrt <- rlang::is_formula(metadata(dds)$models$comparisons[[1]])
+        comparison_row <- data.frame(
+          comparison=name_sanitizer(metadata(dds)$dmc$comparison),
+          test=ifelse(is_lrt, "LRT", "Wald"),
+          type=ifelse(is_lrt, "LRT", "DGE"),
+          model=capture.output(dput(metadata(dds)$model$design)),
+          reducedModel=ifelse(is_lrt, capture.output(dput(metadata(dds)$model$comparisons[[1]])), "")
+        )
+        comparison_table <- c(comparison_table, list(comparison_row))
+        ## Definition file
+        models_list <- c(models_list,list(metadata(dds)$model$lm$model[,-1,drop=FALSE]))
+      }
+    }
+  }
+
+  #  colnames(rsem_raw) <- coldata_frame(
+  write.table(rsem_raw,
+              file=file.path(path, "rsem_raw.txt"),
+              sep="\t", row.names=TRUE, col.names=NA
+              )
+
+  write.table(rsem_norm,
+              file=file.path(path, "rsem_norm.txt"),
+              sep="\t", row.names=TRUE, col.names=NA
+              )
+  
+  comparison_frame <- do.call(rbind, comparison_table)
+  write.table(comparison_frame,
+              file=file.path(path, "design.model.file.txt"),
+              sep="\t", row.names=FALSE
+              )
+  
+  sample_id_list <- lapply(coldata_list, function(df) data.frame(sampleID=df[[1]], sample.id=row.names(df)))
+  definition_frame <- do.call(cbind, sample_id_list[!duplicated(sample_id_list)])
+  coldata_frame <- do.call(cbind, coldata_list[!duplicated(coldata_list)])
+  n_unique <- sapply(coldata_frame, function(x) length(unique(x)))
+  interesting <- (n_unique!=1 & n_unique!=nrow(coldata_frame)) | sapply(coldata_frame, is.numeric)
+  definition_frame <- cbind(data.frame(sample.groups= do.call(paste, coldata_frame[,interesting,drop=FALSE])),
+                           definition_frame)
+  comparisons_for_def <- as.data.frame(matrix("", nrow=nrow(definition_frame), ncol=nrow(comparison_frame),
+                                             dimnames=list(row.names(definition_frame), name_sanitizer(comparison_frame$comparison))
+                                             ))
+  definition_frame <- cbind(definition_frame, comparisons_for_def)
+  write.table(definition_frame,
+              file=file.path(path, "design.dge.lrt.definition.file.txt"),
+              sep="\t", row.names=FALSE
+              )
+
+}
+
+#' @export
+name_sanitizer <- function(str) {  gsub("[^a-zA-Z0-9\\._]", "_", str) }
+
+#' @export
+table_tracker <- function(p) {
+  get_tally <- counter() # keeps track of individual labels and running tally of all tables
+  function(tbl, label, caption) {
+    if (isTRUE(getOption('knitr.in.progress'))) {
+      label <- paste0(gsub("[^[:alnum:]]+", "-", label), "-", get_tally(label))
+      fname <- p2filename(p, sprintf("tbl-%0.3i-%s", get_tally(), label), "csv")
+      tbl_child <- knitr::knit_expand(
+        text=r"(```{r}
+#| label: tbl-{{lbl}}
+#| output: asis
+dir.create(dirname(file.path("{{fname}}")), recursive=TRUE)
+write.csv(as.data.frame(tbl), file=file.path("{{fname}}"),col.names = NA)
+cat('\n\n::: {.column-margin}\n',fontawesome::fa('file-csv'),'[{{caption}}]({{link}})\n:::\n\n')
+tbl
+```)",
+lbl=label,
+caption=caption,
+resdir=path,
+link=attr(fname,"link"),
+fname=fname
+)
+      cat(knitr::knit_child(
+        text=tbl_child,
+        quiet=TRUE,
+        options=list(tbl.cap=caption),
+        envir=environment()),
+        sep='\n'
+        )
+    } else {
+      head(as.data.frame(tbl))
+    }
+  }
+}
+#| tbl-cap: "{{caption}}"
+
+
+#' Generate captioned table
+#'
+#' quarto-compatible plot wrapper
+#'
+#' Either produce a child chunk (labelled so that it can be cross-references),
+#' or print the table, depending on whether the document is being
+#' rendered or run interactively.
+#' @param tbl A gt object
+#' @param label The candidate chunk label, which will get sanitised
+#' @param caption The caption text
+#' @param cap_fn The function that will be called on the caption text
+#' @return 
+#' @author Gavin Kelly
+## do_tbl <- function(tbl, label, caption, path) {
+##   if (isTRUE(getOption('knitr.in.progress'))) {
+##     tbl_child <- knitr::knit_expand(
+##       text=r"(```{r}
+## #| label: tbl-{{lbl}}
+## #| tbl-cap: {{caption}}
+## #| output: asis
+
+## fname <-  knitr::fig_path(".csv")
+## dir.create(dirname(file.path(path, fname)), showWarning=FALSE, recursive=TRUE)
+## write.csv(as.data.frame(tbl), file=file.path(path,fname), col.names = NA)
+## cat('\n\n::: {.column-margin}\n',fontawesome::fa('file-csv'),'[{{caption}}](', fname, ')\n:::\n\n')
+## tbl
+## ```)",
+##       lbl=gsub("[^[:alnum:]]+", "-",label)
+## )
+##     cat(knitr::knit_child(
+##       text=tbl_child,
+##       quiet=TRUE,
+##       envir=environment()),
+##       sep='\n'
+##       )
+##   } else {
+##     head(as.data.frame(tbl))
+##   }
+## }
+
+
+
+
+
+
+#' @export
+sample_X_dataset_table <- function(dds, obj) {
+  samp <- as.data.frame(colData(dds))
+  ddsList <- flatten_nest(obj, function(leaf) leaf$object, layers="sample_sets")
+  # Extra columns introduced by datasets
+  extra_meta <- lapply(
+    setNames(names(ddsList), names(ddsList)),
+    function(x) {
+      newcols <- as.data.frame(colData(ddsList[[x]])[, setdiff(names(colData(ddsList[[x]])),  c(names(samp), ".influential", ".involved", ".influential_in_assay")),drop=FALSE])
+      newcols[[paste0(x, "+")]] <- ifelse(ddsList[[x]]$.influential, "✓", "")
+      m <- merge(
+        setNames(data.frame(ifelse(colnames(dds) %in% colnames(ddsList[[x]]), "✓", ""), row.names=row.names(samp)), x),
+        newcols,
+        by=0, all.x=TRUE
+      )
+      transform(m, row.names=Row.names, Row.names=NULL)[row.names(samp),,drop=FALSE]
+    }
+  )
+
+  extra_meta <- extra_meta[sapply(extra_meta, function(x) ncol(x)!=0 & nrow(x)!=0)]
+  # Generate tab_spanner parameters for each datasets extra columns
+  ts_extra <- lapply(names(extra_meta),
+                    function(x) list(name=x,
+                              id=paste0("ID",match(x,names(extra_meta))),
+                              cols=1:ncol(extra_meta[[x]]))
+                    )
+  # Cummulatively offset the columns to be spanned
+  ts_extra <- Reduce(function(ts, x) {
+    x$cols <- x$cols+max(ts$cols)
+    x},
+    ts_extra,
+    accumulate=TRUE)
+  df <- cbind(samp, do.call(cbind, unname(extra_meta)))
+  cl <- names(df)
+  names(df) <- paste0("X", seq_along(cl))
+  gt(data=df) %>%
+    cols_label(.list=setNames(as.list(cl), names(df))) %>%
+    tab_spanner(label="Metadata",
+                columns=seq_along(samp)) %>%
+    Reduce(f=function(gti, x) tab_spanner(gti, label=x$name,id=x$id,columns=x$cols + ncol(samp)), x=ts_extra, init=.) %>%
+    opt_interactive(page_size_default=25)
+}
+
+#' @export
+src2bullets <- function(meta, fields, model=NULL) {
+  field_titles <- list(
+    subset = "Samples for inclusion in any analysis",
+    influential_samples = "Samples used, out of those already selected for inclusion, to actively inform analysis (differential, heatmap's top genes, principal components)",
+    normalise = "Method for normalising data",
+    impute = "Method for imputing missing values",
+    filterFeatures = "Criteria for keeping features in any analysis",
+    filterQC = "Criteria for keeping features in the exploratory analysis",
+    extra_assays = "Additional generated data matrices"
+  )
+  field_src_substitutes <- list(
+    subset = "All samples",
+    influential_samples = "All included samples",
+    filterFeatures = "No exclusions made",
+    filterQC = "No exclusions beyond the general criterion",
+    extra_assays = "None"
+  )
+  field_src_fns <- list(
+    subset = sum,
+    influential_samples = sum
+  )
+  for (field in intersect(fields, names(meta))) {
+    src <- attr(meta[[field]], "src")
+    agg <- if (field %in% names(field_src_fns)) paste0(" (", field_src_fns[[field]](meta[[field]]), ")") else ""
+    if (!is.null(src)) {
+      cat(paste0(" - ", field_titles[[field]] %||% field, ": ", paste(src, collapse="; "), agg, "\n"))
+    } else if (field %in% names(field_src_substitutes)) {
+      cat(paste0(" - ", field_titles[[field]] %||% field, ": ", field_src_substitutes[[field]], agg, "\n"))
+    }
+  }
+}
+
+    
+#' @export
+assayPlus <- function(dds, i) {
+  if (is.numeric(i) || i %in% assayNames(dds)) {
+    out <- assay(dds, i)
+  } else  if (i=="norm") {
+    if (inherits(dds, "DESeqDataSet")) {
+      out <- counts(dds, norm=TRUE)
+    } else {
+      out <- NULL
+    }
+  } else if (i=="missing") {
+    out <- is.na(assay(dds))
+  } else {
+    out <- NULL
+  }
+  out
+}
+
+save_expected <- function(se, params, hierarchy){
+  which_assay <- assayNames(se)
+  ind <- metadata(se)$ind
+  head_frame <- colDF(se)[ind, , drop=FALSE]
+  head_frame[] <- sapply(head_frame, as.character)
+  fname <- p2filename(params,
+                     paste(
+                       "expected",
+                       which_assay, hierarchy$dataset, hierarchy$model,
+                       sep="_"),
+                     "tsv")
+  dir.create(dirname(fname), recursive=TRUE)
+  write.table(t(head_frame), file=fname, quote=FALSE, sep="\t", col.names=FALSE)
+  write.table(assay(se)[,ind], file=fname,
+              quote=FALSE, sep="\t", append=TRUE, col.names=FALSE)
+  list(
+    link=paste0("<a class=\"download-excel btn btn-primary\" href=\"", attr(fname, "link"), "\">Expected ", which_assay, " modeled as ", hierarchy$model, " in ", hierarchy$dataset, "</a>", sep=""),
+    fname=fname,
+    params=params,
+    hierarchy=hierarchy)
+}

@@ -1,0 +1,805 @@
+#' @export
+sym_colour <- function(dat, lo="blue",zero="white", hi="red", mx=NULL) {
+  if (is.null(mx)) {
+    mx <- quantile(abs(dat), 0.9, na.rm=TRUE)
+  }
+  lowest <- min(dat, na.rm=TRUE)
+  highest <- max(dat, na.rm=TRUE)
+  if (lowest < 0 && highest > 0) {
+    circlize::colorRamp2(c(-mx, 0, mx), colors=c(lo, zero, hi))
+  } else if (lowest < 0) {
+    circlize::colorRamp2(c(-mx, 0), colors=c(lo, zero))
+  } else {
+    circlize::colorRamp2(c(0, mx), colors=c(zero, hi))
+  }    
+}
+
+
+#' @export
+rename_with_tag <- function(params) {
+  function(path, options) {
+    path2 <- file.path(dirname(path), gsub("([0-9]+)-fig-(.*)-1\\.(.*)", paste0("fig-\\1-\\2", params$GIT_REF, ".\\3"), basename(path)))
+    file.rename(path, path2)
+    path2
+  }
+}
+
+#' Generate captioned plot
+#'
+#' quarto-compatible plot wrapper
+#'
+#' Either produce a child chunk (labelled so that it can be cross-references),
+#' or open the default graphics device, depending on whether the document is being
+#' rendered or run interactively.
+#' @param pl A plot object, from ggplot, plot or ComplexHeatmap
+#' @param label The candidate chunk label, which will get sanitised
+#' @param caption The caption text
+#' @param cap_fn The function that will be called on the caption text
+#' @return 
+#' @author Gavin Kelly
+#' @export
+plot_tracker <- function(my_params) {
+  script <- tools::file_path_sans_ext(basename(my_params$script))
+  plot_list <- list()
+  get_tally <- counter() # keeps track of individual labels and running tally of all plots
+  function(pl, label, caption, height_opt="", preview=FALSE, plot_meta=list(), interactive=TRUE, dpi=NULL) {
+    if (nargs()==0) {
+      return(plot_list)
+    }
+    fig_n <- get_tally()
+    label_n <- get_tally(label)
+    chunk_label <- paste0(gsub("[^[:alnum:]]+", "-", label), "-", label_n)
+    chunk_caption <- paste0("[", caption, "](", script, "/","fig-", sprintf("%0.3i",fig_n), "-", chunk_label, my_params$GIT_REF, ".pdf", ")")
+    chunk_caption <- paste0(
+      caption,
+      " [png](", script, "/","fig-", sprintf("%0.3i",fig_n), "-", chunk_label, my_params$GIT_REF, ".png", ")",
+      " [pdf](", script, "/","fig-", sprintf("%0.3i",fig_n), "-", chunk_label, my_params$GIT_REF, ".pdf", ")"
+    )
+    has_interactivity <- interactive &&  inherits(pl, "ggplot") &&
+      any(
+        sapply(pl$layers, function(layer) {
+          any(grepl("^geomInteractive", class(layer$geom), ignore.case = TRUE)) ||
+            any(c("tooltip", "data_id", "onclick") %in% names(layer$mapping))
+        })
+      )
+    if (inherits(pl, "Heatmap") || inherits(pl, "HeatmapList")) {
+      fn <- function() {
+        draw(pl, heatmap_legend_side = "bottom")
+      }
+    }  else if (has_interactivity) {
+      fn <- function() {print(rasterize_points(pl, dpi=dpi))}
+      fn_widget <- function() {
+        g <- girafe(ggobj=pl,
+                   width_svg = 14,
+                   height_svg = 10,
+                   options = list(
+                     opts_hover_inv(css = "opacity:0.2;"),
+                     opts_hover(css = "stroke-width:2;"),
+                     opts_tooltip(use_fill = TRUE),
+                     opts_sizing(rescale = TRUE)
+                   )
+                   )
+        knitr::knit_print(g)
+      }
+    } else if (inherits(pl, "gtable")){
+      fn <- function() {
+        grid.draw(pl)
+      }
+    } else {
+      fn <- function() {
+        print(pl)
+      }
+    }      
+    if (isTRUE(getOption('knitr.in.progress'))) {
+      this_plot_meta <- modifyList(
+        plot_meta,
+        list(
+          png=file.path(script, paste0("fig-", sprintf("%0.3i",fig_n), "-", chunk_label, my_params$GIT_REF, ".png")),
+          label=label,
+          ind=label_n
+        )
+      )
+      plot_list <<- c(plot_list, list(this_plot_meta))     
+      widget_chunk <- knitr::knit_expand(
+        text=c('```{r}',
+               '#| label: widget-{{chunk_label}}',
+               'fn_widget()',
+               '```')
+      )
+      fig_chunk <- knitr::knit_expand(
+        text=c("```{r}",
+               '#| label: fig-{{chunk_label}}',
+               '#| fig-path: "{{script}}/{{fprefix}}-"',
+               height_opt,
+               'fn()',
+               '```'),
+        fprefix=sprintf("%0.3i",fig_n)
+      )
+      widget_chunk <- knitr::knit_expand(
+        text=c('```{r}',
+               '#| label: widget-{{chunk_label}}',
+               'fn_widget()',
+               '```')
+      )
+      out <- knitr::knit_child(
+        options=if (has_interactivity) list(fig.cap=chunk_caption, out.extra='data-interactive="true"') else  list(fig.cap=chunk_caption),
+        text=fig_chunk,
+        quiet=TRUE,
+        envir=environment())
+      if (preview) {
+        cat(sub("(.*)(}.*)", "\\1 .preview-image\\2", out))
+      } else {
+        if (has_interactivity) {
+          widget_out <- knitr::knit_child(
+            text=widget_chunk,
+            quiet=TRUE,
+            envir=environment())
+          cat(widget_out, "\n\n", out)
+        } else {
+          cat(out)
+        }
+      }
+    } else {
+      fn()
+    }
+  }
+}
+
+
+rasterize_points <- function(p, dpi = 150) {
+  if (is_null(dpi)) return(p)
+  p2 <- p
+  # Find point layers that are NOT interactive
+  point_layers <- which(sapply(
+    p2$layers, 
+    function(l) inherits(l$geom, "GeomPoint") &&
+           !inherits(l$geom, "GeomInteractive")
+  ))
+  for (i in point_layers) {
+    p2$layers[[i]] <- ggrastr::rasterise(
+      p2$layers[[i]],
+      dpi  = dpi
+    )
+  }  
+  p2
+}
+
+
+
+#' @export
+separate_legend <- function(dds, vars) {
+  lapply(
+    intersect(vars, names(metadata(colData(dds))$palette$Heatmap)),
+    function(md_name) {
+      md <- metadata(colData(dds))$palette$Heatmap[[md_name]]
+      title <- metadata(colData(dds))$varlabels[[md_name]]
+      if (is.function(md)) {
+        Legend(col_fun=md, title= title)@grob
+      } else{
+        labels <- metadata(colData(dds))$labels[[md_name]]
+        labels <- labels[match(names(md), names(labels))]
+        Legend(legend_gp=gpar(fill=md),labels=labels,
+               title=title, nrow=ifelse(length(md)>8, ceiling(sqrt(length(md))), length(md)))@grob
+      }
+    }
+  )
+}
+
+#' @export
+substitute_x_aes <- function(mapping, colour_as_fill) {
+  # x aesthetic about to be used to represent e.g. PC1 so may need to
+  # remap what was being represented by x to another
+  # aesthetic. Supplement with x swapped to colour if necessary
+  need_alt_x <- !(
+    all(all.vars(mapping$x) %in% all.vars(mapping$colour)) ||
+      all(all.vars(mapping$x) %in% all.vars(mapping$color)) ||
+      all(all.vars(mapping$x) %in% all.vars(mapping$shape))
+  )
+  out <- list(orig=mapping)
+  if (need_alt_x) {
+    mapping$colour <- mapping$x
+    if (colour_as_fill) mapping$fill <- mapping$x
+    out$x2colour <- mapping
+  }
+  out
+}
+
+#' @export
+aes_caption <- function(ae) {
+  ae <- ae[intersect(c("colour","shape", "fill"), names(ae))]
+  if (length(ae)>0) {
+    paste0(names(ae), "\\", as.character(ae), collapse=",")
+  } else {
+    "nothing"
+  }
+}
+
+
+#' @export
+cluster_calc <- function(mat, clusterID) {
+  if (nlevels(clusterID)==1) {
+    setNames(data.frame(colMeans(mat)), levels(clusterID))
+  } else {
+    centres <- apply(mat, 2, function(samp) tapply(samp, clusterID, mean))
+    as.data.frame(t(centres))
+  }
+}
+
+#' @export
+cluster_cardinality <- function(clusterID, prefix="") {
+  tbl <- table(clusterID)
+  ordered_clusters <- names(sort(tbl, decreasing = TRUE))
+  new_labels <- paste0("|", prefix, seq_along(ordered_clusters), "| = ", tbl[ordered_clusters])
+  singleton <- tbl[ordered_clusters]==1
+  new_labels[singleton] <- names(tbl[ordered_clusters])[singleton]
+  factor(clusterID, levels = ordered_clusters, labels = new_labels)
+}
+
+#' @export
+my_alpha_scale <- function(pl, decay=0.3) {
+  mapping <- pl$mapping$alpha
+  if (is.null(mapping)) {
+    return(NULL)
+  }
+  alpha_var <- rlang::as_name(mapping)
+  fac_levels <- levels(factor(pl$data[[alpha_var]]))
+  scale_alpha_manual(values = setNames(rev((decay)^(seq_along(fac_levels)-1)), fac_levels))
+}
+
+
+#' @export
+sort_vars <- function(x, target) {
+  targets <- all.vars(target)
+  if (length(targets)!=0) {
+    x <- intersect(x, targets)
+    x[order(match(x, targets))]
+  } else {
+    x
+  }
+}
+
+
+#' @export
+modify_mapping <- function(plot_config, add_aes=NULL) {
+  aes_obj <- handle_flag_aes(plot_config)
+  aes_obj <- modifyList(aes_obj, add_aes)
+  if (! "tooltip" %in% names(plot_config$extra)) return(aes_obj)
+  vars_used <- unique(unlist(lapply(aes_obj, all.vars)))
+  data_id_var <-  all.vars(aes_obj$data_id)
+  vars_ordered <- c(data_id_var, setdiff(vars_used, data_id_var))
+  tooltip_expr <- rlang::parse_expr(
+    paste0(
+      "paste(",
+      paste(sprintf('\"%s: \", format(%s, digits=2, scientific=NA)', vars_ordered, vars_ordered), collapse = ', \"\\n\", '),
+      ", sep='')"
+    )
+  )
+  aes_obj$tooltip <- tooltip_expr
+  aes_obj
+}
+
+
+handle_flag_aes <- function(plot_config) {
+  aes_obj <- plot_config[[1]]
+  if ("fill" %in% names(aes_obj) || !"colour" %in% names(aes_obj)) return(aes_obj)
+  aes_obj <- as.list(aes_obj)  # make editable
+  colour_expr <- aes_obj$colour
+  aes_obj$fill <- colour_expr
+  if (!is.null(plot_config$extra$flag)) {
+    flag_expr <- plot_config$extra$flag
+    flag_true <- paste(all.vars(plot_config$extra$flag), collapse=",")
+    aes_obj$colour <- expr(factor(ifelse(!!flag_expr, !!flag_true, as.character(!!colour_expr)), levels=c(levels(!!colour_expr), !!flag_true)))
+    aes_obj$flag   <- NULL
+  }
+  do.call(aes, aes_obj)
+}
+
+
+#' @export
+get_colour_scales <- function(dds, mapping, flag_vars=character()) {
+  colour_by <- setdiff(all.vars(eval(mapping)$colour), flag_vars)
+  scale_out <- list()
+  if (length(flag_vars)!=0) {
+    scale_out$legend <- labs(colour=paste(flag_vars, collapse=","))
+  }
+  my_palette <- metadata(colData(dds))$palette$ggplot
+  if (length(colour_by) == 1 && colour_by %in% names(my_palette)) {
+    if (is.numeric(colData(dds)[[colour_by]])) {
+      pal_col <- my_palette[[colour_by]]
+      scale_out$colour <- scale_colour_gradient(low = pal_col[1], high = pal_col[2])
+    } else {
+      flag_true <- paste(flag_vars, collapse=",")
+      scale_out$colour <- scale_colour_manual(values = c(my_palette[[colour_by]], setNames("#000000", flag_true)))
+    }
+  }
+  fill_by <- all.vars(eval(mapping)$fill)
+  if (length(fill_by) == 1 && fill_by %in% names(my_palette)) {
+    if (is.numeric(colData(dds)[[fill_by]])) {
+      pal_col <- my_palette[[fill_by]]
+      scale_out$fill <- scale_fill_gradient(low = pal_col[1], high = pal_col[2])
+    } else {
+      scale_out$fill <- scale_fill_manual(values = my_palette[[fill_by]])
+    }
+  }
+  scale_out
+}
+
+#' @export
+height_scaler <- function(n, small, big, N) {
+  h <- small +(big-small)*(n-1)/(N-1)
+  min(h, big)
+}
+
+#' @export
+facet_wrapper <- function(mapping, default=aes(), ...) {
+  mapping <- modifyList(as.list( default), as.list(mapping))
+  if ("rows" %in% names(mapping) && "cols" %in% names(mapping)) {
+    facet_grid(
+      rows = vars(!!mapping$rows),
+      cols = vars(!!mapping$cols),
+      ...
+    )
+  } else if ("rows" %in% names(mapping) ) {
+    facet_grid(
+      rows = vars(!!mapping$rows),
+      ...
+    )
+  } else if ("cols" %in% names(mapping) ) {
+    facet_grid(
+      cols = vars(!!mapping$cols),
+      ...
+    )
+  } else if ("facets" %in% names(mapping)) {
+    facet_wrap(
+      facets = vars(!!mapping$facets),
+      ...
+    )
+  } else {
+    facet_null()
+  }
+}
+
+#' @export
+#TODO: This used to be used to cut down redundant heatmaps, but is too severe so isn't references anywhere
+distinct_formulae <- function(flist) {
+  keys <- lapply(flist, function(fml) c(
+    as.character(eval(fml[[2]])$y %||% "NULL"),
+    as_label(fml[[3]])
+  ))
+  first_of_kind <- !duplicated(do.call(rbind, keys))
+  names(flist)[first_of_kind]
+}
+
+
+adapt_hclust_param <- function(param, zero_by=NULL, singleton=FALSE) {
+  if (singleton) param@metric <- "euclidean"
+  metric <- param@metric %||% "default"
+  if (metric %in% c("pearson", "kendall", "spearman")) {
+    # Replace metric with a custom distfun
+    param@dist.fun <- function(x, method) {
+      as.dist(1 - cor(t(x), method = metric))
+    }
+    # Clear the metric slot since distfun is now used
+    param@metric <- NULL
+  }
+  if (!is.null(zero_by)) {
+    .zero_by <- outer(zero_by, zero_by, `==`)[lower.tri(matrix(FALSE, length(zero_by), length(zero_by)))]
+    if (!is.null(param@dist.fun)) {
+      if (!is.null(param@metric)) {
+        param@dist.fun <- function(x, method) {
+          tmp <- param@dist.fun(x, method=metric)
+          tmp[.zero_by] <- 0
+          tmp
+        }
+        param@metric <- NULL
+      } else {
+        param@dist.fun <- function(x, method) {
+          tmp <- param@dist.fun(x, method=method)
+          tmp[.zero_by] <- 0
+          tmp
+        }
+      }
+    } else{
+      if (!is.null(param@metric)) {
+        param@dist.fun <- function(x, method) {
+          tmp <- dist(x, method=metric)
+          tmp[.zero_by] <- 0
+          tmp
+        }
+        param@metric <- NULL
+      } else {
+        param@dist.fun <- function(x, method) {
+          tmp <- dist(x)
+          tmp[.zero_by] <- 0
+          tmp
+        }
+      }
+    }
+  }
+  return(param)
+}
+
+step_units <- function(n, size, unit="mm") {function(x) unit(stepfun(x=n, y=size)(x), unit=unit)}
+
+hmap_fn <- function(dds, mat, gene_clust, model_vars, plot_config, measure_name,  ...) {
+  if ("visible" %in% names(plot_config$extra)) {
+    vis_sample <- eval(plot_config$extra$visible, colDF(dds))
+  } else {
+    vis_sample <- TRUE
+  }
+  mat <- mat[, vis_sample, drop=FALSE]
+  dds <- dds[row.names(mat),vis_sample, drop=FALSE]
+  if (length(unique(dds$.influential))>1 & !".influential" %in% model_vars) {
+    model_vars <- c(model_vars, ".influential")
+  }
+  size_fit <- NULL
+  masked <- mat
+  mask <- all.vars(plot_config$extra$mask)[1]
+  if (!is.na(mask) && mask %in% assayNames(dds)) {
+    masked[assay(dds, mask)[row.names(masked), colnames(masked)]] <- NA
+  }
+  col_fn <- sym_colour(masked[,colData(dds)$.influential], mx=plot_config$extra$colour_saturates)
+  rheight <- unit(1, "mm")
+  rheight <- eval(plot_config$extra$row_height)
+  if (is.function(rheight)) rheight <- rheight(nrow(masked))
+  annotation_height <- NULL
+  annotation_height <- eval(plot_config$extra$annotation_row_height)
+  if (is.function(annotation_height)) annotation_height <- annotation_height(length(model_vars))
+  panel_hmap <- function(ind=TRUE, first, last, column_title, args) {
+    left_annotation <- NULL
+    if (plot_config$extra$cluster_unused_samples == "ignore") {
+      ind <- ind[dds$.influential_in_assay]
+    }
+    dds_subset <- dds[, ind]
+    # The sample-dendrogram should be calculated on the underlying more-raw data, not e.g. the row-scaled 
+    cluster_assay <- assay(dds_subset, plot_config$extra[["sample_clustering_assay"]])
+    if (plot_config$extra$cluster_unused_samples == "include") {
+      infl_ind_subset <- TRUE
+    } else {
+      infl_ind_subset <- dds_subset$.influential_in_assay %||% TRUE
+    }
+    N_infl <- length(cluster_assay[1,][infl_ind_subset])
+    if (N_infl<=1) { #Flip so as not to leave one or fewer samples in the tree
+      infl_ind_subset <- !infl_ind_subset 
+      N_infl <- length(cluster_assay[1,][infl_ind_subset])#update
+      if (N_infl <=1) infl_ind_subset <- TRUE #Still one or fewer, so bundle them together
+      N_infl <- length(cluster_assay[1,][infl_ind_subset])#update
+    }
+    if (N_infl >1 && "sample_clust" %in% names(plot_config$extra)) {
+      # Get the subset of data we're actually plotting
+      # cluster influential samples WITHIN this subset      
+      infl_cluster <- bluster::clusterRows(
+        t(cluster_assay[, infl_ind_subset, drop=FALSE]),
+        adapt_hclust_param(plot_config$extra$sample_clust, singleton=nrow(cluster_assay)==1), full=TRUE
+      )$objects$hclust
+      if (all(infl_ind_subset)) {
+        cluster_columns <- infl_cluster
+      } else {
+        dfun <- adapt_hclust_param(plot_config$extra$sample_clust, singleton=nrow(cluster_assay)==1)@dist.fun %||% dist
+        D <- as.matrix(dfun(t(cluster_assay), method = infl_cluster$dist.method))
+        # Extract distances: new samples (rows) to base samples (columns)
+        D_new <- D[!infl_ind_subset, infl_ind_subset, drop=FALSE]
+        D_among_new <- D[!infl_ind_subset, !infl_ind_subset, drop=FALSE]
+        # Insert non-influential samples into the dendrogram
+        cluster_columns <- insert_samples_into_dendrogram(
+          infl_cluster, 
+          D_new,
+          D_among_new,
+          infl_cluster$method,
+          column_names = colnames(cluster_assay)
+        )
+      }
+    } else {
+      cluster_columns <- FALSE
+    }
+    
+    defaults <- list(
+      matrix=masked[, ind, drop=FALSE],
+      column_title = column_title,
+      col = col_fn,
+      cluster_rows = if ("objects" %in% names(gene_clust)) gene_clust$objects$hclust else FALSE,
+      cluster_columns = cluster_columns,
+      heatmap_legend_param = list(direction = "horizontal"),
+      left_annotation=left_annotation,
+      row_split=gene_clust$cluster,
+      height= rheight *  nrow(masked),
+      top_annotation = ComplexHeatmap::HeatmapAnnotation(
+        df = as.data.frame(colData(dds))[ind, model_vars, drop=FALSE], 
+        col = metadata(colData(dds))$palette$Heatmap[model_vars],
+        annotation_height=annotation_height,
+        show_legend=FALSE,
+        show_annotation_name=last
+      ), 
+      show_heatmap_legend=first,
+      show_row_names = FALSE,
+      show_column_names = ncol(dds)<=12
+    )
+    row_behaviour <- plot_config$extra$sort %||% NA
+    if (row_behaviour %in% names(mcols(dds)$results)) {
+      defaults$row_order <- order(mcols(dds)$results[[row_behaviour]])
+      defaults$cluster_rows <- FALSE
+      defaults$row_split <- NULL
+      args$row_split <- NULL
+    }
+    if (row_behaviour %in% paste0("+", names(mcols(dds)$results))) {
+      defaults$row_dend_reorder <- mcols(dds)$results[[sub("^\\+", "", row_behaviour)]]
+    }
+    if (first) {
+      defaults$name <- measure_name
+      pre_size <- expand.grid(mat_row=c(10,20), anno_row=1:2)
+      pre_size$y <- 0.0
+      for (i in 1:nrow(pre_size)) {
+        tmp_args <- modifyList(defaults, args)
+        tmp_args$matrix <- tmp_args$matrix[rep(1, pre_size$mat_row[i]),]
+        tmp_args$height <- rheight * nrow(tmp_args$matrix)
+        tmp_args$row_split <- NULL
+        tmp_args$row_order <- NULL
+        tmp_args$row_dend_reorder <- NULL
+        tmp_args$cluster_rows <- FALSE
+        tmp_args$top_annotation <- ComplexHeatmap::HeatmapAnnotation(
+          df = as.data.frame(colData(dds))[ind, model_vars, drop=FALSE][,rep(1, pre_size$anno_row[i]),drop=FALSE], 
+          show_legend=FALSE,
+          show_annotation_name=last
+        )
+        hm <- do.call(ComplexHeatmap::Heatmap, tmp_args)
+        pdf(NULL)
+        ht_height = sum(component_height(draw(hm, heatmap_legend_side = "bottom"))) + unit(4, "mm")
+        dev.off()
+        pre_size$y[i] <- convertHeight(ht_height, "inch", valueOnly = TRUE)
+      }
+      size_fit <<- lm(y ~ mat_row + anno_row, data=pre_size)
+    }
+
+    structure(
+      do.call(ComplexHeatmap::Heatmap, modifyList(defaults, args)),
+      predicted_height= predict(size_fit,data.frame(mat_row=nrow(defaults$matrix), anno_row=length(model_vars)))
+    )
+  }
+  if ("cols" %in% names(plot_config$extra)) {
+    col_split <- rlang::eval_tidy(plot_config$extra$cols, colDF(dds))
+    splits <- split(seq_along(col_split), col_split)
+  } else {
+    splits <- list("Samples"=seq(length=ncol(dds)))
+  }
+  splits <- splits[lengths(splits) != 0]
+  pls <- mapply(panel_hmap,
+               ind=splits,
+               first=c(TRUE, rep(FALSE, length(splits)-1)),
+               last=c(rep(FALSE, length(splits)-1),TRUE),
+               column_title=names(splits),
+               args=list(list(...))
+               )
+}
+
+
+
+save_palettes <- function(ddsList) {
+  fname <- file.path(ddsList$params$staging, "colours.json")
+  con <- file(fname, "w")
+  palettes <- lapply(ddsList$sample_sets, function(dds) metadata(colData(dds$object))$palette$ggplot)
+  labels <- lapply(ddsList$sample_sets, function(dds) metadata(colData(dds$object))$labels)
+  varlabels <- lapply(ddsList$sample_sets, function(dds) metadata(colData(dds$object))$varlabels)
+  field_instances <- table(unlist(lapply(palettes, names)))
+  in_all <- names(field_instances)[field_instances==length(palettes)]
+  in_common <- sapply(
+    in_all,
+    function(f) {
+      all(sapply(palettes, function(p) {
+        all(p[[f]] == palettes[[1]][[f]])
+      }))
+    })
+
+  palette2json <- function(i, j, close="}") {
+    writeLines(paste0('    "',  j, '": {'), con=con)
+    if (is.null(names(palettes[[i]][[j]]))) {
+      cat(sprintf('      "Label" : "%s",\n      "Range" : ', j), file=con)
+      writeLines(
+        paste0(
+          '[',
+          paste0('"', palettes[[i]][[j]], '"', collapse=", "),
+          "]"),
+      con=con)
+    } else {
+      lbl <- varlabels[[i]][[j]] %||% j
+      writeLines(sprintf('      "Label" : "%s",\n      "Values" : {', lbl), con=con)
+      lbls <- setNames(names(palettes[[i]][[j]]), names(palettes[[i]][[j]]))
+      ind <- match(names(labels[[i]][[j]]), names(lbls))
+      lbls[ind] <- labels[[i]][[j]][ind]
+      writeLines(
+        paste(
+          sprintf('          "%s" : {"colour": "%s", "label": "%s"}',
+                  names(palettes[[i]][[j]]),
+                  palettes[[i]][[j]],
+                  lbls),
+          collapse=",\n"),
+        con=con
+      )
+      writeLines("      }", con=con)
+    }
+    writeLines(paste0("    ", close), con=con)
+  }
+  
+  writeLines('{ "all" : {', con=con)
+  for (j in in_all[in_common]) {
+    palette2json(i=1, j, close=ifelse(j==rev(in_all[in_common])[1], "}", "},"))
+  }
+  writeLines(c('},', '"variations": {'), con=con)
+
+  distinct <- setdiff(names(field_instances), in_all[in_common])
+  palettes <- lapply(palettes, "[", distinct)
+  palettes <- palettes[lengths(palettes)>0]
+  for (i in names(palettes)) {
+    writeLines(sprintf('"%s": {', i), con=con)
+    for (j in names(palettes[[i]])) {
+      palette2json(i, j, close=ifelse(j==rev(names(palettes[[i]])), "}", "},"))
+    }
+    writeLines(ifelse(i == rev(names(palettes))[1], "  }", "  },"), con=con)
+  }
+  writeLines(c("}", "}"), con=con)
+  close(con)
+}
+
+read_palettes <- function(ddsList, fname) {
+  if (!file.exists(fname)) return(ddsList)
+  user_pal <- rjson::fromJSON(file=fname)
+  for (dset in names(ddsList$sample_sets)) {
+    pal <- metadata(colData(ddsList$sample_sets[[dset]]$object))$palette$ggplot
+    for (field in names(pal)) {
+      if (dset %in% names(user_pal$variations) && field %in% names(user_pal$variations[[dset]] )) {
+        metadata(colData(ddsList$sample_sets[[dset]]$object))$varlabels[[field]] <- user_pal$variations[[dset]][[field]]$Label
+      } else {
+        metadata(colData(ddsList$sample_sets[[dset]]$object))$varlabels[[field]] <- user_pal$all[[field]]$Label
+      }
+      for (lev in names(pal[[field]])) {
+        ind <- which(names(user_pal$all[[field]]$Values)==lev)
+        if (length(ind)==0) next
+        val <- user_pal$all[[field]]$Values[[ind]]$colour
+        lbl <- user_pal$all[[field]]$Values[[ind]]$label
+        if (dset %in% names(user_pal$variations) && field %in% names(user_pal$variations[[dset]] )) {
+          ind <- which(names(user_pal$variations[[dset]]$Values[[field]])==lev)
+          if (length(ind)!=0) {
+            val <- user_pal$variations[[dset]][[field]]$Values[[ind]]$colour
+            lbl <- user_pal$variations[[dset]][[field]]$Values[[ind]]$label
+          }
+        }
+        ind <- which(names(metadata(colData(ddsList$sample_sets[[dset]]$object))$palette$ggplot[[field]])==lev)
+        metadata(colData(ddsList$sample_sets[[dset]]$object))$palette$ggplot[[field]][[ind]] <- val
+        metadata(colData(ddsList$sample_sets[[dset]]$object))$palette$Heatmap[[field]][[ind]] <- val
+        ind <- which(names(metadata(colData(ddsList$sample_sets[[dset]]$object))$labels[[field]])==lev)
+        metadata(colData(ddsList$sample_sets[[dset]]$object))$labels[[field]][[ind]] <- lbl
+      }
+      if (is.null(names(pal[[field]]))) {
+        val <- user_pal$all[[field]]$Range
+        if (dset %in% names(user_pal$variations) && field %in% names(user_pal$variations[[dset]] )) {
+          val <- user_pal$variations[[dset]][[field]]$Range
+        }
+        metadata(colData(ddsList$sample_sets[[dset]]$object))$palette$ggplot[[field]] <- val
+        attr(metadata(colData(ddsList$sample_sets[[dset]]$object))$palette$Heatmap[[field]], "colors") <- val
+      }
+    }
+  }
+  ddsList
+}
+  
+  
+
+#' Heatmap colour-scheme generator
+#'
+#' For each column in a dataframe, generate a sensible colour palette
+#' for each column
+#' @param df data.frame containing the covariates to be colour-encoded
+#' @param palette The baseline palette
+#' @return
+#' @author Gavin Kelly
+#' @export
+df2colorspace <- function(df, palette) {
+  pal <- RColorBrewer::brewer.pal(RColorBrewer::brewer.pal.info[palette, "maxcolors"], palette)
+  if (ncol(df)==0) return(list(Heatmap=list(), ggplot=list()))
+  df <- dplyr::mutate_if(as.data.frame(df), is.character, as.factor)
+  seq_cols <-c("Blues", "Greens", "Oranges", "Purples", "Reds")
+  dev_cols <- c("RdYlGn", "PuOr", "PRGn")
+  # Order factor columns by number of levels
+  is_fac <- sapply(df, is.factor)
+  fac_order <- order(sapply(df[, is_fac, drop = FALSE], nlevels))
+  # Reorder dataframe
+  df <- df[, c(which(is_fac)[fac_order], which(!is_fac)), drop = FALSE]
+  # for factors, zero-based starting index for colours
+  start_levels <- cumsum(c(0,sapply(df, nlevels)))[1:length(df)] 
+  is_num <- sapply(df, is.numeric)
+  centred <- sapply(df, function(x) is.numeric(x) && prod(sign(range(x, na.rm=TRUE))) == -1)
+  # for numerics, which seq palette shall we use for this factor
+  start_levels[is_num & !centred] <- (cumsum(is_num[is_num & !centred])-1) %% length(seq_cols) + 1
+  start_levels[is_num & centred] <- (cumsum(is_num[is_num & centred])-1) %% length(dev_cols) + 1
+  res <- list()
+  res$Heatmap <- purrr::map2(df, start_levels,
+                            function(column, start_level) {
+                              if (is.factor(column)) {
+                                setNames(pal[(seq(start_level, length=nlevels(column)) %% length(pal)) + 1],
+                                         levels(column))
+                              } else if (is.logical(column)) {
+                                setNames(pal[(seq(start_level, length=length(unique(column))) %% length(pal)) + 1],
+                                         unique(column))                  
+                              } else {
+                                rng <- range(column, na.rm=TRUE)
+                                if (prod(sign(rng)) == -1) {
+                                  my_cols <- RColorBrewer::brewer.pal(3, dev_cols[start_level])
+                                  circlize::colorRamp2(c(-max(abs(rng)), 0, max(abs(rng))), my_cols)
+                                } else {
+                                  my_cols <- RColorBrewer::brewer.pal(3, seq_cols[start_level])[-2]
+                                  if (length(unique(rng))==2) {
+                                    circlize::colorRamp2(rng, my_cols)
+                                  } else {
+                                    circlize::colorRamp2(rng-c(1,0), my_cols)
+                                  }
+                                }
+                              }
+                            }
+                            )
+  res$Heatmap$.influential_in_assay <-
+    res$Heatmap$.involved <- 
+      res$Heatmap$.influential <-
+        setNames(c("black", "white"), c(TRUE, FALSE))
+  res$ggplot <- purrr::map2(df, start_levels,
+                           function(column, start_level) {
+                             if (is.factor(column)) {
+                               setNames(pal[(seq(start_level, length=nlevels(column)) %% length(pal)) + 1],
+                                        levels(column))
+                             } else if (is.logical(column)) {
+                               setNames(pal[(seq(start_level, length=length(unique(column))) %% length(pal)) + 1],
+                                        unique(column))
+                             } else {
+                               rng <- range(column, na.rm=TRUE)
+                               if (prod(sign(rng)) == -1) {
+                                 RColorBrewer::brewer.pal(3, dev_cols[start_level])
+                               } else {
+                                 RColorBrewer::brewer.pal(3, seq_cols[start_level])[-2]
+                               }
+                             }
+                           }
+                           )
+  res$ggplot$.influential_in_assay <-
+    res$ggplot$.involved <- 
+      res$ggplot$.influential <-
+        setNames(c("black", "white"), c(TRUE, FALSE))
+  res
+}
+
+## in cases like e.g. aes(x=time, y=expression, colour=time, group=interaction(condition))
+## we don't want the line-colour to vary along the path, so
+babs_first <- function(x) x[1]
+
+transform_colour_min <- function(mapping) {
+  if (length(intersect(all.vars(mapping$x), all.vars(mapping$colour)))==0) {
+    return(mapping)
+  }
+  x_expr <- rlang::quo_get_expr(mapping$x)
+  if (!is.symbol(x_expr)) {
+    return(mapping)
+  }
+  x_var <- as.character(x_expr)
+  # Transform colour expression
+  col_quo  <- mapping$colour
+  col_expr <- rlang::quo_get_expr(col_quo)
+  replace_var_with_summary <- function(expr, var) {
+    if (rlang::is_quosure(expr)) {
+      inner <- rlang::quo_get_expr(expr)
+      env <- rlang::quo_get_env(expr)
+      new_inner <- replace_var_with_summary(inner, var)
+      return(rlang::new_quosure(new_inner, env))
+    }
+    if (is.symbol(expr) && as.character(expr) == var) {
+      return(call("babs_first", expr))
+    }
+    if (!is.call(expr)) {
+      return(expr)
+    }
+    fn <- expr[[1]]
+    old_args <- as.list(expr[-1])
+    new_args <- lapply(old_args, replace_var_with_summary, var = var)
+    as.call(c(list(fn), new_args))
+  }
+  new_expr <- replace_var_with_summary(col_expr, x_var)
+  # Rewrap with original environment
+  mapping$colour <- rlang::new_quosure(new_expr, rlang::quo_get_env(col_quo))
+  mapping
+}

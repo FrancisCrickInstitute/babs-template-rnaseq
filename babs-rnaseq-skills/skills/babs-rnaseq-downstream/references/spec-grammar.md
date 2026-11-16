@@ -1,0 +1,1136 @@
+---
+title: Spec-files for differential analysis
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Spec-files for differential analysis}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+author: Gavin Kelly
+---
+
+## Analysis Philosophy
+
+This is a wrapper round DESeq2 which standardises the process of
+generating `DESeq2::results` objects for a specifiable set of
+comparisons. Each comparison is done in the context of a model (a
+specification of what covariates need to be accounted for in
+predicting the expression of any transcript). And each model is
+formulated in a sample-set (which is usually all the samples, but can
+be changed to drop samples, or look at a stratum in an isolated way).
+
+There are three classes of input to the analysis pipeline: the raw
+count files; the experiment table; and an analysis specification. The
+count files should be stored in a folder
+`extdata/alignmentID/genes.results/` relative to the analysis home
+directory, where `alignmentID` is a freeform name that identifies the
+alignment settings and choices (so could just be 'nfcore', or a
+species name, or a version number of a reference ...).
+
+The experiment table is called `extdata/metadata_alignmentID.csv` (to
+match with the choice of the folder name above) and the first column
+should be called `ID` and identifies the sample that a row is
+describing, so if `extadata/nfcore/genes.results/A1.genes.results` is
+sample A1 that is a control, then `extdata/metadata_nfcore.csv` should
+start
+
+```
+ID,treatment,...
+A1,control,...
+```
+
+Other columns should be used to entirely describe the experimental
+state of the sample that might have an influence on expression. There
+is a convention that the first column _after_ `ID` which takes on
+unduplicated values throughout the rows is to be used as the sample
+label in plots (e.g. a `samplename` column 2.) If there is no such
+column, the `ID` column will be used.  In either case, the label will be
+shorn of any common prefix, so if the IDs are SAMP9999A1
+... SAMP999A10, and no other unduplicated column is stored, then the
+samples will be labelled 1...10).
+
+
+The plan as to what analyses are to be carried out is stored in
+a `.spec` file, and there can be as many of these as you want - so you
+could have an `overview.spec` file that tried out a handful of
+approaches, and a `publication.spec` that recorded the chosen
+approach. Each `.spec` file is in fact an R script (and so should be
+treated with as much caution, security-wise, as any other script), but
+is expected to be of a certain form, the first criterion is that it
+should start and end as follows:
+
+```{r, eval = FALSE}
+specification(
+...
+)
+```
+
+### Sample sets
+The highest level of any standardised analysis is a choice as to what
+samples are to be analysed together. Often this is trivial, and the
+only sensible analysis is to look at all the samples together. But
+even in the simplest experiment, it might be observed for example that
+one sample is an outlier and we'd like to examine the effect of
+omitting or retaining this sample. We can accomplish this easily:
+
+```{r, eval = FALSE}
+specification(
+  sample_sets =list( 
+    all = sample_set(
+      subset = TRUE,
+      name="All Samples",# an optional short name
+      description="All samples included in the analysis"# an optional longer description
+    ),
+    no_outlier=sample_set(
+    subset = sample_id != "id_of_bad_sample"
+    )
+  )
+)
+```
+
+So a collection of samples is called a `sample_set`, and we have two
+(a `list`) of them here. The `subset` expression of a sample\_set is
+evaluated in the context of the `colData`, so the first one always
+evaluates to `TRUE`, denoted that we include all samples; the second
+one evaluates to `FALSE` for a particular sample (assuming we have a
+sample\_id column in our `colData`), dropping that sample.
+
+Other reasons we may want to subset our samples into different
+configurations is: if there are two very different cohorts of samples
+where transcripts are likely to have substantially different noise
+profiles and we want to avoid contaminating one set of samples with
+the estimates of dispersion that hold for the other set. Of course it
+then becomes impossible to _statistically test_ between the two
+cohorts, but we can have a third set that still combines them:
+
+```{r, eval = FALSE}
+specification(
+  sample_sets =list( 
+    all = sample_set(
+      subset = TRUE
+    ),
+    tumour=sample_set(
+      subset = condition == "tumour"
+    ),
+    normal=sample_set(
+      subset = condition == "normal"
+    )
+
+  )
+)
+```
+
+It's possible for `sample_set`s to inherit subsets from the
+`specification` level.  We discuss this concept [later on](#cascade), but a simple
+example should suffice to illustrate how we can refine a 'global' subset:
+
+```{r, eval = FALSE}
+specification(
+  subset = ! sample_id %in% c("bad1","bad2"), # get rid of two samples that failed qc
+  sample_sets =list( 
+    all_good = sample_set(
+      ... # No need for a subset here
+    ),
+    tumour=sample_set(
+      subset = condition == "tumour" # this will get 'AND'ed with the top-level `subset`
+    ),
+    normal=sample_set(
+      subset = condition == "normal" # as will this.
+    )
+
+  )
+)
+```
+
+There's also a `influential_samples` field that takes the same form.
+This is to allow situations where you want to focus the statistical
+testing to a subset of samples but not limit the visualisations of the
+differential results to those samples. So in the above example, the
+differential heatmaps of the tumour samples wouldn't show the
+behaviour in the normals. Setting `subset = TRUE` and supplying the
+restriction of the test as `influential_samples = condition ==
+"tumour"` would visualise just the differential genes in the tumour
+subset (same number of genes/rows), but show their expression in all
+samples (larger number of samples/columns).  Samples excluded by an
+`influential_samples` predicate will __not__ play a role in any of the
+following:
+
+ - Contributing to the calculation of gene variance when selecting
+   variable genes for exploratory heatmaps and cluster centroids
+ - Calculating the gene:gene distances for the heatmaps
+ - Calculating the direction of the principal components
+ - Any part of the DESeq2 processing
+
+The conditions on which we `subset` must be defined in the experiment
+table. It is possible to transform some of the predictors (columns of
+`colData`) using the other main component of a `sample_set`, the
+`transform`:
+
+#### Transform
+
+Each specification can have a single `transform` which is a
+`dplyr::mutate` clause that will operate on the sample metadata (but
+with no need for the initial data object):
+
+```{r, eval = FALSE}
+specification(
+    transform=mutate(
+               treatement=relevel(factor(treatment), "control"),
+               patient_id=factor(patient_id),
+           number_of_visits=table(patient_id)[as.character(patient_id)],
+           .include=number_of_visits>1
+    ),...
+```
+
+Notice that we change/create various covariates within a single
+`mutate` - having multiple `transform`s is a mistake as only one will
+be applied.  As mentioned above, `subset` only operates on covariates
+prior to the transform being applied - if we want to utilise
+`transform`ed covariates in the subset, the special covariate
+`.include` should be generated in the `transform`, and the colData
+will be post-processed to only include samples for which that variable
+is `TRUE`.
+
+Also, each `sample_set` can have it's own `transform`. In this case,
+the individual `sample_set`'s version will take complete precedence:
+the global `transform` will not be applied at all to `sample_set`s
+with their own `transform`, and it will simply be used in
+`sample_set`s which don't have their own `transform`.
+
+
+#### Extra Assays
+
+In some situations it is necessary to add extra assays that represent
+additional pre-processing steps - for instance in strongly paired data
+(for example where each biological sample is split into, say,
+cytoplasmic and nuclear subsamples) it might be preferable to look at
+one of the pair normalised against it's pair-mate. This is purely for
+visualisation purposes: for differential analysis it is always worth
+sticking with the primary assay (counts). This can be achieved by a
+setting `extra_assays` in a dataset as a list of `extra_assay`
+calls:
+
+```
+  subset = ...,
+  extra_assays = list(
+      to_nuclear=extra_assay(
+      method="normalise", from="vst",
+      compartment="nuclear",
+      design=~compartment:treatment:replicate,
+      recentre=FALSE, rescale=FALSE)
+  ),
+  visualise = compartment != "nuclear",
+  ...
+```
+
+Currently there are only a few methods implemented. They all take a
+`from` argument that takes the name of the assay from which they are
+to be derived: if omitted it will be from the default assay. They also
+all take a `influential_samples` argument so that samples that no
+longer play a role (e.g. if they've been normalised away to 0) can be
+de-influenced.
+
+##### `normalise`
+
+`normalise` takes:
+
+ - a `design` argument that identifies the groups within which to
+normalise
+ - an assay `from` to use as the base assay
+ - other arguments set the baseline value against which everything in
+   a group (defined by the `design`) will be normalised to
+
+This clearly leaves, in the case above, the _nuclear_ samples normalised to
+themselves (so identically zero across all genes). To avoid this
+disrupting the visual picture, we have a third dataset-specific
+predicate `visualise` (alongside `subset` and `influential_samples`)
+that will remove these samples from plots (this is optional, but if
+you dislike seeing a primarily white set of columns in your heatmaps,
+this is the way to eradicate them.)
+
+##### `identity`
+
+The `method="identity"` allows us to create assays identical to the
+`from` assay, but allow us to have different sets of emphasis.
+
+##### `denoise`
+
+Takes a `design` formula argument: this defines experimental groups,
+and all samples within an experimental group will be set to the
+average expression profile in that group.
+
+##### `partial`
+
+Takes `design` and `reduced` formulae as arguments and produces
+partial residuals (ie regresses out the effects/terms that are
+mentioned in the `design` but omitted from the `reduced`. Also takes
+an optional `resids` argument to determine whether the residuals are
+added back in (default is `TRUE`).
+
+We'll see how to use the extra assays in the [plotting
+section](#profile-formulae). But a reminder: these extra assays are
+ignored in the differential testing, as the inferences and estimations
+are always done on the primary assay. You'll need to model the pairing
+explicitly.
+
+The extra assays accumulate, so you can have a later `to_T0` that
+could be generated `from="to_nulcear"`, for instance.
+
+### Models
+
+DESeq2 uses R's standard one-sided formulas to inform the analysis as
+to which predictors to use in fitting a negative-binomial model of
+expression counts. The `colData` slot should contain all the potential
+predictors, and the `design` slot of a DESeq2 object encodes a
+considered choice of which are relevant to the biological
+question. Obviously, if the question is to find which genes are
+differentially expressed between two treatments, then a predictor
+annotating which treatment a sample is subject to is necessary. But
+quite often there will be other covariates need to be accounted for,
+such as batch; or perhaps there's a subtler question of finding genes
+that respond differently to treatment depending on the genotype of the
+sample.
+
+We may want to consider alternative models, for instance whether or
+not to include a batch effect: if the batch effect is negligible we
+won't want to use up degrees of freedom (ie power) estimating it, but
+if it's substantial then we want to make our estimates more precise by
+accounting for it. So we allow, in any given sample_set, for there to
+be multiple models:
+
+```{r, eval = FALSE}
+specification(
+  sample_sets =list( 
+    all = sample_set(
+      subset = TRUE,
+      models = list(
+        accurate = model(
+          design = ~treatment + batch
+        ),
+        powerful = model(
+          design = ~treatment,
+      name = "Just Treatment",
+      description = "Account for treatment, ignore batch - if there is a batch effect it'll increase the noise, though"
+        )
+      )
+    )
+  )
+)
+```
+
+So once again the plural 'models' is a list of individual `model`
+objects, which for the moment we've just specified by their `design`,
+exactly as we would for a `DESeq` object. Once we have a model, we are
+then in a position to test the significance of contrasts (e.g.
+individual log fold-changes between conditions) and terms in the model
+(e.g whether batch effect is necessary or not):
+
+#### Universal models
+
+Sometimes all/some models should apply to all `sample_sets` in a spec
+file. To save typing, it's possible to elevate the models to the
+top-level within a `specification`, so for example:
+
+```{r, eval = FALSE}
+specification(
+  models = list(
+          powerful = model(
+          design = ~treatment
+        )
+  ),
+  sample_sets =list( 
+    all = sample_set(
+      subset = TRUE,
+      models = list(
+        accurate = model(
+          design = ~treatment + batch
+        ),
+      )
+    ),
+    batch1 = sample_set(
+      subset = batch=="B1"
+      )
+    )    
+  )
+)
+```
+
+will result in the `all` dataset having two models (the universal one
+from the top of the spec file, and a specific one), whereas the
+`batch` dataset will have only the universal one.
+
+There are other similar patterns for other parts of the spec file,
+that certain properties 'cascade' down to other parts of the hierarchy
+- see [here](#cascade) for a list of behaviours.
+
+### Comparisons
+
+DESeq2 has multiple ways of specifying a contrast. All of these are
+supported, and again as 'comparisons' is plural, we can have a list of
+them, and have the pipeline loop through all of them for the parent
+model:
+
+```{r, eval = FALSE}
+specification(
+  sample_sets =list( 
+    all = sample_set(
+      subset = TRUE,
+      models = list(
+        accurate = model(
+          design = ~treatment + batch,
+          comparisons = list(
+            comp1 = "treat_vs_ctrl",
+            comp2 = c("treatment", "treat", "ctrl"),
+            comp3 = list(c("treat_vs_ctrl"), c("vehicle_vs_ctrl"), listValues=c(1,-1))
+            comp4 = c(1,0,-0.5,-0.5),
+            comp5 = ~batch,
+        comp6 = comparison(c("treatment", "treat", "ctrl"), name="Treat-control", description="Treatment vs Control")
+          )
+        )
+      )
+    )
+  )
+)
+```
+
+So all of the traditional ways of specifying a contrast are
+represented, respectively:
+
+- by a single character, traditionally done in DESeq2 with
+  `results(..., name="treat_vs_ctrl")`
+  
+- A character triplet
+
+- A two-component list of characters indicating the numerator and
+  denominator (with possible `listValues` set)
+  
+- A numeric vector.
+
+- A formula specifying the `reduced` term for carrying out Anova via
+  a likelihood ratio test.
+
+You are referred to the DESeq2 reference manual for further
+details. They can also be wrapped in a `comparison` call, to add extra
+information about the comparison, that might get used in the report. But one
+advantage of our wrapper is that it allows a simple enumeration of
+complex comparisons using machinery from the `emmeans` package:
+
+#### Automatic comparison enumeration
+
+We often find ourselves copying a contrast multiple times, with slight
+changes to elicit comparisons between different conditions. For
+example if our samples have been subject to three different treatment
+regimes, and a control, so treatment={_control_, _vehicle_,
+_standard_, _novel\_treatment_}, and we wanted to compare everything to
+_control_, then we'd need to hand-write three comparisons. Instead we
+can now write
+
+```{r, eval = FALSE}
+specification(
+  sample_sets =list( 
+    all = sample_set(
+      subset = TRUE,
+      models = list(
+        accurate = model(
+          design = ~treatment + batch,
+          comparisons = list(
+            mult_comp(trt.vs.ctrl ~ treatment, ref="control")
+          )
+        )
+      )
+    )
+  )
+)
+```
+
+where the `trt.vs.ctrl` is a 'keyword' instructing as to which comparisons to
+carry out - in this case every value of `treatment` against the ones
+labelled "control". There are a number of other helpful keywords:
+
+- `revpairwise` is the most 'verbose', in that it will generate every
+  pair of comparisons, in this case there are six combinations, and it
+  can go up rapidly. Due to a slightly annoying convention, `pairwise`
+  choses an unintuitive ordering that would result in comparisons such
+  as 'control vs novel\_treatment' (and a positive fold change would mean
+  higher expression in the control than the novel treatment), and
+  `revpairwise` has the more conventional ordering of
+  'novel\_treatment vs control' and it's more intuitive positive log
+  fold-change indicating higher expression in the treated to the
+  control. This assumes the levels of the factor are given in the
+  conventional order of the previous paragraph.
+  
+- `consec` takes adjacent pairs along the levels, so again quite a
+  natural 'vehicle vs control', 'standard vs vehicle' and finally
+  'novel\_treatment vs standard'
+  
+- `trt.vs.ctrl` chooses one baseline (which we can select with an
+  additional `ref` argument, rather than having to `relevel` the data)
+  and compares everything else against it.
+  
+- `mean_chg` looks to see if splitting the levels at any particlar
+  point reveals a change between levels before vs after that
+  breakpoint, so amongst other things would test if the average of the
+  _vehicle_ and _control_ was different from the average of the
+  _standard_ and _novel_ treatment.
+  
+- `eff` tests whether each individual level is different from the
+  average of the remaining levels.
+
+These latter two still estimate the _standard error_ in the individual
+experimental groups, so the significance is still assessed relative to
+replicate variability. This is different from 'relabelling' the
+samples (via a `transform`) so that e.g. there was one group called
+"both controls" and another called "both treatments", where the
+standard error would include not only the 'true' replicate variability
+but also the discrepancy between the former experimental groups that
+have now been pooled.
+
+When we don't have an interaction term in our model, this is
+everything we'd ever need, as for example the difference between
+'novel\_treatment' and 'control' is by construction (of the model
+formula) independent of which batch we're in.
+
+The _keywords_ are inherited from the [emmeans
+package](https://rvlenth.github.io/emmeans/articles/AQuickStart.html),
+so that is a good place for extra background material on their
+meaning.
+
+One thing to note is that `emmeans` has a different way of handling
+continuous covariates, so to specifiy a test of difference of slopes,
+it's necessary to request that functionality by providing a `var`
+argument to the `mult_comp` call, e.g.:
+
+```{r, eval = FALSE}
+...
+#design= ~ Infection * time + Participant_in_infection:infection
+mult_comp(revpairwise ~ Infection, var="time")
+```
+
+is the correct formulation within the `mult_comp` framework to
+estimate the per-participant rate of change of expression over `time`,
+and then see if that differs between pairs of groups of patients that
+are distinguished by their `Infection`.
+
+#### Interaction terms
+
+When our model includes an interaction between two main effects, say
+between treatment and genotype, then the magnitude of difference
+between two treatments can depend on the genotype. This leads to two
+types of follow-up question: stratifying the data by one factor, and
+then examining the effect of the other factor in each individual
+stratum, or; examining the interaction itself, so looking to see if
+the magnitude of effect is different in one stratum than another.
+
+To make this more concrete for the genotype x treatment case, we could
+ask: which genes are responding to treatment in the KO; which genes
+are responding to treatment in the WT; which genes are differential
+between WT and KO in the untreated. These are all questions of the
+first type, and we can automatically generate their contrasts by:
+
+```{r, eval = FALSE}
+specification(
+  sample_sets =list( 
+    all = sample_set(
+      subset = TRUE,
+      models = list(
+        accurate = model(
+          design = ~treatment *  genotype,
+          comparisons = list(
+            mult_comp(revpairwise ~ treatment | genotype)
+            mult_comp(revpairwise ~ genotype  | treatment)
+          )
+        )
+      )
+    )
+  )
+)
+```
+
+so the `|` symbol is to be read as "stratified by" (or "conditioned
+on"). The first `mult_comp` is stratifying the genotype, and will
+generate the pairwise comparisons within treatment, separately for
+each different genotype. The second is the dual question: For each
+treatment, find the genes that are 'markers of genotype' within that
+treatment group.
+
+The second type of question, where we want to investigate a
+'difference of differences', is achieved by the following grammar:
+
+```{r, eval = FALSE}
+mult_comp(revpairwise ~ treatment + genotype, interaction=TRUE)
+```
+
+The terms on the right hand side of the formula enumerate the
+predictors we're concerned in, and the left hand side specifies the
+contrasts that are going to be considered (so any of the keywords from
+the previous section) - there needs to be just one, applied to all
+factors. If we omit the `interaction=TRUE` argument then it will
+enumerate all possible combinations of treatment and genotype, and
+then contrast every combination against every other combination -
+probably not what is wanted (e.g. treated KO vs untreated WT); keeping
+the `interaction=TRUE` term is more usual, and builds a contrast that
+represents the differences of differences, e.g. treatment effect in KO
+- treatment effect in WT (where treatment effect in KO is treated KO -
+untreated KO.)
+
+The above is probably quite intimidating, so please ask for help on
+this - I'll try to write something a bit more friendly.
+
+#### Caveat
+
+With the ease of testing so many hypotheses comes a risk of fishing
+the data, resulting in spurious statistical associations. Strictly
+speaking, anything beyond one comparison on the data requires a more
+conservative approach than is achieved even with the traditional
+control for FDR to account for the multiplicity of genes.
+
+The ideal situation is the tests are prespecified. If that is the
+case, then we should really run an anova to confirm that a change
+exists somewhere, and then do at most n-1 comparisons
+(where n is the number of levels in the factor of interest, so at most
+three comparisons for our four-treatment example) and choose
+transcripts where both the anova and contrast are significant. There's
+a further technical constraint that the comparisons should be
+independent but that is often ignored. If there are more comparisons
+of interest, then the p-values won't be controlled at the correct
+rate.
+
+Often, the ideal situation is not achieved, and an exploratory
+approach is requested. Being strict one should immediately correct for
+the abundance of hypotheses in this situation. Pragmatically and
+traditionally we neither adjust in this situation nor consider
+possible adjusting in the pre-specificied case - this means that the
+p-values aren't correctly calibrated, and one of the reasons why I
+discourage presenting them in any quantitative form as part of the
+results.
+
+Also remember the "Table Two Fallacy" - any inference made about
+non-randomly-allocated groups is an observational finding, and doesn't
+carry the same rigour as inferences where treatment was randomly
+allocated. Observations of associations can easily be spurious and
+non-causal.
+
+### Rank deficiency 
+
+One of the most common hurdles in complex designs is the
+rank-deficiency problem. The way the experiment has been described can
+result in the analysis struggling to identify an estimate for a
+particular experimental condition. This happens for one of three
+reasons:
+
+- The design has a fatal flaw. If all your treated samples are in one
+  batch, and all your control samples in another batch, you cannot
+  estimate the extent on how these individually influence expression.
+  
+- Some conditions have no samples. For example, in our genotype x
+  treatment experiment, we might not have a 'vehicle' treatment in one
+  of our genotypes.
+  
+- There is a nesting indicative of repeated measurements. Individuals
+  might have submitted multiple samples (perhaps a time-course), and
+  also be members of larger groups (their disease status, which is
+  assumed constant throughout the time-course).
+  
+The latter two are remediable through some tweaks to the inputs of
+DESeq2, the first will need the advice of a statistician to see if
+anything is recoverable and at what compromise.
+
+The 'missing condition' case is easily remedied by supplying the
+option `drop_unsupported_combinations=TRUE` to any _model_ you want
+this to apply to. The 'nesting' case normally requires a tweak to the
+way factors are coded, and we have made it easy to achieve this
+through a `transform` option to any _sample\_set_.  Both options are
+illustrated below. Note, it is important that there be only **one**
+`transform=mutate` component per sample_set (if you want to
+introduce/transform multiple derived covariates, then separate them by
+commas _within_ the `mutate` expression:
+
+```{r, eval = FALSE}
+specification(
+  sample_sets =list( 
+    all = sample_set(
+      subset = TRUE,
+      transform = mutate(unit = recode_within(unit, genotype),
+                         time = as.numeric(sub("^t", "", timepoint))),
+      models = list(
+        nested = model(
+          design = ~timepoint *  genotype + person:genotype,
+          comparisons = list(
+            mult_comp(revpairwise ~ timepoint + genotype, interaction=TRUE)
+          ),
+          drop_unsupported_combinations=TRUE
+        )
+      )
+    )
+  )
+)
+```
+
+The 'missing condition' case is achieved by just the one line; the
+nesting is more complex - we firstly have to have a 'unit' column in
+our `colData` that identifies which biological unit (person, animal,
+plate) a sample belongs to. Then the `transform` line calls a `recode_
+within` function that tells us that unit is nested within genotype
+here. And we alter the `design` in accordance with the DESeq2 vignette
+on within- and between- group comparisons.
+
+The `transform` statement can be used to adjust any of the `colData`
+columns in-line. It's a question of personal preference whether
+'mistakes' in the original experiment table should be fixed at source
+(which allows the scientist to review changes manually), or via a
+transformation specified in the spec file (which keeps an entirely
+faithful record of what is done).
+
+### Other functionality
+
+#### Plot profiles
+
+In the exploratory plots, we present heatmaps with  dendodrograms, PCA
+plots (both one and two dimensional), and average-expression plots
+(averaging rows grouped by heatmap similarity). Primarily
+these are of the normalised counts without any further processing, but
+there is a mechanism for removing the effect of known covariates prior
+to the calculation of variable genes (for heatmaps) and rotations (for
+PCs). This is useful in cases where the dominant transcriptional
+variation might be driven by "nuisance" covariates, such as batch or
+patient, and so the simply normalised plots focus on experimentally
+uninteresting features.
+
+This is **not** the same as looking at an unadjusted PCA plot,
+noticing that the main clusters appear to relate to batch, and the
+then noticing that, say, timepoint rather than treatment is
+determining the subclusters within the large clusters, and from this
+saying that timepoint is more "important" than treatment. That is a
+fallacy, as the original dimension reduction is looking in the "wrong"
+direction. Recalculating the PCs having removed the nuisance effect is
+more valid.
+
+By default, no additional plots are generated - this is a change from
+previous `qc_formulae` versious, because we were starting to see more
+complex designs where the default option (producing all colours x
+covariate plots) was becoming unmanageably verbose. Now it is
+necessary to add descriptions of the profiles to be plotted explicitly:
+
+```{r, eval = FALSE}
+    all = sample_set(
+      subset = TRUE,
+      models = list(
+        nested = model(
+          design = ~treatment * time + batch,
+          profile_plots = profile_plots(
+            profile_plot(aes(x=time, colour=batch, shape=treatment)),
+            profile_plot(aes(y=denuisance, x=time, colour=treatment)),
+            profile_plot(aes(y=vs_t0, x=time, colour=treatment))
+          )
+        )
+      )
+    )
+```
+
+Everything in the first (in the above - only) element of the
+`profile_plot` is an aesthetic mapping for any given plot. If `y` is
+omitted, it is assumed that data will be taken from the default assay,
+but if `y` is given, data will be taken from an assay defined by
+`extra_assays` (defined [here](#extra-assays))
+
+It is possible to customise plots by adding an `extra` argument to the
+`profile_plot` (this `extra` can also be defined at the model or
+dataset level, and apply to apply all plots below it in the dataset >
+model hierarchy).
+
+#### `extra` plot configuration
+
+We have a number of ways of tweaking the plots. Some of these apply to
+heatmaps, some to PCAs etc, but we list them below: they'll only get
+used in the relevant plot-type (e.g. the top variable genes count is
+irrelevant to a PCA). Here they are with their defaults, and a brief
+description:
+
+- `section = "all"`: which sections (exploratory/differential/all)
+should this plot be produced for 
+- `top_n_variable = 500`: top N features for generating the heatmap
+  (`Inf` gives you everything, but is intense!)
+- `gene_clust = bluster::HclustParam(cut.params = list(k = 12))`: The
+  gene clustering expression (look at the HclustParam docs)
+- `sample_clust= bluster::HclustParam(metric="pearson")`:
+  Sample-clustering (we extend the `metric` with the various flavours
+  of correlation as well)
+- `pc_weight = "equal weight"`: equal_weight/eigen (latter favours
+  early PCs) when working out which are the 'interesting' PCs
+  associated with experimental terms
+- `reduce_heuristic="drop1"`: again for PC assocation, the
+  model-selection method for seeing if a term is interesting
+- `sort_by=NULL`: an expression (so use `quote` or `~`) who's terms will determine the
+  design-driven sorting of columns of the heatmaps. This defaults to
+  the order that the terms in appear in the `model$variables`.
+- `visible=TRUE`: an expression that will be evaluated in the context
+  of the column-data of the dataset. If it evaluates to FALSE the
+  sample will not be plotted
+- `flag=NULL`: An extra 'aesthetic' used to draw attention to certain
+  samples. Where it evaluates to `TRUE`, the sample will be
+  highlighted (circle drawn around the PC projection, or an
+  black/white distinction on heatmaps) 
+- `expand_rows=NULL`: a name of an mcols column that will group
+  together naturally grouped features (e.g. guides/exons belonging to
+  the same gene)
+- `centre=TRUE`: Should the colour-scale in heatmaps be centred to
+  mean-per-row being white
+- `scale=TRUE`: Similarly should the dynamic colour range of each row
+  be constant
+- `colour_saturates=NULL`: A fixed radius for saturation of colour in
+  the heatmaps
+- `pc_x = 1`: Which component to treat as the horizontal PC
+- `pc_y = 2`: and which the vertical
+- `sample_clustering_assay=1`: Which assay to base the clustering on -
+  can be different from the one that is used to colour the dendrogram.
+- `row_height=step_units(n = c(20, 50, 500), size = c(4, 2, 0.5, 0.1),
+  unit = "mm")`: For the dendrogram, a way of handling differing
+  numbers of rows consistently. See the step_fun function in R.
+- `annotation_row_height = NULL`: Same as above but for annotation rows
+- `cluster_unused_samples="inject": inject/include/ignore - for
+  samples that are not tagged as influential, how do we put them in
+  the sampple-dendrogram (best place in the dendrogram of influential
+  samples; build the dendrogram with them, but don't use them to
+  determine variable features; don't show them at all in the heatmap).
+
+#### Clustering
+
+We use the `bluster` package to cluster samples and features in our
+heatmaps, via the `gene_clust` and `sample_clust` settings. The defaults are:
+
+```
+settings( ...
+  gene_clust     = bluster::HclustParam(cut.params = list(k = 12)),   ## When we need to chose clusters of genes, how many?
+  sample_clust   = bluster::HclustParam(metric="pearson"),...
+  )
+```
+
+The `k` there determines the number of feature clusters that a heatmap
+is broken into (which are then used in the profile-plots, so we'll be
+plotting e.g. 12 centroids).  The metric can be any `dist` metric, or
+`cor` method.
+
+
+#### Sample swaps
+
+If there have been a pair of samples swapped, this can be corrected in
+the spec file.
+
+```{r, eval = FALSE}
+    all = sample_set(
+      subset = TRUE,
+      swap=list("A"="B")
+```
+
+This will swap the _metadata_ of sample with ID `A` with that of
+sample ID `B`.  **Every** column of the metadata will be exchanged:
+this is generally what is required (remember that `ID` is what is used
+to connect the metadata to the correct quantified counts file):
+
+```
+ID Name Treatment Batch
+A  T1   Treated   B1
+B  C1   Control   B1
+```
+
+correctly becomes
+
+```
+ID Name Treatment Batch
+A  C1   Control   B1
+B  T1   Treated   B1
+```
+
+Tellings us that the contents of nfcore file `A.genes.results` are
+from a control sample from batch B1. But if somehow the swap had not
+affected the `Name`, and the situation that needed correcting was
+
+```
+ID Name Treatment Batch
+A  C1   Treated   B1
+B  T1   Control   B1
+```
+
+then you might want to consider fixing the anomaly manually (perhaps
+via a `mutate`) as swapping around that table will result in the
+somewhat confusingly "Named"
+
+```
+ID Name Treatment Batch
+A  T1   Control   B1
+B  C1   Treated   B1
+```
+
+(the correct association between A and "Control Batch 1" has been
+made, but the name is now "off" - unimportant for the analysis, but
+counter-intuitive).
+
+#### Technical Replicates
+
+Sometimes a scientist has done purely technical replicates. Ideally
+these should be concatenated at the nfcore level, but sometimes they
+get kept separate. We can correct for this in the spec file, for
+example:
+
+```{r, eval = FALSE}
+    all = sample_set(
+      subset = TRUE,
+      collapse=~treatment + biological_replicate + timepoint + batch,
+      ...
+```
+
+The collapse formula should identify the distinct experimental groups,
+so in the above formula we might expect that there are multiple
+samples (rows in the experiment_table) with the same values for each
+of those four variables; so there may be three rows with
+`treatment=control`, `biological_replicate=3`, `timepoint=7hr` and
+`batch=1` corresponding to three technical replicates. Ensure you have
+enough terms in your model to distinguish all experimental conditions
+and true replicates.
+
+Keeping technical replicates in (without a `collapse`) is almost
+always bad, as the standard errors are badly miscalculated.
+
+#### Normalisation strategies
+
+We can fine-tune which genes are analysed and which genes are used to
+calculate size factors:
+
+```{r, eval = FALSE}
+    all = sample_set(
+      subset = TRUE,
+      controlGenes=expression(grepl("^ercc", ID)),
+      subsetGenes=expression(symbol!=""),
+      ...
+```
+
+`controlGenes` and `subsetGenes` both take an R expression that should
+evaluate to a boolean of the featureData of the dataset
+(traditionally, `symbol` and `entrez` get set, and `ID` is my
+convention for accessing the row.names (probably the ensembl ID). The
+size factors are calculated on all rows that pass the controlGenes
+filter, and then the subset filter is applied to all the original rows
+(so one can calculate on the spike-ins, and then drop them out.)
+
+For `SummarizedExperiment` objects (e.g. proteomics or metabolomics
+analysis, but not _yet_ DESeq2 RNASeq analyses), we have the
+capability to stratify the normalisation process: adding a `strata = ~
+batch` to a `sample_set` definition will separately calculate the
+imputation and vst transformations for each stratum defined by the formula.
+
+#### External genelists
+
+If there are lists of _a priori_ interesting genes, the analysis can
+be informed of these via an additional csv file, the location of which
+is supplied with a line in the spec-file:
+
+```{r, eval = FALSE}
+  external_list="extdata/lists.csv"
+```
+
+This can either be an element of the `settings`, or the
+`specification` or any individual `sample_set`, and is expected to be of the form:
+
+
+|ID  | Comparison | Cluster |
+|----|------------|---------|
+|S1  | Pos Control|  C1     |
+|S2  | Pos Control|  C2     |
+|S3  | Pos Control|  C3     |
+|S4  | Public     |  C4     |
+|S5  | Public     |  C4     |
+
+`ID` needs to match up with the `row.names` of your assay,
+`Comparison` will determine which genes are grouped together in a plot
+(given the same colour in scatter plots; given their own plot in a
+heatmap or profile-plot), and the `Cluster` is only used in the
+profile plots: genes with the same Cluster within a Comparison will be
+averaged, to provide a single trace - if Cluster is omitted, each
+symbol will be plotted as its own singleton cluster.
+
+#### Imputation
+
+For `limma`-like analyses, (see [this vignette on running just the
+'differential' phase of the analysis](isolated.html) ), it is possible
+to define different imputation strategies:
+
+```{r, eval = FALSE}
+sample_set(...,
+    normalise = "vsn",
+    impute    = list(method="MinProb", q=0.01),
+    ...
+)
+```
+
+We will better document this shortly.
+
+
+### Settings
+
+Other than the overall modelling strategy, it's important to be able
+to tune the analysis by choosing the parameters behind the
+algorithms. It's possible to set any parameters that the core analysis
+script has made available to you through the `settings` top level
+option:
+
+```{r, eval = FALSE}
+specification(
+  sample_sets =list( 
+  ...
+  ),
+ settings=settings(     ## analysis parameters
+   alpha          = 0.05,    ## p-value cutoff
+   lfcThreshold   = 0,       ## abs lfc threshold
+   baseMeanMin    = 0,       ## discard transcripts with average normalised counts lower than this
+   top_n_variable = 500,     ## For PCA
+   showCategory   = 25,      ## For enrichment analyses
+   seed           = 1,       ## random seed gets set at start of script, just in case.
+   filterFun      = IHW::ihw ## NULL for standard DESeq2 results, otherwise  functions,
+   gene_clust     = bluster::HclustParam(cut.params = list(k=12))    )
+)
+```
+
+
+### Cascading properties of a spec file {#cascade}
+
+To save repeating oneself, there are various aspects of a spec file
+that will propagate down the `specificiation > sample_sets > models >
+comparisons` hierarchy.  We list the expected behaviour of those:
+
+ - `models` can be set at the top `specification` level, and will get pre-pended to any sample-set specific models.
+ - `subset` and `influential_samples`  can be set at the top `specification` level, and will get boolean-`AND`ed with sample-set specific subsets.
+ - `transform` can be set at the top `specification` level, and will only be used when sample-set doesn't specify its own transform
+ - `drop_unsupported_combinations` can be set at the `specification` and/or `sample_set` level, and will only be used when a model doesn't specify this directly.
+ - `drop_incomplete` can be set at the `specification` and/or `sample_set` level, and will only be used when a model doesn't specify this directly.
+ - `profile_plots` can be set at the `specification` and/or `sample_set` level, and will be added to those of any model-specific plot profiles
+ - `extra_assay`s can be set at the `specification` level, and will be added to any sample_set-specific ones.
+
+These are intended to 'do what I mean' for the most typical situations.
+
+### Less verbose specification
+
+Sometime the specfile can seem somewhat long-winded:
+
+```{r, eval = FALSE}
+specification(
+  sample_sets =list(
+    S1=sample_set(
+      models=list(
+       M1=model (
+         comparisons=list(
+	   c1 = comparison(
+	   ...
+```
+
+
+
+We can cut this down in three ways:
+
+#### Shortcuts for parent-list > child
+
+There are a set of functions `sample_sets`, `models`, `comparisons` which replace the whole `plurals=list(singular...`, so the above can become:
+
+```{r, eval = FALSE}
+specification(
+  sample_sets(
+    S1=sample_set(
+      models(
+       M1=model (
+         comparisons(
+	   c1 = comparison(
+```
+
+Using R's meta-programming capabilities, these expand to the same syntax as the original above, there's often no need to have the explicit `list`.
+
+#### Automatic wrapping of objects
+
+A further level of abbreviation allows us to say that any singular
+object (model, sample_set, comparison) that's not in a corresponding
+list (models, samples_sets, comparisons) - in either of the above
+syntaxes - should get wrapped in the corresponding 'plural list'
+wrapper. For example, here we have a singular `model` that isn't
+explicitly container in a `models` list, but the pipeline will now
+automically adjust for that, so the following is valid:
+
+```{r, eval = FALSE}
+specification(
+  sampleset(subset=TRUE,
+    model(design = ~1,
+      comparison(name="coef"
+```
+
+We can have multiple singletons, and give it/them short IDs to help identification:
+
+```{r, eval = FALSE}
+specification(
+  sampleset(subset=TRUE,
+    const=model(design = ~1,
+      comparison(name="coef"...
+    treat=model(design = ~treatment,
+      comparison(name="coef"...
+```
+
+
+
+#### Automatic nesting
+
+Sometime's we'll want, say, the same model fitted to each subset.  If
+a model is defined at the top of the specification (ie alongside,
+rather than within, a sample_set), then it will get added to all the
+sample_sets it sits alongside.
+
+
+```{r, eval = FALSE}
+specification(
+  sample_set(subset=TRUE),
+  sample_set(subset=!ID in c("outlier1","outlier2")),
+  model(design ~ treatment + batch)
+)
+  
+```
+
+will result in two sample_sets, each fitted with the same design.
+
+Similarly a comparison that is not within a model will be applied
+across the elements it is defined alongside:
+
+```{r, eval = FALSE}
+specification(
+  sample_set(subset=TRUE),
+  sample_set(subset=!ID in c("outlier1","outlier2")),
+  model(design ~ treatment + batch),
+  model(design ~ treatment)
+  comparison(mult_comp(revpairwise ~ treatment)
+)
+```
+
+will result in two sample_sets, each fitted with two models, and the
+comparison between treatments being applied to these four settings
+separetly. This is the same as the [cascading idea](#cascade)
+mentioned previously, but works particularly well in combination with the two other tricks.
+
+
+#### Availability of these helper functions
+
+The `plural(` shortcut notation for `plural=list(` is available for the
+following objects:
+
+ - `sample_sets`
+ - `models`
+ - `comparisons`
+ - `missingness`
+ - `feature_filters`
+ - `settings`
+ - `strata`
+ - `profile_plots`
+ - `extra_assays`
+
+basically, anywhere one used to type `plural=list(`!
+
+The automatic wrapping of singleton objects in their corresponding
+plurals is more limited to the primary specfile objects
+
+ - `sample_set`
+ - `model`
+ - `comparison`
+ - `extra_assay`
+ - `profile_plot`

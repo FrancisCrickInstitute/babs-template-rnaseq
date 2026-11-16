@@ -1,0 +1,763 @@
+---
+title: Exploratory analysis ${title}
+description: >-
+  Exploratory analysis of ${description}
+categories: [Exploratory]
+params:
+  section: Exploratory analysis
+---
+
+# Preface
+
+We load in all the necessary additional R packages, and set up some initial parameters.
+
+```{r}
+#| label: load-exp1
+#| output: false
+#| warning: false
+#| error: false
+
+library(tidyverse)       # Language
+library(devtools)
+library(openxlsx)        # IO
+library(ggrepel)         # General Vis.
+library(RColorBrewer)
+library(ComplexHeatmap)
+library(gt)
+library(DESeq2)          # Assay-specific
+library(PoiClaClu)
+library(rtracklayer)
+library(tximport)
+library(clusterProfiler)
+library(ReactomePA)
+library(GO.db)
+library(IHW)
+library(MSnbase)
+library(imputeLCMD)
+library(ggiraph)
+library(htmltools)
+
+source("R/plot.r", local = knitr::knit_global())
+source("R/dendrogram_insert.r", local = knitr::knit_global())
+source("R/markdown.r", local = knitr::knit_global())
+source("R/rnaseq.r", local = knitr::knit_global())
+source("R/partial.r", local = knitr::knit_global())
+source("R/helpers.r", local = knitr::knit_global())
+source("R/output.r", local = knitr::knit_global())
+if (file.exists("R/my-functions.r")) source("R/my-functions.r",  local = knitr::knit_global())
+
+set.seed(1)
+
+if (!isTRUE(getOption('knitr.in.progress'))) {
+  params <- load_params(choose_staging("01_exploratory"))
+}
+
+
+do_plot <- plot_tracker(params)
+
+knitr::opts_chunk$set(
+  warning=FALSE, error=TRUE, message=FALSE,
+  dev=c("ragg_png","cairo_pdf"), out.width="100%",
+  dev.args=list(ragg_png=list(scaling=1.5)),
+  fig.width=14, fig.height=10, fig.process=rename_with_tag(params),
+  results='asis'
+)
+
+theme_set(cowplot::theme_half_open(12) + cowplot::panel_border())
+
+```
+
+```{r}
+#| label: tbl-load-exp2
+#| tbl-cap: Context
+
+if (isTRUE(getOption('knitr.in.progress'))) {
+  gt(data.frame(Setting=names(params),
+                Value=unlist(params)))
+}
+
+```
+
+```{r}
+#| label: read-expl
+#| error: FALSE
+
+data(list=paste0("counts_", params$data_source))
+is_des <- inherits(dds, "DESeqDataSet")
+
+
+if (!is.null(metadata(dds)$organism$org)) {
+  library(metadata(dds)$organism$org, character.only=TRUE)
+}
+
+specs   <- load_specs(params, context=dds)
+data_source_params <- get_data_source_params(params$data_source)
+rowNoun <- data_source_params$rowNoun %||% "gene"
+RowNoun <- stringr::str_to_title(rowNoun)
+if ("missing" %in% names(data_source_params)) {
+  attr(rowNoun, "readout") <- "missingness"
+  attr(RowNoun, "readout") <- "Missingness"
+}
+
+```
+
+We also have the following defaults set.  Whenever they are used
+or changed in the analysis, that will be highlighted in the text
+in a table identified with an info icon.
+
+```{r}
+#| label: tbl-settings
+#| tbl-cap: Analysis Settings
+
+data.frame(
+  Option=names(specs$settings),
+  Value=sapply(specs$settings, function(s) attr(s, "src") %||% s %||% "NULL")
+) %>%
+  gt() %>%
+  as_raw_html()
+
+```
+
+```{r}
+#| label: do-settings
+
+# Calling the setter without a value will pick up the default (from the spec), _and_ alert it in the markdown, and return the default
+set.seed(specs$settings$seed)
+
+
+
+```
+
+```{r}
+#| label: tbl-create-ddsList
+#| tbl-cap: Feature Filtering
+
+ddsList <- build_dds_list(dds, specs)
+gt(summarise_filters(ddsList))
+ddsList <- leaf_modify(ddsList,
+                      function(leaf, layers) {
+                        leaf$object <- leaf$object[mcols(leaf$object)$filter$universal %||% TRUE, , drop=FALSE]
+                        leaf},
+                      layers="sample_sets")
+ddsList <- leaf_modify(ddsList,
+                      function(leaf, layers) {
+                        leaf$object <- sample_norm(leaf)
+                        leaf},
+                      layers="sample_sets")
+ddsList <- removeLow(ddsList)
+ddsList <- leaf_modify(ddsList,
+                      function(leaf, layers) {
+                        leaf$object <- add_extra_assays(leaf$object, leaf$extra_assays)
+                        leaf},
+                      layers="sample_sets")
+
+dtag <- dmc_factory(ddsList, type="dataset")
+mtag <- dmc_factory(ddsList, type="model")
+
+save(ddsList,
+     file=file.path("data",paste0("ddsList_", params$data_source, "_", params$spec, ".rda")))
+
+```
+
+::: {.content-visible unless-profile="concise"}
+
+# Input Summary
+
+The sample annotations are as follows:
+
+```{r}
+#| label: inputs-table
+#| column: page
+#| eval: !expr isFALSE(jsonlite::fromJSON(Sys.getenv("QUARTO_EXECUTE_INFO"))$format$metadata$concise)
+
+table_tracker(params)(sample_X_dataset_table(dds, ddsList), label="inputs", caption="Sample Annotation")
+```
+
+:::
+
+```{r}
+#| label: save-assay
+
+links <- list(
+  assays=list(),
+  clusters=list(),
+  pcs = list(),
+  expecteds=list()
+)
+
+anames <- unique(unlist(leaf_modify(
+  ddsList,
+  function(leaf, layers) {assayNames(leaf$object)}, layers="sample_sets")$sample_sets))
+if (is_des) anames <- c(anames, "norm")
+#anames <- intersect(anames, c("counts", "vst", "norm", "abundance", "imputed"))
+for (aname in anames) {
+  links$assays <- c(
+    links$assays,
+    write_assay(ddsList,
+                aname=aname,
+                params=params)
+  )
+}
+
+
+```
+
+# All Datasets and Models
+
+We may examine the samples in different combinations, and leave out
+certain samples (either entirely ignore them, or visualise them but
+not let them influence the analysis in any way.)
+
+::: {.content-visible unless-profile="concise"}
+
+In the above table, the columns under the 'In Subset' group indicate
+these combinations are listed, and the samples' inclusions are
+indicated. Below, we describe the datasets in terms of the predicates
+which determine which samples are included in them, and also the
+'influential' samples that determine: how the genes are clustered; how
+he principal components are calculated; and what samples are used in
+subsequent differential analysis.
+
+Usually we will use include all samples and they will all be
+'influential', but depending on the analysis question, it might be
+useful to completely ignore samples/experimental-groups entirely and
+from those select an influential subset that drive the analysis (the
+non-influential samples being retained in the visualisations and
+analysis for cross-reference, but which won't actively drive the
+analysis.)
+
+:::
+
+Each of those datasets may be inferentially analysed in
+potentially several ways, as formulated below. In simple 'A vs B'
+experiments there may only be one inferential approach, but as soon as
+we have a more complex structure different questions may demand a
+diversity of approaches, optionally: accounting for various
+covariates; stratifying the analysis by experimental factors; looking
+for the ways that one factor modifies the effect of another upon
+`{r}  noun_to_readout(rowNoun)`;... We use mathematical formulae to
+specify these approaches:
+
+```{r}
+#| label: formulae
+
+for (dataset in names(ddsList$sample_sets)) {
+  dmc_heading(ddsList, list(dataset=dataset), depth="##")
+  src2bullets(ddsList$sample_set[[dataset]], c("subset", "extra_assays", "influential_samples"))
+  mdls <- ddsList$sample_sets[[dataset]]$models
+  designs <- lapply(mdls[sapply(mdls, function(m) "comparisons" %in% names(m))], function(x) x$design)
+  for (mdl in names(designs)) {
+    dmc_heading(ddsList, list(dataset=dataset, model=mdl), depth="###", numbered=FALSE)
+    src2bullets(ddsList$sample_sets[[dataset]]$models[[mdl]], c("subset", "influential_samples", "extra_assays"))
+    cat("`",
+      Reduce(paste, sub("~", paste0(noun_to_readout(RowNoun)," ~ "), deparse(designs[[mdl]]))),
+      "`\n\n"
+        )
+  }
+}
+
+```
+
+::: {.content-visible unless-profile="concise"}
+
+# Description of Visualisations
+
+There are different ways of configuring the plots. These roughly
+divide into two choices:
+
+ - How to illustrate the covariates (treatments, batches, ...) in the
+   visualisations: in multi-factorial experiments, we may want to
+   represent one covariate in terms of colouring the point that
+   represents a sample. It might be obvious what these 'aesthetic'
+   choices should be, but conversely we may produce multiple 'plot
+   configurations' to illustrate different experimental factors.
+
+ - What to use as the 'outcome': typically we'll use the normalised
+   readout in heatmaps, or to generate principal components, but there
+   are situations where we might wish to 'normalise out' the effect
+   of, say, batch so that the true biology can come into focus. Or we
+   might wish to 'recentre' the data so that one particular
+   experimental group is seen as a baseline.
+
+At the beginning of each 'plot config' section we list the respective
+choice made for the plots in that section: the 'aesthetic' mapping
+describes how each aspect of the plot (colour, x-coordinate, shape,
+...)  reflects an aspect of the experimental desgin (e.g. treatment);
+and the 'reconstruction' (if present) states which experimental
+factors have been normalised out (e.g. `. - batch` indicates that the
+batch effect has been regressed out of visualisation).
+
+Now we give a brief introduction to each of the plot-types we show for
+each configuration.
+
+## Overall Heatmaps
+
+These visualisations are carried out blind to the experimental
+design. For the heatmap @fig-Heatmap-1, we select a subset of
+`{r} rowNoun`s removing the (assumed uninformative) `{r} rowNoun`s with flat `{r} noun_to_readout(rowNoun)`
+levels across the whole sample set. We'd expect samples from the same
+experimental group to cluster together, in the sense that they are on
+the same branch of the tree. But this is a transcriptome-wide picture,
+and even if the clustering is not perfect, there will still be `{r} rowNoun`s
+that are consistent with the expected `{r} noun_to_readout(rowNoun)` profiles, and they
+will be revealed in the differential analysis.
+
+The values of the covariates relevant to the dataset and model will be
+illustrated in the colour-bar above the heatmp. Influential samples
+(often defined as all the samples) will be identified similarly in the
+colourbar - the choice of "most variable genes" wil be based on their
+behaviour in the influential samples.
+
+In case that heatmap doesn't cluster exactly according to the
+experimental design, in @fig-HeatmapOrd-1, we provide the
+samples ordered according to one particular interpretation of the
+experimental design.  In simple (one-way) designs where there is only
+one covariate, this is a fairly straightforward way of gathering
+samples in a set of columns, but in more complex designs it isn't
+obvious whether to sort first by genotype and then treatment, say, or
+perhaps the reverse, so for this 'supervised' clustering we chose the
+(arbitrary) order the 'model' was specified, above.
+
+## Clustering centroids
+
+Based on the `{r} rowNoun`'s `{r} noun_to_readout(rowNoun)` in the
+influential samples, the dendrogram from the heatmap will be split
+into similarly behaving features. We can aggregate the `{r} noun_to_readout(rowNoun)`
+across those features and produce dot
+plots for each of the clusters. See, for example @fig-clustProfile-1
+
+## PC-Covariate assocation
+
+Principal Components are a way of finding a number of meta-`{r} rowNoun`s
+- proxies that best reconstruct the multi-dimensional `{r} noun_to_readout(rowNoun)`
+signal if we had to choose 1, 2,
+... individual numbers to represent a sample. In @fig-covar-1 the
+columns explore the lower-order principal components (which although
+not providing a universally strong signal transcriptome wide, might
+still detect biology that is affecting a smaller subset of `{r} rowNoun`s,
+or a reasonably large set of `{r} rowNoun`s to a lesser
+extent than happens in the higher-order PCS). The rows represent the
+experimental factors we have recorded, and the depth of colour of the
+cell records the degree of 'association' that factor has with the give
+PC (and grey says there was no statistically significant association.)
+This being an automated report, we've had to make various compromises
+so please don't read too much into this chart: it primarily guides
+which other plots we should generate to look at how samples associate
+with each other.
+
+## Principal Component Scatterplots
+
+Then come scatter plots of the first two
+Principal Components - a way of summarising all the `{r} rowNoun`s down to just
+two 'meta`{r} rowNoun`s' that attempt to encapsulate the variability across the
+samples in as faithful way as possible. Each plot
+(e.g. @fig-twopc-1) takes the PCs from the unadjusted data,
+and colours them according to the plot configuration under
+consideration.
+
+There's a slight complexity here in that we may need to
+produce two such plots to reveal all the information requested in a
+plot configuration: the configuration might requested the use of the
+horizontal position to represent an aspect of the experimental design,
+but this is needed to represent the first PC, so it may be necessary
+to generate a second plot representing the missing aspect as a colour
+in the chart.
+
+These plots are interactive - hovering over a point will bring up a
+tooltip listing all the experimental factors pertaining to that
+sample. Hovering will also select all other samples that share an
+attribute with that sample - the nominated attribute will be the first
+one listed in the tooltip.
+
+## Principal Component Dot-Plots
+
+We can choose to look closer at certain principal components that
+e.g. @fig-covar-1 leads us to believe are relevant to the experimental
+design. Just like the cluster dot-plots, we can take a single value as
+a representation of the sample and plot it, as in @fig-onepc-1, against the covariates
+according to the chosen plot configuration. Whereas in the cluster
+dotplot we equally-weighted various subsets of similar `{r} rowNoun`s,
+in the PC dotplots we aggregate all the `{r} rowNoun`s
+but chose a weighting scheme that captures as much of the
+multi-dimensionality as possible.
+
+:::
+
+```{r}
+#| label: fig-qc-visualisation
+
+first <- TRUE
+cluster_ind <- counter(post_fn=to_letter)
+pc_ind <-  counter(post_fn=to_letter)
+girafe_ind <- counter()
+
+for (dataset_id in names(ddsList$sample_sets)) {
+  dataset <- ddsList$sample_sets[[dataset_id]]
+  section_hierarchy <- list(dataset=dataset_id)
+  dmc_heading(ddsList, section_hierarchy, depth=strrep("#", length(section_hierarchy)))
+  src2bullets(dataset, c("subset", "extra_assays", "influential_samples"))
+  mdls <- Filter(function(m) {
+    !is.null(dataset$models[[m]]$profile_plots) && length(dataset$models[[m]]$profile_plots)>0 &&
+      length(get_in_section(dataset$models[[m]]$profile_plots, c("all", "exploratory"))) > 0},
+    names(dataset$models))
+  for (model_id in mdls) {
+    model <- dataset$models[[model_id]]
+    model_se <- dataset$object
+    design(model_se) <- model$design
+    section_hierarchy <- list(dataset=dataset_id, model=model_id)
+    plot_formulae <- get_in_section(model$profile_plots, c("all", "exploratory"))
+    model_vars <- sort_vars(
+      unique(c(all.vars(model$design),
+               unique(unlist(lapply(plot_formulae, function(x) c(
+                 unique(unlist(lapply(x[[1]], all.vars))),
+                 unique(unlist(lapply(x$extra, all.vars)))
+                )))))),
+      model$variables)
+    model_vars <- intersect(model_vars, names(colDF(model_se)))
+    dmc_heading(ddsList, section_hierarchy, depth=strrep("#", length(section_hierarchy)))
+    # Show an overall legend
+    #
+    # Save the expected values across the designs reference-grid
+    expected_assay <- partial_reconstruct(model_se, design(model_se), resids=FALSE)
+    links$expecteds <- c(links$expecteds, list(save_expected(expected_assay, params, section_hierarchy)))
+    ## Loop through plot configurations
+    for (plot_id in names(plot_formulae)) {
+      plot_config <- plot_formulae[[plot_id]]
+      plot_aes <- plot_config[[1]]
+      section_hierarchy <- list(dataset=dataset_id, model=model_id, plot_config=plot_id)
+      dmc_heading(ddsList, section_hierarchy, depth=strrep("#", length(section_hierarchy)), describe=NA)
+      cat('\n\n::: {.panel-tabset .unnumbered group="diffplot"}\n\n')
+      cat("\n\n", strrep("#", length(section_hierarchy)+1), " Details\n\n", sep="")
+      dmc_heading(ddsList, section_hierarchy, depth=strrep("#", length(section_hierarchy)+2), numbered=FALSE)
+      cat("\n\n", strrep("#", length(section_hierarchy)+1), " Legend\n\n", sep="")
+      if  (plot_id == names(plot_formulae)[1]) {
+        nice_legends <- separate_legend(model_se, model_vars)
+        pl <- do.call(gridExtra::arrangeGrob, c(
+          nice_legends,
+          ncol=ceiling(sqrt(length(nice_legends)))))
+        do_plot(pl,
+                label= "legend-a",
+                caption=paste("Metadata colour-codings for",dtag(dataset_id)),
+                plot_meta=section_hierarchy
+                )
+        legend_url <- do_plot()
+        legend_url <- if (length(legend_url)>0) legend_url[[length(legend_url)]]$png else ""
+      } else {
+        cat("\n![](", legend_url, ")\n", sep="")
+      }
+      # Make a plot se, with just the relevant assay
+      which_assay <- default_assay_name(plot_aes, model_se)
+      plot_se <- model_se
+      assays(plot_se) <- setFirstAssay(model_se, which_assay)
+      plot_se$.influential_in_assay <- (plot_se$.influential %||% TRUE) & (plot_se$.influential_in_assay[[which_assay]] %||% TRUE)
+      if (!is.null(plot_config$extra$sort_by)) {
+        sample_order <- reorder_samples(plot_se, all.vars(plot_config$extra$sort_by))
+      } else {
+        sample_order <- reorder_samples(plot_se, model_vars)
+      }
+      y_hint <- dataset$extra_assays[[which_assay]]$hint %||% which_assay
+      plot_se <- plot_se[mcols(plot_se)$filter$exploratory %||% TRUE, , drop=FALSE]
+      #
+      ## Heatmaps
+      cat("\n\n", strrep("#", length(section_hierarchy)+1), " Heatmap\n\n", sep="")
+      top <- order(
+        rowVars(assay(plot_se, plot_config$extra$sample_clustering_assay)[,plot_se$.influential_in_assay,drop=FALSE]),
+        decreasing = TRUE)[1:min(nrow(plot_se),plot_config$extra$top_n_variable)]
+      expander <- all.vars(plot_config$extra$expand_rows)
+      if (length(expander)==1) {
+        ## Use a 1:many mcols column to expand out the top rows?
+        n_per_top <- sapply(top, function(x) sum(mcols(plot_se)[[expander]] == mcols(plot_se)[[expander]][x]))
+        ind <- which(cumsum(n_per_top) >= length(top))[1]
+        top <- which(mcols(plot_se)[[expander]] %in% mcols(plot_se)[[expander]][top[1:ind]])
+      }
+      hmap_data <- assay(plot_se)[top, ]
+      colnames(hmap_data) <- rownames(colDF(plot_se))
+      do_labels <- nrow(colDF(plot_se)) < 10
+      gene_clust <- bluster::clusterRows(
+        hmap_data[,plot_se$.influential_in_assay],
+        adapt_hclust_param(plot_config$extra$gene_clust, zero_by=if (length(expander)==1) mcols(plot_se)[[expander]][top] else  NULL),
+        full=TRUE)
+      singletons <- which(table(gene_clust$clusters)==1)
+      ind <- match(singletons, gene_clust$clusters)
+      if (!any(names(gene_clust$clusters)[ind] %in% levels(gene_clust$clusters))) {
+        levels(gene_clust$clusters)[singletons] <- names(gene_clust$clusters)[ind]
+      }
+      this_clust <- cluster_ind()
+      gene_clust$clusters <- cluster_cardinality(gene_clust$clusters, this_clust)
+      cc <- cluster_calc(hmap_data, clusterID=gene_clust$clusters)
+      vis_sample <- eval( plot_config$extra$visible, colDF(plot_se))
+      do_scale <- eval(plot_config$extra$scale,colDF(plot_se))
+      do_centre <- eval(plot_config$extra$centre, colDF(plot_se))
+      if (is.logical(do_centre) && length(do_centre)==1 && do_centre) {
+        centre_txt <- "Centred "
+        hmap_data <- hmap_data - rowMeans(hmap_data[,plot_se$.influential_in_assay, drop=FALSE])
+      } else if (is.logical(do_centre) && any(do_centre)) {
+        centre_txt <- "Shifted "
+        hmap_data <- hmap_data - rowMeans(hmap_data[,plot_se$.influential_in_assay & do_centre, drop=FALSE])
+      }  else if (is_formula(do_centre)) {
+        grp <- as.integer(interaction(model.frame(do_scale, colData(plot_se)), drop=TRUE))
+        m <- do.call(cbind, tapply(seq_along(grp), grp, function(ic) rowMeans(hmap_data[,ic, drop=FALSE])))
+        hmap_data <- hmap_data - (m[,grp, drop=FALSE])
+        centre_txt <- "Group-centred "
+      } else {
+        centre_txt <- ""
+      }
+      if (is.logical(do_scale) && length(do_scale)==1 && do_scale) {
+        scale_txt <- "Scaled "
+        hmap_data <- hmap_data / sqrt(rowVars(hmap_data[,plot_se$.influential_in_assay, drop=FALSE]))
+      } else if (is.logical(do_scale) && any(do_scale)) {
+        scale_txt <- "Reference-group-scaled "
+        hmap_data <- hmap_data / sqrt(rowVars(hmap_data[,plot_se$.influential_in_assay & do_scale, drop=FALSE]))
+      }  else if (is_formula(do_scale)) {
+        grp <- as.integer(interaction(model.frame(do_scale, colData(plot_se)), drop=TRUE))
+        v <- do.call(cbind, tapply(seq_along(grp), grp, function(ic) rowVars(hmap_data[,ic,drop=FALSE])))
+        hmap_data <- hmap_data / sqrt(v[,grp, drop=FALSE])
+        scale_txt <- "Group-scaled "
+      } else {
+        scale_txt <- ""
+      }
+      if (plot_config$extra$sample_clust@metric %in% c("binary")) {
+        measure_name <- paste("Binary", noun_to_readout(RowNoun))
+      } else {
+        measure_name <- paste0(centre_txt, scale_txt, noun_to_readout(RowNoun))
+      }
+      measure_name <- paste(measure_name, y_hint)
+      my_caption <- paste0(measure_name, " in ",  dtag(dataset_id), metadata(plot_se)$removed)
+
+      #
+      ## Empirically column-ordered heatmap
+      pls <- hmap_fn(
+        dds=plot_se[,sample_order, drop=FALSE], mat=hmap_data[,sample_order, drop=FALSE],
+        row_split = if ("cut.params" %in% slotNames(plot_config$extra$gene_clust) && "k" %in% names(slot(plot_config$extra$gene_clust, "cut.params"))) slot(plot_config$extra$gene_clust, "cut.params")$k  else NULL,
+        gene_clust = gene_clust,
+        row_title = paste0(RowNoun, "s"),
+        model_vars = model_vars, plot_config =plot_config, measure_name =measure_name)
+      do_plot(Reduce(`+`, pls),
+              label= "Heatmap",
+              caption=my_caption,
+              height_opt=c(
+                paste0("#| fig-height: [", 1.5*attr(pls[[1]], "predicted_height"), ",", attr(pls[[1]], "predicted_height") ,"]"),
+                "#| out-height: 800px"),
+              preview=first,
+              plot_meta=section_hierarchy
+              )
+      first <- FALSE
+      #
+      ## Design-based column ordering of  heatmap
+      cat("\n\n---\n\n")
+      pls <- hmap_fn(dds=plot_se[,sample_order, drop=FALSE], mat=hmap_data[,sample_order, drop=FALSE], row_title = paste0(RowNoun, "s"),
+                    row_split = if ("cut.params" %in% slotNames(plot_config$extra$gene_clust) && "k" %in% names(slot(plot_config$extra$gene_clust, "cut.params"))) slot(plot_config$extra$gene_clust, "cut.params")$k  else NULL,
+                    gene_clust = gene_clust,
+                    model_vars = model_vars,
+                    plot_config = plot_config,
+                    measure_name = measure_name,
+                    cluster_columns = FALSE)
+      do_plot(Reduce(`+`, pls),
+              label= "HeatmapOrd",
+              caption=paste("Sorted", my_caption),
+              height_opt=c(
+                paste0("#| fig-height: [", 1.5*attr(pls[[1]], "predicted_height"), ",", attr(pls[[1]], "predicted_height") ,"]"),
+                "#| out-height: 800px"),
+              preview=first,
+              plot_meta=section_hierarchy
+              )
+      cat("\n\n---\n\n")
+      #
+      ## Feature-cluster aggregate profile plots
+
+      cat("\n\n", strrep("#", length(section_hierarchy)+1), " Profiles\n\n", sep="")
+      centroid_df <- cbind(cc, colDF(plot_se))[vis_sample,,drop=FALSE] %>%
+        pivot_longer(cols=any_of(names(cc)), names_to=".derived", values_to=".derived.value") %>%
+        mutate(.derived=factor(.derived, levels=names(cc)))
+      mapping <- modify_mapping(plot_config, aes(y=.derived.value))
+      flag_vars <- all.vars(plot_config$extra$flag)
+      colour_aes <- transform_colour_min(mapping)
+      orig_caption <- aes_caption(plot_aes)
+      pl <- ggplot(centroid_df, mapping) +
+        facet_wrapper(mapping, default=aes(facets = .derived), scales="free_y") +
+        geom_point_interactive(size = 3, shape = 21) +
+        labs(y=paste(noun_to_readout(RowNoun),y_hint))
+      if ("group" %in% names(mapping)) {
+        group_df <- cbind(cc, colDF(plot_se))[vis_sample,,drop=FALSE]  %>%
+          pivot_longer(cols=any_of(names(cc)), names_to=".derived", values_to=".derived.value") %>%
+          mutate(.derived=factor(.derived, levels=names(cc)))
+        pl <- pl +
+          geom_line(colour_aes, linewidth=0.25, alpha=0.2,
+                    stat="summary",
+                    fun=mean) +
+          geom_line(colour_aes, data=group_df, alpha=0.2,
+                    stat="summary",
+                    fun=mean)
+      }
+      pl <- pl + get_colour_scales(plot_se, mapping, flag_vars)
+
+      if ("ScaleDiscrete" %in% class(layer_scales(pl)$x)) {
+        pl <- pl + scale_x_discrete(guide=guide_axis(n.dodge=2))
+      }
+      capt <- paste0("Cluster profiles annotated with ", orig_caption, " in ", dtag(dataset_id), metadata(plot_se)$removed)
+      do_plot(pl,
+              label= "clustProfile",
+              caption=capt,
+              plot_meta=section_hierarchy)
+      links$clusters[[this_clust]] <- write_clusters(
+        clusters=gene_clust$clusters,
+        description=capt,
+        mcols=mcols(plot_se),
+        params=params,
+        hierarchy=section_hierarchy,
+        prefix="exploratory-clusters"
+      )
+
+      cat("\n\n---\n\n")
+      #
+      ## Two-dimensional PC plots
+      cat("\n\n", strrep("#", length(section_hierarchy)+1), " 2PC\n\n", sep="")
+      my_pc <- prcomp(
+        t(assay(plot_se)[,plot_se$.influential_in_assay]),
+        center = TRUE,
+        scale = FALSE)
+      proj <- predict(my_pc, newdata = t(assay(plot_se)))
+      this_pc <- pc_ind()
+      links$pcs[[this_pc]] <- write_proj(cbind(colDF(plot_se), proj), params=params, section_hierarchy, prefix="PC")
+      my_percent <- round(100 * my_pc$sdev^2/sum(my_pc$sdev^2))
+      pc.df <- cbind(colDF(plot_se),
+                    data.frame(
+                      PC1 = proj[, plot_config$extra$pc_x],
+                      PC2 = proj[, plot_config$extra$pc_y],
+                      sample = rownames(colDF(plot_se))))
+
+      aes_list <- substitute_x_aes(mapping, colour_as_fill=!"fill" %in% names(plot_aes))
+      for (this_aes in aes_list) {
+        pl <- ggplot(transform(pc.df[vis_sample,],.derived="", .derived.value=""),
+                    modifyList(this_aes, aes(x=PC1, y=PC2))) +
+          geom_point_interactive(size = 5, shape = 21) +
+          facet_wrapper(mapping, this_aes) +
+          xlab(paste0("PC ", plot_config$extra$pc_x, ": ", my_percent[plot_config$extra$pc_x], "% variance")) +
+          ylab(paste0("PC ", plot_config$extra$pc_y, ": ", my_percent[plot_config$extra$pc_y], "% variance"))
+        if (do_labels) {
+          pl <- pl + geom_text_repel(aes(label = sample))
+        }
+        pl <- pl + get_colour_scales(plot_se, this_aes, flag_vars)
+        cat("\n\n")
+        if (identical(this_aes,aes_list[[1]])) {
+          this_caption <- orig_caption
+        } else {
+          tmp <- plot_aes
+          tmp$colour <- tmp$x
+          this_caption <- aes_caption(tmp)
+        }
+        do_plot(pl,
+                label= "twopc",
+                caption=paste("Annotated by", this_caption, "in", dtag(dataset_id), metadata(plot_se)$removed),
+                plot_meta=section_hierarchy)
+        cat("\n\n")
+      } # Repeat if need to annotate by an overwritten 'x'
+      #
+      ## 1D PC plots
+      cat("\n\n", strrep("#", length(section_hierarchy)+1), " 1PC\n\n", sep="")
+      #Can use weights=my_pc$sdev^2/sum(my_pc$sdev^2) in the following line, if we want to de-emphasise low-order PCs
+      pc_weights <- if (plot_config$extra$pc_weight=="eigen") my_pc$sdev^2/sum(my_pc$sdev^2) else NULL
+      maxpc <- min(40, ncol(proj))
+      covar_x_pc <- mat_x_terms(proj[,1:maxpc], model$design, colDF(plot_se), weights=pc_weights[1:maxpc], type=plot_config$extra$reduce_heuristic)
+      pl <- ggplot(covar_x_pc, aes(x = column, y = Covariate, fill = Assoc)) +
+       geom_raster() +
+       facet_wrap(~wrap, scales = "free_x",ncol = 1)  +
+       scale_fill_gradient2(low = "#4575b4",mid = "grey90", high = "#d73027") +
+       theme(aspect.ratio = length(unique(covar_x_pc$Covariate))/min(20, ncol(pc)))
+      do_plot(pl,
+              label="covar",
+              caption=paste("Covariate association in", dtag(dataset_id), metadata(plot_se)$removed),
+              plot_meta=section_hierarchy
+              )
+      cat("\n\n---\n\n")
+      long_dat <- transform(extract_hits(covar_x_pc, proj[vis_sample,], colDF(plot_se)[vis_sample,, drop=FALSE]), .derived=PC, .derived.value=value)
+      pl <- ggplot(long_dat, modifyList(mapping, aes(y=.derived.value))) +
+        geom_point_interactive(size = 3, shape = 21) +
+        facet_wrapper(mapping, default=aes(facets = .derived), scales="free_y")
+      if ("group" %in% names(mapping)){
+        pl <- pl+geom_line(colour_aes, stat="summary", alpha=0.2,
+                          fun=mean)
+      }
+      if ("ScaleDiscrete" %in% class(layer_scales(pl)$x)) {
+        pl <- pl + scale_x_discrete(guide=guide_axis(n.dodge=2))
+      }
+      pl <- pl + get_colour_scales(plot_se, mapping, flag_vars)
+      do_plot(pl,
+              label= "onepc",
+              caption=paste("Annotated by", orig_caption, "in", dtag(dataset_id), metadata(plot_se)$removed),
+              plot_meta=section_hierarchy
+              )
+      cat("\n\n---\n\n")
+      cat(':::\n\n')
+    }   # next formula
+  }  # next model
+} # next dataset
+
+################################################################
+
+```
+
+# Downloads
+
+```{r}
+#| label: downloads
+
+link2sub <- list(
+  assays="Complete assay values",
+  expecteds="Experimental-group averages",
+  clusters="Cluster assignments",
+  pcs="PC projections"
+)
+
+dfs <- data.frame()
+for (i in names(link2sub)) {
+  cat("\n\n##", link2sub[[i]], "\n")
+  for (j in links[[i]]) {
+    cat("\n", j$link, "\n", sep="")
+    dfs <- dplyr::bind_rows(dfs, as.data.frame(
+      modifyList(
+        list(
+          file=j$fname,
+          section=params$section,
+          data_source=params$data_source,
+          plan=params$spec,
+          type=i),
+        modifyList(list(dataset=NA, model=NA, plot_config=NA, assay=NA), j$hierarchy))
+    ))
+  }
+}
+
+fname <- p2filename(params, prefix="manifest", suffix="txt")
+write.table(dfs, file=fname, row.names=FALSE, quote=FALSE, sep="\t")
+cat("\n<a class=\"download-excel btn btn-primary\" href=\"", attr(fname, "link"), "\">Manifest of all downloadable files</a>\n", sep="")
+
+plot_df <- dplyr::bind_rows(do_plot())
+saveRDS(plot_df, file = file.path("data", "exploratory_plots.rds"))
+ojs_define(plot_df = plot_df)
+
+```
+
+```{ojs}
+//| label: select-plot
+plot_rows=transpose(plot_df);
+viewof dataset=Inputs.select([...new Set(plot_rows.map(d => d.dataset))]);
+viewof model=Inputs.select([...new Set(plot_rows.map(d => d.model))]);
+viewof label=Inputs.select([...new Set(plot_rows.map(d => d.label))]);
+
+filtered = plot_rows.filter(function(row) {
+  return row.dataset==dataset && row.model==model && row.label==label;});
+
+html`<img src="${filtered[0].png}" style="max-width: 100%; height: auto;">`
+```
+
+# Terms Of Use
+
+The Crick has a [publication
+policy](https://intranet.crick.ac.uk/our-crick/library-information-services/pages/guidelines-publication)
+and we expect to be included on publications, regardless of funding
+arrangements. Any use of these results in publication must be
+discussed with BABS regarding authorship. If not authorship then
+the BABS analyst must receive a named acknowledgement. Please also
+cite the following sources which have enabled the analysis to be
+carried out.
+
