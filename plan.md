@@ -394,9 +394,11 @@ babs-rnaseq-skills/                          # new directory (or repo), nothing 
     deliberately broken spec with an unknown covariate; a request to add a
     comparison to an existing spec) and run them
     through an agent with the plugin installed, saving outputs per iteration.
-20. Compare against the Phase 0 reference with a script
-    (`scripts/compare-to-reference.sh`): same objects, same tables, same figure
-    set. Fix drivers until they match; the R code is never the thing fixed.
+20. Compare against the Phase 0 reference with
+    `babs-rnaseq-skills/tests/compare-to-reference.sh`: same objects, same
+    tables, same figure set. Fix drivers until they match; the R code is never
+    the thing fixed. The same script, driven by `tests/RUNBOOK.md`, is how the
+    test steps of Phases 2 to 7 are run.
 21. Have the statisticians review one full agent run and the SKILL.md texts
     (particularly what the agent is told to say about results).
 

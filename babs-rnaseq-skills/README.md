@@ -26,6 +26,10 @@ skills/
   rnaseq-differential/      summarise-differential.R, results-columns.md
   rnaseq-enrichment/        summarise-enrichment.R, reading-enrichment.md
   rnaseq-report/            build-site.sh, list-outputs.sh, loading-results.md
+tests/                      not used by the agent
+  compare-to-reference.sh   compare an analysis directory with the Phase 0 reference run
+  compare-objects.R         leaf-by-leaf comparison of the rds/rda/xlsx outputs
+  RUNBOOK.md                NEMO steps for testing each stage against the reference
 ```
 
 ## Prerequisites
