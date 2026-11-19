@@ -320,6 +320,29 @@ babs-rnaseq-skills/                          # new directory (or repo), nothing 
    `staging/_quarto.yml`; these are the specification for what the driver
    scripts must emit.
 
+**Phase 0 outcome (done 2026-11-19 on NEMO).** The reference lives in
+`/nemo/stp/babs/working/bootj/phase0-reference-20261119/`:
+`differential.tar.gz` (the whole `test/babs/differential` folder, without
+`renv/library` or any `.env.local*`/`.env.mk`), `nfcore.tar.gz`,
+`provenance.txt` and `phase0-determinism.txt`.
+
+- Template commit `43dfede` (main, `v1.17.0-30-g43dfede`), image
+  `bioconductor_docker:3.23-R-4.6.0-v1.14.0`, R 4.6.0, quarto 1.9.36.
+- Output files are stamped `v9.9.9-35d73cb1`, as `make test-differential`
+  sets `VERSION=v9.9.9`. `provenance.txt` says `VERSION=unreleased`, which was
+  read outside the test target; the archived file names are the truth.
+- Determinism: a second run in a fresh copy gave identical counts and
+  identical results for all 14 contrasts (`identical()` TRUE). The tsv/csv
+  tables matched once file names were paired across the two version stamps.
+- The archived `renv.lock` (md5 `98680fff…`) is not the repo's (md5
+  `097d8968…`). The run re-saved it after installing `org.Hs.eg.db` 3.23.1,
+  and `rlang` is 1.3.0 instead of the locked 1.2.0; the rest is
+  `Repository` field churn. Phase 8 compares against the archived lockfile,
+  not the repo's.
+- Consequence for Phase 8: skill runs will usually be stamped `unreleased`, so
+  `compare-to-reference.sh` must pair files with the version stamp removed and
+  ignore it inside `search.json` and the manifest.
+
 ### Phase 1: plugin skeleton and vendored assets
 4. Create `babs-rnaseq-skills/` with the layout in section 4; copy the files
    listed in design decision 1 verbatim; write `sync-check.sh` and run it.
