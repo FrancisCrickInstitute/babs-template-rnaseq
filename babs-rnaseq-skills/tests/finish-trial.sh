@@ -48,8 +48,23 @@ fi
 
 # ---- final message and timing (best effort: the format is internal)
 python3 - "$run" <<'PY'
-import json, os, sys, datetime
+# Kept to Python 3.6, the python3 on NEMO (no datetime.fromisoformat).
+import calendar, json, os, re, sys, time
 run = sys.argv[1]
+
+def iso_seconds(ts):
+    """'2026-11-25T12:00:05.123Z' (or +00:00) -> seconds since the epoch, UTC."""
+    m = re.match(r"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(\.\d+)?(Z|[+-]\d\d:?\d\d)?$", ts)
+    if not m:
+        return None
+    secs = calendar.timegm(time.strptime(m.group(1), "%Y-%m-%dT%H:%M:%S")) + float(m.group(2) or 0)
+    tz = m.group(3)
+    if tz and tz != "Z":
+        sign = 1 if tz[0] == "+" else -1
+        hh, mm = int(tz[1:3]), int(tz[-2:])
+        secs -= sign * (hh * 3600 + mm * 60)
+    return secs
+
 started = None
 try:
     started = int(open(f"{run}/started").read().strip())
@@ -73,10 +88,9 @@ for line in open(f"{run}/transcript.jsonl"):
         continue
     ts = m.get("timestamp")
     if isinstance(ts, str):
-        try:
-            times.append(datetime.datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp())
-        except ValueError:
-            pass
+        s = iso_seconds(ts)
+        if s is not None:
+            times.append(s)
     msg = m.get("message") if isinstance(m.get("message"), dict) else m
     if m.get("type") == "assistant" or msg.get("role") == "assistant":
         model = msg.get("model") or model
