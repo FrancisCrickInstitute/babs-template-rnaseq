@@ -3,6 +3,8 @@
 #  - rewrite resources/_dependencies.R so it ends with library(<org.db>) for
 #    every data source's org.db
 #  - renv activate / restore, then install the org.db packages (lock=TRUE)
+#  - restore again, so dependencies the org.db install upgraded go back to
+#    their locked versions (an addition to the makefile; see below)
 #  - commit renv.lock, renv/, .Rprofile, resources/, R/ ("Renv initialised by pipeline")
 #  - knitr::write_bib of every package in renv.lock -> extdata/R.bib
 #
@@ -44,6 +46,12 @@ for o in "${orgs[@]:-}"; do [[ -n "$o" ]] && echo "library($o)" >> resources/_de
 {
   babs_exec R -e 'library(renv); activate()'
   babs_exec R -e "library(renv); restore(); install(strsplit(\"${orgs_str}\", \" +\")[[1]], lock=TRUE)"
+  # Not in the makefile: install() takes the newest repository version of any
+  # dependency it (re)installs, and lock=TRUE records only the org.db packages,
+  # so the library can drift from renv.lock (seen: systemfonts 1.3.2 -> 1.3.4).
+  # A second restore() puts those dependencies back to their locked versions;
+  # the org.db packages are in the lockfile by now, so they stay.
+  babs_exec R -e 'library(renv); restore()'
 } 2>&1 | tee "$BABS_LOG_DIR/renv.log"
 
 git add renv.lock renv .Rprofile "$BABS_SOURCE_DIR" 2>/dev/null || true

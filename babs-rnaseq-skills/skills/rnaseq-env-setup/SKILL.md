@@ -41,9 +41,12 @@ home directory and packages are reinstalled on every call.
      user to set these; never type a token yourself.
 2. After `rnaseq-ingest/stage-inputs.sh` has written `extdata/<ds>.config`, run
    `PLUGIN/skills/rnaseq-env-setup/scripts/restore-renv.sh --dir ANALYSIS_DIR`.
-   This replicates the makefile `renv` target:
+   This replicates the makefile `renv` target, with one addition:
    - adds `library(<org.db>)` to `resources/_dependencies.R`
    - runs `renv::restore()`, then installs the org.db packages
+   - runs `renv::restore()` again (not in the makefile): installing the
+     org.db packages can upgrade a dependency past its locked version, and
+     this puts it back so the library matches `renv.lock`
    - commits ("Renv initialised by pipeline")
    - writes `extdata/R.bib`
 
