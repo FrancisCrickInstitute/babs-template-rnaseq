@@ -388,6 +388,20 @@ babs-rnaseq-skills/                          # new directory (or repo), nothing 
     opens with the index listing and the manifest downloads resolving.
 18. Write the orchestrator SKILL.md and its references (section 4.1).
 
+**Phases 2 to 7 test outcome (reports reviewed 2026-11-25).** Run on NEMO
+following `tests/RUNBOOK.md`, stamped `unreleased-944aef0c`. The full
+comparison after `build-site.sh` gave 40 pass, 1 fail, 1 skip: `counts`,
+`ddsList` and `analyse_x` identical, all 34 tsv/csv tables and all figure
+names identical, the same up/down counts for all 14 contrasts. Neither of the
+reported failures was a real difference, and both were fixed in the test
+scripts:
+- The Phase 4 to 6 per-page checks flagged figures and some tsv files as
+  missing because they sit under `staging/results/<VERSION>/` until
+  `build-site.sh` copies them across; the comparison now reads both folders.
+- The one xlsx failure was the `R Packages`/`R Details` session-info sheets
+  (render date, one package version, in line with the Phase 0 lockfile
+  drift); those sheets now give a WARN. The results sheets were identical.
+
 ### Phase 8: end-to-end agent trials
 19. Using the skill-creator workflow, write 3 to 4 test prompts (airway with the
     shipped spec; a two-factor spec from `example_docs/analyse.spec`; a

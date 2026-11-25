@@ -26,7 +26,8 @@
 # the stamps and the author block. Each check prints one line:
 #   PASS   identical after normalising the stamps
 #   FAIL   real difference, missing or unexpected file (details follow)
-#   WARN   difference that plan section 6 allows (author block), shown for review
+#   WARN   difference that plan section 6 allows (author block, the xlsx
+#          session-info sheets), shown for review
 #   SKIP   not applicable / not rendered yet
 # Exit status 1 if any FAIL.
 set -uo pipefail
@@ -160,13 +161,15 @@ run_r() { # stage
     case "$line" in
       *" SUMMARY "*)
         f="$(echo "$line" | awk '{print $1}')"
-        st=PASS; [[ "$line" == *"-> FAIL" ]] && st=FAIL
+        st=PASS
+        [[ "$line" == *"-> PASS (session info differs)" ]] && st=WARN
+        [[ "$line" == *"-> FAIL" ]] && st=FAIL
         say "$st" "$stage" "object $f" "$(echo "$line" | sed 's/.*SUMMARY *//; s/ -> .*//')"
         [[ -n "$buf" ]] && printf '%s' "$buf" | sed 's/^[^ ]* *//' | detail 40
         buf="" ;;
       *" MISSING reference file "*|*" MISSING run file "*)
         say FAIL "$stage" "object $(echo "$line" | awk '{print $1}')" "$(echo "$line" | sed 's/^[^ ]* *//')" ;;
-      *" DIFFERS "*|*" MISSING "*|*" EXTRA "*|*" EQUAL "*)
+      *" DIFFERS "*|*" MISSING "*|*" EXTRA "*|*" EQUAL "*|*" SESSION "*)
         buf+="$line"$'\n' ;;
     esac
   done <<<"$out"
@@ -183,32 +186,62 @@ rendered_html() { # page -> path of the run's html, or empty
   for f in "$run/staging/results/$RUN_V/$p.html" "$run/results/$RUN_V/$p.html"; do [[ -f "$f" ]] && { echo "$f"; return; }; done
 }
 
+# A page's outputs are split across two folders until build-site.sh runs:
+# quarto writes figures and the knitr-linked downloads under
+# staging/results/<VERSION>/<page>/, while the R code writes some tables and
+# the xlsx straight to results/<VERSION>/<page>/. build-site.sh then copies
+# the staging folder over results/ (`cp -R`), so staging wins on a clash.
+# The run's page folder is therefore the union of the two, staging first.
+run_page_dirs=()
+set_run_page_dirs() { # page
+  run_page_dirs=()
+  local d
+  for d in "$run/staging/results/$RUN_V/$1" "$run/results/$RUN_V/$1"; do [[ -d "$d" ]] && run_page_dirs+=("$d"); done
+}
+run_file() { # rel -> path in the run's page folder (staging first), or empty
+  local d
+  for d in ${run_page_dirs[@]+"${run_page_dirs[@]}"}; do [[ -f "$d/$1" ]] && { echo "$d/$1"; return; }; done
+}
+run_rel_files() { # find-args... -> relative paths across the run's page folders, de-duplicated
+  local d
+  for d in ${run_page_dirs[@]+"${run_page_dirs[@]}"}; do (cd "$d" && find . -type f "$@" | sed 's#^\./##'); done | LC_ALL=C sort -u
+}
+
 compare_page_folder() { # stage page
   local stage="$1" page="$2"
-  local rd="$ref/results/$REF_V/$page" ud="$run/results/$RUN_V/$page"
+  local rd="$ref/results/$REF_V/$page"
   if [[ ! -d "$rd" ]]; then say SKIP "$stage" "tables" "reference has no results folder for $page"; return; fi
-  [[ -d "$ud" ]] || { say FAIL "$stage" "tables" "missing folder ${ud#$run/}"; return; }
-  local f rel name mapped n_same=0 n_ver=0 bad=() figs_ref figs_run
+  set_run_page_dirs "$page"
+  [[ ${#run_page_dirs[@]} -gt 0 ]] || { say FAIL "$stage" "tables" "missing folder results/$RUN_V/$page (and staging/results/$RUN_V/$page)"; return; }
+  local where="" n_staging_only
+  n_staging_only=0
+  if [[ ! -f "$run/results/$RUN_V/index.html" && -d "$run/staging/results/$RUN_V/$page" ]]; then
+    n_staging_only="$(cd "$run/staging/results/$RUN_V/$page" && find . -type f | while IFS= read -r f; do [[ -f "$run/results/$RUN_V/$page/$f" ]] || echo x; done | grep -c . || true)"
+    [[ "$n_staging_only" -gt 0 ]] && where="; $n_staging_only file(s) read from staging/, build-site.sh not run yet"
+  fi
+  local f uf rel name mapped n_same=0 n_ver=0 bad=() figs_ref figs_run
+  local tables=( \( -name '*.tsv' -o -name '*.csv' -o -name '*.txt' -o -name '*.json' \) )
   # text tables
   while IFS= read -r f; do
     rel="${f#$rd/}"; name="$(basename "$rel")"
     [[ "$name" == manifest* ]] && continue   # per-page manifests are merged by build-site
     mapped="${rel//$REF_G/$RUN_G}"
-    if [[ ! -f "$ud/$mapped" ]]; then bad+=("MISSING  $mapped"); continue; fi
-    if cmp -s "$f" "$ud/$mapped"; then n_same=$((n_same+1))
-    elif diff -q <(norm ref < "$f") <(norm run < "$ud/$mapped") >/dev/null; then n_ver=$((n_ver+1))
+    uf="$(run_file "$mapped")"
+    if [[ -z "$uf" ]]; then bad+=("MISSING  $mapped"); continue; fi
+    if cmp -s "$f" "$uf"; then n_same=$((n_same+1))
+    elif diff -q <(norm ref < "$f") <(norm run < "$uf") >/dev/null; then n_ver=$((n_ver+1))
     else bad+=("DIFFERS  $rel"); fi
-  done < <(find "$rd" -type f \( -name '*.tsv' -o -name '*.csv' -o -name '*.txt' -o -name '*.json' \) | LC_ALL=C sort)
+  done < <(find "$rd" -type f "${tables[@]}" | LC_ALL=C sort)
   # files in the run with no reference counterpart
-  while IFS= read -r f; do
-    rel="${f#$ud/}"; name="$(basename "$rel")"
+  while IFS= read -r rel; do
+    name="$(basename "$rel")"
     [[ "$name" == manifest* ]] && continue
     mapped="${rel//$RUN_G/$REF_G}"
     [[ -f "$rd/$mapped" ]] || bad+=("EXTRA    $rel")
-  done < <(find "$ud" -type f \( -name '*.tsv' -o -name '*.csv' -o -name '*.txt' -o -name '*.json' \) | LC_ALL=C sort)
+  done < <(run_rel_files "${tables[@]}")
   local total=$((n_same+n_ver+${#bad[@]}))
   if [[ ${#bad[@]} -eq 0 ]]; then
-    say PASS "$stage" "tables" "$n_same identical, $n_ver identical apart from stamps"
+    say PASS "$stage" "tables" "$n_same identical, $n_ver identical apart from stamps$where"
   else
     say FAIL "$stage" "tables" "${#bad[@]} of $total not matching"
     printf '%s\n' "${bad[@]}" | detail 30
@@ -216,13 +249,14 @@ compare_page_folder() { # stage page
     for f in "${bad[@]}"; do
       [[ "$f" == DIFFERS* ]] || continue
       rel="${f#DIFFERS  }"
-      diff <(norm ref < "$rd/$rel") <(norm run < "$ud/${rel//$REF_G/$RUN_G}") | detail 10
+      diff <(norm ref < "$rd/$rel") <(norm run < "$(run_file "${rel//$REF_G/$RUN_G}")") | detail 10
       break
     done
   fi
   # figures: names only
-  figs_ref="$(cd "$rd" && find . -type f \( -name '*.png' -o -name '*.pdf' -o -name '*.svg' \) | norm ref | LC_ALL=C sort)"
-  figs_run="$(cd "$ud" && find . -type f \( -name '*.png' -o -name '*.pdf' -o -name '*.svg' \) | norm run | LC_ALL=C sort)"
+  local figs=( \( -name '*.png' -o -name '*.pdf' -o -name '*.svg' \) )
+  figs_ref="$(cd "$rd" && find . -type f "${figs[@]}" | sed 's#^\./##' | norm ref | LC_ALL=C sort)"
+  figs_run="$(run_rel_files "${figs[@]}" | norm run | LC_ALL=C sort)"
   if [[ "$figs_ref" == "$figs_run" ]]; then
     say PASS "$stage" "figure set" "$(echo -n "$figs_ref" | grep -c . | tr -d ' ') files, names only"
   else
@@ -231,7 +265,9 @@ compare_page_folder() { # stage page
   fi
   # spreadsheets go through the R comparison, sheet by sheet
   while IFS= read -r f; do
-    rel="${f#$rd/}"; queue_r "$f" "$ud/${rel//$REF_G/$RUN_G}"
+    rel="${f#$rd/}"; mapped="${rel//$REF_G/$RUN_G}"
+    uf="$(run_file "$mapped")"
+    queue_r "$f" "${uf:-$run/results/$RUN_V/$page/$mapped}"
   done < <(find "$rd" -type f -name '*.xlsx' | LC_ALL=C sort)
 }
 

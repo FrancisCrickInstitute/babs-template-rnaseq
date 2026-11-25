@@ -167,6 +167,12 @@ bash $PLUGIN/shared/scripts/run-r-helper.sh --dir $WORK $PLUGIN/skills/rnaseq-ex
 **Compare.** This covers `ddsList_GRCh38_analyse.rda`, the plot data object,
 every tsv and csv in the page folder, and the figure names.
 
+Until `build-site.sh` runs (Phase 7), a page's figures and some of its tsv
+files are only under `staging/results/<VERSION>/<page>/`; the R code writes
+the rest straight to `results/<VERSION>/<page>/`. The comparison reads both
+folders, so the per-page checks pass before the site is built, and the
+`tables` line says how many files it read from `staging/`.
+
 ```bash
 cmpref phase4-01_exploratory.txt --stage 01_exploratory
 ```
@@ -184,6 +190,12 @@ bash $PLUGIN/shared/scripts/run-r-helper.sh --dir $WORK $PLUGIN/skills/rnaseq-di
 **Compare.** This covers every comparison's results table in
 `analyse_x_GRCh38.rds`, including padj, shrunkLFC and class, and the xlsx
 workbook sheet by sheet.
+
+The workbook's `R Packages` and `R Details` sheets hold the R session info
+(render date, installed package versions), so they always differ from the
+reference. They give a WARN, not a FAIL, and list what differs, e.g.
+`rlang ondiskversion: 1.2.0 -> 1.3.0`. Any difference in a results sheet is
+still a FAIL.
 
 ```bash
 cmpref phase5-02_differential.txt --stage 02_differential

@@ -18,6 +18,11 @@
 #   DIFFERS   real difference (first line of all.equal() shown)
 #   MISSING   leaf in the reference but not in the run
 #   EXTRA     leaf in the run but not in the reference
+#   SESSION   the "R Packages" / "R Details" sheets of a write_results() xlsx
+#             differ. They hold sessioninfo::session_info() (render date,
+#             installed package versions), which plan section 6 allows to
+#             differ; the differing packages/settings are listed for review.
+#             The SUMMARY then ends "-> PASS (session info differs)".
 # Exit status 1 if anything is DIFFERS, MISSING or EXTRA.
 
 suppressPackageStartupMessages({
@@ -107,6 +112,26 @@ read_any <- function(f) {
   stop("don't know how to read ", f)
 }
 
+# Session-info sheets written by write_results() (shared/R/output.r).
+session_sheets <- c("/R Packages", "/R Details")
+# Describe how two session-info sheets differ: package versions or settings.
+session_diff <- function(a, b) {
+  if (!is.data.frame(a) || !is.data.frame(b)) return("not both tables")
+  key <- intersect(c("package", "setting"), intersect(names(a), names(b)))[1]
+  if (is.na(key)) return("sheet layout differs")
+  cols <- setdiff(intersect(names(a), names(b)), key)
+  m <- merge(a[c(key, cols)], b[c(key, cols)], by = key, all = TRUE, suffixes = c(".ref", ".run"))
+  out <- character()
+  for (r in seq_len(nrow(m))) {
+    d <- vapply(cols, function(cl) !identical(as.character(m[r, paste0(cl, ".ref")]), as.character(m[r, paste0(cl, ".run")])), logical(1))
+    if (!any(d)) next
+    cl <- cols[d][1]
+    out <- c(out, sprintf("%s %s: %s -> %s", m[r, key], cl, m[r, paste0(cl, ".ref")], m[r, paste0(cl, ".run")]))
+  }
+  if (!length(out)) return("formatting only")
+  paste(c(head(out, 6), if (length(out) > 6) sprintf("... and %d more", length(out) - 6)), collapse = "; ")
+}
+
 total_bad <- 0L
 for (i in seq(1, length(args), by = 2)) {
   rf <- args[i]; uf <- args[i + 1]
@@ -118,22 +143,29 @@ for (i in seq(1, length(args), by = 2)) {
   # sheet names in xlsx carry no stamp, but leaf paths might: normalise them too
   names(ref) <- normalise_chr(names(ref), ref_tok); names(run) <- normalise_chr(names(run), run_tok)
   paths <- union(names(ref), names(run))
-  n <- c(IDENTICAL = 0L, EQUAL = 0L, DIFFERS = 0L, MISSING = 0L, EXTRA = 0L)
+  is_xlsx <- tolower(tools::file_ext(uf)) == "xlsx"
+  n <- c(IDENTICAL = 0L, EQUAL = 0L, SESSION = 0L, DIFFERS = 0L, MISSING = 0L, EXTRA = 0L)
   for (p in paths) {
     if (!p %in% names(run)) { st <- "MISSING"; msg <- "" }
     else if (!p %in% names(ref)) { st <- "EXTRA"; msg <- "" }
     else if (identical(ref[[p]], run[[p]])) { st <- "IDENTICAL"; msg <- "" }
     else {
       ae <- tryCatch(all.equal(ref[[p]], run[[p]], check.attributes = TRUE), error = function(e) conditionMessage(e))
-      if (isTRUE(ae)) { st <- "EQUAL"; msg <- "" } else { st <- "DIFFERS"; msg <- paste(head(ae, 1), collapse = "") }
+      if (isTRUE(ae)) { st <- "EQUAL"; msg <- "" }
+      else if (is_xlsx && p %in% session_sheets) { st <- "SESSION"; msg <- session_diff(ref[[p]], run[[p]]) }
+      else { st <- "DIFFERS"; msg <- paste(head(ae, 1), collapse = "") }
     }
     n[[st]] <- n[[st]] + 1L
     if (st != "IDENTICAL") cat(sprintf("%-40s %-9s %s %s\n", label, st, p, msg))
   }
   bad <- n[["DIFFERS"]] + n[["MISSING"]] + n[["EXTRA"]]
   total_bad <- total_bad + bad
-  cat(sprintf("%-40s SUMMARY   %d leaves: %d identical, %d equal, %d differ, %d missing, %d extra -> %s\n",
-              label, length(paths), n[["IDENTICAL"]], n[["EQUAL"]], n[["DIFFERS"]], n[["MISSING"]], n[["EXTRA"]],
-              if (bad == 0) if (n[["EQUAL"]] == 0) "PASS" else "PASS (numerically equal)" else "FAIL"))
+  verdict <- if (bad > 0) "FAIL"
+             else if (n[["SESSION"]] > 0) "PASS (session info differs)"
+             else if (n[["EQUAL"]] > 0) "PASS (numerically equal)"
+             else "PASS"
+  cat(sprintf("%-40s SUMMARY   %d leaves: %d identical, %d equal, %d session, %d differ, %d missing, %d extra -> %s\n",
+              label, length(paths), n[["IDENTICAL"]], n[["EQUAL"]], n[["SESSION"]], n[["DIFFERS"]], n[["MISSING"]], n[["EXTRA"]],
+              verdict))
 }
 quit(status = if (total_bad > 0) 1L else 0L)
