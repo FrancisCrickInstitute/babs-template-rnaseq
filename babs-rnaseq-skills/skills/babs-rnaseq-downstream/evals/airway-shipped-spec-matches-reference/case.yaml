@@ -1,0 +1,17 @@
+schema_version: "1.1"
+name: airway-shipped-spec-matches-reference
+expected_outcome: |
+  The agent runs the whole downstream analysis on the airway data with the
+  shipped spec, using the plugin's scripts in the orchestrator's order:
+  check-env, init-workdir, discover/stage-inputs, validate-inputs,
+  restore-renv, then 00_init, 01_exploratory, 02_differential and
+  03_enrichment for GRCh38 x analyse, each after its parent, then
+  build-site. After each page it runs that stage's summariser and checks
+  the page log. It never edits R/ or resources/*.qmd. The analysis
+  directory matches the Phase 0 reference (compare-to-reference.sh --stage
+  all: no FAIL; the xlsx session-info WARN is expected). The final message
+  gives significant-gene counts that match the summariser output (for
+  example C1, treatment: 1528 up, 1860 down) and the path of
+  results/<VERSION>/index.html.
+context:
+  scaffold_script: place-files.sh

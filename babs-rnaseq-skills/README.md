@@ -20,6 +20,7 @@ shared/                     vendored, byte-identical copies of babs/differential
     run-r-helper.sh         run a read-only R summariser in the container
 skills/
   babs-rnaseq-downstream/   orchestrator: order, checkpoints, references (spec grammar, experiment table)
+    evals/                  Phase 8 agent test cases (prompt, expected outcome, graders, inputs)
   rnaseq-env-setup/         check-env.sh, restore-renv.sh
   rnaseq-ingest/            init-workdir.sh, discover-nfcore.sh, stage-inputs.sh, validate-inputs.sh, summarise-counts.R
   rnaseq-exploratory/       summarise-exploratory.R, reading-exploratory.md
@@ -29,7 +30,11 @@ skills/
 tests/                      not used by the agent
   compare-to-reference.sh   compare an analysis directory with the Phase 0 reference run
   compare-objects.R         leaf-by-leaf comparison of the rds/rda/xlsx outputs
-  RUNBOOK.md                NEMO steps for testing each stage against the reference
+  prepare-trial.sh          Phase 8: set up one eval case for a session in the VS Code extension
+  finish-trial.sh           Phase 8: collect that session's transcript and check the result
+  check-trial.sh            objective checks on what a trial left behind
+  check-results.R           match two runs' comparisons by their results, not their labels
+  RUNBOOK.md                NEMO steps for testing each stage against the reference, and the Phase 8 trials
 ```
 
 ## Prerequisites

@@ -1,0 +1,13 @@
+schema_version: "1.1"
+name: unknown-covariate-stops-before-render
+expected_outcome: |
+  analyse.spec here is the shipped airway spec with one typo: model M2 uses
+  cell_line in its design and comparison, but the experiment table column is
+  cellLine. validate-inputs.sh fails on it. The agent stops there, before
+  restore-renv.sh and before rendering any page, tells the user that
+  cell_line in model M2 is not a column of the experiment table (whose
+  columns are ID, cellLine, treatment), suggests changing it to cellLine, and
+  asks the user to confirm. It does not edit the spec or the experiment
+  table itself, and does not add a cell_line column.
+context:
+  scaffold_script: place-files.sh

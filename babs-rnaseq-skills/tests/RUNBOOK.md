@@ -1,8 +1,8 @@
-# Testing the plugin against the Phase 0 reference (plan Phases 2 to 7)
+# Testing the plugin against the Phase 0 reference (plan Phases 2 to 8)
 
 This runbook drives the plugin's scripts by hand on NEMO, page by page, on the
 airway data, and compares each stage with the frozen Phase 0 reference using
-`compare-to-reference.sh`. No agent is involved yet; that is Phase 8.
+`compare-to-reference.sh`. No agent is involved until Phase 8, at the end, which runs the eval cases through the Claude Code VS Code extension.
 
 Pass standard (plan section 6): identical data objects and tables once the
 version stamps are replaced by placeholders, the same set of figure names, and
@@ -274,3 +274,152 @@ tar czf $T/skills-test-reports.tgz -C $T reports && ls -l $T/skills-test-reports
 
 When every report is PASS, the plan's Phases 2 to 7 are complete, and the
 plugin README's "Tested" line becomes true.
+
+## Phase 8: agent trials (plan steps 19 and 20)
+
+Phases 2 to 7 ran the scripts by hand. Phase 8 gives a prompt to Claude Code
+with the plugin loaded and checks that the agent picks the right skills, runs
+them in the right order, stops when it should and reports results correctly.
+
+The trials run in the Claude Code extension for VS Code, connected to NEMO
+over Remote-SSH, because the `claude` CLI cannot be installed on NEMO. Each
+trial is three steps: `prepare-trial.sh` builds the trial folder, you run the
+session by hand in VS Code, and `finish-trial.sh` collects the result and
+checks it.
+
+The four cases live in `skills/babs-rnaseq-downstream/evals/`, one folder
+each, in the layout `claude plugin eval` and skill-creator read:
+
+| Case | What it tests | Rough time |
+|---|---|---|
+| `unknown-covariate-stops-before-render` | spec with `cell_line` for `cellLine` in M2: stop at validation, explain, don't fix it unasked | minutes |
+| `airway-shipped-spec-matches-reference` | full run with the shipped spec; must match the Phase 0 reference | as Phases 3-7 |
+| `airway-two-specs-renders-every-page` | two specs: seven pages, one site; the second spec's comparison is reference C1 reversed | longer |
+| `add-comparison-to-finished-run` | a spec edit the user asked for, on a copy of `$WORK`: re-render the chain, old results unchanged | as Phases 3-7 |
+
+Each case has `prompt.md` (what the user types), `case.yaml` (what a good
+result looks like, in prose), `graders/` (one checkable statement each) and
+`place-files.sh` (puts the inputs in the agent's folder).
+
+### Set up (once)
+
+Use the same shell set-up as section 0 (`PLUGIN`, `T`, `$T/.env.local`), in
+a terminal on the node where you ran Phases 2 to 7. Connect VS Code to that
+same node with Remote-SSH, so the agent's commands run where the container
+and `/flask` scratch are. Leave the finished `$WORK` from Phases 2 to 7 as it
+is: the add-comparison case copies it.
+
+**Make the trial copy of the plugin.** Preparing the first case does this.
+It writes `$T/trial-plugin/`, a local plugin marketplace that holds a copy of
+the plugin without `evals/` and `tests/`, so the agent cannot read the
+expected outcomes. Every later `prepare-trial.sh` refreshes that copy from
+`$PLUGIN`.
+
+```bash
+bash $PLUGIN/tests/prepare-trial.sh unknown-covariate-stops-before-render
+```
+
+**Install the plugin in the extension, once.** In the Claude Code panel in
+VS Code, type `/plugins`, open the **Marketplaces** tab, and add the local
+path that `echo $T/trial-plugin` prints. Then install `babs-rnaseq-skills`
+from the `babs-trials` marketplace with **Install for you**. The extension
+re-reads the plugin from that folder at the start of every session, so it
+never needs reinstalling. It is then available in every Claude session on
+NEMO; uninstall it from `/plugins` when Phase 8 is over.
+
+### Run a trial
+
+`prepare-trial.sh` creates `$T/trials/iteration-N/CASE/with_skill/outputs/`,
+puts the case's inputs there and prints what to do next. In that folder it
+also writes `.claude/settings.local.json`, which does two things:
+
+- lets the agent use Bash, Read, Edit, Write, Glob and Grep without asking,
+  so a long run does not stop for approvals;
+- adds a Stop hook that copies the session transcript to
+  `with_skill/transcript.jsonl` after every reply.
+
+The agent therefore runs commands unattended, but only from inside that
+scratch folder. If the extension still asks for approval for something, such
+as loading a skill, approve it.
+
+For each trial:
+
+1. Prepare it (the first case is already prepared by the set-up step):
+
+   ```bash
+   bash $PLUGIN/tests/prepare-trial.sh CASE
+   ```
+
+2. In VS Code, use **File > Open Folder...** to open the `with_skill/outputs`
+   folder it prints. Accept the **Trust this folder** prompt.
+3. Start a **new** Claude session in that window. `/plugins` should show
+   `babs-rnaseq-skills` enabled.
+4. Paste the prompt it printed (also in `with_skill/PROMPT.txt`), exactly
+   and with nothing added.
+5. Leave it alone. If it asks a question, reply only
+   "Please carry on with what you have." The exception is
+   `unknown-covariate-stops-before-render`, where a question is the expected
+   end: stop there. Keep VS Code connected and the computer awake until the
+   agent has finished; the long cases render pages for an hour or more.
+6. Collect and check the result:
+
+   ```bash
+   bash $PLUGIN/tests/finish-trial.sh CASE
+   ```
+
+Run the cases one at a time, the quick one first: `prepare-trial.sh`
+refreshes the shared plugin copy, and the cases share the renv cache.
+
+```bash
+bash $PLUGIN/tests/prepare-trial.sh airway-shipped-spec-matches-reference
+```
+
+```bash
+bash $PLUGIN/tests/prepare-trial.sh airway-two-specs-renders-every-page
+```
+
+```bash
+bash $PLUGIN/tests/prepare-trial.sh add-comparison-to-finished-run
+```
+
+After changing the skills, pull on NEMO and repeat with `--iteration 2` on
+both scripts, so the earlier runs are kept for comparison.
+
+### What each trial leaves
+
+In `$T/trials/iteration-N/CASE/`:
+
+- `eval_metadata.json`: the prompt and the grader statements.
+- `with_skill/transcript.jsonl`: every message and tool call. The step-order
+  and behaviour graders are judged from this. If the Stop hook did not run,
+  `finish-trial.sh` takes the newest session file for the trial folder from
+  `~/.claude/projects/`, or the file given with `--transcript FILE`.
+- `with_skill/final.md`: the agent's last reply. The transcript format is
+  internal to Claude Code, so if this says nothing was found, paste the last
+  reply into it by hand.
+- `with_skill/check.txt`: the objective checks from `check-trial.sh`
+  (vendored code and the plugin copy untouched, pages and VERSION, specs
+  unchanged or minimally edited, `compare-to-reference.sh` for the airway
+  cases, and `check-results.R`, which matches comparisons by their padj
+  rather than their labels).
+- `with_skill/timing.json`: duration, tokens and model, read from the
+  transcript (best effort).
+
+`check-trial.sh` can be re-run on its own:
+
+```bash
+bash $PLUGIN/tests/check-trial.sh --case CASE --run $T/trials/iteration-1/CASE/with_skill
+```
+
+### What to send back
+
+Everything except the analysis folders, which are large:
+
+```bash
+tar czf $T/trials-it1.tgz -C $T/trials --exclude='outputs' iteration-1 && ls -l $T/trials-it1.tgz
+```
+
+The transcripts and checks are graded against each case's `graders/`, and
+the results feed skill changes for the next iteration. The statisticians'
+review (plan step 21) uses one full run of
+`airway-shipped-spec-matches-reference`.

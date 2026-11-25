@@ -1,0 +1,23 @@
+schema_version: "1.1"
+name: airway-two-specs-renders-every-page
+expected_outcome: |
+  The agent stages both specs and renders every page the analysis needs:
+  00_init once for GRCh38, then 01_exploratory, 02_differential and
+  03_enrichment for each of the two specs, each after its parent, then
+  builds one site that lists all seven pages. treatment.spec is the
+  single-factor example from babs/docs/example_docs/analyse.spec adapted to
+  airway (Untreated as reference, cell line as a blocking term). The
+  example's two-factor interaction spec cannot be fitted on airway, because
+  no cell line x treatment combination is replicated.
+  The analyse pages still match the Phase 0 reference
+  (compare-to-reference.sh --spec analyse, stages inputs to 03_enrichment).
+  One exception is expected: data/exploratory_plots.rds is shared by both
+  specs' 01_exploratory pages, so it holds whichever spec was rendered last.
+  The treatment spec's single comparison is Dexamethasone minus Untreated
+  with the same model as reference C1 (~ treatment + cellLine), so it should
+  be reference C1 with the direction reversed: 1860 up, 1528 down, and the
+  same padj. If it is not, that is a finding to investigate before blaming
+  the skills. The final message reports each spec separately and says which
+  direction the treatment comparison runs.
+context:
+  scaffold_script: place-files.sh

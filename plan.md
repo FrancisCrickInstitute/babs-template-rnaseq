@@ -408,6 +408,18 @@ scripts:
     deliberately broken spec with an unknown covariate; a request to add a
     comparison to an existing spec) and run them
     through an agent with the plugin installed, saving outputs per iteration.
+    *Drafted 2026-11-25:* the four cases are in
+    `babs-rnaseq-skills/skills/babs-rnaseq-downstream/evals/`
+    (`airway-shipped-spec-matches-reference`,
+    `airway-two-specs-renders-every-page`,
+    `unknown-covariate-stops-before-render`,
+    `add-comparison-to-finished-run`), run on NEMO in the Claude Code VS Code extension (the CLI cannot be
+    installed there), set up by `tests/prepare-trial.sh` and collected and
+    checked by `tests/finish-trial.sh`; `tests/RUNBOOK.md` has the steps. The
+    two-factor case adapts the example's single-factor spec (Untreated as
+    reference, cell line as a blocking term). The example's interaction spec
+    cannot be fitted on airway, because no cell line x treatment cell is
+    replicated.
 20. Compare against the Phase 0 reference with
     `babs-rnaseq-skills/tests/compare-to-reference.sh`: same objects, same
     tables, same figure set. Fix drivers until they match; the R code is never

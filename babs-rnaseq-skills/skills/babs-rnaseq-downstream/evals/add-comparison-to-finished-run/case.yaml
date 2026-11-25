@@ -1,0 +1,20 @@
+schema_version: "1.1"
+name: add-comparison-to-finished-run
+expected_outcome: |
+  ./analysis is a copy of the finished Phases 2-7 run. The user asks for a
+  spec change, so the agent may edit the spec. It reads the spec grammar,
+  then adds one mult_comp to model M1's comparisons in
+  analysis/extdata/analyse.spec, comparing each cell line with N61311
+  (trt.vs.ctrl on cellLine with N61311 as the reference level), and changes
+  nothing else in the spec. Changing a tracked file changes VERSION, so it
+  re-renders from 00_init through 03_enrichment and rebuilds the site, all
+  under one VERSION. The new comparison has three contrasts, each a cell
+  line vs N61311. Each has the same padj as the matching pairwise contrast
+  in C2, so its up/down counts are the same with up and down swapped if
+  the direction is reversed. All existing comparisons give the same numbers
+  as before. Because comparisons are numbered in spec order, the old M2/M3
+  labels (C3.x, C4) shift by one, so they are matched by name. The final
+  message explains the new comparisons, that the later labels shifted, and
+  where the updated report is.
+context:
+  scaffold_script: place-files.sh
