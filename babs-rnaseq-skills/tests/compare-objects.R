@@ -115,11 +115,17 @@ read_any <- function(f) {
 # Session-info sheets written by write_results() (shared/R/output.r).
 session_sheets <- c("/R Packages", "/R Details")
 # Describe how two session-info sheets differ: package versions or settings.
+# Library locations (path, loadedpath, library) depend on where the analysis
+# folder lives, so they differ for every package and are not listed; version
+# columns are reported first so a real version change is what shows.
+session_ignore <- c("path", "loadedpath", "library")
+session_first <- c("ondiskversion", "loadedversion", "source", "value")
 session_diff <- function(a, b) {
   if (!is.data.frame(a) || !is.data.frame(b)) return("not both tables")
   key <- intersect(c("package", "setting"), intersect(names(a), names(b)))[1]
   if (is.na(key)) return("sheet layout differs")
-  cols <- setdiff(intersect(names(a), names(b)), key)
+  cols <- setdiff(intersect(names(a), names(b)), c(key, session_ignore))
+  cols <- c(intersect(session_first, cols), setdiff(cols, session_first))
   m <- merge(a[c(key, cols)], b[c(key, cols)], by = key, all = TRUE, suffixes = c(".ref", ".run"))
   out <- character()
   for (r in seq_len(nrow(m))) {
@@ -128,7 +134,7 @@ session_diff <- function(a, b) {
     cl <- cols[d][1]
     out <- c(out, sprintf("%s %s: %s -> %s", m[r, key], cl, m[r, paste0(cl, ".ref")], m[r, paste0(cl, ".run")]))
   }
-  if (!length(out)) return("formatting only")
+  if (!length(out)) return(if (any(names(a) %in% session_ignore)) "library paths only" else "formatting only")
   paste(c(head(out, 6), if (length(out) > 6) sprintf("... and %d more", length(out) - 6)), collapse = "; ")
 }
 
